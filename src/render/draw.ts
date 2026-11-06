@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { W, ctx, reduced } from '../core/dom';
 import { G, S } from '../core/state';
-import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, blit, blitSprite, bossFrames, dirOf, disc, px } from './sprites';
+import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
 import { CY, RI, RO, WANDS, isMod } from '../systems/deck';
 import { foBoss, foFloor } from '../systems/faceoff';
 import { drawPull } from '../systems/flow';
@@ -19,11 +19,19 @@ function arcDots(x,y,rad,fromA,toA,w,col){
   for(let a=fromA;a<toA;a+=st) c.fillRect(pr(x*K+Math.cos(a)*rr-w/2),pr(y*K+Math.sin(a)*rr-w/2),w,w);
 }
 export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)*K*R));c.fillStyle=col;for(let i=0;i<=n;i++)c.fillRect(pr((x0+(x1-x0)*i/n)*K),pr((y0+(y1-y0)*i/n)*K),w,w); }
+const nowS=()=>performance.now()/1000;
+/** What the wizard is doing: one-shots (hurt, cast) win over walk, which wins over idle. Returns [clip name, seconds into it]. */
+function wizardAction(P){ const t=nowS();
+  if(P.hurtAt!==undefined&&t-P.hurtAt<.55) return ['hurt',t-P.hurtAt];
+  if(P.castAt!==undefined&&t-P.castAt<.5) return ['cast',t-P.castAt];
+  return t-(P.moveAt??-9)<.15?['walk',t]:['idle',t]; }
+/** The frame to draw for a direction: the current clip if that clip exists, else idle, else the still pose. */
+function wizardFrame(set,rest,dir){ const [name,age]=G.P?wizardAction(G.P):['idle',nowS()], A=SPRITE_OVERRIDES.anim[set]; const clip=A[name]?.[dir]||A.idle?.[dir]; return clip?clipFrame(clip,age):rest; }
 /** facing: one of the 8 directions (south = towards the camera). Falls back to the procedural wizard if the art is missing. */
 function drawWizard(x,y,fade,facing='south'){
   const c=ctx; if(fade)c.globalAlpha=.4;
   const set=SPRITE_OVERRIDES.wizardDirs; let tip;
-  if(set) tip=blitSprite(c,set[facing],px(x),px(y)+8);          // feet 8 logical px below the hitbox centre
+  if(set) tip=blitSprite(c,wizardFrame('arena',set[facing],facing),px(x),px(y)+8);          // feet 8 logical px below the hitbox centre
   else { blit(c,px(x),px(y)-2,wizSprite()); tip={x:px(x)+6,y:px(y)-11}; }
   if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);blit(c,tip.x,tip.y,disc(w.c,1.5));}
   if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(tip.x-.25,tip.y-.25,.5,.5);}
@@ -31,7 +39,8 @@ function drawWizard(x,y,fade,facing='south'){
 }
 function drawPlayer(){
   const c=ctx, blink=G.P.inv>0&&Math.floor(S.t*14)%2===0;
-  if(S.fo&&G.fo){ if(blink)c.globalAlpha=.4; if(SPRITE_OVERRIDES.wizardBack) blitSprite(c,SPRITE_OVERRIDES.wizardBack,px(G.P.x),px(G.P.y)+28); else blit(c,px(G.P.x),px(G.P.y),foWiz()); c.globalAlpha=1; for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
+  if(Math.hypot(G.P.x-(G.P.lx??G.P.x),G.P.y-(G.P.ly??G.P.y))>.4) G.P.moveAt=nowS(); G.P.lx=G.P.x; G.P.ly=G.P.y;
+  if(S.fo&&G.fo){ if(blink)c.globalAlpha=.4; if(SPRITE_OVERRIDES.wizardBack) blitSprite(c,wizardFrame('large',SPRITE_OVERRIDES.wizardBack,'north'),px(G.P.x),px(G.P.y)+28); else blit(c,px(G.P.x),px(G.P.y),foWiz()); c.globalAlpha=1; for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
   if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink,G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north');
   if(G.P.shield>0&&!(G.P.shield<1&&Math.floor(S.t*10)%2)) arcDots(G.P.x,G.P.y,28,0,TAU,1,'#bfeaf2');
   for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); }

@@ -1,0 +1,65 @@
+{
+  "group_id": "1ec06aa2-cb9f-464f-86b3-1a5fc0c9f44a",
+  "states": [
+    {
+      "character": {
+        "id": "18f98419-69c1-4725-ba9f-cbd49df5c732",
+        "name": "Idle",
+        "prompt": "Raven Astrologer: an anthropomorphic black raven wizard with a hooded dark purple cloak with gold star and crescent-moon embroidery, tattered cape, gold medallion necklace, belt with a gold sun clasp, holding a tall golden astrolabe staff with a glowing violet orb. Palette: near-black, deep purple, burgundy, antique gold.",
+        "size": {
+          "width": 112,
+          "height": 112
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-11-06T08:20:23.933500+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "idle": {
+            "north": [
+              "Idle/animations/idle/north/frame_000.png",
+              "Idle/animations/idle/north/frame_001.png",
+              "Idle/animations/idle/north/frame_002.png",
+              "Idle/animations/idle/north/frame_003.png"
+            ]
+          },
+          "hurt": {
+            "north": [
+              "Idle/animations/hurt/north/frame_000.png",
+              "Idle/animations/hurt/north/frame_001.png",
+              "Idle/animations/hurt/north/frame_002.png",
+              "Idle/animations/hurt/north/frame_003.png",
+              "Idle/animations/hurt/north/frame_004.png",
+              "Idle/animations/hurt/north/frame_005.png"
+            ]
+          },
+          "cast": {
+            "north": [
+              "Idle/animations/cast/north/frame_000.png",
+              "Idle/animations/cast/north/frame_001.png",
+              "Idle/animations/cast/north/frame_002.png",
+              "Idle/animations/cast/north/frame_003.png",
+              "Idle/animations/cast/north/frame_004.png",
+              "Idle/animations/cast/north/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-06T08:55:00.602250"
+}

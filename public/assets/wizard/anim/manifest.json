@@ -1,0 +1,90 @@
+{
+ "arena": {
+  "cast": {
+   "fps": 12,
+   "loop": false,
+   "frames": 6,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
+  "hurt": {
+   "fps": 12,
+   "loop": false,
+   "frames": 6,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
+  "idle": {
+   "fps": 6,
+   "loop": true,
+   "frames": 4,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
+  "walk": {
+   "fps": 12,
+   "loop": true,
+   "frames": 6,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  }
+ },
+ "large": {
+  "cast": {
+   "fps": 12,
+   "loop": false,
+   "frames": 6,
+   "dirs": [
+    "north"
+   ]
+  },
+  "hurt": {
+   "fps": 12,
+   "loop": false,
+   "frames": 6,
+   "dirs": [
+    "north"
+   ]
+  },
+  "idle": {
+   "fps": 6,
+   "loop": true,
+   "frames": 4,
+   "dirs": [
+    "north"
+   ]
+  }
+ }
+}

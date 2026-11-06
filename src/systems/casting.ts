@@ -35,7 +35,7 @@ export function castSpell(i){
   if(S.mode!=='fight'||S.paused||!G.P.spells[i]||G.P.cd>0)return;
   const s=G.P.spells[i],c=spellCost(s); if(G.P.mana<c||G.P.beam)return; if(has(s,'blood')&&G.P.hp<=1){chestSay('Not enough blood','#ff9d94');return;}
   if(has(s,'blood')){G.P.hp--;burst(G.P.x,G.P.y,'#e0405a',12);} G.P.castGold=false; if(has(s,'gold')&&G.P.gold>=5){G.P.gold-=5;G.P.castGold=true;burst(G.P.x,G.P.y,'#ffd27a',8);}
-  G.P.mana-=c; if(hasGear('sage')){G.P.sageN++;if(G.P.sageN%3===0)G.P.mana+=c;} G.P.cd=.25; doCast(s,1); chestCast(); sfx.cast();
+  G.P.mana-=c; if(hasGear('sage')){G.P.sageN++;if(G.P.sageN%3===0)G.P.mana+=c;} G.P.cd=.25; doCast(s,1); chestCast(); sfx.cast(); G.P.castAt=performance.now()/1000;
 }
 export const has=(s,e)=>s.els.includes(e);
 function addSeeds(n,d){ for(let i=0;i<n;i++) G.seeds.push({x:G.P.x,y:G.P.y-14,vx:rnd(-170,170),vy:rnd(-220,-90),homing:true,d,life:4}); }

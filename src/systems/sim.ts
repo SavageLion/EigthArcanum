@@ -23,8 +23,8 @@ function clearNear(r){ G.shots=G.shots.filter(s=>{ if(Math.hypot(s.x-G.P.x,s.y-G
 export function hurt(){
   if(G.P.inv>0||S.mode!=='fight'||G.P.shield>0)return;
   if(!S.god&&hasGear('moon')&&!G.P.moonUsed){G.P.moonUsed=true;G.P.inv=1;burst(G.P.x,G.P.y,'#e6dcef',16);sfx.block();chestSay('Blocked by the locket','#e6dcef');return;}
-  if(S.god){S.hits++;G.P.inv=1.4;return;}
-  G.P.cleanFight=false; if(hasGear('blood'))G.P.mana=G.P.manaMax; G.P.hp-=isMod('tower')?2:1; if(hasWand('warding')&&G.P.hp>0){G.P.shield=2;G.P.shieldSpell=null;} S.hits++; G.P.inv=1.5; S.shake=reduced?0:8; S.flash=.28; sfx.hurt(); burst(G.P.x,G.P.y,'#ff7a6e',16); clearNear(90);
+  if(S.god){S.hits++;G.P.inv=1.4;G.P.hurtAt=performance.now()/1000;return;}
+  G.P.hurtAt=performance.now()/1000; G.P.cleanFight=false; if(hasGear('blood'))G.P.mana=G.P.manaMax; G.P.hp-=isMod('tower')?2:1; if(hasWand('warding')&&G.P.hp>0){G.P.shield=2;G.P.shieldSpell=null;} S.hits++; G.P.inv=1.5; S.shake=reduced?0:8; S.flash=.28; sfx.hurt(); burst(G.P.x,G.P.y,'#ff7a6e',16); clearNear(90);
   if(G.P.hp<=0) die();
 }
 

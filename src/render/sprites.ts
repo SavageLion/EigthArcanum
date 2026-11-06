@@ -13,11 +13,14 @@ export const LW=160, K=LW/W;
 export const DIRS=['east','south-east','south','south-west','west','north-west','north','north-east'];
 export const dirOf=(ang:number)=>DIRS[((Math.round(ang/(Math.PI/4))%8)+8)%8];
 
-/** A Pixel Lab image plus where its visible pixels sit (physical px), and where the staff orb is. */
-export type Sprite={img:HTMLImageElement,bx:number,by:number,bw:number,bh:number,tipx:number,tipy:number};
-export const SPRITE_OVERRIDES:{boss:Record<number,any>,wizardDirs:Record<string,Sprite>|null,wizardBack:Sprite|null,wizardFront:Sprite|null}={boss:{},wizardDirs:null,wizardBack:null,wizardFront:null};
+/** A Pixel Lab image, where the feet sit relative to the image centre (ax,ay, physical px) and where the staff orb is. */
+export type Sprite={img:HTMLImageElement,ax:number,ay:number,tipx:number,tipy:number};
+export type Clip={fps:number,loop:boolean,frames:Sprite[]};
+export type ClipSet=Record<string,Record<string,Clip>>;   // anim name -> direction -> clip
+export const SPRITE_OVERRIDES:{boss:Record<number,any>,wizardDirs:Record<string,Sprite>|null,wizardBack:Sprite|null,wizardFront:Sprite|null,anim:{arena:ClipSet,large:ClipSet}}={boss:{},wizardDirs:null,wizardBack:null,wizardFront:null,anim:{arena:{},large:{}}};
 
-function analyse(img:HTMLImageElement):Sprite{
+/** rest = the still pose of the same direction: animation frames reuse its foot anchor so they bob instead of jitter. */
+function analyse(img:HTMLImageElement,rest?:Sprite):Sprite{
   (img as any).hi=true;
   const c=mk(img.width,img.height),g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0);
   const d=g.getImageData(0,0,img.width,img.height).data;
@@ -27,8 +30,8 @@ function analyse(img:HTMLImageElement):Sprite{
     if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y;
     if(b>=170&&r>=100&&gg<=150&&b>gg+60){tx+=x;ty+=y;tn++;}   // glowing violet orb on the staff
   }
-  const bw=x1-x0+1,bh=y1-y0+1;
-  return {img,bx:x0,by:y0,bw,bh,tipx:tn>2?tx/tn:x0+bw/2,tipy:tn>2?ty/tn:y0};
+  const bw=x1-x0+1;
+  return {img,ax:rest?rest.ax:(x0+bw/2)-img.width/2,ay:rest?rest.ay:(y1+1)-img.height/2,tipx:tn>2?tx/tn:x0+bw/2,tipy:tn>2?ty/tn:y0};
 }
 function loadImage(name:string):Promise<HTMLImageElement|null>{
   return new Promise(res=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=import.meta.env.BASE_URL+'assets/'+name; });
@@ -38,17 +41,33 @@ async function loadSet(folder:string):Promise<Record<string,Sprite>|null>{
   if(imgs.some(i=>!i)) return null;
   const out={}; DIRS.forEach((d,i)=>out[d]=analyse(imgs[i])); return out;
 }
+/** wizard/anim/manifest.json lists, per set, each clip's fps/loop/frame count and the directions drawn. Missing clips just don't animate. */
+async function loadClips(set:'arena'|'large',rest:Record<string,Sprite>|null){
+  if(!rest) return;
+  let man; try{ const r=await fetch(import.meta.env.BASE_URL+'assets/wizard/anim/manifest.json'); if(!r.ok) return; man=(await r.json())[set]; }catch(e){ return; }
+  if(!man) return;
+  const jobs=[];
+  for(const [name,m] of Object.entries<any>(man)) for(const dir of m.dirs) jobs.push((async()=>{
+    const imgs=await Promise.all(Array.from({length:m.frames},(_,n)=>loadImage(`wizard/anim/${set}/${name}/${dir}/${n}.png`)));
+    if(imgs.some(i=>!i)) return;
+    (SPRITE_OVERRIDES.anim[set][name] ||= {})[dir]={fps:m.fps,loop:m.loop,frames:imgs.map(i=>analyse(i,rest[dir]))};
+  })());
+  await Promise.all(jobs);
+}
 /** Loads Pixel Lab art from public/assets. Anything missing or failing to load keeps the procedural fallback. */
 export async function loadSprites(){
   const [arena,large]=await Promise.all([loadSet('arena'),loadSet('large')]);
   SPRITE_OVERRIDES.wizardDirs=arena; SPRITE_OVERRIDES.wizardBack=large?large.north:null; SPRITE_OVERRIDES.wizardFront=large?large.south:null;
+  await Promise.all([loadClips('arena',arena),loadClips('large',large)]);
 }
-/** Draw a sprite with its visible feet-centre at logical (x,footY). Returns the staff-orb position in logical px. */
+/** Draw a sprite with its feet-centre at logical (x,footY). Returns the staff-orb position in logical px. */
 export function blitSprite(g,s:Sprite,x:number,footY:number){
-  const dx=x-(s.bx+s.bw/2)/R, dy=footY-(s.by+s.bh)/R;
-  g.drawImage(s.img,Math.round(dx*R)/R,Math.round(dy*R)/R,s.img.width/R,s.img.height/R);
+  const w=s.img.width,h=s.img.height, dx=x-(w/2+s.ax)/R, dy=footY-(h/2+s.ay)/R;
+  g.drawImage(s.img,Math.round(dx*R)/R,Math.round(dy*R)/R,w/R,h/R);
   return {x:dx+s.tipx/R,y:dy+s.tipy/R};
 }
+/** Which frame of a clip to show. age = seconds since the clip started (one-shots hold their last frame). */
+export function clipFrame(c:Clip,age:number):Sprite{ const n=c.frames.length,i=Math.floor(age*c.fps); return c.frames[c.loop?i%n:Math.min(n-1,i)]; }
 const bossCache={};
 export function bossFrames(i){
   if(SPRITE_OVERRIDES.boss[i]) return SPRITE_OVERRIDES.boss[i];
