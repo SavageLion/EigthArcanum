@@ -176,3 +176,36 @@ p{font-size:1.32rem;line-height:1.1}
   linear-gradient(var(--gold-dim),var(--gold-dim)) 0 50%/22px 2px no-repeat, linear-gradient(var(--gold),var(--gold)) 50% 50%/6px 6px no-repeat, linear-gradient(var(--gold-dim),var(--gold-dim)) 100% 50%/22px 2px no-repeat}
 
 .inner{gap:11px}
+
+/* ---- Pixel Lab icons ---- */
+.ico{image-rendering:pixelated;width:44px;height:44px;object-fit:contain;flex:none;grid-row:span 2}
+.card .ico,.card .icowrap{grid-row:span 2}
+.shoprow .ico{width:38px;height:38px;grid-row:auto}
+.icowrap{position:relative;display:block;width:44px;height:44px;flex:none}
+.icowrap .ico{width:44px;height:44px;grid-row:auto}
+.icoel{position:absolute;right:-6px;bottom:-6px;width:22px;height:22px;image-rendering:pixelated;filter:drop-shadow(0 0 0 #0b0814) drop-shadow(1px 1px 0 #0b0814)}
+#spells .spell .icowrap,#spells .spell .ico{width:34px;height:34px}
+#spells .spell .icoel{width:18px;height:18px}
+
+/* ---- tarot cards: Pixel Lab back and front frame ---- */
+.slot .face{border:0;box-shadow:none;background:transparent;padding:0;overflow:visible;filter:drop-shadow(3px 3px 0 #0b0814)}
+.slot .face::before{content:"";position:absolute;inset:0;background:url(/assets/cards/back.png) 0 0/100% 100% no-repeat;image-rendering:pixelated;filter:var(--tint,none)}
+.slot .face.front::before{background-image:url(/assets/cards/front.png)}
+.slot .back{--tint:hue-rotate(228deg) saturate(1.1)}
+.slot.elite .back{--tint:hue-rotate(-42deg) saturate(1.5) brightness(.95)}
+.slot.omencard .back{--tint:none}
+.slot.arenacard .back{--tint:hue-rotate(128deg) saturate(1.2)}
+.slot .back span{display:none}
+.slot .back em{position:absolute;left:12%;right:12%;bottom:10%;z-index:1;color:#f0d9a5;text-shadow:1px 1px 0 #0b0814,-1px 1px 0 #0b0814;font-size:1.1rem;letter-spacing:.06em;text-transform:uppercase}
+.slot .front{background:transparent;padding:15% 14% 28%;gap:2px;justify-content:center}
+.slot.elite .front::before{filter:hue-rotate(-18deg) saturate(1.6)}
+.slot .front>*{position:relative;z-index:1}
+.slot .front img{width:100%;max-height:100%;object-fit:contain}
+.slot .front small{color:var(--gold);font-size:1.5rem;text-shadow:1px 1px 0 #0b0814}
+.slot .front b{position:absolute;left:15%;right:15%;bottom:9%;height:15%;display:flex;align-items:center;justify-content:center;color:#3a2218;font-size:.78rem;line-height:1;text-align:center}
+
+.slot .front b{font-size:.62rem;line-height:.92;letter-spacing:-.01em;padding:0 2px;overflow:hidden}
+.slot .front small{font-size:1.7rem}
+
+/* keep the main button reachable on long screens (shop) */
+.inner>.go:last-child{position:sticky;bottom:6px;z-index:3}

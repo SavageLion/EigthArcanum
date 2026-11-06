@@ -3,7 +3,7 @@ import { W } from '../core/dom';
 import { G, S } from '../core/state';
 import { TAU, clamp, rnd } from '../core/util';
 
-export function every(k,iv,fn){ const m=G.B.tm; if(m[k]===undefined)m[k]=iv*.6; m[k]-=G.DT; if(m[k]<=0){m[k]+=iv;fn();} }
+export function every(k,iv,fn){ const m=G.B.tm; if(m[k]===undefined)m[k]=iv*.6; m[k]-=G.DT; if(m[k]<=0){m[k]+=iv;G.B.atkAt=performance.now()/1000;fn();} }
 export function shot(x,y,a,s,o={}){ if(G.shots.length>420)return; G.shots.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,r:5.5,c:G.B.color,grazed:false,...o}); }
 const aim=()=>Math.atan2(G.P.y-G.B.y,G.P.x-G.B.x);
 export function fan(n,spread,s,o,base){ const a=base===undefined?aim():base; for(let i=0;i<n;i++) shot(G.B.x,G.B.y+20,a+(n>1?(i/(n-1)-.5)*spread:0),s,o); }

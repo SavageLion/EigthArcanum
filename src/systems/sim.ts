@@ -20,11 +20,12 @@ export function damage(d){ if(!G.B||S.mode!=='fight')return; if(S.fo)d*=G.B.open
   G.B.hp-=d*(isMod('tower')?1.5:(isMod('moon')||isMod('hanged'))?1.25:1); if(d>=G.P.scale*3)G.B.flash=.05; if(G.B.hp<=0){G.B.hp=0;win();} }
 export function burst(x,y,c,n){ for(let i=0;i<n&&G.parts.length<320;i++){ const a=rnd(0,TAU),s=rnd(30,n>5?260:90); G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,c,life:rnd(.25,.8),t:0,r:rnd(1,3)}); } }
 function clearNear(r){ G.shots=G.shots.filter(s=>{ if(Math.hypot(s.x-G.P.x,s.y-G.P.y)<r){burst(s.x,s.y,GOLD,1);return false} return true; }); }
+import { fxExplosion, fxImpact, fxShield, fxShieldHit } from '../render/vfx';
 export function hurt(){
   if(G.P.inv>0||S.mode!=='fight'||G.P.shield>0)return;
   if(!S.god&&hasGear('moon')&&!G.P.moonUsed){G.P.moonUsed=true;G.P.inv=1;burst(G.P.x,G.P.y,'#e6dcef',16);sfx.block();chestSay('Blocked by the locket','#e6dcef');return;}
   if(S.god){S.hits++;G.P.inv=1.4;G.P.hurtAt=performance.now()/1000;return;}
-  G.P.hurtAt=performance.now()/1000; G.P.cleanFight=false; if(hasGear('blood'))G.P.mana=G.P.manaMax; G.P.hp-=isMod('tower')?2:1; if(hasWand('warding')&&G.P.hp>0){G.P.shield=2;G.P.shieldSpell=null;} S.hits++; G.P.inv=1.5; S.shake=reduced?0:8; S.flash=.28; sfx.hurt(); burst(G.P.x,G.P.y,'#ff7a6e',16); clearNear(90);
+  G.P.hurtAt=performance.now()/1000; fxImpact(G.P.x,G.P.y,'#ff7a6e'); G.P.cleanFight=false; if(hasGear('blood'))G.P.mana=G.P.manaMax; G.P.hp-=isMod('tower')?2:1; if(hasWand('warding')&&G.P.hp>0){G.P.shield=2;G.P.shieldSpell=null; if(G.P.shieldFx)G.P.shieldFx.drop(); G.P.shieldFx=fxShield('#bfeaf2');} S.hits++; G.P.inv=1.5; S.shake=reduced?0:8; S.flash=.28; sfx.hurt(); burst(G.P.x,G.P.y,'#ff7a6e',16); clearNear(90);
   if(G.P.hp<=0) die();
 }
 
@@ -54,7 +55,7 @@ export function step(dt){
     if(S.mode==='fight')beamStep(dt);
     if(S.mode==='fight')trapStep(dt);
     if(S.mode==='fight')chestStep(dt);
-    G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?7*(isMod('star')||isMod('hermit')?2:1)*(hasGear('pilgrim')?1.4:1)*dt:0)); G.P.cd=Math.max(0,G.P.cd-dt); G.P.shield=Math.max(0,G.P.shield-dt); G.B.chill=Math.max(0,G.B.chill-dt);
+    G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?7*(isMod('star')||isMod('hermit')?2:1)*(hasGear('pilgrim')?1.4:1)*dt:0)); G.P.cd=Math.max(0,G.P.cd-dt); G.P.shield=Math.max(0,G.P.shield-dt); if(G.P.shield<=0&&G.P.shieldFx){G.P.shieldFx.drop();G.P.shieldFx=null;} G.B.chill=Math.max(0,G.B.chill-dt);
     if(!S.fo)G.P.cast-=dt; if(S.open){ if(G.still>.1&&G.P.cast<=0){G.P.cast=rateNow();oaAim();} } else if(!S.fo&&G.P.cast<=0){G.P.cast+=rateNow(); if(!isMod('hermit')){ const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const off=n>1?(i-.5)*14:0, crit=hasWand('gambler')&&Math.random()<.15, m=crit?5:1, wc=crit?'#f0a8d8':undefined, sx=G.P.x+off;
       if(S.orbit)G.bolts.push({x:sx,y:G.P.y,...toBoss(sx,G.P.y,620),d:G.P.scale*m*(G.P.tr===RI?1.5:1),r:crit?5:3,c:wc||'#ffe9a8',basic:true}); else G.bolts.push({x:sx,y:G.P.y-22,vy:-640,d:G.P.scale*m,r:crit?6:4,c:wc,basic:true}); } }}
     if(G.B.burning>0){G.B.burning-=dt;damage(5*G.P.scale*dt);}
@@ -63,7 +64,7 @@ export function step(dt){
     G.helpers=G.helpers.filter(h=>h.life>0);
   }
   const hurtR=G.P?G.P.hit:5;
-  for(const b of G.bolts){ if(b.basic&&hasWand('hunter')&&fighting){const v=toBoss(b.x,b.y,640);b.vx=(b.vx||0)+(v.vx-(b.vx||0))*Math.min(1,dt*7);} b.x+=(b.vx||0)*dt;b.y+=b.vy*dt; if(fighting&&Math.hypot(b.x-G.B.x,b.y-G.B.y)<G.B.rad+b.r){b.dead=true;if(b.basic&&hasWand('siphon')&&G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+1);damage(b.d);burst(b.x,b.y,b.c||G.B.color,b.spell?6:1);if(b.spell&&Math.random()<(b.pc??1))proc(b.spell,b.pw);} if(b.y<-20||b.y>G.H+20||b.x<-20||b.x>W+20)b.dead=true; if(!b.dead&&G.pillars.length&&inPillar(b.x,b.y)){b.dead=true;burst(b.x,b.y,'#b5afc2',2);} }
+  for(const b of G.bolts){ if(b.basic&&hasWand('hunter')&&fighting){const v=toBoss(b.x,b.y,640);b.vx=(b.vx||0)+(v.vx-(b.vx||0))*Math.min(1,dt*7);} b.x+=(b.vx||0)*dt;b.y+=b.vy*dt; if(fighting&&Math.hypot(b.x-G.B.x,b.y-G.B.y)<G.B.rad+b.r){b.dead=true;if(b.spell||b.d>5)fxImpact(b.x,b.y,b.c||'#ffe9a8');if(b.basic&&hasWand('siphon')&&G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+1);damage(b.d);burst(b.x,b.y,b.c||G.B.color,b.spell?6:1);if(b.spell&&Math.random()<(b.pc??1))proc(b.spell,b.pw);} if(b.y<-20||b.y>G.H+20||b.x<-20||b.x>W+20)b.dead=true; if(!b.dead&&G.pillars.length&&inPillar(b.x,b.y)){b.dead=true;burst(b.x,b.y,'#b5afc2',2);} }
   G.bolts=G.bolts.filter(b=>!b.dead);
   for(const s of G.seeds){
     if(s.recast){s.delay-=dt;if(s.delay<=0){s.dead=true;if(fighting)doCast(s.recast,.6);}continue;}
@@ -87,7 +88,7 @@ export function step(dt){
     if(G.P&&fighting&&!s.dead&&!s.seed){
       const d=Math.hypot(s.x-G.P.x,s.y-G.P.y);
       if(G.P.shield>0&&d<28+s.r){
-        s.dead=true; burst(s.x,s.y,'#8fdcf0',2); const w=G.P.shieldSpell;
+        s.dead=true; burst(s.x,s.y,'#8fdcf0',2); fxShieldHit(G.P.shieldFx,s.x,s.y); const w=G.P.shieldSpell;
         if(w){ if(Math.random()<.4)proc(w,G.P.shieldPw); const r=recipeOf(w); if(has(w,'mirror')||(r&&r.id==='hall')) G.bolts.push({x:s.x,y:s.y,...toBoss(s.x,s.y,640),d:1.5*G.P.shieldPw,r:4,c:'#f0a8d8'}); }
       }
       else if(d<s.r*.72+hurtR){s.dead=true;hurt();}

@@ -12,6 +12,7 @@ import { EL, spellCost } from '../systems/spells';
 import { BONE, GOLD, TAU, clamp, rnd } from '../core/util';
 import { circle, fl, ln, poly } from './bossArt';
 import { drawArenaLayers } from './arenaArt';
+import { vfxDraw, vfxStep } from './vfx';
 import { pixelise } from './pixel';
 
 /* ---------- drawing ---------- */
@@ -25,6 +26,7 @@ export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.rou
 const nowS=()=>performance.now()/1000;
 /** What the wizard is doing: one-shots (hurt, cast) win over walk, which wins over idle. Returns [clip name, seconds into it]. */
 function wizardAction(P){ const t=nowS();
+  if(S.mode==='dying'||S.mode==='dead') return ['death',t-(P.deathAt??t)];
   if(P.hurtAt!==undefined&&t-P.hurtAt<.55) return ['hurt',t-P.hurtAt];
   if(P.castAt!==undefined&&t-P.castAt<.5) return ['cast',t-P.castAt];
   return t-(P.moveAt??-9)<.15?['walk',t]:['idle',t]; }
@@ -44,14 +46,16 @@ function drawPlayer(){
   const c=ctx, blink=G.P.inv>0&&Math.floor(S.t*14)%2===0;
   if(Math.hypot(G.P.x-(G.P.lx??G.P.x),G.P.y-(G.P.ly??G.P.y))>.4) G.P.moveAt=nowS(); G.P.lx=G.P.x; G.P.ly=G.P.y;
   if(S.fo&&G.fo){ if(blink)c.globalAlpha=.4; if(SPRITE_OVERRIDES.wizardBack) blitSprite(c,wizardFrame('large',SPRITE_OVERRIDES.wizardBack,'north'),px(G.P.x),px(G.P.y)+28); else blit(c,px(G.P.x),px(G.P.y),foWiz()); c.globalAlpha=1; for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
-  if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink,G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north');
+  G.P.face=G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north';
+  if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink,G.P.face);
   if(G.P.shield>0&&!(G.P.shield<1&&Math.floor(S.t*10)%2)) arcDots(G.P.x,G.P.y,28,0,TAU,1,'#bfeaf2');
   for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); }
   const hx=px(G.P.x),hy=px(G.P.y),r=G.P.hit<4?1:1;
   blit(c,hx,hy,disc('#ffd76a',1.5));
 }
 function drawBoss(){
-  const c=ctx,f=bossFrames(S.stage),fr=f[Math.floor(S.t*6)%f.length];
+  const c=ctx,f=bossFrames(S.stage),atk=SPRITE_OVERRIDES.bossAtk[S.stage],age=performance.now()/1000-(G.B.atkAt??-9);
+  const fr=(atk&&age<.45)?atk[Math.min(atk.length-1,Math.floor(age*14))]:f[Math.floor(S.t*6)%f.length];
   const j=G.B.enraged&&!reduced?(Math.floor(S.t*14)%2):0;
   const x=px(G.B.x)+j,y=px(G.B.y);
   blit(c,x,y,fr.img);
@@ -98,7 +102,7 @@ export function draw(){
   c.fillStyle='#0b0814';c.fillRect(0,0,LW,G.LH);
   if(S.shake>0) c.translate(Math.round(rnd(-S.shake,S.shake)*.2),Math.round(rnd(-S.shake,S.shake)*.2));
   if(isMod('hanged')&&S.mode!=='draw'){c.translate(0,G.LH);c.scale(1,-1);}
-  c.drawImage(G.bg,0,0,LW,G.LH); drawArenaLayers(c,LW);
+  c.drawImage(G.bg,0,0,LW,G.LH); drawArenaLayers(c,LW); vfxStep();
   if(S.mode==='draw'){drawPull();return;}
   if(!G.B||S.mode==='shop') return;
   if(S.fo&&G.fo)foFloor(c); if(S.open&&G.oa)oaDrawFloor(c);
@@ -116,6 +120,7 @@ export function draw(){
   for(const s of G.seeds){ if(s.homing) blit(c,px(s.x),px(s.y),disc('#9dbb6a',1)); }
   for(const s of G.shots){
     if(isMod('moon')&&G.P&&Math.hypot(s.x-G.P.x,s.y-G.P.y)>135)continue;
+    if(S.stage===0||S.stage===13){ for(let k=3;k>=1;k--){ c.globalAlpha=.55-k*.1; blit(c,px(s.x-s.vx*.011*k),px(s.y-s.vy*.011*k),disc(k>1?'#c0301a':s.c,Math.max(1.5,s.r*K*(1-.2*k)))); } c.globalAlpha=1; }
     blit(c,px(s.x),px(s.y),disc(s.c,Math.max(2,s.r*K)));
     if(s.seed) arcDots(s.x,s.y,s.r+15*clamp(s.fuse/1.15,0,1),0,TAU,1,s.c);
   }
@@ -123,7 +128,9 @@ export function draw(){
   drawChest(c);
   for(const k of G.traps){ const on=k.arm<=0&&Math.floor(S.t*5)%2===0; blit(c,px(k.x),px(k.y),disc(k.c,on?3:2)); c.fillStyle=k.c; for(let i=0;i<4;i++){const a=i*1.57+S.t;c.fillRect(px(k.x)+Math.round(Math.cos(a)*7),px(k.y)+Math.round(Math.sin(a)*7),1,1);} }
   if(G.P&&G.P.beam&&G.B){ const col=EL[G.P.beam.s.els[0]].c; lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#0b0814',5); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,col,3); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#fffbee',1); }
-  if(G.P&&S.mode!=='dying'&&S.mode!=='dead') drawPlayer();
+  vfxDraw(c,'back');
+  if(G.P){ if(S.mode==='dying'||S.mode==='dead'){ if(!S.fo) drawWizard(G.P.x,G.P.y,false,G.P.face||'north'); } else drawPlayer(); }
+  vfxDraw(c,'front');
   c.setTransform(R,0,0,R,0,0); if(G.P&&S.mode!=='title') drawHUD(); if(S.open&&(S.mode==='fight'||S.mode==='intro')) oaDrawStick(c);
   if(S.flash>0){ c.fillStyle=`rgba(255,240,210,${Math.min(.5,S.flash)})`; c.fillRect(-4,-4,LW+8,G.LH+8); }
 }

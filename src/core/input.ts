@@ -5,7 +5,7 @@ import { castSpell } from '../systems/casting';
 import { RI, RO, isMod } from '../systems/deck';
 import { foDodge, foThrow, pause, pixIcon } from '../systems/faceoff';
 import { endBeam } from '../systems/spellFx';
-import { snd, tone, wakeAudio } from './audio';
+import { applyMuteToMusic, snd, tone, wakeAudio } from './audio';
 
 /* ---------- input: relative drag so your thumb never hides the wizard ---------- */
 export const KEYS={left:false,right:false,up:false,down:false};
@@ -25,5 +25,5 @@ addEventListener('keydown',e=>{ if(S.fo){ if(e.key==='ArrowLeft'||e.key==='a')fo
 addEventListener('keyup',e=>{ if(['1','2','3','j','k','l'].includes(e.key)&&G.P)endBeam();const k=keymap[e.key];if(k)KEYS[k]=false;});
 function paintMute(){ muteBtn.setAttribute('aria-label',snd.muted?'Turn sound on':'Turn sound off');
   muteBtn.innerHTML=pixIcon(snd.muted?'off':'on'); }
-muteBtn.onclick=()=>{snd.muted=!snd.muted;try{localStorage.setItem('ea-mute',snd.muted?'1':'0')}catch(e){};wakeAudio();paintMute();};
+muteBtn.onclick=()=>{snd.muted=!snd.muted;try{localStorage.setItem('ea-mute',snd.muted?'1':'0')}catch(e){};wakeAudio();applyMuteToMusic();paintMute();};
 paintMute();

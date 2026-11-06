@@ -3,7 +3,7 @@ import { W, muteBtn, ov, reduced, stage } from '../core/dom';
 import { G, S } from '../core/state';
 import { BOSSES, ELITE_SECOND } from '../data/bosses';
 import { hotSave } from '../main';
-import { LW, blit, disc, makeBg } from '../render/sprites';
+import { LW, SPRITE_OVERRIDES, blit, disc, makeBg } from '../render/sprites';
 import { foPlan } from './bossPlans';
 import { paintSpells, spellBar } from './casting';
 import { CY, ECHO, GOODS, POS_HP, RO, WANDS, fightReward, hasWand, isMod, shuffle, spellValue } from './deck';
@@ -16,7 +16,8 @@ import { BOSS_EL, EL, RECIPES, TYPES, fuse, learnRecipe, recipeOf, spellCost, sp
 import { pixelise } from '../render/pixel';
 import { circle, fl, ln, poly } from '../render/bossArt';
 import { $, BONE, GOLD, clamp, rnd } from '../core/util';
-import { sfx, tone, wakeAudio } from '../core/audio';
+import { setMusic, sfx, tone, wakeAudio } from '../core/audio';
+import { fxExplosion, fxHeal } from '../render/vfx';
 
 /* ---------- face-off arena, shared by every boss ---------- */
 export const FO_LANES=[95,200,305], FO_ATTACKS={
@@ -66,7 +67,9 @@ export function foThrow(){
 }
 export function foFreeze(){ const cancel=!!(G.fo.atk&&!G.fo.atk.did); if(cancel){G.fo.atk=null;G.fo.queue=[];G.fo.gap=.9;} G.fo.frozen=cancel?1.6:.9; G.B.open=Math.max(G.B.open,G.fo.frozen); $('hint').hidden=true; foCall(cancel?'Frozen mid-swing!':'Frozen','#bfeaf2'); }
 function foZone(c,i,col,alpha,dither){ const top=Math.round(G.LH*.5)+1,bot=G.LH-34; c.fillStyle=col;c.globalAlpha=alpha; for(let y=top;y<bot;y++){const p=(y-top)/(bot-top),w=14+27*p,cx=80+(i-1)*(w*2),x0=Math.round(cx-w),x1=Math.round(cx+w); if(dither){for(let x=x0;x<x1;x++)if((x+y)%2===0)c.fillRect(x,y,1,1);}else c.fillRect(x0,y,x1-x0,1);} c.globalAlpha=1; }
-export function foFloor(c){ const top=Math.round(G.LH*.5),bot=G.LH-34; const drawLinger=()=>{ if(G.fo.linger&&!(G.fo.linger.t<.5&&Math.floor(S.t*10)%2))foZone(c,G.fo.linger.lane,G.B.color,.7,false); }; c.fillStyle='#160a10';c.fillRect(0,top,LW,G.LH-top); c.fillStyle='#2a1a24'; for(let y=top;y<G.LH;y+=Math.max(2,Math.round((y-top)/5)+2))c.fillRect(0,y,LW,1); c.fillStyle='#4a3440'; for(let k=-3;k<=3;k++)for(let y=top;y<G.LH;y++){const p=(y-top)/(bot-top);c.fillRect(Math.round(80+k*(14+27*p)),y,1,1);} c.fillStyle=GOLD;c.fillRect(0,top,LW,1); drawLinger();
+export function foFloor(c){ const top=Math.round(G.LH*.5),bot=G.LH-34; const drawLinger=()=>{ if(G.fo.linger&&!(G.fo.linger.t<.5&&Math.floor(S.t*10)%2))foZone(c,G.fo.linger.lane,G.B.color,.7,false); }; c.fillStyle='#160a10';c.fillRect(0,top,LW,G.LH-top);
+  { const T=SPRITE_OVERRIDES.arena.tiles; if(T.length>15){ c.save(); c.beginPath(); c.rect(0,top,LW,G.LH-top); c.clip(); for(let ty=top;ty<G.LH;ty+=16)for(let tx=0;tx<LW;tx+=16){ c.globalAlpha=.55; c.drawImage(T[((tx*7+ty*13)>>4)%5===0?(tx>>4)%16:[0,1,8,10,13][((tx>>4)+(ty>>4))%5]],tx,ty,16,16); } c.globalAlpha=.72; c.fillStyle='#160a10'; c.fillRect(0,top,LW,G.LH-top); c.restore(); c.globalAlpha=1; } }
+  c.fillStyle='#2a1a24'; for(let y=top;y<G.LH;y+=Math.max(2,Math.round((y-top)/5)+2))c.fillRect(0,y,LW,1); c.fillStyle='#4a3440'; for(let k=-3;k<=3;k++)for(let y=top;y<G.LH;y++){const p=(y-top)/(bot-top);c.fillRect(Math.round(80+k*(14+27*p)),y,1,1);} c.fillStyle=GOLD;c.fillRect(0,top,LW,1); drawLinger();
   const a=G.fo.atk; if(a&&S.mode==='fight'){ const f=clamp(a.t/a.warn,0,1); if(isMod('moon')&&f<.6)return; const zs=a.zones||(a.lock!==undefined?[a.lock]:[G.fo.lane]); if(a.hide&&!a.did&&f>.45&&f<.93){}else if(a.fake&&!a.did&&a.warn-a.t>.28)zs.map(z=>2-z).forEach(z=>foZone(c,z,'#e8592c',.55,Math.floor(S.t*12)%2===0)); else if(!a.did)zs.forEach(z=>foZone(c,z,'#e8592c',.25+.5*f,Math.floor(S.t*12)%2===0||f<.5)); else zs.forEach(z=>foZone(c,z,'#fff2c8',.9,false)); } }
 export function foBoss(c){
   const set=foFrames(S.stage),fr=set.frames[Math.floor(S.t*6)%8],j=G.B.enraged&&!reduced?Math.floor(S.t*14)%2:0,bx=80+j,by=Math.round(G.LH*.3)+(G.B.open>0?7:0);
@@ -94,7 +97,7 @@ export function startFight(){
   if(isMod('sun'))G.P.hp=G.P.max;
   if(isMod('death')){G.P.heldHp=G.P.hp;G.P.hp=1;}
   stage.style.setProperty('--boss',d.color);
-  S.mode='intro';S.t=0; ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
+  setMusic(d.elite?'elite':'battle'); S.mode='intro';S.t=0; ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
   $('bossname').textContent=`${d.num} · ${d.name}`; $('bossname').hidden=false;
   const tag=[d.elite&&'Elite',S.mod&&S.mod.name,!S.fo&&S.echo!==null&&`Echo: ${ECHO[S.echo].name}`].filter(Boolean).join(' · ');
   $('omen').textContent=tag; $('omen').hidden=!tag;
@@ -102,16 +105,16 @@ export function startFight(){
   paintSpells(); hotSave();
 }
 export function win(){
-  S.mode='won';S.t=0; G.P.beam=null; G.traps=[]; G.chestCall=0; if(S.open){$('call').hidden=true;} if(G.fo)G.fo.atk=null; $('hint').hidden=true; $('call').hidden=true;
+  setMusic('draw'); S.mode='won';S.t=0; G.P.beam=null; G.traps=[]; G.chestCall=0; if(S.open){$('call').hidden=true;} if(G.fo)G.fo.atk=null; $('hint').hidden=true; $('call').hidden=true;
   G.shots.forEach(s=>burst(s.x,s.y,GOLD,1)); G.shots=[];G.rings=[];G.cols=[];G.helpers=[];G.bands=[];
-  burst(G.B.x,G.B.y,G.B.color,70); burst(G.B.x,G.B.y,GOLD,40); S.shake=reduced?0:14; S.flash=.6; sfx.win();
+  burst(G.B.x,G.B.y,G.B.color,70); burst(G.B.x,G.B.y,GOLD,40); fxExplosion(G.B.x,G.B.y,1.7); fxHeal(G.P.x,G.P.y+10,'heal'); S.shake=reduced?0:14; S.flash=.6; sfx.win();
   G.P.scale*=1.1; G.P.reward=fightReward(); G.P.gold+=G.P.reward.g;
   if(isMod('death')){G.P.hp=G.P.heldHp;G.P.extraPick=true;}
   G.P.hp=Math.min(G.P.max,G.P.hp+(hasGear('bloodstone')?2:1)); S.chest=null; spellBar.hidden=true; $('omen').hidden=true;
   if(S.pos+1>S.best) saveBest(S.pos+1);
 }
 function saveBest(v){ S.best=v; try{localStorage.setItem('ea-best',String(v));}catch(e){} }
-export function die(){ G.P.beam=null; G.traps=[]; if(G.fo)G.fo.atk=null; $('hint').hidden=true; S.mode='dying';S.t=0;S.shake=reduced?0:12;spellBar.hidden=true;burst(G.P.x,G.P.y,BONE,50);sfx.lose(); }
+export function die(){ G.P.deathAt=performance.now()/1000; G.P.beam=null; G.traps=[]; if(G.fo)G.fo.atk=null; $('hint').hidden=true; S.mode='dying';S.t=0;S.shake=reduced?0:12;spellBar.hidden=true;burst(G.P.x,G.P.y,BONE,50);sfx.lose(); }
 const ICONS={
  bolt:["..........   ",".......##....","......##.....",".....##......","....##.......","...#######...","......##.....",".....##......","....##.......","...##........","..#.........."],
  nova:["....#####....","..##.....##..",".#.........#.",".#...###...#.","#...#####...#","#...#####...#","#...#####...#",".#...###...#.",".#.........#.","..##.....##..","....#####...."],
@@ -133,6 +136,10 @@ const ICONS={
  off:["....#........","...##........","..###.#...#..","#####..#.#...","#####...#....","#####..#.#...","..###.#...#..","...##........","....#........"]
 };
 export function pixIcon(n){ const m=ICONS[n]; let r=''; m.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(ch==='#')r+=`<rect x="${x}" y="${y}" width="1" height="1" fill="currentColor"/>`; if(ch==='+')r+=`<rect x="${x}" y="${y}" width="1" height="1" fill="currentColor" opacity=".3"/>`; })); return `<svg viewBox="0 0 13 ${m.length}" shape-rendering="crispEdges" aria-hidden="true">${r}</svg>`; }
+/** Pixel Lab icon if we have it (ids: spell_<type>, el_<element>, gear_<id>, wand_<id>, good_<id>), else the old pixel map. */
+export function icon(id,fallback){ return SPRITE_OVERRIDES.icons.has(id)?`<img class="ico" alt="" src="${import.meta.env.BASE_URL}assets/icons/${id}.png">`:fallback; }
+/** a spell's icon with its element badge */
+export function spellIcon(s){ const base=icon('spell_'+s.type,sig[s.type]), el=SPRITE_OVERRIDES.icons.has('el_'+s.els[0])?`<img class="icoel" alt="" src="${import.meta.env.BASE_URL}assets/icons/el_${s.els[0]}.png">`:''; return SPRITE_OVERRIDES.icons.has('spell_'+s.type)?`<span class="icowrap">${base}${el}</span>`:base; }
 export const sig={bolt:pixIcon('bolt'),nova:pixIcon('nova'),ward:pixIcon('ward'),summon:pixIcon('summon'),beam:pixIcon('beam'),trap:pixIcon('trap'),blink:pixIcon('blink')};
 const wandInfo=()=>WANDS.find(w=>w.id===G.P.wand);
 const handHTML=()=>{ const items=G.P.spells.map(spellName); if(G.P.wand)items.push(wandInfo().name); Object.values(G.P.gear).forEach(id=>{if(id)items.push(gearOf(id).name);}); return items.length?`<div class="hand">${items.map(n=>`<i>${n}</i>`).join('')}</div>`:''; };
@@ -144,7 +151,7 @@ export function heroHTML(clip='idle',hold=false){ const n=HERO_FRAMES[clip], bas
 function animateHeroes(){ ov.querySelectorAll('.hero img').forEach(img=>{ const n=+img.dataset.n; if(!n)return; let i=0; const t=setInterval(()=>{ if(!img.isConnected){clearInterval(t);return;} i=(i+1)%n; img.src=img.dataset.base+i+'.png'; },170); }); }
 function cardHTML(s,i,label){
   const r=recipeOf(s);
-  return `<button class="card${r?' secret':''}" data-i="${i}" style="--boss:${EL[s.els[0]].c}">${sig[s.type]}<div class="txt">${label?`<small>${r?'Secret recipe · ':''}${label}</small>`:''}<b>${spellName(s)}</b><span>${spellDesc(s)}</span><em>${spellCost(s)} mana</em></div></button>`;
+  return `<button class="card${r?' secret':''}" data-i="${i}" style="--boss:${EL[s.els[0]].c}">${spellIcon(s)}<div class="txt">${label?`<small>${r?'Secret recipe · ':''}${label}</small>`:''}<b>${spellName(s)}</b><span>${spellDesc(s)}</span><em>${spellCost(s)} mana</em></div></button>`;
 }
 export function showPick(){
   const d=BOSSES[S.stage], el=BOSS_EL[S.stage]; S.mode='pick';
@@ -190,7 +197,7 @@ function rerollCost(){ return 5+5*S.rerolls; }
 export function showShop(){
   S.mode='shop'; $('bossname').hidden=true; const rc=rerollCost();
   const row=(it,i)=>{ const sold=it.sold, can=!sold&&G.P.gold>=it.cost&&(it.wand||it.ok());
-    return `<button class="shoprow" data-i="${i}" style="--boss:${it.c}" ${can?'':'disabled'}>${pixIcon(it.icon)}<div class="txt"><b>${it.name}</b><span>${it.desc}${it.wand&&G.P.wand?` Replaces your ${wandInfo().name}.`:''}</span></div><em>${sold?'Sold':it.cost+' gold'}</em></button>`; };
+    return `<button class="shoprow" data-i="${i}" style="--boss:${it.c}" ${can?'':'disabled'}>${icon(it.wand?'wand_'+it.id:'good_'+it.id,pixIcon(it.icon))}<div class="txt"><b>${it.name}</b><span>${it.desc}${it.wand&&G.P.wand?` Replaces your ${wandInfo().name}.`:''}</span></div><em>${sold?'Sold':it.cost+' gold'}</em></button>`; };
   show(`<div class="eyebrow">The shop · before pull ${S.pos+2} of 16</div><h2>Spend your gold</h2>
     <div class="shopstatus">${goldHTML()}<div class="gold">${G.P.hp}/${G.P.max} hearts</div></div>
     <div class="cards">${S.stock.map(row).join('')}</div>
@@ -205,7 +212,7 @@ export function showShop(){
 export function buy(it){ if(it.sold||G.P.gold<it.cost)return; G.P.gold-=it.cost; it.sold=true; if(it.wand)G.P.wand=it.id; else it.fx(); sfx.coin(); showShop(); }
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 export function showDead(){
-  S.mode='dead'; const d=BOSSES[S.stage];
+  setMusic('defeat'); S.mode='dead'; const d=BOSSES[S.stage];
   show(`${heroHTML('hurt',true)}<div class="eyebrow">The run ends on pull ${S.pos+1} of 16</div><h2>${d.name} takes the hand</h2>
     <div class="stats"><div><b>${S.pos}</b><small>Bosses beaten</small></div><div><b>${S.best}</b><small>Best run</small></div><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Recipes</small></div></div>
     ${handHTML()}<p class="muted">Every spell is gone. The deck is shuffled again.</p>
@@ -213,7 +220,7 @@ export function showDead(){
   $('again').onclick=startRun; $('again').focus({preventScroll:true});
 }
 export function showVictory(){
-  S.mode='victory';
+  setMusic('victory'); S.mode='victory';
   show(`${heroHTML('idle')}<div class="eyebrow">All 16 cards defeated</div><h1>The deck is yours</h1>
     <p>You cleared the deck in ${fmt(S.runSeconds)}.</p>${handHTML()}
     <div class="stats"><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Secret recipes found</small></div></div>
@@ -221,7 +228,7 @@ export function showVictory(){
   $('again').onclick=startRun;
 }
 export function showTitle(){
-  S.mode='title'; G.pull=null; muteBtn.hidden=true; spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true;
+  setMusic('title'); S.mode='title'; G.pull=null; muteBtn.hidden=true; spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true;
   show(`${heroHTML('idle')}<div class="eyebrow">A boss-rush roguelike</div><h1>The Eighth Arcanum</h1>
     <p>Each pull, the hands deal a blind boss, omen and arena. An elite waits on every fourth pull. Beat it for gold, take its spell, then keep, fuse or sell it. Spend your gold in the shop. Die and the deck is shuffled again.</p>
     <details class="how"><summary>How it plays</summary><p class="muted">The arena card decides how you fight: open field, orbit, face-off or open arena. Chests appear mid-fight with gear, gold or mana. If one wiggles it's a mimic, so cast a spell near it before you touch it. Tap spells with your other thumb. Near misses and perfect dodges refill mana.</p></details>

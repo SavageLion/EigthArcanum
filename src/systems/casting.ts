@@ -1,13 +1,14 @@
 // @ts-nocheck
 import { G, S } from '../core/state';
 import { isMod, toBoss } from './deck';
-import { foFreeze, sig } from './faceoff';
+import { foFreeze, sig, spellIcon } from './faceoff';
 import { chestCast, chestSay, hasGear } from './gear';
 import { burst, damage } from './sim';
 import { doBlink, endBeam, placeTrap, startBeam } from './spellFx';
 import { BOSS_EL, EL, recipeOf, spellCost, spellName } from './spells';
 import { $, TAU, rnd } from '../core/util';
 import { sfx } from '../core/audio';
+import { fxExplosion, fxIce, fxLightning, fxShield } from '../render/vfx';
 
 /* ---------- spell buttons ---------- */
 export const spellBar=$('spells');
@@ -15,7 +16,7 @@ export function paintSpells(){
   G.btnState='';
   if(!G.P||!G.P.spells.length){spellBar.hidden=true;return;}
   spellBar.hidden=false; spellBar.classList.toggle('three',G.P.spells.length>2);
-  spellBar.innerHTML=G.P.spells.map((s,i)=>`<button class="spell" data-i="${i}" style="--boss:${EL[s.els[0]].c}" aria-label="Cast ${spellName(s)}, ${spellCost(s)} mana">${sig[s.type]}<small>${spellCost(s)}</small></button>`).join('');
+  spellBar.innerHTML=G.P.spells.map((s,i)=>`<button class="spell" data-i="${i}" style="--boss:${EL[s.els[0]].c}" aria-label="Cast ${spellName(s)}, ${spellCost(s)} mana">${spellIcon(s)}<small>${spellCost(s)}</small></button>`).join('');
   spellBar.querySelectorAll('.spell').forEach(b=>{
     const i=+b.dataset.i;
     b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();castSpell(i);});
@@ -45,8 +46,8 @@ function reflectNear(r,pw,cap){
 }
 export function proc(s,pw){
   if(has(s,'fire')){G.B.burning=3;}
-  if(has(s,'frost')){G.B.chill=Math.max(G.B.chill,3);}
-  if(has(s,'storm')){ const r=recipeOf(s),n=r&&r.id==='thunder'?3:1; for(let i=0;i<n;i++){damage(5*pw);G.beams.push({x:G.B.x+rnd(-26,26),t:.16});} sfx.strike(); }
+  if(has(s,'frost')){G.B.chill=Math.max(G.B.chill,3); fxIce(G.B.x,G.B.y+16,'spikes',.7);}
+  if(has(s,'storm')){ const r=recipeOf(s),n=r&&r.id==='thunder'?3:1; for(let i=0;i<n;i++){damage(5*pw);{const lx=G.B.x+rnd(-26,26);G.beams.push({x:lx,t:.16});fxLightning(lx,G.B.y+10);}} sfx.strike(); }
 }
 export function doCast(s,mult){
   const pw=G.P.scale*(1+.5*s.tier)*mult*(has(s,'blood')?2.5:1)*(G.P.castGold&&has(s,'gold')?1.6:1)*(isMod('hermit')?3:1)*(S.echo!==null&&has(s,BOSS_EL[S.echo])?1.25:1), r=recipeOf(s), col=EL[s.els[0]].c;
@@ -58,11 +59,13 @@ export function doCast(s,mult){
     const R=135+25*s.tier; let n=0;
     G.shots=G.shots.filter(q=>{ if(Math.hypot(q.x-G.P.x,q.y-G.P.y)<R){n++;burst(q.x,q.y,col,1);return false;} return true; });
     G.rings.push({x:G.P.x,y:G.P.y,rad:12,v:520,gap:TAU,a:0,w:5,c:col,hit:true,mine:true,maxR:R});
+    if(has(s,'frost')) fxIce(G.P.x,G.P.y+12,'nova',1); else fxExplosion(G.P.x,G.P.y,.7+.15*s.tier);
     if(S.fo)foFreeze(); damage((10+Math.min(n,30)*1.5*(r&&r.id==='shock'?3:1))*pw); proc(s,pw);
   }
   if(s.type==='ward'){
     const t=(3+s.tier)*(has(s,'sound')?1.5:1)*(r&&r.id==='hall'?2:1);
     G.P.shield=Math.max(G.P.shield,t); G.P.shieldSpell=s; G.P.shieldPw=pw;
+    if(G.P.shieldFx)G.P.shieldFx.drop(); G.P.shieldFx=fxShield(col);
   }
   if(s.type==='summon'){
     const n=(r&&r.id==='ossuary'?3:1)+(has(s,'sound')?1:0);

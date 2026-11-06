@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const SETS = { arena: 'art-source/raven-80-anim', large: 'art-source/raven-112-anim' };
-const CLIPS = { idle: { fps: 6, loop: true }, walk: { fps: 12, loop: true }, cast: { fps: 12, loop: false }, hurt: { fps: 12, loop: false } };
+const CLIPS = { idle: { fps: 6, loop: true }, walk: { fps: 12, loop: true }, cast: { fps: 12, loop: false }, hurt: { fps: 12, loop: false }, death: { fps: 9, loop: false } };
 const out = 'public/assets/wizard/anim';
 fs.rmSync(out, { recursive: true, force: true });
 const manifest = {};

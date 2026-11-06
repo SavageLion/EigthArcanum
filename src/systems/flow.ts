@@ -3,14 +3,14 @@ import { ctx, cv, muteBtn, ov, reduced, stage } from '../core/dom';
 import { G, S, newPlayer } from '../core/state';
 import { BOSSES, dealOrder } from '../data/bosses';
 import { hotSave } from '../main';
-import { blit, bossFrames, makeBg } from '../render/sprites';
+import { SPRITE_OVERRIDES, blit, bossFrames, makeBg } from '../render/sprites';
 import { BOSS_SIG } from './bossPlans';
 import { spellBar } from './casting';
 import { ECHO, OMENS } from './deck';
 import { requestWake, startFight } from './faceoff';
 import { oaEnd } from './openArena';
 import { BOSS_EL, EL } from './spells';
-import { tone, wakeAudio } from '../core/audio';
+import { setMusic, sfx, tone, wakeAudio } from '../core/audio';
 import { $, GOLD, clamp, rnd } from '../core/util';
 import { circle, fl, ln, poly } from '../render/bossArt';
 import { mk, pixelise } from '../render/pixel';
@@ -31,7 +31,7 @@ function drawOmen(){
 export function showDraw(){
   S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; oaEnd(); S.arena=null; S.t=0;
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
-  const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
+  setMusic('draw'); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);
   const omen=drawOmen(), arena=ARENAS[Math.floor(Math.random()*ARENAS.length)];
   G.pull={i:0,phase:'shuffle',t:0,omen,arena,done:false,fast:reduced};
@@ -57,7 +57,7 @@ function pullTap(e){
 function throwCard(){
   const el=$('slot'+G.pull.i); if(!el)return;
   const sr=el.getBoundingClientRect(), r=cv.getBoundingClientRect(), fx=r.left+r.width*.5-(sr.left+sr.width/2), fy=r.top+r.height*.76-(sr.top+sr.height/2);
-  el.style.setProperty('--fx',fx+'px'); el.style.setProperty('--fy',fy+'px'); el.classList.add('landed'); if(!reduced)el.classList.add('fly');
+  sfx.card(); el.style.setProperty('--fx',fx+'px'); el.style.setProperty('--fy',fy+'px'); el.classList.add('landed'); if(!reduced)el.classList.add('fly');
   tone(1250,.07,'square',.03,-500);
 }
 export function turnCard(){
@@ -99,6 +99,14 @@ function cardRect(c,x,y,col,w=20,h=30){ x=Math.round(x);y=Math.round(y);c.fillSt
 export function drawPull(){
   if(!G.pull||G.pull.done)return; buildHands();
   const c=ctx,cy=Math.round(G.LH*.76),i=Math.min(G.pull.i,2),col=backCol(i),T=performance.now()/1000;
+  const HA=SPRITE_OVERRIDES.hands;
+  if(HA){   // Pixel Lab hands: one sprite holding the deck, animated while shuffling
+    let f=0,dy=0;
+    if(G.pull.phase==='shuffle'&&!reduced){ f=Math.floor(T*12)%HA.length; if(Math.floor(T*14)!==G.pull.tick&&Math.random()<.4){ G.pull.tick=Math.floor(T*14); tone(1500+rnd(0,300),.02,'square',.012); } }
+    else if(G.pull.phase==='throw'&&!reduced) dy=-Math.round(5*Math.sin(clamp(G.pull.t/.2,0,1)*Math.PI));
+    else dy=reduced?0:Math.sin(T*2.5)*1.2;
+    blit(c,80,cy-4+dy,HA[f]); return;
+  }
   let lx=46,rx=114,ly=cy+20,ry=cy+20;
   if(G.pull.phase==='shuffle'&&!reduced){
     const w=Math.sin(T*16); lx=46-w*7; rx=114+w*7; ly=cy+20+Math.round(Math.abs(w)*2); ry=cy+20+Math.round(Math.abs(Math.cos(T*16))*2);

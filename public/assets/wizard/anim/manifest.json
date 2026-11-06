@@ -15,6 +15,21 @@
     "west"
    ]
   },
+  "death": {
+   "fps": 9,
+   "loop": false,
+   "frames": 7,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
   "hurt": {
    "fps": 12,
    "loop": false,

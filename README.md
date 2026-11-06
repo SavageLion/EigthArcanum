@@ -29,6 +29,12 @@ The canvas is `LW*R` = 320 px wide (`R=2`, in `render/pixel.ts`). Code still dra
 ## Arena looks
 `render/arenaArt.ts` paints a backdrop per arena type onto the background canvas: constellations plus a drifting star layer (open field), an astrolabe plate with a turning glyph ring (orbit), a gothic hall (face-off), and flagstones from the Pixel Lab tile set with carved pillars (open arena). The HUD (gilded bars, hearts) is drawn in `render/draw.ts`; overlay screens are HTML styled in `style.css`.
 
+## Effects, art packs and audio
+- Spell effects: `render/vfx.ts` runs the Sprite Fusion open-source VFX library (`render/vfx/*.ts`, MIT) on one shared pixel buffer; the spell systems call `fxExplosion / fxIce / fxLightning / fxShield / fxBlink / fxBeam / fxImpact / fxHeal`.
+- Art packers: `node tools/pack-wizard-anim.mjs` (character clips), `node tools/pack-icons.mjs` (41 UI icons: spell_, el_, gear_, wand_, good_).
+- Hand-made art overrides live in `render/sprites.ts` (`SPRITE_OVERRIDES`): wizard, Cinder King boss, chest and mimic, shuffling hands, icons, arena tiles and pillar. Anything missing falls back to the procedural art.
+- Audio: see `docs/audio.md` (file slots, manifest, and the licensing shortlist).
+
 ## State
 Everything that used to be a closure variable (`P` player, `B` boss, `shots`, `H`, ...) now lives on one
 exported object: `G` in `core/state.ts` (`G.P`, `G.B`, `G.shots`...). `S` is the run/mode state.

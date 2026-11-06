@@ -210,6 +210,80 @@
               "Idle/animations/cast/south/frame_005.png"
             ]
           },
+          "death": {
+            "east": [
+              "Idle/animations/death/east/frame_000.png",
+              "Idle/animations/death/east/frame_001.png",
+              "Idle/animations/death/east/frame_002.png",
+              "Idle/animations/death/east/frame_003.png",
+              "Idle/animations/death/east/frame_004.png",
+              "Idle/animations/death/east/frame_005.png",
+              "Idle/animations/death/east/frame_006.png"
+            ],
+            "north": [
+              "Idle/animations/death/north/frame_000.png",
+              "Idle/animations/death/north/frame_001.png",
+              "Idle/animations/death/north/frame_002.png",
+              "Idle/animations/death/north/frame_003.png",
+              "Idle/animations/death/north/frame_004.png",
+              "Idle/animations/death/north/frame_005.png",
+              "Idle/animations/death/north/frame_006.png"
+            ],
+            "west": [
+              "Idle/animations/death/west/frame_000.png",
+              "Idle/animations/death/west/frame_001.png",
+              "Idle/animations/death/west/frame_002.png",
+              "Idle/animations/death/west/frame_003.png",
+              "Idle/animations/death/west/frame_004.png",
+              "Idle/animations/death/west/frame_005.png",
+              "Idle/animations/death/west/frame_006.png"
+            ],
+            "south-west": [
+              "Idle/animations/death/south-west/frame_000.png",
+              "Idle/animations/death/south-west/frame_001.png",
+              "Idle/animations/death/south-west/frame_002.png",
+              "Idle/animations/death/south-west/frame_003.png",
+              "Idle/animations/death/south-west/frame_004.png",
+              "Idle/animations/death/south-west/frame_005.png",
+              "Idle/animations/death/south-west/frame_006.png"
+            ],
+            "south-east": [
+              "Idle/animations/death/south-east/frame_000.png",
+              "Idle/animations/death/south-east/frame_001.png",
+              "Idle/animations/death/south-east/frame_002.png",
+              "Idle/animations/death/south-east/frame_003.png",
+              "Idle/animations/death/south-east/frame_004.png",
+              "Idle/animations/death/south-east/frame_005.png",
+              "Idle/animations/death/south-east/frame_006.png"
+            ],
+            "south": [
+              "Idle/animations/death/south/frame_000.png",
+              "Idle/animations/death/south/frame_001.png",
+              "Idle/animations/death/south/frame_002.png",
+              "Idle/animations/death/south/frame_003.png",
+              "Idle/animations/death/south/frame_004.png",
+              "Idle/animations/death/south/frame_005.png",
+              "Idle/animations/death/south/frame_006.png"
+            ],
+            "north-east": [
+              "Idle/animations/death/north-east/frame_000.png",
+              "Idle/animations/death/north-east/frame_001.png",
+              "Idle/animations/death/north-east/frame_002.png",
+              "Idle/animations/death/north-east/frame_003.png",
+              "Idle/animations/death/north-east/frame_004.png",
+              "Idle/animations/death/north-east/frame_005.png",
+              "Idle/animations/death/north-east/frame_006.png"
+            ],
+            "north-west": [
+              "Idle/animations/death/north-west/frame_000.png",
+              "Idle/animations/death/north-west/frame_001.png",
+              "Idle/animations/death/north-west/frame_002.png",
+              "Idle/animations/death/north-west/frame_003.png",
+              "Idle/animations/death/north-west/frame_004.png",
+              "Idle/animations/death/north-west/frame_005.png",
+              "Idle/animations/death/north-west/frame_006.png"
+            ]
+          },
           "walk": {
             "south": [
               "Idle/animations/walk/south/frame_000.png",
@@ -281,5 +355,5 @@
     }
   ],
   "export_version": "3.1",
-  "export_date": "2026-11-06T08:54:57.465658"
+  "export_date": "2026-11-06T09:52:46.349140"
 }
