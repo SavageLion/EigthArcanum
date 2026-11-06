@@ -93,7 +93,7 @@ function drawHandArt(c){
   poly(c,[[-22,-8],[-36,-24],[-30,-30],[-16,-18]]);fl(c,'#e8b98e');ln(c,'#4a2420',1.5);
   circle(c,-3,-12,5);fl(c,'#3956a8');circle(c,-3,-12,2);fl(c,GOLD);
 }
-function buildHands(){ if(G.handImg)return; G.handImg=pixelise(drawHandArt,104,.72).img; const o=mk(G.handImg.width,G.handImg.height),x=o.getContext('2d');x.translate(o.width,0);x.scale(-1,1);x.drawImage(G.handImg,0,0);G.handFlip=o; }
+function buildHands(){ if(G.handImg)return; G.handImg=pixelise(drawHandArt,104,.72).img; const o=mk(G.handImg.width,G.handImg.height),x=o.getContext('2d');x.translate(o.width,0);x.scale(-1,1);x.drawImage(G.handImg,0,0);(o as any).hi=true; G.handFlip=o; }
 function backCol(i){ return i===0?(BOSSES[S.stage].elite?'#6e1830':'#3a2466'):i===1?'#7d5a22':'#1d5a66'; }
 function cardRect(c,x,y,col,w=20,h=30){ x=Math.round(x);y=Math.round(y);c.fillStyle='#0b0814';c.fillRect(x-1,y-1,w+2,h+2);c.fillStyle=col;c.fillRect(x,y,w,h);c.fillStyle=GOLD;c.fillRect(x+2,y+2,w-4,1);c.fillRect(x+2,y+h-3,w-4,1);c.fillRect(x+2,y+2,1,h-4);c.fillRect(x+w-3,y+2,1,h-4);c.fillRect(x+w/2-1,y+h/2-1,3,3); }
 export function drawPull(){

@@ -4,7 +4,10 @@ export function hexRGB(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5
 export function nearest(r,g,b){let best=PALETTE[0],d=1e9;for(const p of PALETTE){const e=(p[0]-r)**2+(p[1]-g)**2+(p[2]-b)**2;if(e<d){d=e;best=p;}}return best;}
 export function mk(w,h){const o=document.createElement('canvas');o.width=w;o.height=h;return o;}
 export const OUT=[11,8,20];
+/** Render scale: the canvas is LW*R physical pixels wide. Art made with pixelise() is R x finer than the logical grid. */
+export const R=2;
 export function pixelise(draw,N,sc){
+  N=Math.round(N*R); sc*=R;
   const o=mk(N,N),c=o.getContext('2d',{willReadFrequently:true}); c.translate(N/2,N/2); c.scale(sc,sc); draw(c);
   c.setTransform(1,0,0,1,0,0);
   const im=c.getImageData(0,0,N,N),d=im.data,on=new Uint8Array(N*N);
@@ -13,6 +16,7 @@ export function pixelise(draw,N,sc){
     if((x>0&&on[i-1])||(x<N-1&&on[i+1])||(y>0&&on[i-N])||(y<N-1&&on[i+N])){const j=i*4;d[j]=OUT[0];d[j+1]=OUT[1];d[j+2]=OUT[2];d[j+3]=255;}}
   c.putImageData(im,0,0);
   const w=mk(N,N),wc=w.getContext('2d'),wi=wc.createImageData(N,N);for(let i=0;i<N*N*4;i+=4){if(d[i+3]){wi.data[i]=wi.data[i+1]=wi.data[i+2]=255;wi.data[i+3]=255;}}wc.putImageData(wi,0,0);
+  (o as any).hi=true; (w as any).hi=true;
   return {img:o,white:w};
 }
 export const COL={k:'#0b0814',b:'#3956a8',n:'#26336f',g:'#dcb868',s:'#e8b98e',w:'#f1e8d4',y:'#ffd27a',W:'#ffffff',t:'#a9875a',r:'#d9505f',p:'#f3b8ae',d:'#35263f'};

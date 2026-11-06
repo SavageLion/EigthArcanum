@@ -23,6 +23,9 @@ npm run smoke      # build first; plays all 16 bosses x 4 arenas in headless Chr
 - `public/assets/` – shipped art (Pixel Lab output goes here); `art-source/` – prompts and sources, not shipped
 - `docs/original-single-file.html` – the original single-file prototype
 
+## Resolution
+The canvas is `LW*R` = 320 px wide (`R=2`, in `render/pixel.ts`). Code still draws in 160-unit logical coordinates through a 2x transform; art made with `pixelise()`, `disc()`, `makeBg()` and Pixel Lab images is flagged `hi` and drawn at its true 2x resolution by `blit()`. Hand-made pixel maps (hearts, skull, icons) are still logical-size and look chunkier.
+
 ## State
 Everything that used to be a closure variable (`P` player, `B` boss, `shots`, `H`, ...) now lives on one
 exported object: `G` in `core/state.ts` (`G.P`, `G.B`, `G.shots`...). `S` is the run/mode state.

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { W, ctx, reduced } from '../core/dom';
 import { G, S } from '../core/state';
-import { HEART, HEART0, K, LW, SKULL, SPRITE_OVERRIDES, blit, bossFrames, disc, px } from './sprites';
+import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, blit, blitSprite, bossFrames, dirOf, disc, px } from './sprites';
 import { CY, RI, RO, WANDS, isMod } from '../systems/deck';
 import { foBoss, foFloor } from '../systems/faceoff';
 import { drawPull } from '../systems/flow';
@@ -13,23 +13,26 @@ import { BONE, GOLD, TAU, clamp, rnd } from '../core/util';
 
 /* ---------- drawing ---------- */
 const gx=()=>ctx;
+const pr=v=>Math.round(v*R)/R; // snap a logical coordinate to the physical pixel grid
 function arcDots(x,y,rad,fromA,toA,w,col){
-  const c=ctx,rr=rad*K; if(rr<1)return; const st=.8/rr; c.fillStyle=col;
-  for(let a=fromA;a<toA;a+=st) c.fillRect(Math.round(x*K+Math.cos(a)*rr-w/2),Math.round(y*K+Math.sin(a)*rr-w/2),w,w);
+  const c=ctx,rr=rad*K; if(rr<1)return; const st=.8/(rr*R); c.fillStyle=col;
+  for(let a=fromA;a<toA;a+=st) c.fillRect(pr(x*K+Math.cos(a)*rr-w/2),pr(y*K+Math.sin(a)*rr-w/2),w,w);
 }
-export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)*K));c.fillStyle=col;for(let i=0;i<=n;i++)c.fillRect(Math.round((x0+(x1-x0)*i/n)*K),Math.round((y0+(y1-y0)*i/n)*K),w,w); }
-function drawWizard(x,y,fade){
+export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)*K*R));c.fillStyle=col;for(let i=0;i<=n;i++)c.fillRect(pr((x0+(x1-x0)*i/n)*K),pr((y0+(y1-y0)*i/n)*K),w,w); }
+/** facing: one of the 8 directions (south = towards the camera). Falls back to the procedural wizard if the art is missing. */
+function drawWizard(x,y,fade,facing='south'){
   const c=ctx; if(fade)c.globalAlpha=.4;
-  const art=SPRITE_OVERRIDES.wizard, wx=art?11:5, wy=art?-15:-12; // Pixel Lab raven is 32px, the procedural wizard ~20px; wx/wy = staff tip
-  blit(c,px(x),px(y)-(art?4:2),art||wizSprite());
-  if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);c.fillStyle=w.c;c.fillRect(px(x)+wx,px(y)+wy,3,3);}
-  if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(px(x)+wx+1,px(y)+wy+1,1,1);}
+  const set=SPRITE_OVERRIDES.wizardDirs; let tip;
+  if(set) tip=blitSprite(c,set[facing],px(x),px(y)+8);          // feet 8 logical px below the hitbox centre
+  else { blit(c,px(x),px(y)-2,wizSprite()); tip={x:px(x)+6,y:px(y)-11}; }
+  if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);blit(c,tip.x,tip.y,disc(w.c,1.5));}
+  if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(tip.x-.25,tip.y-.25,.5,.5);}
   c.globalAlpha=1;
 }
 function drawPlayer(){
   const c=ctx, blink=G.P.inv>0&&Math.floor(S.t*14)%2===0;
-  if(S.fo&&G.fo){ if(blink)c.globalAlpha=.4; blit(c,px(G.P.x),px(G.P.y),foWiz()); c.globalAlpha=1; for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
-  if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink);
+  if(S.fo&&G.fo){ if(blink)c.globalAlpha=.4; if(SPRITE_OVERRIDES.wizardBack) blitSprite(c,SPRITE_OVERRIDES.wizardBack,px(G.P.x),px(G.P.y)+28); else blit(c,px(G.P.x),px(G.P.y),foWiz()); c.globalAlpha=1; for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
+  if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink,G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north');
   if(G.P.shield>0&&!(G.P.shield<1&&Math.floor(S.t*10)%2)) arcDots(G.P.x,G.P.y,28,0,TAU,1,'#bfeaf2');
   for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); }
   const hx=px(G.P.x),hy=px(G.P.y),r=G.P.hit<4?1:1;
@@ -61,15 +64,15 @@ function drawHUD(){
   }
 }
 export function draw(){
-  const c=ctx; c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled=false;
+  const c=ctx; c.setTransform(R,0,0,R,0,0); c.imageSmoothingEnabled=false;
   c.fillStyle='#0b0814';c.fillRect(0,0,LW,G.LH);
   if(S.shake>0) c.translate(Math.round(rnd(-S.shake,S.shake)*.2),Math.round(rnd(-S.shake,S.shake)*.2));
   if(isMod('hanged')&&S.mode!=='draw'){c.translate(0,G.LH);c.scale(1,-1);}
-  c.drawImage(G.bg,0,0);
+  c.drawImage(G.bg,0,0,LW,G.LH);
   if(S.mode==='draw'){drawPull();return;}
   if(!G.B||S.mode==='shop') return;
   if(S.fo&&G.fo)foFloor(c); if(S.open&&G.oa)oaDrawFloor(c);
-  if(S.orbit&&G.P){ for(const r of [RI,RO]){ const live=G.P.tr===r,rr=r*K,st=(live?5:7)/rr; c.globalAlpha=live?.75:.3; c.fillStyle=live?BONE:G.B.color; for(let a=S.t*.1;a<TAU+S.t*.1;a+=st)c.fillRect(Math.round(LW/2+Math.cos(a)*rr),Math.round(CY()*K+Math.sin(a)*rr),1,1); c.globalAlpha=1; }
+  if(S.orbit&&G.P){ for(const r of [RI,RO]){ const live=G.P.tr===r,rr=r*K,st=(live?5:7)/(rr*R); c.globalAlpha=live?.75:.3; c.fillStyle=live?BONE:G.B.color; for(let a=S.t*.1;a<TAU+S.t*.1;a+=st)c.fillRect(pr(LW/2+Math.cos(a)*rr),pr(CY()*K+Math.sin(a)*rr),1,1); c.globalAlpha=1; }
     for(const k of G.bands){ const w=px(k.w); if(k.t<k.warn){ if(Math.floor(S.t*12)%2){ arcDots(W/2,CY(),k.r-k.w/2,0,TAU,1,BONE); arcDots(W/2,CY(),k.r+k.w/2,0,TAU,1,BONE); } } else { arcDots(W/2,CY(),k.r,0,TAU,w,G.B.color); arcDots(W/2,CY(),k.r,0,TAU,Math.max(2,w-6),'#fffbee'); } } }
   for(const k of G.cols){
     const x0=px(k.x-k.w/2),w=px(k.w);
@@ -79,11 +82,11 @@ export function draw(){
   for(const r of G.rings){ const w=Math.max(1,Math.round(r.w*K)); if(r.gap>=TAU-.01) arcDots(r.x,r.y,r.rad,0,TAU,w,r.c); else { arcDots(r.x,r.y,r.rad,r.a+r.gap,r.a-r.gap+TAU,w+2,'#0b0814'); arcDots(r.x,r.y,r.rad,r.a+r.gap,r.a-r.gap+TAU,w,r.c);} }
   if(!['won','pick','victory'].includes(S.mode)){ if(S.fo&&G.fo)foBoss(c); else drawBoss(); }
   for(const b of G.beams){ if(b.sy!==undefined) lineDots(b.sx,b.sy,G.B.x,G.B.y,GOLD); else { lineDots(b.x,0,b.x+rnd(-10,10),G.B.y*.5,'#fff2a0',2); lineDots(b.x,G.B.y*.5,b.x,G.B.y,'#fff2a0',2);} }
-  for(const b of G.bolts){ if(b.c) blit(c,px(b.x),px(b.y),disc(b.c,Math.max(1,Math.round(b.r*K)))); else { c.fillStyle='#7d5a22';c.fillRect(px(b.x)-1,px(b.y),3,6);c.fillStyle='#ffe9a8';c.fillRect(px(b.x),px(b.y)-1,1,6); } }
+  for(const b of G.bolts){ if(b.c) blit(c,px(b.x),px(b.y),disc(b.c,Math.max(1,b.r*K))); else { c.fillStyle='#7d5a22';c.fillRect(px(b.x)-1,px(b.y),3,6);c.fillStyle='#ffe9a8';c.fillRect(px(b.x),px(b.y)-1,1,6); } }
   for(const s of G.seeds){ if(s.homing) blit(c,px(s.x),px(s.y),disc('#9dbb6a',1)); }
   for(const s of G.shots){
     if(isMod('moon')&&G.P&&Math.hypot(s.x-G.P.x,s.y-G.P.y)>135)continue;
-    blit(c,px(s.x),px(s.y),disc(s.c,Math.max(2,Math.round(s.r*K))));
+    blit(c,px(s.x),px(s.y),disc(s.c,Math.max(2,s.r*K)));
     if(s.seed) arcDots(s.x,s.y,s.r+15*clamp(s.fuse/1.15,0,1),0,TAU,1,s.c);
   }
   for(const p of G.parts){ c.fillStyle=p.c; const z=p.r>2&&p.t<p.life*.5?2:1; c.fillRect(px(p.x),px(p.y),z,z); }
@@ -91,11 +94,11 @@ export function draw(){
   for(const k of G.traps){ const on=k.arm<=0&&Math.floor(S.t*5)%2===0; blit(c,px(k.x),px(k.y),disc(k.c,on?3:2)); c.fillStyle=k.c; for(let i=0;i<4;i++){const a=i*1.57+S.t;c.fillRect(px(k.x)+Math.round(Math.cos(a)*7),px(k.y)+Math.round(Math.sin(a)*7),1,1);} }
   if(G.P&&G.P.beam&&G.B){ const col=EL[G.P.beam.s.els[0]].c; lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#0b0814',5); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,col,3); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#fffbee',1); }
   if(G.P&&S.mode!=='dying'&&S.mode!=='dead') drawPlayer();
-  c.setTransform(1,0,0,1,0,0); if(G.P&&S.mode!=='title') drawHUD(); if(S.open&&(S.mode==='fight'||S.mode==='intro')) oaDrawStick(c);
+  c.setTransform(R,0,0,R,0,0); if(G.P&&S.mode!=='title') drawHUD(); if(S.open&&(S.mode==='fight'||S.mode==='intro')) oaDrawStick(c);
   if(S.flash>0){ c.fillStyle=`rgba(255,240,210,${Math.min(.5,S.flash)})`; c.fillRect(-4,-4,LW+8,G.LH+8); }
 }
 export function drawTitle(){
-  const c=ctx; c.setTransform(1,0,0,1,0,0); c.imageSmoothingEnabled=false; c.drawImage(G.bg,0,0);
+  const c=ctx; c.setTransform(R,0,0,R,0,0); c.imageSmoothingEnabled=false; c.drawImage(G.bg,0,0,LW,G.LH);
   const f=bossFrames(7); blit(c,LW/2,60+Math.round(Math.sin(S.t)*2),f[Math.floor(S.t*6)%f.length].img);
   for(let i=0;i<14;i++){ const a=S.t*.45+i/14*TAU,r=100+((S.t*38+i*18)%90); blit(c,px(W/2+Math.cos(a)*r),px(150+Math.sin(a)*r*.82),disc(i%2?'#b78cff':GOLD,2)); }
   const sv=G.P; drawWizard(W/2,270,false);
