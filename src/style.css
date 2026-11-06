@@ -236,3 +236,17 @@ p{font-size:1.32rem;line-height:1.1}
 .run span{font-size:.9rem;line-height:1.05;color:var(--bone-dim);text-align:center}
 .run.sel{border-color:var(--gold);background:#2c1c3c}
 .run:disabled{opacity:.5;cursor:default}
+
+/* ---- per-type card backs and frames (replaces the single tinted image) ---- */
+.slot .back::before{background-image:url(/assets/cards/back_boss.png);filter:none}
+.slot.elite .back::before{background-image:url(/assets/cards/back_elite.png)}
+.slot.omencard .back::before{background-image:url(/assets/cards/back_omen.png)}
+.slot.arenacard .back::before{background-image:url(/assets/cards/back_arena.png)}
+.slot .front::before{background-image:url(/assets/cards/front_boss.png);filter:none}
+.slot.elite .front::before{background-image:url(/assets/cards/front_elite.png);filter:none}
+.slot.omencard .front::before{background-image:url(/assets/cards/front_omen.png)}
+.slot.arenacard .front::before{background-image:url(/assets/cards/front_arena.png)}
+.slot .front .art{max-height:100%}
+.slot .front .num{position:absolute;top:13%;left:0;right:0;text-align:center;font-size:.8rem;z-index:2;opacity:.95;text-shadow:1px 1px 0 #0b0814}
+
+.slot.omencard .front b,.slot.arenacard .front b{top:74.5%}

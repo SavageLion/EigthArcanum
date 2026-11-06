@@ -41,9 +41,9 @@ export function showDraw(){
   ov.className='overlay pullov'; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default';
   ov.innerHTML=`<div class="pullhead"><div class="eyebrow">Pull ${S.pos+1} of ${total()}${d.elite?' · Elite':''}</div><div class="gold" id="pullstatus"></div></div>
     <div class="slots">
-      ${slotHTML(0,d.elite?'elite':'boss',`<img src="${art}" alt=""><b>${d.name}</b>`,'Boss')}
-      ${slotHTML(1,'omencard',`<small>${omen.num}</small><b>${omen.name}</b>`,'Omen')}
-      ${slotHTML(2,'arenacard',`<small>${arena.num}</small><b>${arena.name}</b>`,'Arena')}
+      ${slotHTML(0,d.elite?'elite':'boss',`<img src="${art}" alt=""><b>${d.name}</b>`,d.elite?'Elite':'Boss')}
+      ${slotHTML(1,'omencard',`<img class="art" alt="" src="${import.meta.env.BASE_URL}assets/cards/omen/${omen.id}.png"><small class="num">${omen.num}</small><b>${omen.name}</b>`,'Omen')}
+      ${slotHTML(2,'arenacard',`<img class="art" alt="" src="${import.meta.env.BASE_URL}assets/cards/arena/${arena.id}.png"><small class="num">${arena.num}</small><b>${arena.name}</b>`,'Arena')}
     </div>
     <div class="reads" id="reads"></div><div class="pullfoot" id="pullfoot"></div>`;
   ov.onclick=pullTap;
