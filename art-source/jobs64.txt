@@ -1,0 +1,99 @@
+# slug baseJobId (64-run bosses, index 32..63 in order)
+cartog 22638d61-e433-4478-bd83-92dc416b2e50
+tide d4e67120-9643-426e-ad82-f1f8a3661d8e
+cellist 1915c377-14b5-4266-8eba-72e35178e72d
+fox 4dda88ae-f703-4aa0-be5d-60fc24e7430a
+ink d45d06e4-0ed5-474e-af70-04e26ed023ab
+spider c5463908-2ef1-48d7-b844-8af2e27356cb
+glassk 207904b1-67b3-4c9b-919a-08b417c72e95
+myc 81f82747-a02d-4204-a4b0-66bdb9892c3c
+herald PENDING
+crows 0d764423-10a6-4e43-abf3-006a496b2d6d
+idol 7ffda062-f255-4ffe-be0d-805d89894908
+sphinx c002ec97-fe9d-474e-aabd-241c4ce1d4f3
+teeth 4d4ba64e-108e-42a6-afe6-72f05e9b1e2b
+bride 5baa8c25-e8f7-44c0-8777-716ffadab683
+colossus 23e87167-164a-4fcc-9ae9-e6863e7d2166
+weeping 3aa81a6b-58b8-4232-8f68-8ac659bd7584
+honey 1bce6482-f2bf-4107-babc-5804400b7f93
+# anim: slug kind jobId
+anim cartog idle 0f9f989a-64c1-4025-8960-c96a86b22f43
+anim cartog attack a0e5a674-d526-436d-8537-661c2a02a429
+anim tide idle 0583cc63-c9fe-4365-bc24-3e70edbf6a9f
+anim tide attack 8a3592c9-5a47-46f1-828f-01da28867c2b
+anim cellist idle f7cd019b-02d5-47f5-8da9-8541d614ba47
+anim cellist attack ede9f383-68d5-4ed4-ae3a-5ff46698be8f
+anim fox idle 59c5fde3-7e72-4e89-ac05-538f03faac9b
+anim fox attack d6fc9801-3985-425c-bcdd-9b7133bc0611
+anim ink idle b8b14d00-f1e1-4d31-9690-11cf2a11759f
+anim ink attack 0da099db-a811-43ab-be7e-ed40ae15f73b
+anim spider idle e0850c5a-c509-405f-9fdd-1b54b1bc3e8c
+anim spider attack d2e66c7f-335a-44c0-9b45-ce34d5f179bd
+anim glassk idle e6d1569e-d37b-4599-b792-79b34bbeda38
+anim glassk attack b672f91f-801b-455d-a211-3a92761f1b4f
+anim myc idle a6ddd8c3-32c5-4869-9dfa-5c7e27e6cb2c
+anim myc attack c285e2ca-537f-4632-987d-fef92ea3378f
+base herald a6d4bfdc-7c4a-4603-9355-d331216e5ad8
+base swan ad104941-c4af-4e2b-91ff-a460e6703a7f
+base jester 6ac6f781-450a-4c8f-9d00-74c1b10de55e
+base hydra 2d92810f-8377-4067-a0a0-9f2604be8e70
+base seedling 6040e731-424e-4f6a-8160-2ec8dd10ffb0
+base paper 9872aa9f-fec7-4299-b3b6-bfaff6abf09c
+base crown 7fbfbf76-c215-468e-996b-0428713736f8
+base bull dc3665a9-f232-4a7e-a8d3-7515a7789c21
+anim crows idle eea60818-6228-4324-8db1-5d77ab5bb44e
+anim crows attack 2682bb28-479c-4bf6-97e1-e5ec0367218f
+anim idol idle 8b5bc379-8362-4493-9e6f-0fc20338a8aa
+anim idol attack 2c214ed5-2ec1-4c49-8b65-ad6aacfd3e1d
+anim sphinx idle 9025601e-6515-4d12-bcbc-4b4af6800799
+anim sphinx attack f5fcb979-19f5-44bd-b1c3-9c5ba79265f5
+anim teeth idle 6959c80e-5d56-4f78-9fe6-b7ddfaf6980f
+anim teeth attack 1a732d03-9cc6-4333-b253-57b1c50ec27e
+anim bride idle 1a9641b5-2f6c-4951-bbee-212060aefefb
+anim bride attack 152e6051-8c76-44aa-832b-05eb0edf1dce
+anim colossus idle 8653e1f2-ce78-4611-bf68-23aa47f0ea9b
+anim colossus attack e33c230c-05f2-4773-9fb9-f9454cd7c108
+anim weeping idle 08a9742c-0b92-4c85-94fc-35f17d47c1e0
+anim weeping attack 77045dea-e26a-4a7d-901d-0e664f3b44d5
+anim honey idle cc81fbca-4e54-473a-8de8-2f47d33cf142
+anim honey attack 4f108b9d-6db1-40b4-ae37-586f3e059e56
+anim herald idle 1ff06cbe-37d9-46a2-9eaf-af89c1e0eaa9
+anim herald attack 41c2c404-32d7-4c0d-8fe0-0de0e1b674c4
+anim swan idle 45cc024e-8ca6-4cc6-addd-89ab6d0400de
+anim swan attack b0a01bb7-bbd7-47a3-a358-5bac9f245d6c
+anim jester idle 3773ef8c-ec37-4c49-a59c-7d49ca581167
+anim jester attack 0a0bc41c-7732-4b91-9e69-fb48ff84afb7
+anim hydra idle 60d6b176-7adf-4c15-8f53-b34dc55b9a1c
+anim hydra attack 53002d85-cd47-40ae-9277-e1f3035d7d2a
+anim seedling idle 6f5470ec-55d2-457c-85ee-d6820ec686e8
+anim seedling attack 639bba6e-22a6-484f-bb5f-ad7444b560c6
+anim paper idle a16a3048-9fb2-49ed-8e52-0d14e741567f
+anim paper attack 090850ba-e2aa-42c0-89c7-33074f143d18
+anim crown idle 9194eb03-426d-46bc-93d7-0f5f73e7114d
+anim crown attack 3eb3c280-7c11-4b3b-a190-861eb10bd1ec
+anim bull idle 1170f72c-6996-4ac4-a307-90767f553ab8
+anim bull attack 925b5660-787e-483f-8820-cd95e83e2d86
+base pearl a0caa81d-d646-4b9a-94fa-9d3fe2f9e6f5
+base scarab 21199352-9656-4bf8-881e-240aab58fabb
+base gallows d234b2ca-25d0-446d-a91d-b85a8f355248
+base phantom b05ff914-1a22-47f4-96f3-7fdfb69d9cac
+base lich 638fbffc-c391-4f51-bdf3-2f67c66d3dc8
+base wolf 9a178a2e-0c73-4aea-a119-921d05356356
+base moons 5306a749-5ced-4387-8afa-ab224e9f81c5
+base arcanum 0af5a0d8-88b7-40dd-ac77-ab39601e02f2
+anim pearl idle bb90ec60-8b37-45ab-ad27-34bd9b5bbdb9
+anim pearl attack f87316ce-0977-4994-9704-5a4f656bfa23
+anim scarab idle 9f66c7d4-fb63-4771-9888-c799fe6be40f
+anim scarab attack d72550b8-a94b-4725-b6b1-ca6490f79bdb
+anim gallows idle 1dd94e26-cd7f-4648-a347-90b8acdc8428
+anim gallows attack 40846ff7-fe5c-4fa8-935d-a3f423fd9d97
+anim phantom idle 8ad42f6c-7d14-4c9f-bce1-4aa0de29f539
+anim phantom attack 88ef119c-10b0-4f34-8580-fd30a81fe034
+anim lich idle 0b43d2ca-0e31-4eb3-b8ce-7fdcb03b88e3
+anim lich attack 94f81729-0279-46cf-84df-6beb1b047720
+anim wolf idle 603d19da-f7b6-4ccf-be40-351858f14fef
+anim wolf attack 14813d16-31aa-4665-b7b0-b9769a3b81c2
+anim moons idle 9f3b3d5b-e53b-45c7-ad20-59e8ed2f4ac4
+anim moons attack 70700cfb-25d4-4e89-982c-1ee75bbc216c
+anim arcanum idle 9e8e6fea-eabd-4683-a76e-9eb35e687b62
+anim arcanum attack d37c2724-be83-4426-a88e-13be97f48c7b

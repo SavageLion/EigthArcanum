@@ -40,7 +40,8 @@ try{ window.claude?.hot?.snapshot?.(()=>({saved:S.saved||null})); }catch(e){}
 Promise.all([loadSprites(),loadAudioManifest()]).finally(()=>{ window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {}); });
 
 import * as _vfx from './render/vfx';
-import './data/newBosses';
+import './data/newBosses'
+import './data/newBosses64';
 import * as _score from './core/score';
 import * as _meta from './data/meta';
 window.__arcana={meta:_meta,score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,showLoot,lootOrShop,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foThrow,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,showShop,openShop,leaveShop,buy,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,takeSpell,forgeOptions,castSpell,spellName,spellCost,nextBoss,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};

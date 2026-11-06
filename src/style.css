@@ -250,3 +250,16 @@ p{font-size:1.32rem;line-height:1.1}
 .slot .front .num{position:absolute;top:13%;left:0;right:0;text-align:center;font-size:.8rem;z-index:2;opacity:.95;text-shadow:1px 1px 0 #0b0814}
 
 .slot.omencard .front b,.slot.arenacard .front b{top:74.5%}
+
+/* loadout panel (reward, forge and shop screens) */
+.loadout{margin:10px 0;border:2px solid var(--gold-dim);background:rgba(11,8,20,.55);padding:6px 8px}
+.loadout summary{cursor:pointer;font-family:var(--label);font-size:1.15rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
+.lostats{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0;font-family:var(--label);font-size:1.02rem;color:var(--bone)}
+.lo{display:grid;grid-template-columns:40px 1fr;gap:8px;align-items:center;padding:5px 0;border-top:1px dashed rgba(240,217,165,.18)}
+.lo .ico,.lo .icowrap{width:36px;height:36px;grid-row:auto;flex:none}
+.lo .icowrap .ico{width:36px;height:36px}
+.lo .txt b{display:block;color:var(--boss);font-family:var(--label);font-size:1.15rem;letter-spacing:.03em}
+.lo .txt b small{margin-left:8px;color:var(--bone);opacity:.65;font-size:.9rem;font-weight:400}
+.lo .txt span{display:block;font-size:.95rem;line-height:1.1;color:var(--bone)}
+.lo.empty{opacity:.45}
+.lomark{display:flex;align-items:center;justify-content:center;width:36px;height:36px;color:var(--gold);font-size:1.4rem}

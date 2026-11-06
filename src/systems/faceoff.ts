@@ -150,7 +150,17 @@ export function icon(id,fallback){ return SPRITE_OVERRIDES.icons.has(id)?`<img c
 export function spellIcon(s){ const base=icon('spell_'+s.type,sig[s.type]), el=SPRITE_OVERRIDES.icons.has('el_'+s.els[0])?`<img class="icoel" alt="" src="${import.meta.env.BASE_URL}assets/icons/el_${s.els[0]}.png">`:''; return SPRITE_OVERRIDES.icons.has('spell_'+s.type)?`<span class="icowrap">${base}${el}</span>`:base; }
 export const sig={bolt:pixIcon('bolt'),nova:pixIcon('nova'),ward:pixIcon('ward'),summon:pixIcon('summon'),beam:pixIcon('beam'),trap:pixIcon('trap'),blink:pixIcon('blink')};
 const wandInfo=()=>WANDS.find(w=>w.id===G.P.wand);
-const handHTML=()=>{ const items=G.P.spells.map(spellName); if(G.P.wand)items.push(wandInfo().name); Object.values(G.P.gear).forEach(id=>{if(id)items.push(gearOf(id).name);}); return items.length?`<div class="hand">${items.map(n=>`<i>${n}</i>`).join('')}</div>`:''; };
+/** "Your loadout": every spell, wand and piece of gear you carry, with what it does. Shown on the reward, forge and shop screens. */
+const handHTML=()=>{
+  const P=G.P, w=wizardById(P.wizard), rows=[];
+  const row=(ic,name,tag,desc,col)=>`<div class="lo" style="--boss:${col||'var(--gold-dim)'}">${ic}<div class="txt"><b>${name}<small>${tag}</small></b><span>${desc}</span></div></div>`;
+  if(w.perk) rows.push(row('<span class="lomark">★</span>',w.perkText.split(':')[0],w.name,w.perkText.includes(':')?w.perkText.split(':').slice(1).join(':').trim():w.perkText));
+  P.spells.forEach(sp=>rows.push(row(spellIcon(sp),spellName(sp),`Spell · ${spellCost(sp)} mana`,spellDesc(sp),EL[sp.els[0]].c)));
+  if(P.wand){ const wd=wandInfo(); rows.push(row(icon('wand_'+wd.id,pixIcon('wand')),wd.name,'Wand',wd.desc,wd.c)); }
+  for(const slot of ['hat','robe','charm']){ const g=P.gear[slot]&&gearOf(P.gear[slot]); rows.push(g?row(icon('gear_'+g.id,pixIcon(slot)),g.name,SLOT_LABEL[slot]+(g.cursed?' · cursed':''),g.desc,g.cursed?'#e0405a':'var(--gold)'):`<div class="lo empty"><span class="lomark">·</span><div class="txt"><b>${SLOT_LABEL[slot]}<small>empty</small></b></div></div>`); }
+  const stats=`<div class="lostats"><span>♥ ${P.hp}/${P.max}</span><span>Mana ${P.manaMax}</span><span>Bolt ${(1/rateNow()).toFixed(1)}/s</span><span>Power ×${P.scale.toFixed(2)}</span><span>${P.slots} spell slots</span></div>`;
+  return `<details class="loadout" open><summary>Your loadout</summary>${stats}${rows.join('')}</details>`;
+};
 const goldHTML=()=>`<div class="gold"><span class="coin"></span>${G.P.gold} gold</div>`;
 export function show(html){ ov.innerHTML=`<div class="inner">${html}</div>`; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default'; animateHeroes(); }
 /** The raven for title, victory and defeat screens: front view, looping an animation clip (or holding its last frame). */
