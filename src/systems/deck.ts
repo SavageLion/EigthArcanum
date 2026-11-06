@@ -9,6 +9,11 @@ import { sfx } from '../core/audio';
 
 /* ---------- the pull: boss order, echoes, omens ---------- */
 export const POS_HP=[90,130,170,340,260,300,350,680,440,510,590,1150,720,820,930,2100];
+/** run length, and a 0-15 progress value that stays comparable across 16, 32 and 64 boss runs */
+export const total=()=>S.order?S.order.length:16;
+export const relPos=()=>S.pos*15/Math.max(1,total()-1);
+export const posHp=(pos,tot)=>{ const t=pos*15/Math.max(1,tot-1), i=Math.floor(t), f=t-i, a=POS_HP[i], b=POS_HP[Math.min(15,i+1)]; return (a+(b-a)*f)*(tot>16?1+.25*Math.log2(tot/16):1); };
+export const hasPerk=id=>!!(G.P&&G.P.perk===id);
 export const RO=165, RI=95, CY=()=>Math.round(G.H*.45);
 export const toBoss=(x,y,sp)=>{const a=Math.atan2(G.B.y-y,G.B.x-x);return {vx:Math.cos(a)*sp,vy:Math.sin(a)*sp};};
 export const isMod=id=>S.mod&&S.mod.id===id;
@@ -61,7 +66,7 @@ export const GOODS=[
 ];
 export const spellValue=s=>10+8*s.tier+5*(s.els.length-1);
 export function fightReward(){
-  const base=10+3*S.pos, parts=[`${base} for the win`]; let g=base;
+  const base=Math.round(10+3*relPos()), parts=[`${base} for the win`]; let g=base;
   if(BOSSES[S.stage].elite){g+=25;parts.push('25 for the elite');}
   if(G.P.cleanFight){g+=10;parts.push('10 for no hits');if(hasGear('coin')){g+=15;parts.push('15 from your coin');}}
   if(['tower','death','moon','hanged'].some(isMod)){g+=8;parts.push('8 for the omen');}

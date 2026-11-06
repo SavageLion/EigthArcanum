@@ -6,7 +6,7 @@ import { lineDots } from '../render/draw';
 import { LW, SPRITE_OVERRIDES, blitSprite, px } from '../render/sprites';
 import { ring } from './attacks';
 import { OA_STYLE } from './bossPlans';
-import { hasWand, isMod } from './deck';
+import { hasPerk, hasWand, isMod, relPos } from './deck';
 import { burst, hurt } from './sim';
 import { $, BONE, TAU, clamp, rnd } from '../core/util';
 import { sfx, tone } from '../core/audio';
@@ -22,7 +22,7 @@ export function oaMove(dt){
   if(moving){ G.still=0; const nx=clamp(G.P.x+vx*sp*dt,22,W-22); if(!inPillar(nx,G.P.y,10))G.P.x=nx; const ny=clamp(G.P.y+vy*sp*dt,G.H*.12,G.H-96); if(!inPillar(G.P.x,ny,10))G.P.y=ny; G.P.vx=vx*6; } else { G.still+=dt; G.P.vx=0; }
 }
 export function oaBoss(dt){
-  const o=G.oa, st=OA_STYLE[S.stage]||OA_STYLE[5]; o.t+=dt; const slow=(G.B.chill>0?.6:1)*(.85+.025*S.pos), sp=st.speed*(G.B.enraged?1.4:1)*slow;
+  const o=G.oa, st=OA_STYLE[S.stage]||OA_STYLE[5]; o.t+=dt; const slow=(G.B.chill>0?.6:1)*(.85+.025*relPos()), sp=st.speed*(G.B.enraged?1.4:1)*slow;
   if(st.pull&&o.state!=='stun'){ const a=Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x),nx=clamp(G.P.x+Math.cos(a)*st.pull*dt,22,W-22),ny=clamp(G.P.y+Math.sin(a)*st.pull*dt,G.H*.12,G.H-96); if(!inPillar(nx,ny,10)){G.P.x=nx;G.P.y=ny;} }
   if(o.state==='chase'){
     o.tick=(o.tick||0)+dt;
@@ -48,7 +48,7 @@ export function oaBoss(dt){
   if(o.hint>0){o.hint-=dt;if(o.hint<=0)$('hint').hidden=true;}
   if(Math.hypot(G.P.x-G.B.x,G.P.y-G.B.y)<(o.state==='dash'?44:36)) hurt();
 }
-export function oaAim(){ if(isMod('hermit'))return; const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const crit=hasWand('gambler')&&Math.random()<.15,sx=G.P.x+(n>1?(i-.5)*14:0),a=Math.atan2(G.B.y-G.P.y,G.B.x-sx); G.bolts.push({x:sx,y:G.P.y,vx:Math.cos(a)*640,vy:Math.sin(a)*640,d:G.P.scale*(crit?5:1),r:crit?5:3,c:crit?'#f0a8d8':'#ffe9a8',basic:true}); } }
+export function oaAim(){ if(isMod('hermit'))return; const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1),sx=G.P.x+(n>1?(i-.5)*14:0),a=Math.atan2(G.B.y-G.P.y,G.B.x-sx); G.bolts.push({x:sx,y:G.P.y,vx:Math.cos(a)*640,vy:Math.sin(a)*640,d:G.P.scale*(crit?5:1),r:crit?5:3,c:crit?'#f0a8d8':'#ffe9a8',basic:true}); } }
 export function oaDrawFloor(c){
   const pil=SPRITE_OVERRIDES.arena.pillar;
   if(!SPRITE_OVERRIDES.arena.tiles.length){ c.fillStyle='#0b0814'; c.globalAlpha=.3; for(let x=0;x<LW;x+=16)c.fillRect(x,0,1,G.LH); for(let y=0;y<G.LH;y+=16)c.fillRect(0,y,LW,1); c.globalAlpha=1; }

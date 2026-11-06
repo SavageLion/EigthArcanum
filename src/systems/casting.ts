@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { G, S } from '../core/state';
-import { isMod, toBoss } from './deck';
+import { hasPerk, isMod, toBoss } from './deck';
 import { foFreeze, sig, spellIcon } from './faceoff';
 import { chestCast, chestSay, hasGear } from './gear';
 import { burst, damage } from './sim';
@@ -34,9 +34,9 @@ export function syncSpells(){
 /* ---------- casting ---------- */
 export function castSpell(i){
   if(S.mode!=='fight'||S.paused||!G.P.spells[i]||G.P.cd>0)return;
-  const s=G.P.spells[i],c=spellCost(s); if(G.P.mana<c||G.P.beam)return; if(has(s,'blood')&&G.P.hp<=1){chestSay('Not enough blood','#ff9d94');return;}
+  const s=G.P.spells[i],c=G.P.freeCast>0?0:spellCost(s); if(G.P.mana<c||G.P.beam)return; if(has(s,'blood')&&G.P.hp<=1){chestSay('Not enough blood','#ff9d94');return;}
   if(has(s,'blood')){G.P.hp--;burst(G.P.x,G.P.y,'#e0405a',12);} G.P.castGold=false; if(has(s,'gold')&&G.P.gold>=5){G.P.gold-=5;G.P.castGold=true;burst(G.P.x,G.P.y,'#ffd27a',8);}
-  G.P.mana-=c; if(hasGear('sage')){G.P.sageN++;if(G.P.sageN%3===0)G.P.mana+=c;} G.P.cd=.25; doCast(s,1); chestCast(); sfx.cast(); G.P.castAt=performance.now()/1000;
+  G.P.mana-=c; if(c===0&&G.P.freeCast>0)G.P.freeCast--; if(hasGear('sage')){G.P.sageN++;if(G.P.sageN%3===0)G.P.mana+=c;} G.P.cd=.25; doCast(s,1); chestCast(); sfx.cast(); G.P.castAt=performance.now()/1000;
 }
 export const has=(s,e)=>s.els.includes(e);
 function addSeeds(n,d){ for(let i=0;i<n;i++) G.seeds.push({x:G.P.x,y:G.P.y-14,vx:rnd(-170,170),vy:rnd(-220,-90),homing:true,d,life:4}); }
@@ -63,7 +63,7 @@ export function doCast(s,mult){
     if(S.fo)foFreeze(); damage((10+Math.min(n,30)*1.5*(r&&r.id==='shock'?3:1))*pw); proc(s,pw);
   }
   if(s.type==='ward'){
-    const t=(3+s.tier)*(has(s,'sound')?1.5:1)*(r&&r.id==='hall'?2:1);
+    const t=(3+s.tier)*(has(s,'sound')?1.5:1)*(r&&r.id==='hall'?2:1)*(hasPerk('rime')?1.5:1);
     G.P.shield=Math.max(G.P.shield,t); G.P.shieldSpell=s; G.P.shieldPw=pw;
     if(G.P.shieldFx)G.P.shieldFx.drop(); G.P.shieldFx=fxShield(col);
   }

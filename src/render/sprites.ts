@@ -21,7 +21,7 @@ export type ClipSet=Record<string,Record<string,Clip>>;   // anim name -> direct
 export const SPRITE_OVERRIDES:{boss:Record<number,any>,bossAtk:Record<number,any>,shot:Record<number,HTMLImageElement>,wizardDirs:Record<string,Sprite>|null,wizardBack:Sprite|null,wizardFront:Sprite|null,chest:{idle:HTMLImageElement|null,open:HTMLImageElement[],mimic:HTMLImageElement[]}|null,hands:HTMLImageElement[]|null,icons:Set<string>,anim:{arena:ClipSet,large:ClipSet},arena:{tiles:HTMLImageElement[],pillar:Sprite|null}}={boss:{},bossAtk:{},shot:{},wizardDirs:null,wizardBack:null,wizardFront:null,chest:null,hands:null,icons:new Set<string>(),anim:{arena:{},large:{}},arena:{tiles:[],pillar:null}};
 
 /** rest = the still pose of the same direction: animation frames reuse its foot anchor so they bob instead of jitter. */
-function analyse(img:HTMLImageElement,rest?:Sprite):Sprite{
+export function analyse(img:any,rest?:Sprite):Sprite{
   (img as any).hi=true;
   const c=mk(img.width,img.height),g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0);
   const d=g.getImageData(0,0,img.width,img.height).data;

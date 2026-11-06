@@ -35,6 +35,11 @@ The canvas is `LW*R` = 320 px wide (`R=2`, in `render/pixel.ts`). Code still dra
 - Hand-made art overrides live in `render/sprites.ts` (`SPRITE_OVERRIDES`): wizard, Cinder King boss, chest and mimic, shuffling hands, icons, arena tiles and pillar. Anything missing falls back to the procedural art.
 - Audio: see `docs/audio.md` (file slots, manifest, and the licensing shortlist).
 
+## Meta-progression
+- `data/meta.ts`: the save (localStorage `ea-meta-v1`), the five wizards with their stats and perks, and the milestone rules. Wizards unlock by counters (bosses beaten, clean wins, elites, mimics); the 32-run unlocks by winning a 16-run and the 64-run by winning a 32-run.
+- Wizard and run length are chosen on the setup screen (`showSetup` in `systems/faceoff.ts`). Run length is no longer fixed at 16: HP, boss speed, gold and the player's power curve scale by relative position (`relPos()`, `posHp()` in `systems/deck.ts`).
+- Coded wizards (`render/wizardArt.ts`) and coded bosses (`render/bossArt2.ts`, registered in `data/newBosses.ts`) are placeholder art; Pixel Lab art overrides them. Bosses 17+ are appended to `BOSSES` and every per-boss table in one place. A run length only becomes available when enough bosses and a final boss exist (`FINALS` in `data/bosses.ts`).
+
 ## State
 Everything that used to be a closure variable (`P` player, `B` boss, `shots`, `H`, ...) now lives on one
 exported object: `G` in `core/state.ts` (`G.P`, `G.B`, `G.shots`...). `S` is the run/mode state.

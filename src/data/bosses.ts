@@ -64,12 +64,15 @@ const NEW_BOSSES=[
 BOSSES.push(...NEW_BOSSES);
 BOSSES[7].elite=true;
 export const TOTAL=16, ELITE_POS=[3,7,11,15];
-const isElitePull=p=>ELITE_POS.includes(p);
-export function dealOrder(){
-  const regular=shuffle(BOSSES.map((b,i)=>i).filter(i=>!BOSSES[i].elite));
-  const elites=shuffle(BOSSES.map((b,i)=>i).filter(i=>BOSSES[i].elite&&i!==7));
+/** every fourth pull is an elite, and the last pull is the run's final boss */
+const isElitePull=p=>p%4===3;
+export const FINALS={16:7};   // run length -> final boss index (32 and 64 get theirs when those bosses exist)
+export const runAvailable=n=>n===16||(BOSSES.length>=n&&FINALS[n]!==undefined);
+export function dealOrder(total=16){
+  const fin=FINALS[total]??7, pool=BOSSES.map((b,i)=>i).filter(i=>i<total&&i!==fin);
+  const regular=shuffle(pool.filter(i=>!BOSSES[i].elite)), elites=shuffle(pool.filter(i=>BOSSES[i].elite)), any=shuffle(pool);
   const out=[];
-  for(let p=0;p<TOTAL;p++) out.push(p===15?7:isElitePull(p)?elites.shift():regular.shift());
+  for(let p=0;p<total;p++) out.push(p===total-1?fin:(isElitePull(p)?(elites.shift()??any[p%any.length]):(regular.shift()??any[p%any.length])));
   return out;
 }
 export const ELITE_SECOND={13:'storm',14:'frost',15:'thorn'};

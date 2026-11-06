@@ -15,7 +15,8 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   await page.goto(`http://localhost:${port}/`);
   await page.waitForSelector('#ov .go');
-  await page.click('#ov .go');                 // Begin a run
+  await page.click('#ov .go');                 // Begin a run (title)
+  await page.waitForSelector('#start'); await page.click('#start');   // setup screen: Begin the run
   await page.waitForTimeout(600);
   // every boss x every arena type, run for a couple of simulated seconds
   const arenas = ['chariot', 'wheel', 'justice', 'strength'];

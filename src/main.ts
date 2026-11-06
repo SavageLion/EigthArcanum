@@ -26,12 +26,12 @@ function frame(now){
   else { syncSpells(); if(S.mode==='draw'&&!S.paused)updateDraw(dt); if(!S.paused&&S.mode!=='pick'&&S.mode!=='dead'&&S.mode!=='victory'&&S.mode!=='draw'&&S.mode!=='shop') step(dt); draw(); }
   requestAnimationFrame(frame);
 }
-export function hotSave(){ S.saved=G.P?{order:S.order,pos:S.pos,hp:G.P.hp,seconds:S.runSeconds,used:S.usedOmens,gear:G.P.gear,slots:G.P.slots,gold:G.P.gold,wand:G.P.wand,max:G.P.max,manaMax:G.P.manaMax,thirdEye:G.P.thirdEye,spells:G.P.spells.map(s=>({...s}))}:null; }
+export function hotSave(){ S.saved=G.P?{wizard:G.P.wizard,order:S.order,pos:S.pos,hp:G.P.hp,seconds:S.runSeconds,used:S.usedOmens,gear:G.P.gear,slots:G.P.slots,gold:G.P.gold,wand:G.P.wand,max:G.P.max,manaMax:G.P.manaMax,thirdEye:G.P.thirdEye,spells:G.P.spells.map(s=>({...s}))}:null; }
 function start(data){
   resize();
   const d=data&&data.saved;
-  if(d&&Array.isArray(d.spells)&&Array.isArray(d.order)&&d.order.length===TOTAL){
-    G.P=newPlayer(); G.P.spells=d.spells; G.P.gear=d.gear||G.P.gear; G.P.slots=d.slots||2; G.P.gold=d.gold||0; G.P.wand=d.wand||null; G.P.max=d.max||4; G.P.manaMax=d.manaMax||100; G.P.thirdEye=!!d.thirdEye; G.P.scale=Math.pow(1.1,d.pos); G.P.hp=Math.min(G.P.max,d.hp); S.order=d.order; S.pos=d.pos; S.usedOmens=d.used||[]; S.runSeconds=d.seconds||0;
+  if(d&&Array.isArray(d.spells)&&Array.isArray(d.order)&&[16,32,64].includes(d.order.length)){
+    G.P=newPlayer(d.wizard||'raven'); G.P.spells=d.spells; G.P.gear=d.gear||G.P.gear; G.P.slots=d.slots||2; G.P.gold=d.gold||0; G.P.wand=d.wand||null; G.P.max=d.max||4; G.P.manaMax=d.manaMax||100; G.P.thirdEye=!!d.thirdEye; G.P.scale=Math.pow(1.1,d.pos*15/Math.max(1,d.order.length-1)); G.P.hp=Math.min(G.P.max,d.hp); S.order=d.order; S.pos=d.pos; S.usedOmens=d.used||[]; S.runSeconds=d.seconds||0;
     showDraw();
   } else showTitle();
   requestAnimationFrame(t=>{G.last=t;frame(t)});
@@ -40,5 +40,7 @@ try{ window.claude?.hot?.snapshot?.(()=>({saved:S.saved||null})); }catch(e){}
 Promise.all([loadSprites(),loadAudioManifest()]).finally(()=>{ window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {}); });
 
 import * as _vfx from './render/vfx';
+import './data/newBosses';
 import * as _score from './core/score';
-window.__arcana={score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,showLoot,lootOrShop,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foThrow,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,showShop,openShop,leaveShop,buy,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,takeSpell,forgeOptions,castSpell,spellName,spellCost,nextBoss,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};
+import * as _meta from './data/meta';
+window.__arcana={meta:_meta,score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,showLoot,lootOrShop,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foThrow,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,showShop,openShop,leaveShop,buy,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,takeSpell,forgeOptions,castSpell,spellName,spellCost,nextBoss,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};

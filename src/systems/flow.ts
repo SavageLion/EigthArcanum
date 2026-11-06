@@ -6,7 +6,9 @@ import { hotSave } from '../main';
 import { SPRITE_OVERRIDES, blit, bossFrames, makeBg } from '../render/sprites';
 import { BOSS_SIG } from './bossPlans';
 import { spellBar } from './casting';
-import { ECHO, OMENS } from './deck';
+import { ECHO, OMENS, total } from './deck';
+import { meta, remember } from '../data/meta';
+import { runAvailable } from '../data/bosses';
 import { requestWake, startFight } from './faceoff';
 import { oaEnd } from './openArena';
 import { BOSS_EL, EL } from './spells';
@@ -16,7 +18,7 @@ import { circle, fl, ln, poly } from '../render/bossArt';
 import { R, mk, pixelise } from '../render/pixel';
 
 /* ---------- flow ---------- */
-export function startRun(){ wakeAudio(); G.P=newPlayer(); S.order=dealOrder(); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
+export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=16; remember(wizardId,runLen); G.P=newPlayer(wizardId); S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
 /* ---------- the three blind draws ---------- */
 const ARENAS=[
  {id:'chariot',num:'VII',name:'The Chariot',desc:'Open field. Roam freely and weave through the shots.'},
@@ -37,7 +39,7 @@ export function showDraw(){
   G.pull={i:0,phase:'shuffle',t:0,omen,arena,done:false,fast:reduced};
   const art=bossFrames(S.stage)[0].img.toDataURL();
   ov.className='overlay pullov'; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default';
-  ov.innerHTML=`<div class="pullhead"><div class="eyebrow">Pull ${S.pos+1} of 16${d.elite?' · Elite':''}</div><div class="gold" id="pullstatus"></div></div>
+  ov.innerHTML=`<div class="pullhead"><div class="eyebrow">Pull ${S.pos+1} of ${total()}${d.elite?' · Elite':''}</div><div class="gold" id="pullstatus"></div></div>
     <div class="slots">
       ${slotHTML(0,d.elite?'elite':'boss',`<img src="${art}" alt=""><b>${d.name}</b>`,'Boss')}
       ${slotHTML(1,'omencard',`<small>${omen.num}</small><b>${omen.name}</b>`,'Omen')}
@@ -74,7 +76,7 @@ function nextDraw(){
   G.pull.phase='shuffle'; setStatus();
 }
 function readText(i){
-  if(i===0){ const d=BOSSES[S.stage]; const note=d.elite?(S.pos===15?'The final elite. No spell follows this card.':'Elite: harder attacks, 25 more gold and a two-element spell.'):S.pos<4?'Drawn early, so weaker.':S.pos>=11?'Drawn late, so stronger.':''; const echo=S.echo===null?'':` Echo of ${BOSSES[S.echo].name}: ${ECHO[S.echo].name} in open-field and orbit fights, and your ${EL[BOSS_EL[S.echo]].noun.toLowerCase()} spells deal 25% more.`; return `<b>${d.name}</b> ${note}${echo}`; }
+  if(i===0){ const d=BOSSES[S.stage]; const note=d.elite?(S.pos===total()-1?'The final elite. No spell follows this card.':'Elite: harder attacks, 25 more gold and a two-element spell.'):S.pos<4?'Drawn early, so weaker.':S.pos>=11?'Drawn late, so stronger.':''; const echo=S.echo===null?'':` Echo of ${BOSSES[S.echo].name}: ${ECHO[S.echo].name} in open-field and orbit fights, and your ${EL[BOSS_EL[S.echo]].noun.toLowerCase()} spells deal 25% more.`; return `<b>${d.name}</b> ${note}${echo}`; }
   if(i===1) return `<b>${G.pull.omen.name}</b> ${G.pull.omen.desc}`;
   const sig=BOSS_SIG[S.stage], extra=G.pull.arena.id==='justice'?sig.f:G.pull.arena.id==='strength'?sig.s:''; return `<b>${G.pull.arena.name}</b> ${G.pull.arena.desc}${extra?` ${BOSSES[S.stage].name}: ${extra}`:''}`;
 }

@@ -2,7 +2,8 @@
 import { W } from '../core/dom';
 import { G, S } from '../core/state';
 import { SPRITE_OVERRIDES, WIZ_ROWS, blit, px } from '../render/sprites';
-import { CY, RI, RO, hasWand } from './deck';
+import { CY, RI, RO, hasPerk, hasWand, relPos } from './deck';
+import { noteChest, noteMimic } from '../data/meta';
 import { FO_LANES, icon, openShop, pixIcon, show } from './faceoff';
 import { inPillar } from './openArena';
 import { burst, hurt } from './sim';
@@ -62,20 +63,20 @@ export function spawnChest(){
   S.chest={x,y,t:0,life:S.fo?5:6.5,mimic}; chestSay('A chest!','#ffd27a'); tone(1180,.1,'triangle',.05);
 }
 export function chestLoot(bonus){
-  const r=Math.random(),goldMult=hasGear('fool')?2:1;
+  const r=Math.random(),goldMult=(hasGear('fool')?2:1)*(hasPerk('lucky')?1.5:1);
   if(bonus||r<.42){ const pool=GEAR.filter(g=>!hasGear(g.id)&&!G.P.loot.includes(g.id)); const g=pool[Math.floor(Math.random()*pool.length)]; if(g){G.P.loot.push(g.id);chestSay(`${g.name}!`,'#ffd27a');} if(bonus){const v=15*goldMult;G.P.gold+=v;} }
-  else if(r<.78){ const v=(12+S.pos*2)*goldMult; G.P.gold+=v; chestSay(`+${v} gold`,'#ffd27a'); }
+  else if(r<.78){ const v=Math.round((12+relPos()*2)*goldMult); G.P.gold+=v; chestSay(`+${v} gold`,'#ffd27a'); }
   else { G.P.mana=G.P.manaMax; G.P.grazeGlow=.4; fxHeal(G.P.x,G.P.y+10,'mana'); chestSay('Mana refilled','#a9d4f7'); }
   sfx.coin();
 }
 export function chestStep(dt){
   if(G.chestCall>0){G.chestCall-=dt;if(G.chestCall<=0)$('call').hidden=true;}
   if(S.chest){ const c=S.chest; c.t+=dt; if(c.t>=c.life){S.chest=null;return;}
-    if(Math.hypot(G.P.x-c.x,G.P.y-c.y)<(S.fo?45:26)){ S.chest=null; burst(c.x,c.y,GOLD,12); chestFx(c,c.mimic?'mimic':'open'); if(c.mimic){ chestSay('Mimic!','#ff9d94'); hurt(); } else chestLoot(false); }
+    if(Math.hypot(G.P.x-c.x,G.P.y-c.y)<(S.fo?45:26)){ S.chest=null; burst(c.x,c.y,GOLD,12); chestFx(c,c.mimic?'mimic':'open'); if(!c.mimic)noteChest(); if(c.mimic){ chestSay('Mimic!','#ff9d94'); hurt(); } else chestLoot(false); }
     return; }
   if(S.chestsLeft>0){ S.chestT-=dt; if(S.chestT<=0){ S.chestsLeft--; S.chestT=rnd(9,15); spawnChest(); } }
 }
-export function chestCast(){ const c=S.chest; if(c&&c.mimic&&Math.hypot(G.P.x-c.x,G.P.y-c.y)<135){ S.chest=null; burst(c.x,c.y,'#ff7a6e',18); chestFx(c,'mimic'); fxExplosion(c.x,c.y,.6); chestLoot(true); chestSay('Mimic slain!','#ffd27a'); } }
+export function chestCast(){ const c=S.chest; if(c&&c.mimic&&Math.hypot(G.P.x-c.x,G.P.y-c.y)<135){ S.chest=null; burst(c.x,c.y,'#ff7a6e',18); chestFx(c,'mimic'); fxExplosion(c.x,c.y,.6); noteMimic(); chestLoot(true); chestSay('Mimic slain!','#ffd27a'); } }
 /** a chest (or mimic) was just opened or slain: play its animation where it stood */
 export function chestFx(c,kind){ (G.chestFxs||(G.chestFxs=[])).push({x:c.x,y:c.y,kind,t0:performance.now()/1000}); if(kind==='mimic')sfx.mimic(); else sfx.chest(); }
 function drawChestFx(c){ const A=SPRITE_OVERRIDES.chest; if(!A||!G.chestFxs||!G.chestFxs.length)return; const now=performance.now()/1000;
