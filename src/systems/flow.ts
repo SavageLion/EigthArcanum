@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { sideEnd } from './sideView';
+import { eventsEnd } from './arenaEvents';
 import { ctx, cv, muteBtn, ov, reduced, stage } from '../core/dom';
 import { G, S, newPlayer } from '../core/state';
 import { BOSSES, dealOrder } from '../data/bosses';
@@ -61,11 +62,11 @@ export function bossCardArt(d,stageIdx){
 function outline(img,col){ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const g=c.getContext('2d'); g.drawImage(img,0,0); g.globalCompositeOperation='source-in'; g.fillStyle=col; g.fillRect(0,0,c.width,c.height); return c; }
 
 export function showDraw(){
-  S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; S.side=false; sideEnd(); oaEnd(); S.arena=null; S.t=0;
+  S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; S.side=false; sideEnd(); eventsEnd(); oaEnd(); S.arena=null; S.t=0;
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
   setMusic('draw',S.pos); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);
-  const omen=drawOmen(), arena=ARENAS[Math.floor(Math.random()*ARENAS.length)];
+  const arena=ARENAS[Math.floor(Math.random()*ARENAS.length)]; let omen=drawOmen(); while(arena.id==='fool'&&omen.id==='hanged')omen=drawOmen();   // an upside-down room makes no sense for a platformer
   G.pull={i:0,phase:'shuffle',t:0,omen,arena,done:false,fast:reduced};
   const art=bossCardArt(d,S.stage);
   ov.className='overlay pullov'; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default';
@@ -112,7 +113,7 @@ function readText(i){
 }
 function addRead(i){ const p=document.createElement('p'); p.id='read'+i; p.innerHTML=readText(i); $('reads').appendChild(p); }
 function enterArena(){ ov.className='overlay'; ov.onclick=null; S.mod=G.pull.omen; S.lastOmen=G.pull.omen.id; S.arena=G.pull.arena.id; G.pull=null; startFight(); }
-export function quickPull(modId,arena){ G.pull={omen:OMENS.find(o=>o.id===modId)||drawOmen(),arena:ARENAS.find(a=>a.id===arena)||ARENAS[0]}; enterArena(); }
+export function quickPull(modId,arena){ G.pull={omen:OMENS.find(o=>o.id===modId)||drawOmen(),arena:ARENAS.find(a=>a.id===arena)||ARENAS[0]}; if(G.pull.arena.id==='fool'&&G.pull.omen.id==='hanged')G.pull.omen=OMENS.find(o=>o.id!=='hanged'); enterArena(); }
 export function updateDraw(dt){
   if(!G.pull||G.pull.done)return; G.pull.t+=dt;
   const dur=G.pull.fast?.02:G.pull.i===0?1.05:.5;

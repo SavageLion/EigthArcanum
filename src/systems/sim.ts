@@ -9,6 +9,7 @@ import { CY, ECHO, RI, RO, hasPerk, hasWand, isMod, relPos, toBoss, total } from
 import { die, foStep, showDead, showPick, showVictory, win } from './faceoff';
 import { chestSay, chestStep, hasGear, nearMiss, rateNow } from './gear';
 import { sideMove } from './sideView';
+import { eventsStep } from './arenaEvents';
 import { inPillar, oaAim, oaBoss, oaMove } from './openArena';
 import { beamStep, trapStep } from './spellFx';
 import { recipeOf } from './spells';
@@ -53,11 +54,11 @@ export function step(dt){
     if(S.side)sideMove(dt); if(S.fo)foStep(dt); else if(S.open){ oaMove(dt); oaBoss(dt); if(S.mode==='fight'&&G.oa.state==='chase')G.B.def.attack(ph); } else G.B.def.attack(ph);
     if(!S.fo&&S.mode==='fight'&&S.echo!==null&&(!S.open||G.oa.state==='chase')) ECHO[S.echo].fn(BOSSES[S.echo].color);
     if(S.orbit) every('bloom',ph?4:5.5,()=>{G.B.bloomOuter=!G.B.bloomOuter;G.bands.push({r:G.B.bloomOuter?RO:RI,w:40,t:0,warn:.85,on:.3,hit:false});});
-    if(S.mode==='fight')beamStep(dt);
+    if(S.mode==='fight')beamStep(dt); eventsStep(dt);
     if(S.mode==='fight')trapStep(dt);
     if(S.mode==='fight')chestStep(dt);
     G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?7*(isMod('star')||isMod('hermit')?2:1)*(hasGear('pilgrim')?1.4:1)*dt:0)); G.P.cd=Math.max(0,G.P.cd-dt); G.P.shield=Math.max(0,G.P.shield-dt); if(G.P.shield<=0&&G.P.shieldFx){G.P.shieldFx.drop();G.P.shieldFx=null;} G.B.chill=Math.max(0,G.B.chill-dt);
-    if(!S.fo)G.P.cast-=dt; if(S.open||S.side){ if((S.side||G.still>.1)&&G.P.cast<=0){G.P.cast=rateNow();oaAim();} } else if(!S.fo&&G.P.cast<=0){G.P.cast+=rateNow(); if(!isMod('hermit')){ const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const off=n>1?(i-.5)*14:0, crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1), m=crit?5:1, wc=crit?'#f0a8d8':undefined, sx=G.P.x+off;
+    if(!S.fo)G.P.cast-=dt; if(S.open||S.side){ if((S.side||G.still>.1)&&G.P.cast<=0){G.P.cast=rateNow()*(G.P.surge>0?.55:1);oaAim();} } else if(!S.fo&&G.P.cast<=0){G.P.cast+=rateNow()*(G.P.surge>0?.55:1); if(!isMod('hermit')){ const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const off=n>1?(i-.5)*14:0, crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1), m=crit?5:1, wc=crit?'#f0a8d8':undefined, sx=G.P.x+off;
       if(S.orbit)G.bolts.push({x:sx,y:G.P.y,...toBoss(sx,G.P.y,620),d:G.P.scale*m*(G.P.tr===RI?1.5:1),r:crit?5:3,c:wc||'#ffe9a8',basic:true}); else G.bolts.push({x:sx,y:G.P.y-22,vy:-640,d:G.P.scale*m,r:crit?6:4,c:wc,basic:true}); } }}
     if(G.B.burning>0){G.B.burning-=dt;damage(5*G.P.scale*dt);}
     for(const h of G.helpers){ h.life-=dt;h.a+=dt*2.4;h.cd-=dt; const hx=G.P.x+Math.cos(h.a)*42,hy=G.P.y+Math.sin(h.a)*30; h.x=hx;h.y=hy;

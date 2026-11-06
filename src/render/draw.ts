@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { sideDrawFloor } from '../systems/sideView';
+import { pickupDraw } from '../systems/arenaEvents';
 import { W, ctx, reduced } from '../core/dom';
 import { G, S } from '../core/state';
 import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
@@ -41,9 +42,9 @@ function wizardFrame(set,rest,dir){ const [name,age]=G.P?wizardAction(G.P):['idl
 function drawWizard(x,y,fade,facing='south'){
   const c=ctx; if(fade)c.globalAlpha=.4;
   const WS=wizardSprites(G.P&&G.P.wizard), set=WS.dirs; let tip;
-  if(set&&WS.anim) tip=blitSprite(c,wizardFrame('arena',set[facing],facing),px(x),px(y)+8);
-  else if(set){ const dead=S.mode==='dying'||S.mode==='dead', age=dead?nowS()-(G.P.deathAt??nowS()):0, bob=dead?0:Math.round(Math.sin(nowS()*3.2)*R)/R*.8;
-    if(dead){ c.save(); c.translate(px(x),px(y)+8); c.rotate(Math.min(age*3.2,1.45)); tip=blitSprite(c,set[facing],0,0); c.restore(); } else tip=blitSprite(c,set[facing],px(x),px(y)+8+bob); }          // feet 8 logical px below the hitbox centre
+  if(set&&WS.anim){ const side=S.side&&G.plats&&G.plats.length, air=side&&G.P.air, af=air?SPRITE_OVERRIDES.anim.arena.walk?.[facing]?.frames[2]:null; tip=blitSprite(c,af||wizardFrame('arena',set[facing],facing),px(x),px(y)+8,side?1.45:1); }
+  else if(set){ const k=S.side&&G.plats&&G.plats.length?1.45:1, dead=S.mode==='dying'||S.mode==='dead', age=dead?nowS()-(G.P.deathAt??nowS()):0, bob=dead?0:Math.round(Math.sin(nowS()*3.2)*R)/R*.8;
+    if(dead){ c.save(); c.translate(px(x),px(y)+8); c.rotate(Math.min(age*3.2,1.45)); tip=blitSprite(c,set[facing],0,0); c.restore(); } else tip=blitSprite(c,set[facing],px(x),px(y)+8+bob,k); }          // feet 8 logical px below the hitbox centre
   else { blit(c,px(x),px(y)-2,wizSprite()); tip={x:px(x)+6,y:px(y)-11}; }
   if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);blit(c,tip.x,tip.y,disc(w.c,1.5));}
   if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(tip.x-.25,tip.y-.25,.5,.5);}
@@ -112,7 +113,7 @@ export function draw(){
   c.drawImage(G.bg,0,0,LW,G.LH); drawArenaLayers(c,LW); vfxStep();
   if(S.mode==='draw'){drawPull();return;}
   if(!G.B||S.mode==='shop') return;
-  if(S.fo&&G.fo)foFloor(c); if(S.open&&G.oa)oaDrawFloor(c); if(S.side&&G.plats)sideDrawFloor(c);
+  if(S.fo&&G.fo)foFloor(c); if(S.open&&G.oa)oaDrawFloor(c); if(S.side&&G.plats)sideDrawFloor(c); if(!S.fo&&!S.orbit&&S.mode==='fight')pickupDraw(c);
   if(S.orbit&&G.P){ for(const r of [RI,RO]){ const live=G.P.tr===r,rr=r*K,st=(live?5:7)/(rr*R); c.globalAlpha=live?.75:.3; c.fillStyle=live?BONE:G.B.color; for(let a=S.t*.1;a<TAU+S.t*.1;a+=st)c.fillRect(pr(LW/2+Math.cos(a)*rr),pr(CY()*K+Math.sin(a)*rr),1,1); c.globalAlpha=1; }
     for(const k of G.bands){ const w=px(k.w); if(k.t<k.warn){ if(Math.floor(S.t*12)%2){ arcDots(W/2,CY(),k.r-k.w/2,0,TAU,1,BONE); arcDots(W/2,CY(),k.r+k.w/2,0,TAU,1,BONE); } } else { arcDots(W/2,CY(),k.r,0,TAU,w,G.B.color); arcDots(W/2,CY(),k.r,0,TAU,Math.max(2,w-6),'#fffbee'); } } }
   for(const k of G.cols){

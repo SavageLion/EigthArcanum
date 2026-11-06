@@ -10,7 +10,7 @@ import { tone } from '../core/audio';
 
 /* Side-view fight ("The Fool"): the boss floats at the top and fires its usual patterns down the screen while you run and jump between
    one-way platforms. Bolts fly up on their own, so you line up under the boss. A double jump keeps it forgiving on a phone. */
-const FEET=14, GRAV=1750, JUMP=700, RUN=235;
+const FEET=20, GRAV=1750, JUMP=700, RUN=235;
 export const groundY=()=>G.H-82;
 function makePlatforms(){
   const g=groundY(), seed=arenaSeed(), L=(seed>>>3)%4, p=[{x:W/2,y:g,w:W+60,ground:true}];
@@ -32,6 +32,7 @@ export function sideMove(dt){
   const prev=P.y+FEET; P.vy=Math.min(P.vy+GRAV*dt,1100); P.y+=P.vy*dt; const feet=P.y+FEET;
   if(P.vy>=0) for(const q of G.plats){ if(q.ground||P.drop<=0){ if(Math.abs(P.x-q.x)<q.w/2+4&&prev<=q.y+1&&feet>=q.y){ P.y=q.y-FEET; P.vy=0; P.jumps=0; break; } } }
   if(P.y>groundY()-FEET){ P.y=groundY()-FEET; P.vy=0; P.jumps=0; }
+  P.air=P.vy<0||!G.plats.some(q=>Math.abs(q.y-(P.y+FEET))<1.5&&Math.abs(P.x-q.x)<q.w/2+4);
   if(G.B&&S.mode==='fight'&&Math.hypot(P.x-G.B.x,P.y-G.B.y)<G.B.rad*.8)hurt();
   if(G.sd&&G.sd.hint>0){ G.sd.hint-=dt; if(G.sd.hint<=0)$('hint').hidden=true; }
 }

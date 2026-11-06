@@ -4,6 +4,7 @@ import { G, S } from '../core/state';
 import { BOSSES, ELITE_SECOND } from '../data/bosses';
 import { hotSave } from '../main';
 import { sideEnd, sideStart } from './sideView';
+import { eventsEnd, eventsStart } from './arenaEvents';
 import { FIST, LW, SPRITE_OVERRIDES, WIZ_SETS, blit, disc, makeBg } from '../render/sprites';
 import { foPlan } from './bossPlans';
 import { paintSpells, spellBar } from './casting';
@@ -101,7 +102,7 @@ export function startFight(){
   G.B={...d,def:d,rad:S.fo?105:d.elite?56:46,x:W/2,y:S.orbit?CY():150,max:hp,hp,t:0,tm:{},flash:0,burning:0,chill:0,enraged:false,ang:0,jump:3.5,bloomOuter:false};
   G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];
   G.bg=makeBg(d); G.P.x=W/2;G.P.y=G.H-150;G.P.a=Math.PI/2;G.P.tr=RO;G.P.rr=RO;G.P.inv=0;G.P.shield=0;G.P.mana=G.P.spells.length?Math.round(G.P.manaMax/2):0;G.P.cd=0;G.P.cleanFight=true;G.P.moonUsed=false;G.P.beam=null;G.traps=[];S.chest=null;S.chestT=rnd(5,12);S.chestsLeft=(d.elite?1:0)+(Math.random()<.75?(Math.random()<.35?2:1):0);
-  if(S.fo)foStart(); else G.fo=null; $('hint').hidden=true; $('call').hidden=true; if(S.open)oaStart(); else oaEnd(); if(S.side)sideStart(); else sideEnd();
+  if(S.fo)foStart(); else G.fo=null; $('hint').hidden=true; $('call').hidden=true; if(S.open)oaStart(); else oaEnd(); if(S.side)sideStart(); else sideEnd(); eventsStart();
   if(isMod('sun'))G.P.hp=G.P.max;
   G.P.freeCast=hasPerk('wildfire')?1:0; if(hasPerk('grave')) G.helpers.push({a:0,life:14,d:2.2*G.P.scale,cd:.4,s:{els:[],type:'summon',tier:0},pw:G.P.scale,c:'#e9e3cb'});
   if(isMod('death')){G.P.heldHp=G.P.hp;G.P.hp=1;}

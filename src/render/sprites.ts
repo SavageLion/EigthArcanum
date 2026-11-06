@@ -106,10 +106,10 @@ async function loadArena(){
   SPRITE_OVERRIDES.arena.props=props;
 }
 /** Draw a sprite with its feet-centre at logical (x,footY). Returns the staff-orb position in logical px. */
-export function blitSprite(g,s:Sprite,x:number,footY:number){
-  const w=s.img.width,h=s.img.height, dx=x-(w/2+s.ax)/R, dy=footY-(h/2+s.ay)/R;
-  g.drawImage(s.img,Math.round(dx*R)/R,Math.round(dy*R)/R,w/R,h/R);
-  return {x:dx+s.tipx/R,y:dy+s.tipy/R};
+export function blitSprite(g,s:Sprite,x:number,footY:number,k=1){
+  const w=s.img.width,h=s.img.height, dx=x-(w/2+s.ax)/R*k, dy=footY-(h/2+s.ay)/R*k;
+  g.drawImage(s.img,Math.round(dx*R)/R,Math.round(dy*R)/R,w/R*k,h/R*k);
+  return {x:dx+s.tipx/R*k,y:dy+s.tipy/R*k};
 }
 /** Which frame of a clip to show. age = seconds since the clip started (one-shots hold their last frame). */
 export function clipFrame(c:Clip,age:number):Sprite{ const n=c.frames.length,i=Math.floor(age*c.fps); return c.frames[c.loop?i%n:Math.min(n-1,i)]; }
