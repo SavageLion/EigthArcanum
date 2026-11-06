@@ -16,7 +16,7 @@ export function eventsEnd(){ G.pickups=[]; G.hot=null; }
 function spot(){
   for(let n=0;n<30;n++){
     let x,y;
-    if(S.side&&G.plats){ const q=G.plats[1+Math.floor(Math.random()*(G.plats.length-1))]||G.plats[0]; x=q.x+rnd(-q.w/2+14,q.w/2-14); y=q.y-26; }
+    if(S.side&&G.plats){ const q=G.plats[1+Math.floor(Math.random()*(G.plats.length-1))]||G.plats[0]; x=q.x+rnd(-q.w/2+14,q.w/2-14); y=q.y-14; }
     else { x=rnd(40,W-40); y=rnd(G.H*.45,G.H-120); }
     if(G.pillars.length&&inPillar(x,y,14))continue;
     if(Math.hypot(x-G.P.x,y-G.P.y)<80)continue;

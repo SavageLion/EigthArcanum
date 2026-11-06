@@ -269,3 +269,11 @@ p{font-size:1.32rem;line-height:1.1}
 .slot.boss .front b,.slot.elite .front b{top:77.2%;height:9.2%;left:16%;right:16%;color:#3a2218;z-index:2}
 
 .linkbtn{appearance:none;background:none;border:1px dashed var(--gold-dim);color:var(--bone-dim);font-family:var(--body);font-size:.95rem;padding:6px;margin-top:4px;cursor:pointer}
+
+/* landscape side-view fight: keep the text out of the play area */
+#stage.side #hint{top:15%}
+#stage.side #omen{display:none}
+#stage.side #bossname{top:calc(var(--u)*1.2);font-size:.85rem}
+#stage.side #call{top:30%}
+#stage.side #intro{top:35%}
+#stage.side #spells{bottom:6px}

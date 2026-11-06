@@ -44,7 +44,7 @@ export function step(dt){
     G.B.flash=Math.max(0,G.B.flash-dt);
     if(fighting||S.mode==='intro'){
       G.B.t+=dt;
-      if(S.open){} else if(S.fo){G.B.x=W/2;G.B.y=G.H*.3;} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(S.side){ G.B.x=W/2+Math.sin(G.B.t*.55)*125; G.B.y=G.H*.44+Math.sin(G.B.t*1.2)*42; } else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
+      if(S.open){} else if(S.fo){G.B.x=W/2;G.B.y=G.H*.3;} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(S.side){ G.B.x=W/2+Math.sin(G.B.t*.55)*135; G.B.y=G.H*.5+Math.sin(G.B.t*1.2)*14; } else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
     }
   }
   if(fighting){

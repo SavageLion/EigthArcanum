@@ -6,7 +6,7 @@ import '@fontsource/pixelify-sans/700.css';
 import '@fontsource/vt323/400.css';
 import { G, S, newPlayer } from './core/state';
 import { swapRing } from './core/input';
-import { resize } from './core/size';
+import { resize, syncLayout } from './core/size';
 import { BOSSES, ELITE_POS, TOTAL, dealOrder } from './data/bosses';
 import { draw, drawTitle } from './render/draw';
 import { bossFrames, loadSprites } from './render/sprites';
@@ -23,7 +23,7 @@ import { EL, TYPES, spellCost, spellName } from './systems/spells';
 function frame(now){
   const dt=Math.min(.033,(now-G.last)/1000||0); G.last=now;
   if(S.mode==='title'){ S.t+=dt; drawTitle(); }
-  else { syncSpells(); if(S.mode==='draw'&&!S.paused)updateDraw(dt); if(!S.paused&&S.mode!=='pick'&&S.mode!=='dead'&&S.mode!=='victory'&&S.mode!=='draw'&&S.mode!=='shop') step(dt); draw(); }
+  else { syncLayout(); syncSpells(); if(S.mode==='draw'&&!S.paused)updateDraw(dt); if(!S.paused&&S.mode!=='pick'&&S.mode!=='dead'&&S.mode!=='victory'&&S.mode!=='draw'&&S.mode!=='shop') step(dt); draw(); }
   requestAnimationFrame(frame);
 }
 export function hotSave(){ S.saved=G.P?{wizard:G.P.wizard,order:S.order,pos:S.pos,hp:G.P.hp,seconds:S.runSeconds,used:S.usedOmens,gear:G.P.gear,slots:G.P.slots,gold:G.P.gold,wand:G.P.wand,max:G.P.max,manaMax:G.P.manaMax,thirdEye:G.P.thirdEye,spells:G.P.spells.map(s=>({...s}))}:null; }
