@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { W, ctx, reduced } from '../core/dom';
 import { G, S } from '../core/state';
-import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
+import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
 import { CY, RI, RO, WANDS, isMod } from '../systems/deck';
 import { foBoss, foFloor } from '../systems/faceoff';
 import { drawPull } from '../systems/flow';
@@ -27,7 +27,7 @@ export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.rou
 const nowS=()=>performance.now()/1000;
 /** the sprite set for a wizard: the Raven uses the animated Pixel Lab art, the others their coded art (static, with a little bob) */
 const codedCache={};
-function wizardSprites(id){ if(!id||id==='raven') return {dirs:SPRITE_OVERRIDES.wizardDirs,back:SPRITE_OVERRIDES.wizardBack,anim:true}; return codedCache[id]||(codedCache[id]={dirs:codedWizardSet(id),back:codedWizardLarge(id),anim:false}); }
+function wizardSprites(id){ if(!id||id==='raven') return {dirs:SPRITE_OVERRIDES.wizardDirs,back:SPRITE_OVERRIDES.wizardBack,anim:true}; const W=WIZ_SETS[id]; if(W) return {dirs:W.dirs,back:W.back,anim:false}; return codedCache[id]||(codedCache[id]={dirs:codedWizardSet(id),back:codedWizardLarge(id),anim:false}); }
 /** What the wizard is doing: one-shots (hurt, cast) win over walk, which wins over idle. Returns [clip name, seconds into it]. */
 function wizardAction(P){ const t=nowS();
   if(S.mode==='dying'||S.mode==='dead') return ['death',t-(P.deathAt??t)];

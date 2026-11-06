@@ -3,7 +3,7 @@ import { W, muteBtn, ov, reduced, stage } from '../core/dom';
 import { G, S } from '../core/state';
 import { BOSSES, ELITE_SECOND } from '../data/bosses';
 import { hotSave } from '../main';
-import { LW, SPRITE_OVERRIDES, blit, disc, makeBg } from '../render/sprites';
+import { LW, SPRITE_OVERRIDES, WIZ_SETS, blit, disc, makeBg } from '../render/sprites';
 import { foPlan } from './bossPlans';
 import { paintSpells, spellBar } from './casting';
 import { CY, ECHO, GOODS, POS_HP, RO, WANDS, fightReward, hasPerk, hasWand, isMod, posHp, relPos, shuffle, spellValue, total } from './deck';
@@ -256,7 +256,7 @@ export function showTitle(){
 }
 /** pending unlock messages (new wizard, new run length) as a banner */
 export function unlockBanner(){ const u=takeUnlocks(); return u.length?`<div class="unlock">${u.map(t=>`<b>★ ${t}</b>`).join('')}</div>`:''; }
-function portraitHTML(id){ const raven=id==='raven'&&SPRITE_OVERRIDES.wizardFront; if(raven) return `<img alt="" src="${SPRITE_OVERRIDES.wizardFront.img.src}">`; const c=codedWizardPortrait(id); return c?`<img alt="" src="${c.toDataURL()}">`:''; }
+function portraitHTML(id){ const W=WIZ_SETS[id]; if(W) return `<img alt="" src="${W.front.img.src||W.front.img.toDataURL()}">`; const raven=id==='raven'&&SPRITE_OVERRIDES.wizardFront; if(raven) return `<img alt="" src="${SPRITE_OVERRIDES.wizardFront.img.src}">`; const c=codedWizardPortrait(id); return c?`<img alt="" src="${c.toDataURL()}">`:''; }
 const pips=(n,max)=>'<i class="pip on"></i>'.repeat(n)+'<i class="pip"></i>'.repeat(Math.max(0,max-n));
 /** between the title and the first card draw: pick a wizard and a run length */
 export function showSetup(){
