@@ -18,7 +18,7 @@ export const dirOf=(ang:number)=>DIRS[((Math.round(ang/(Math.PI/4))%8)+8)%8];
 export type Sprite={img:HTMLImageElement,ax:number,ay:number,tipx:number,tipy:number};
 export type Clip={fps:number,loop:boolean,frames:Sprite[]};
 export type ClipSet=Record<string,Record<string,Clip>>;   // anim name -> direction -> clip
-export const SPRITE_OVERRIDES:{boss:Record<number,any>,bossAtk:Record<number,any>,wizardDirs:Record<string,Sprite>|null,wizardBack:Sprite|null,wizardFront:Sprite|null,chest:{idle:HTMLImageElement|null,open:HTMLImageElement[],mimic:HTMLImageElement[]}|null,hands:HTMLImageElement[]|null,icons:Set<string>,anim:{arena:ClipSet,large:ClipSet},arena:{tiles:HTMLImageElement[],pillar:Sprite|null}}={boss:{},bossAtk:{},wizardDirs:null,wizardBack:null,wizardFront:null,chest:null,hands:null,icons:new Set<string>(),anim:{arena:{},large:{}},arena:{tiles:[],pillar:null}};
+export const SPRITE_OVERRIDES:{boss:Record<number,any>,bossAtk:Record<number,any>,shot:Record<number,HTMLImageElement>,wizardDirs:Record<string,Sprite>|null,wizardBack:Sprite|null,wizardFront:Sprite|null,chest:{idle:HTMLImageElement|null,open:HTMLImageElement[],mimic:HTMLImageElement[]}|null,hands:HTMLImageElement[]|null,icons:Set<string>,anim:{arena:ClipSet,large:ClipSet},arena:{tiles:HTMLImageElement[],pillar:Sprite|null}}={boss:{},bossAtk:{},shot:{},wizardDirs:null,wizardBack:null,wizardFront:null,chest:null,hands:null,icons:new Set<string>(),anim:{arena:{},large:{}},arena:{tiles:[],pillar:null}};
 
 /** rest = the still pose of the same direction: animation frames reuse its foot anchor so they bob instead of jitter. */
 function analyse(img:HTMLImageElement,rest?:Sprite):Sprite{
@@ -72,9 +72,14 @@ async function loadIcons(){ try{ const r=await fetch(import.meta.env.BASE_URL+'a
 /** Hand-made boss art: an idle loop (ping-pong) and an attack pose clip. White silhouettes give the hit flash. */
 function packBoss(src:HTMLImageElement){ const c=mk(src.width,src.height); c.getContext('2d').drawImage(src,0,0); (c as any).hi=true; const w=mk(src.width,src.height),g=w.getContext('2d'); g.drawImage(src,0,0); g.globalCompositeOperation='source-in'; g.fillStyle='#fff'; g.fillRect(0,0,w.width,w.height); (w as any).hi=true; return {img:c,white:w}; }
 async function loadBosses(){
-  const idle=await Promise.all([0,1,2,3].map(i=>loadImage(`boss/cinder/idle/${i}.png`))), atk=await Promise.all([1,2,3,4,5].map(i=>loadImage(`boss/cinder/attack/${i}.png`)));
-  if(idle.some(i=>!i)||atk.some(i=>!i)) return;
-  const I=idle.map(packBoss); SPRITE_OVERRIDES.boss[0]=[I[0],I[1],I[2],I[3],I[2],I[1]]; SPRITE_OVERRIDES.bossAtk[0]=atk.map(packBoss);
+  let man:any; try{ const r=await fetch(import.meta.env.BASE_URL+'assets/boss/manifest.json'); if(!r.ok) return; man=await r.json(); }catch(e){ return; }
+  await Promise.all(Object.entries<any>(man).map(async([idx,b])=>{
+    const load=async(kind:string,order:number[])=>{ const by:Record<number,HTMLImageElement|null>={}; await Promise.all([...new Set(order)].map(async n=>{ by[n]=await loadImage(`boss/${b.slug}/${kind}/${n}.png`); })); return order.map(n=>by[n]); };
+    const [idle,atk,shot]=await Promise.all([load('idle',b.idle),load('attack',b.attack),b.shot?loadImage(`boss/${b.slug}/shot.png`):Promise.resolve(null)]);
+    if(idle.some(i=>!i)||atk.some(i=>!i)) return;
+    SPRITE_OVERRIDES.boss[+idx]=idle.map(packBoss); SPRITE_OVERRIDES.bossAtk[+idx]=atk.map(packBoss);
+    if(shot){ (shot as any).hi=true; SPRITE_OVERRIDES.shot[+idx]=shot; }
+  }));
 }
 /** Floor tiles and pillar for the open arena. */
 async function loadArena(){
