@@ -8,7 +8,7 @@ import { swapRing } from './core/input';
 import { resize } from './core/size';
 import { BOSSES, ELITE_POS, TOTAL, dealOrder } from './data/bosses';
 import { draw, drawTitle } from './render/draw';
-import { bossFrames } from './render/sprites';
+import { bossFrames, loadSprites } from './render/sprites';
 import { foPlan } from './systems/bossPlans';
 import { castSpell, syncSpells } from './systems/casting';
 import { CY, GOODS, OMENS, RI, RO, WANDS } from './systems/deck';
@@ -36,6 +36,6 @@ function start(data){
   requestAnimationFrame(t=>{G.last=t;frame(t)});
 }
 try{ window.claude?.hot?.snapshot?.(()=>({saved:S.saved||null})); }catch(e){}
-window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+loadSprites().finally(()=>{ window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {}); });
 
 window.__arcana={damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,showLoot,lootOrShop,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foThrow,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,showShop,openShop,leaveShop,buy,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,takeSpell,forgeOptions,castSpell,spellName,spellCost,nextBoss,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};

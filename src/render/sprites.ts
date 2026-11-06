@@ -8,7 +8,16 @@ import { BONE, GOLD, TAU, clamp, rnd } from '../core/util';
 /* ---------- pixel renderer: all art is drawn on a 160px-wide canvas and scaled up with hard edges.
    SPRITE_OVERRIDES is the slot for final art: boss sheets and wizard frames replace these placeholders. ---------- */
 export const LW=160, K=LW/W;
-export const SPRITE_OVERRIDES={boss:{},wizard:null};
+export const SPRITE_OVERRIDES:{boss:Record<number,any>,wizard:CanvasImageSource|null,wizardBack:CanvasImageSource|null}={boss:{},wizard:null,wizardBack:null};
+
+/** Loads Pixel Lab art from public/assets. Anything missing or failing to load keeps the procedural fallback. */
+function loadImage(name:string):Promise<HTMLImageElement|null>{
+  return new Promise(res=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=import.meta.env.BASE_URL+'assets/'+name; });
+}
+export async function loadSprites(){
+  const [front,back]=await Promise.all([loadImage('wizard/south.png'),loadImage('wizard/north.png')]);
+  SPRITE_OVERRIDES.wizard=front; SPRITE_OVERRIDES.wizardBack=back;
+}
 const bossCache={};
 export function bossFrames(i){
   if(SPRITE_OVERRIDES.boss[i]) return SPRITE_OVERRIDES.boss[i];

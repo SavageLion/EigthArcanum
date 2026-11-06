@@ -20,9 +20,10 @@ function arcDots(x,y,rad,fromA,toA,w,col){
 export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)*K));c.fillStyle=col;for(let i=0;i<=n;i++)c.fillRect(Math.round((x0+(x1-x0)*i/n)*K),Math.round((y0+(y1-y0)*i/n)*K),w,w); }
 function drawWizard(x,y,fade){
   const c=ctx; if(fade)c.globalAlpha=.4;
-  blit(c,px(x)+(G.P&&G.P.vx>2?1:G.P&&G.P.vx<-2?-1:0)*0,px(y)-2,SPRITE_OVERRIDES.wizard||wizSprite());
-  if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);c.fillStyle=w.c;c.fillRect(px(x)+5,px(y)-12,3,3);}
-  if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(px(x)+6,px(y)-11,1,1);}
+  const art=SPRITE_OVERRIDES.wizard, wx=art?11:5, wy=art?-15:-12; // Pixel Lab raven is 32px, the procedural wizard ~20px; wx/wy = staff tip
+  blit(c,px(x),px(y)-(art?4:2),art||wizSprite());
+  if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);c.fillStyle=w.c;c.fillRect(px(x)+wx,px(y)+wy,3,3);}
+  if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(px(x)+wx+1,px(y)+wy+1,1,1);}
   c.globalAlpha=1;
 }
 function drawPlayer(){
