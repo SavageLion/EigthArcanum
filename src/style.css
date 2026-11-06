@@ -211,7 +211,7 @@ p{font-size:1.32rem;line-height:1.1}
 .inner>.go:last-child{position:sticky;bottom:6px;z-index:3}
 
 /* title sits inside the parchment banner (banner spans ~74-88% of the card height) */
-.slot .front b{top:75.5%;bottom:auto;height:13%;left:19%;right:19%;padding:0}
+.slot .front b{top:76%;bottom:auto;height:8.5%;left:17%;right:17%;padding:0;white-space:nowrap}
 
 /* ---- wizard select + unlock banners ---- */
 .unlock{display:flex;flex-direction:column;gap:4px;background:#2a1a38;border:2px solid var(--gold);box-shadow:3px 3px 0 #0b0814;padding:8px 10px}

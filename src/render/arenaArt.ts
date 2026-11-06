@@ -45,8 +45,16 @@ function flagstones(c,b,WP,HP){
 }
 
 /* ---- open field: constellations, plus a drifting star layer drawn every frame ---- */
+/** soft dithered cloud blobs in a colour, painted pixel by pixel so they match the rest of the art */
+function cloud(c,cx,cy,rx,ry,col,al,rng){ for(let y=-ry;y<=ry;y+=2) for(let x=-rx;x<=rx;x+=2){ const d=Math.hypot(x/rx,y/ry); if(d<1&&rng()<(1-d)*1.1) px1(c,cx+x,cy+y,col,al*(1-d*.5),2); } }
+function skyStyle(c,b,WP,HP,rng){
+  const v=arenaSeed()%4;
+  if(v===1){ for(let k=0;k<5;k++) cloud(c,WP*rng(),HP*(.1+rng()*.7),60+rng()*70,22+rng()*26,b.rays,.14,rng); }                                   // nebula
+  else if(v===2){ for(let k=0;k<3;k++){ const y0=HP*(.12+k*.12), ph=rng()*6; for(let x=0;x<WP;x+=2){ const y=y0+Math.sin(x*.012+ph)*26; for(let t=0;t<34;t+=2) if(((x>>1)+(t>>1))%3) px1(c,x,y+t,k%2?'#8fe0c8':b.rays,.1*(1-t/34),2); } } }  // aurora
+  else if(v===3){ for(let k=0;k<9;k++) cloud(c,WP*rng(),HP*(.05+rng()*.6),50+rng()*60,14+rng()*14,'#0b0814',.45,rng); }                      // storm banks
+}
 function sky(c,b,WP,HP){
-  const rng=mulberry(77+S.stage*13);
+  const rng=mulberry(77+S.stage*13); skyStyle(c,b,WP,HP,mulberry(arenaSeed()));
   for(let k=0;k<3;k++){
     const n=5+((rng()*3)|0); let x=WP*(.15+rng()*.7), y=HP*(.12+rng()*.62); const pts=[];
     for(let i=0;i<n;i++){ pts.push([x,y]); x+= (rng()-.5)*WP*.22; y+=(rng()-.35)*HP*.07; x=Math.min(WP-14,Math.max(14,x)); y=Math.min(HP-40,Math.max(40,y)); }
@@ -74,11 +82,13 @@ function astrolabe(c,b,WP,HP){
   const {cy}=orbitCentre(), cx=WP/2, ro=RO*K*R, ri=RI*K*R, gold='#8f7440';
   c.globalAlpha=.4; c.fillStyle='#0b0814'; c.beginPath(); c.arc(cx,cy,ro+16,0,TAU); c.fill();
   dotRing(c,cx,cy,ro+16,GOLD,.55); dotRing(c,cx,cy,ro+10,gold,.3); dotRing(c,cx,cy,(ro+ri)/2,gold,.16,2); dotRing(c,cx,cy,ri-7,gold,.25,2); dotRing(c,cx,cy,38,gold,.2,2);
+  const ov=arenaSeed()%3; if(ov===1){ for(let k=0;k<6;k++){ const a=k*TAU/6; dotLine(c,cx,cy,cx+Math.cos(a)*ri,cy+Math.sin(a)*ri,b.rays,.12,3); } dotRing(c,cx,cy,ri*.6,b.rays,.2,2); } else if(ov===2){ for(let k=0;k<3;k++){ const a=k*TAU/3-TAU/4, pts=[0,1,2].map(j=>[cx+Math.cos(a+j*TAU/3)*ri*.9,cy+Math.sin(a+j*TAU/3)*ri*.9]); dotLine(c,pts[0][0],pts[0][1],pts[1][0],pts[1][1],b.rays,.14,3); } }
   for(let deg=0;deg<360;deg+=3){ const a=deg*Math.PI/180, big=deg%30===0, mid=deg%15===0, len=big?8:mid?5:3, r0=ro+16; dotLine(c,cx+Math.cos(a)*r0,cy+Math.sin(a)*r0,cx+Math.cos(a)*(r0+len),cy+Math.sin(a)*(r0+len),big?GOLD:gold,big?.7:.4); }
   for(let k=0;k<12;k++){ const a=k*TAU/12+TAU/24; dotLine(c,cx+Math.cos(a)*(ri-7),cy+Math.sin(a)*(ri-7),cx+Math.cos(a)*(ro+10),cy+Math.sin(a)*(ro+10),gold,.12,2); }
   // glyph ring (separate canvas so it can rotate)
   const rr=(ro+ri)/2, S2=Math.ceil((rr+8)*2)+2, g=mk(S2,S2), gc=g.getContext('2d');
-  for(let k=0;k<12;k++){ const a=k*TAU/12-TAU/4, gx=S2/2+Math.cos(a)*rr-3.5, gy=S2/2+Math.sin(a)*rr-3.5, m=GLYPHS[k%GLYPHS.length]; m.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(ch==='#') px1(gc,gx+x,gy+y,GOLD,.55); })); }
+  const NG=[8,12,16][arenaSeed()%3];
+  for(let k=0;k<NG;k++){ const a=k*TAU/NG-TAU/4, gx=S2/2+Math.cos(a)*rr-3.5, gy=S2/2+Math.sin(a)*rr-3.5, m=GLYPHS[k%GLYPHS.length]; m.forEach((row,y)=>[...row].forEach((ch,x)=>{ if(ch==='#') px1(gc,gx+x,gy+y,GOLD,.55); })); }
   g.hi=true; G.bgGlyph=g;
 }
 export function drawArenaLayers(c,LW){
@@ -92,8 +102,11 @@ function hall(c,b,WP,HP){
   dotRing(c,cx,cy,70,b.rays,.28); dotRing(c,cx,cy,64,b.rays,.14,2); dotRing(c,cx,cy,26,b.rays,.3);
   for(let k=0;k<16;k++){ const a=k*TAU/16; dotLine(c,cx+Math.cos(a)*26,cy+Math.sin(a)*26,cx+Math.cos(a)*70,cy+Math.sin(a)*70,b.rays,.18,2); }
   for(let k=0;k<8;k++){ const a=k*TAU/8+TAU/16; dotRing(c,cx+Math.cos(a)*48,cy+Math.sin(a)*48,9,b.rays,.22,2); }
+  const hv=arenaSeed()%3;
+  if(hv===1){ for(const dx of [-70,70]) { dotRing(c,cx+dx,cy+30,24,b.rays,.2,2); dotRing(c,cx+dx,cy+30,10,b.rays,.2); } }
+  else if(hv===2){ for(let k=0;k<5;k++){ const x=WP*(.2+k*.15); dotLine(c,x,cy-40,x,floor,b.rays,.12,3); dotRing(c,x,cy-40,12,b.rays,.18,2); } }
   for(const side of [0,1]){
-    const w=22, x0=side?WP-w:0;
+    const w=hv===2?30:22, x0=side?WP-w:0;
     c.globalAlpha=1; c.fillStyle='#150d1f'; c.fillRect(x0,0,w,floor);
     for(let x=0;x<w;x+=5){ c.globalAlpha=.55; c.fillStyle='#241636'; c.fillRect(x0+x,0,2,floor); c.globalAlpha=.35; c.fillStyle='#0b0814'; c.fillRect(x0+x+2,0,1,floor); }
     const edge=side?x0:x0+w-2; c.globalAlpha=.8; c.fillStyle='#8f7440'; c.fillRect(edge,0,2,floor);

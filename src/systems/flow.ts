@@ -46,7 +46,7 @@ export function bossCardArt(d,stageIdx){
   const src=bossFrames(stageIdx)[0].img, sw=src.width, sh=src.height, t=document.createElement('canvas'); t.width=sw; t.height=sh;
   const tc=t.getContext('2d'); tc.drawImage(src,0,0); const px=tc.getImageData(0,0,sw,sh).data; let x0=sw,y0=sh,x1=0,y1=0;
   for(let y=0;y<sh;y++)for(let x=0;x<sw;x++) if(px[(y*sw+x)*4+3]>40){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
-  const cw=x1-x0+1, ch=y1-y0+1, k=Math.min(30/cw,38/ch), dw=Math.max(1,Math.round(cw*k)), dh=Math.max(1,Math.round(ch*k));
+  const cw=x1-x0+1, ch=y1-y0+1, k=Math.min(28/cw,34/ch), dw=Math.max(1,Math.round(cw*k)), dh=Math.max(1,Math.round(ch*k));
   const s=document.createElement('canvas'); s.width=dw; s.height=dh; const sc=s.getContext('2d'); sc.imageSmoothingEnabled=true; sc.imageSmoothingQuality='high'; sc.drawImage(src,x0,y0,cw,ch,0,0,dw,dh);
   const id=sc.getImageData(0,0,dw,dh), a=id.data;
   for(let i=0;i<a.length;i+=4){ a[i+3]=a[i+3]>110?255:0; if(a[i+3]){ a[i]=Math.round(a[i]/24)*24; a[i+1]=Math.round(a[i+1]/24)*24; a[i+2]=Math.round(a[i+2]/24)*24; } }
@@ -69,7 +69,7 @@ export function showDraw(){
   ov.className='overlay pullov'; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default';
   ov.innerHTML=`<div class="pullhead"><div class="eyebrow">Pull ${S.pos+1} of ${total()}${d.elite?' · Elite':''}</div><div class="gold" id="pullstatus"></div></div>
     <div class="slots">
-      ${slotHTML(0,d.elite?'elite':'boss',`<img class="art" src="${art}" alt=""><b>${d.name}</b>`,d.elite?'Elite':'Boss')}
+      ${slotHTML(0,d.elite?'elite':'boss',`<img class="art" src="${art}" alt=""><b>${d.name.replace(/^The /,'')}</b>`,d.elite?'Elite':'Boss')}
       ${slotHTML(1,'omencard',`<img class="art" alt="" src="${import.meta.env.BASE_URL}assets/cards/omen/${omen.id}.png"><small class="num">${omen.num}</small><b>${omen.name}</b>`,'Omen')}
       ${slotHTML(2,'arenacard',`<img class="art" alt="" src="${import.meta.env.BASE_URL}assets/cards/arena/${arena.id}.png"><small class="num">${arena.num}</small><b>${arena.name}</b>`,'Arena')}
     </div>
@@ -78,7 +78,7 @@ export function showDraw(){
   setStatus(); hotSave(); fitCardText(); document.fonts&&document.fonts.ready.then(fitCardText);
 }
 /** shrink each card title until it fits inside its banner (names run from 'Strength' to 'The Mother of Thorns') */
-export function fitCardText(){ ov.querySelectorAll('.slot .front b').forEach(b=>{ b.style.fontSize=''; let fs=parseFloat(getComputedStyle(b).fontSize)||10; while((b.scrollHeight>b.clientHeight+1||b.scrollWidth>b.clientWidth+1)&&fs>5.5){ fs-=.5; b.style.fontSize=fs+'px'; } }); }
+export function fitCardText(){ ov.querySelectorAll('.slot .front b').forEach(b=>{ b.style.fontSize=''; let fs=parseFloat(getComputedStyle(b).fontSize)||10; while((b.scrollHeight>b.clientHeight+1||b.scrollWidth>b.clientWidth+1)&&fs>5){ fs-=.5; b.style.fontSize=fs+'px'; } }); }
 function slotHTML(i,kind,front,label){ return `<div class="slot ${kind}" id="slot${i}"><div class="slotin"><div class="face back"><span>?</span><em>${label}</em></div><div class="face front">${front}</div></div></div>`; }
 function setStatus(){ const e=$('pullstatus'); if(!e||!G.pull)return; e.textContent=G.pull.done?'':G.pull.phase==='wait'?'Tap to turn the card':'Shuffling…'; }
 function pullTap(e){
