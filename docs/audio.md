@@ -3,6 +3,10 @@
 The game has a built-in synth for every sound, and plays recorded files when it finds them.
 Nothing here is required: with no files, the synth plays.
 
+## Generated score (default)
+With no music files registered, the game plays a procedural score built in code (`src/core/score.ts`): a pad, bass, arpeggio, drums and a random-walk lead per scene, each with its own tempo, scale and chord loop. Each boss gets its own key. It needs no files and has no licence. Edit `SCENES` in `score.ts` to change tempo, scale, chords or density. Previews of every scene render to `docs/music-preview/*.wav` (git-ignored).
+Recorded files, when added below, replace it slot by slot.
+
 ## Adding recorded audio
 1. Put music in `public/assets/audio/music/` and effects in `public/assets/audio/sfx/` (mp3, ogg, aac or wav).
 2. Register them in `public/assets/audio/manifest.json`:

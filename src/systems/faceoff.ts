@@ -97,7 +97,7 @@ export function startFight(){
   if(isMod('sun'))G.P.hp=G.P.max;
   if(isMod('death')){G.P.heldHp=G.P.hp;G.P.hp=1;}
   stage.style.setProperty('--boss',d.color);
-  setMusic(d.elite?'elite':'battle'); S.mode='intro';S.t=0; ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
+  setMusic(d.elite?'elite':'battle',S.stage); S.mode='intro';S.t=0; ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
   $('bossname').textContent=`${d.num} · ${d.name}`; $('bossname').hidden=false;
   const tag=[d.elite&&'Elite',S.mod&&S.mod.name,!S.fo&&S.echo!==null&&`Echo: ${ECHO[S.echo].name}`].filter(Boolean).join(' · ');
   $('omen').textContent=tag; $('omen').hidden=!tag;
