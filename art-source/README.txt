@@ -9,3 +9,7 @@ Animations (Pixel Lab template clips, 1 gen/direction):
   raven-80-anim/   idle(breathing-idle) walk(walking-6-frames) cast(fireball) hurt(taking-punch), all 8 directions -> anim/arena
   raven-112-anim/  idle, cast, hurt for north only (face-off back view) -> anim/large
 Repack after regenerating: node tools/pack-wizard-anim.mjs
+
+Arena art (Pixel Lab):
+  arena-pillar/pillar.png  object 64x80 (fdeed24e-2322-48b0-b501-45a491b41963) -> public/assets/arena/pillar.png
+  arena-tiles/tile_0..15    square top-down 32px stone set (ea11c67c-6238-43bd-b319-47374f014927) -> public/assets/arena/tiles/

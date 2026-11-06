@@ -26,6 +26,9 @@ npm run smoke      # build first; plays all 16 bosses x 4 arenas in headless Chr
 ## Resolution
 The canvas is `LW*R` = 320 px wide (`R=2`, in `render/pixel.ts`). Code still draws in 160-unit logical coordinates through a 2x transform; art made with `pixelise()`, `disc()`, `makeBg()` and Pixel Lab images is flagged `hi` and drawn at its true 2x resolution by `blit()`. Hand-made pixel maps (hearts, skull, icons) are still logical-size and look chunkier.
 
+## Arena looks
+`render/arenaArt.ts` paints a backdrop per arena type onto the background canvas: constellations plus a drifting star layer (open field), an astrolabe plate with a turning glyph ring (orbit), a gothic hall (face-off), and flagstones from the Pixel Lab tile set with carved pillars (open arena). The HUD (gilded bars, hearts) is drawn in `render/draw.ts`; overlay screens are HTML styled in `style.css`.
+
 ## State
 Everything that used to be a closure variable (`P` player, `B` boss, `shots`, `H`, ...) now lives on one
 exported object: `G` in `core/state.ts` (`G.P`, `G.B`, `G.shots`...). `S` is the run/mode state.

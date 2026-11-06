@@ -3,7 +3,7 @@ import { W, reduced } from '../core/dom';
 import { G, S } from '../core/state';
 import { KEYS } from '../core/input';
 import { lineDots } from '../render/draw';
-import { LW, px } from '../render/sprites';
+import { LW, SPRITE_OVERRIDES, blitSprite, px } from '../render/sprites';
 import { ring } from './attacks';
 import { OA_STYLE } from './bossPlans';
 import { hasWand, isMod } from './deck';
@@ -50,8 +50,10 @@ export function oaBoss(dt){
 }
 export function oaAim(){ if(isMod('hermit'))return; const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const crit=hasWand('gambler')&&Math.random()<.15,sx=G.P.x+(n>1?(i-.5)*14:0),a=Math.atan2(G.B.y-G.P.y,G.B.x-sx); G.bolts.push({x:sx,y:G.P.y,vx:Math.cos(a)*640,vy:Math.sin(a)*640,d:G.P.scale*(crit?5:1),r:crit?5:3,c:crit?'#f0a8d8':'#ffe9a8',basic:true}); } }
 export function oaDrawFloor(c){
-  c.fillStyle='#0b0814'; c.globalAlpha=.3; for(let x=0;x<LW;x+=16)c.fillRect(x,0,1,G.LH); for(let y=0;y<G.LH;y+=16)c.fillRect(0,y,LW,1); c.globalAlpha=1;
-  for(const p of G.pillars){ const x=px(p.x-p.w/2),y=px(p.y-p.h/2),w=px(p.w),h=px(p.h); c.fillStyle='#0b0814';c.fillRect(x-1,y-1,w+2,h+6); c.fillStyle='#3f3a4c';c.fillRect(x,y+h-1,w,5); c.fillStyle='#8a8498';c.fillRect(x,y,w,h); c.fillStyle='#b5afc2';c.fillRect(x,y,w,2);c.fillRect(x,y,2,h); c.fillStyle='#5c566c';c.fillRect(x+6,y+6,w-12,1);c.fillRect(x+6,y+h-7,w-12,1); }
+  const pil=SPRITE_OVERRIDES.arena.pillar;
+  if(!SPRITE_OVERRIDES.arena.tiles.length){ c.fillStyle='#0b0814'; c.globalAlpha=.3; for(let x=0;x<LW;x+=16)c.fillRect(x,0,1,G.LH); for(let y=0;y<G.LH;y+=16)c.fillRect(0,y,LW,1); c.globalAlpha=1; }
+  if(pil) for(const p of G.pillars){ const fy=px(p.y+p.h/2); c.globalAlpha=.4; c.fillStyle='#0b0814'; c.beginPath(); c.ellipse(px(p.x),fy-.5,11,3,0,0,TAU); c.fill(); c.globalAlpha=1; blitSprite(c,pil,px(p.x),fy+1); }
+  else for(const p of G.pillars){ const x=px(p.x-p.w/2),y=px(p.y-p.h/2),w=px(p.w),h=px(p.h); c.fillStyle='#0b0814';c.fillRect(x-1,y-1,w+2,h+6); c.fillStyle='#3f3a4c';c.fillRect(x,y+h-1,w,5); c.fillStyle='#8a8498';c.fillRect(x,y,w,h); c.fillStyle='#b5afc2';c.fillRect(x,y,w,2);c.fillRect(x,y,2,h); c.fillStyle='#5c566c';c.fillRect(x+6,y+6,w-12,1);c.fillRect(x+6,y+h-7,w-12,1); }
   if(G.oa)for(const q of G.oa.patches){ const cx=px(q.x),cy=px(q.y),col=q.kind==='fire'?(Math.floor(S.t*8+q.x)%2?'#f2a03d':'#e8592c'):q.kind==='ice'?'#bfeaf2':'#d9d2bb'; c.fillStyle=col; c.globalAlpha=q.t<.6&&Math.floor(S.t*10)%2?.3:.85; for(let i=0;i<7;i++){const a=i*.9+q.x;c.fillRect(cx+Math.round(Math.cos(a)*(2+i%4*2)),cy+Math.round(Math.sin(a)*(2+i%4*2)),2,2);} c.globalAlpha=1; }
   if(G.oa&&S.mode==='fight'&&G.oa.state==='windup'&&Math.floor(S.t*12)%2){ lineDots(G.B.x,G.B.y,G.oa.tx,G.oa.ty,'#ff7a6e',2); }
 }

@@ -137,7 +137,11 @@ export const sig={bolt:pixIcon('bolt'),nova:pixIcon('nova'),ward:pixIcon('ward')
 const wandInfo=()=>WANDS.find(w=>w.id===G.P.wand);
 const handHTML=()=>{ const items=G.P.spells.map(spellName); if(G.P.wand)items.push(wandInfo().name); Object.values(G.P.gear).forEach(id=>{if(id)items.push(gearOf(id).name);}); return items.length?`<div class="hand">${items.map(n=>`<i>${n}</i>`).join('')}</div>`:''; };
 const goldHTML=()=>`<div class="gold"><span class="coin"></span>${G.P.gold} gold</div>`;
-export function show(html){ ov.innerHTML=`<div class="inner">${html}</div>`; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default'; }
+export function show(html){ ov.innerHTML=`<div class="inner">${html}</div>`; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default'; animateHeroes(); }
+/** The raven for title, victory and defeat screens: front view, looping an animation clip (or holding its last frame). */
+const HERO_FRAMES={idle:4,hurt:6};
+export function heroHTML(clip='idle',hold=false){ const n=HERO_FRAMES[clip], base=import.meta.env.BASE_URL+'assets/wizard/anim/arena/'+clip+'/south/'; return `<div class="hero"><img alt="" src="${base}${hold?n-1:0}.png" data-base="${base}" data-n="${hold?0:n}"></div>`; }
+function animateHeroes(){ ov.querySelectorAll('.hero img').forEach(img=>{ const n=+img.dataset.n; if(!n)return; let i=0; const t=setInterval(()=>{ if(!img.isConnected){clearInterval(t);return;} i=(i+1)%n; img.src=img.dataset.base+i+'.png'; },170); }); }
 function cardHTML(s,i,label){
   const r=recipeOf(s);
   return `<button class="card${r?' secret':''}" data-i="${i}" style="--boss:${EL[s.els[0]].c}">${sig[s.type]}<div class="txt">${label?`<small>${r?'Secret recipe · ':''}${label}</small>`:''}<b>${spellName(s)}</b><span>${spellDesc(s)}</span><em>${spellCost(s)} mana</em></div></button>`;
@@ -202,7 +206,7 @@ export function buy(it){ if(it.sold||G.P.gold<it.cost)return; G.P.gold-=it.cost;
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 export function showDead(){
   S.mode='dead'; const d=BOSSES[S.stage];
-  show(`<div class="eyebrow">The run ends on pull ${S.pos+1} of 8</div><h2>${d.name} takes the hand</h2>
+  show(`${heroHTML('hurt',true)}<div class="eyebrow">The run ends on pull ${S.pos+1} of 16</div><h2>${d.name} takes the hand</h2>
     <div class="stats"><div><b>${S.pos}</b><small>Bosses beaten</small></div><div><b>${S.best}</b><small>Best run</small></div><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Recipes</small></div></div>
     ${handHTML()}<p class="muted">Every spell is gone. The deck is shuffled again.</p>
     <button class="go" id="again">Start again</button>`);
@@ -210,7 +214,7 @@ export function showDead(){
 }
 export function showVictory(){
   S.mode='victory';
-  show(`<div class="eyebrow">All 16 cards defeated</div><h1>The deck is yours</h1>
+  show(`${heroHTML('idle')}<div class="eyebrow">All 16 cards defeated</div><h1>The deck is yours</h1>
     <p>You cleared the deck in ${fmt(S.runSeconds)}.</p>${handHTML()}
     <div class="stats"><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Secret recipes found</small></div></div>
     <button class="go" id="again">Play another run</button>`);
@@ -218,9 +222,9 @@ export function showVictory(){
 }
 export function showTitle(){
   S.mode='title'; G.pull=null; muteBtn.hidden=true; spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true;
-  show(`<div class="eyebrow">A boss-rush roguelike</div><h1>The Eighth Arcanum</h1>
+  show(`${heroHTML('idle')}<div class="eyebrow">A boss-rush roguelike</div><h1>The Eighth Arcanum</h1>
     <p>Each pull, the hands deal a blind boss, omen and arena. An elite waits on every fourth pull. Beat it for gold, take its spell, then keep, fuse or sell it. Spend your gold in the shop. Die and the deck is shuffled again.</p>
-    <p class="muted">The arena card decides how you fight: open field, orbit, face-off or open arena. Chests appear mid-fight with gear, gold or mana. If one wiggles it's a mimic, so cast a spell near it before you touch it. Tap spells with your other thumb. Near misses and perfect dodges refill mana.</p>
+    <details class="how"><summary>How it plays</summary><p class="muted">The arena card decides how you fight: open field, orbit, face-off or open arena. Chests appear mid-fight with gear, gold or mana. If one wiggles it's a mimic, so cast a spell near it before you touch it. Tap spells with your other thumb. Near misses and perfect dodges refill mana.</p></details>
     ${S.best||S.recipes.length?`<div class="stats"><div><b>${S.best} / 16</b><small>Best run</small></div><div><b>${S.recipes.length} / ${RECIPES.length}</b><small>Recipes</small></div></div>`:''}
     <button class="go" id="begin">Begin a run</button>`);
   $('begin').onclick=startRun;

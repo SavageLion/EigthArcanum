@@ -153,3 +153,26 @@ p{font-size:1.32rem;line-height:1.1}
 #spells.three{gap:8px}
 #spells.three .spell{width:54px;height:54px}
 #spells.three .spell svg{width:31px}
+
+/* ---- tarot polish: raven hero, gilded corner brackets, collapsible help ---- */
+.hero{align-self:center;flex:none;margin:0 0 -6px;position:relative}
+.hero::before{content:"";position:absolute;inset:18% 12% 4%;background:radial-gradient(closest-side,rgba(183,140,255,.28),transparent);filter:blur(8px)}
+.hero img{position:relative;width:min(44vw,176px);aspect-ratio:1;image-rendering:pixelated;display:block}
+.how summary{font-family:var(--label);font-size:1.15rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);cursor:pointer;list-style:none;padding:6px 0;touch-action:manipulation}
+.how summary::-webkit-details-marker{display:none}
+.how summary::before{content:"▸ ";color:var(--gold-dim)} .how[open] summary::before{content:"▾ "}
+.how p{margin-top:4px}
+.card,.shoprow,.cardback{position:relative}
+.card::after,.shoprow::after,.cardback::after{content:"";position:absolute;inset:-3px;pointer-events:none;
+  --g:var(--gold);
+  background:
+   linear-gradient(var(--g),var(--g)) 0 0/9px 3px no-repeat, linear-gradient(var(--g),var(--g)) 0 0/3px 9px no-repeat,
+   linear-gradient(var(--g),var(--g)) 100% 0/9px 3px no-repeat, linear-gradient(var(--g),var(--g)) 100% 0/3px 9px no-repeat,
+   linear-gradient(var(--g),var(--g)) 0 100%/9px 3px no-repeat, linear-gradient(var(--g),var(--g)) 0 100%/3px 9px no-repeat,
+   linear-gradient(var(--g),var(--g)) 100% 100%/9px 3px no-repeat, linear-gradient(var(--g),var(--g)) 100% 100%/3px 9px no-repeat}
+.shoprow:disabled::after{opacity:.35}
+.card::before{content:"";position:absolute;inset:4px;border:1px solid color-mix(in srgb,var(--boss) 28%,transparent);pointer-events:none}
+.inner h2::after{content:"";display:block;width:64px;height:4px;margin-top:6px;background:
+  linear-gradient(var(--gold-dim),var(--gold-dim)) 0 50%/22px 2px no-repeat, linear-gradient(var(--gold),var(--gold)) 50% 50%/6px 6px no-repeat, linear-gradient(var(--gold-dim),var(--gold-dim)) 100% 50%/22px 2px no-repeat}
+
+.inner{gap:11px}

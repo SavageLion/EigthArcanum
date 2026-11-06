@@ -3,6 +3,7 @@ import { W } from '../core/dom';
 import { G, S } from '../core/state';
 import { BOSSES } from '../data/bosses';
 import { R, hexRGB, mapSprite, mk, pixelise } from './pixel';
+import { arenaKind, paintArena } from './arenaArt';
 export { R };
 import { BONE, GOLD, TAU, clamp, rnd } from '../core/util';
 
@@ -17,7 +18,7 @@ export const dirOf=(ang:number)=>DIRS[((Math.round(ang/(Math.PI/4))%8)+8)%8];
 export type Sprite={img:HTMLImageElement,ax:number,ay:number,tipx:number,tipy:number};
 export type Clip={fps:number,loop:boolean,frames:Sprite[]};
 export type ClipSet=Record<string,Record<string,Clip>>;   // anim name -> direction -> clip
-export const SPRITE_OVERRIDES:{boss:Record<number,any>,wizardDirs:Record<string,Sprite>|null,wizardBack:Sprite|null,wizardFront:Sprite|null,anim:{arena:ClipSet,large:ClipSet}}={boss:{},wizardDirs:null,wizardBack:null,wizardFront:null,anim:{arena:{},large:{}}};
+export const SPRITE_OVERRIDES:{boss:Record<number,any>,wizardDirs:Record<string,Sprite>|null,wizardBack:Sprite|null,wizardFront:Sprite|null,anim:{arena:ClipSet,large:ClipSet},arena:{tiles:HTMLImageElement[],pillar:Sprite|null}}={boss:{},wizardDirs:null,wizardBack:null,wizardFront:null,anim:{arena:{},large:{}},arena:{tiles:[],pillar:null}};
 
 /** rest = the still pose of the same direction: animation frames reuse its foot anchor so they bob instead of jitter. */
 function analyse(img:HTMLImageElement,rest?:Sprite):Sprite{
@@ -58,7 +59,12 @@ async function loadClips(set:'arena'|'large',rest:Record<string,Sprite>|null){
 export async function loadSprites(){
   const [arena,large]=await Promise.all([loadSet('arena'),loadSet('large')]);
   SPRITE_OVERRIDES.wizardDirs=arena; SPRITE_OVERRIDES.wizardBack=large?large.north:null; SPRITE_OVERRIDES.wizardFront=large?large.south:null;
-  await Promise.all([loadClips('arena',arena),loadClips('large',large)]);
+  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadArena()]);
+}
+/** Floor tiles and pillar for the open arena. */
+async function loadArena(){
+  const [pillar,...tiles]=await Promise.all([loadImage('arena/pillar.png'),...Array.from({length:16},(_,i)=>loadImage(`arena/tiles/tile_${i}.png`))]);
+  SPRITE_OVERRIDES.arena.tiles=tiles.every(t=>t)?tiles:[]; SPRITE_OVERRIDES.arena.pillar=pillar?analyse(pillar):null;
 }
 /** Draw a sprite with its feet-centre at logical (x,footY). Returns the staff-orb position in logical px. */
 export function blitSprite(g,s:Sprite,x:number,footY:number){
@@ -99,10 +105,13 @@ export function makeBg(b){
     d[j]=A[0]+(Z[0]-A[0])*lv;d[j+1]=A[1]+(Z[1]-A[1])*lv;d[j+2]=A[2]+(Z[2]-A[2])*lv;d[j+3]=255;
   }
   c.putImageData(im,0,0);
-  c.fillStyle=b.rays;
+  const flat=arenaKind()==='open';   // the flagstone floor replaces the rays and stars
+  if(!flat){ c.fillStyle=b.rays;
   for(let i=0;i<24;i++){const a=i/24*TAU,len=i%2?60*R:HP; c.globalAlpha=i%2?.14:.22; for(let r=34*R;r<len;r+=2)c.fillRect(Math.round(cx+Math.cos(a)*r),Math.round(cy+Math.sin(a)*r),1,1);}
   c.globalAlpha=.32;for(let i=0;i<190*R;i++){const a=i/(190*R)*TAU;c.fillRect(Math.round(cx+Math.cos(a)*30*R),Math.round(cy+Math.sin(a)*30*R),1,1);}
   c.fillStyle=BONE;for(let i=0;i<60;i++){c.globalAlpha=Math.random()<.3?.8:.35;c.fillRect(Math.floor(rnd(4*R,WP-4*R)),Math.floor(rnd(4*R,HP-4*R)),1,1);}
+  }
+  paintArena(c,b,WP,HP);
   c.globalAlpha=1;c.fillStyle=GOLD;c.scale(R,R);
   c.fillRect(2,2,LW-4,1);c.fillRect(2,G.LH-3,LW-4,1);c.fillRect(2,2,1,G.LH-4);c.fillRect(LW-3,2,1,G.LH-4);
   [[3,3],[LW-4,3],[3,G.LH-4],[LW-4,G.LH-4]].forEach(([x,y])=>{c.fillRect(x-1,y-2,3,5);c.fillRect(x-2,y-1,5,3);});
