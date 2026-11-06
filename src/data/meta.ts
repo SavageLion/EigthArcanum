@@ -1,5 +1,5 @@
 /* Meta-progression: what carries over between runs (wizards, run lengths, counters). Saved in localStorage. */
-export const RUN_LENGTHS=[16,32,64] as const;
+export const RUN_LENGTHS=[8,16,32,64] as const;
 
 export interface Meta{
   wizards:string[];                      // unlocked wizard ids
@@ -9,9 +9,9 @@ export interface Meta{
   lastWizard:string; lastRun:number;
 }
 const KEY='ea-meta-v1';
-const fresh=():Meta=>({wizards:['raven'],runs:[16],counters:{bosses:0,elites:0,clean:0,mimics:0,chests:0,won:{16:0,32:0,64:0}},best:{16:0,32:0,64:0},lastWizard:'raven',lastRun:16});
+const fresh=():Meta=>({wizards:['raven'],runs:[8],counters:{bosses:0,elites:0,clean:0,mimics:0,chests:0,won:{8:0,16:0,32:0,64:0}},best:{8:0,16:0,32:0,64:0},lastWizard:'raven',lastRun:8});
 function load():Meta{ try{ const j=JSON.parse(localStorage.getItem(KEY)||'null'); if(j&&j.counters) return {...fresh(),...j,counters:{...fresh().counters,...j.counters,won:{...fresh().counters.won,...j.counters.won}},best:{...fresh().best,...j.best}}; }catch(e){} return fresh(); }
-export const meta:Meta=load();
+export const meta:Meta=load(); if(!meta.runs.includes(8)) meta.runs.unshift(8);
 export const saveMeta=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(meta)); }catch(e){} };
 
 export interface Wizard{
@@ -29,13 +29,14 @@ export const WIZARDS:Wizard[]=[
 ];
 export const wizardById=(id:string)=>WIZARDS.find(w=>w.id===id)||WIZARDS[0];
 export const isRunUnlocked=(n:number)=>meta.runs.includes(n);
-export const RUN_UNLOCK:Record<number,string>={16:'Available from the start',32:'Win a 16-boss run',64:'Win a 32-boss run'};
+export const RUN_UNLOCK:Record<number,string>={8:'Available from the start',16:'Win the 8-boss run',32:'Win a 16-boss run',64:'Win a 32-boss run'};
 
 /* ---- unlock bookkeeping ---- */
 let pending:string[]=[];
 export const takeUnlocks=()=>{ const p=pending; pending=[]; return p; };
 function check(){
   for(const w of WIZARDS) if(!meta.wizards.includes(w.id)&&w.unlocked(meta)){ meta.wizards.push(w.id); pending.push(`New wizard: ${w.name}`); }
+  if(!meta.runs.includes(16)&&(meta.counters.won[8]>0||meta.counters.won[16]>0)){ meta.runs.push(16); pending.push('Unlocked: the 16-boss run'); }
   if(!meta.runs.includes(32)&&meta.counters.won[16]>0){ meta.runs.push(32); pending.push('Unlocked: the 32-boss run'); }
   if(!meta.runs.includes(64)&&meta.counters.won[32]>0){ meta.runs.push(64); pending.push('Unlocked: the 64-boss run'); }
   saveMeta();

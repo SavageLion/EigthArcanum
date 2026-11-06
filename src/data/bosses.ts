@@ -66,11 +66,11 @@ BOSSES[7].elite=true;
 export const TOTAL=16, ELITE_POS=[3,7,11,15];
 /** every fourth pull is an elite, and the last pull is the run's final boss */
 const isElitePull=p=>p%4===3;
-export const FINALS={16:7,32:31};   // run length -> final boss index (32 and 64 get theirs when those bosses exist)
-export const runAvailable=n=>n===16||(BOSSES.length>=n&&FINALS[n]!==undefined);
+export const FINALS={8:7,16:7,32:31};   // run length -> final boss index (32 and 64 get theirs when those bosses exist)
+export const runAvailable=n=>n<=16||(BOSSES.length>=n&&FINALS[n]!==undefined);
 export function dealOrder(total=16){
-  const fin=FINALS[total]??7, pool=BOSSES.map((b,i)=>i).filter(i=>i<total&&i!==fin);
-  const regular=shuffle(pool.filter(i=>!BOSSES[i].elite)), elites=shuffle(pool.filter(i=>BOSSES[i].elite)), any=shuffle(pool);
+  const fin=FINALS[total]??7, pool=BOSSES.map((b,i)=>i).filter(i=>(i<total||(total<16&&BOSSES[i].elite&&i<16))&&i!==fin);   // the 8-run borrows an elite from the 16 for its mid-run elite pull
+  const regular=shuffle(pool.filter(i=>!BOSSES[i].elite&&i<total)), elites=shuffle(pool.filter(i=>BOSSES[i].elite)), any=shuffle(pool);
   const out=[];
   for(let p=0;p<total;p++) out.push(p===total-1?fin:(isElitePull(p)?(elites.shift()??any[p%any.length]):(regular.shift()??any[p%any.length])));
   return out;

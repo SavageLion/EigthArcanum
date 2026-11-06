@@ -56,6 +56,7 @@ async function loadClips(set:'arena'|'large',rest:Record<string,Sprite>|null){
   await Promise.all(jobs);
 }
 /** Pixel Lab sets for the unlockable wizards (static, 8 directions): arena size plus a scaled-up copy for the face-off back/front views. */
+export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
 export const WIZ_SETS:Record<string,{dirs:Record<string,Sprite>,back:Sprite,front:Sprite}>={};
 function scaled(img:HTMLImageElement,k:number){ const c=mk(Math.round(img.width*k),Math.round(img.height*k)),g=c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(img,0,0,c.width,c.height); return c as any; }
 async function loadWizSets(){
@@ -71,7 +72,7 @@ async function loadWizSets(){
 export async function loadSprites(){
   const [arena,large]=await Promise.all([loadSet('arena'),loadSet('large')]);
   SPRITE_OVERRIDES.wizardDirs=arena; SPRITE_OVERRIDES.wizardBack=large?large.north:null; SPRITE_OVERRIDES.wizardFront=large?large.south:null;
-  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadWizSets(),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
+  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadWizSets(),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
 }
 async function loadHands(){ const f=await Promise.all(Array.from({length:9},(_,i)=>loadImage(`hands/${i}.png`))); if(f.some(i=>!i)) return; f.forEach(i=>{(i as any).hi=true;}); SPRITE_OVERRIDES.hands=f; }
 async function loadChest(){

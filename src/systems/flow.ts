@@ -18,7 +18,7 @@ import { circle, fl, ln, poly } from '../render/bossArt';
 import { R, mk, pixelise } from '../render/pixel';
 
 /* ---------- flow ---------- */
-export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=16; remember(wizardId,runLen); G.P=newPlayer(wizardId); S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
+export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=8; remember(wizardId,runLen); G.P=newPlayer(wizardId); S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
 /* ---------- the three blind draws ---------- */
 const ARENAS=[
  {id:'chariot',num:'VII',name:'The Chariot',desc:'Open field. Roam freely and weave through the shots.'},

@@ -230,7 +230,7 @@ p{font-size:1.32rem;line-height:1.1}
 .stats2{display:flex;gap:10px;flex-wrap:wrap;margin-top:1px}
 .stats2 em{font-style:normal;font-size:.95rem;color:var(--bone);display:flex;align-items:center;gap:4px;white-space:nowrap}
 .pip{display:inline-block;width:6px;height:9px;background:#3a2a4a;margin-right:2px}.pip.on{background:var(--gold)}
-.runs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.runs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .run{appearance:none;display:flex;flex-direction:column;align-items:center;gap:2px;background:#20142a;color:var(--bone);border:2px solid var(--gold-dim);box-shadow:3px 3px 0 #0b0814;padding:8px 4px;cursor:pointer;touch-action:manipulation;font-family:var(--body);min-width:0}
 .run b{font-family:var(--display);font-weight:700;font-size:1.5rem;line-height:1}
 .run span{font-size:.9rem;line-height:1.05;color:var(--bone-dim);text-align:center}
@@ -267,3 +267,5 @@ p{font-size:1.32rem;line-height:1.1}
 /* boss/elite portraits are drawn to exactly fill the frame's art window, so there is no dark margin inside the frame */
 .slot.boss .front .art,.slot.elite .front .art{position:absolute;left:12.6%;top:8.2%;width:79%;height:65.6%;max-height:none;object-fit:fill;image-rendering:pixelated;z-index:0}
 .slot.boss .front b,.slot.elite .front b{top:77.2%;height:9.2%;left:16%;right:16%;color:#3a2218;z-index:2}
+
+.linkbtn{appearance:none;background:none;border:1px dashed var(--gold-dim);color:var(--bone-dim);font-family:var(--body);font-size:.95rem;padding:6px;margin-top:4px;cursor:pointer}

@@ -3,12 +3,12 @@ import { W, muteBtn, ov, reduced, stage } from '../core/dom';
 import { G, S } from '../core/state';
 import { BOSSES, ELITE_SECOND } from '../data/bosses';
 import { hotSave } from '../main';
-import { LW, SPRITE_OVERRIDES, WIZ_SETS, blit, disc, makeBg } from '../render/sprites';
+import { FIST, LW, SPRITE_OVERRIDES, WIZ_SETS, blit, disc, makeBg } from '../render/sprites';
 import { foPlan } from './bossPlans';
 import { paintSpells, spellBar } from './casting';
 import { CY, ECHO, GOODS, POS_HP, RO, WANDS, fightReward, hasPerk, hasWand, isMod, posHp, relPos, shuffle, spellValue, total } from './deck';
 import { showDraw, startRun } from './flow';
-import { RUN_LENGTHS, RUN_UNLOCK, WIZARDS, meta, noteBoss, noteRunEnd, takeUnlocks, wizardById } from '../data/meta';
+import { unlockEverything, RUN_LENGTHS, RUN_UNLOCK, WIZARDS, meta, noteBoss, noteRunEnd, takeUnlocks, wizardById } from '../data/meta';
 import { runAvailable } from '../data/bosses';
 import { codedWizardPortrait } from '../render/wizardArt';
 import { GEAR, SLOT_LABEL, equip, gearOf, hasGear, lootOrShop, nearMiss, rateNow } from './gear';
@@ -33,7 +33,7 @@ const foCache={};
 function enlarge(src,k){ const c=mk(Math.round(src.width*k),Math.round(src.height*k)),g=c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(src,0,0,c.width,c.height); c.hi=true; return c; }
 function foFrames(i){ if(foCache[i])return foCache[i]; const b=BOSSES[i],frames=[]; const ov=SPRITE_OVERRIDES.boss[i];
   if(ov){ const k=256/ov[0].img.width, memo=new Map(); for(let n=0;n<8;n++){ const f=ov[n%ov.length]; if(!memo.has(f)) memo.set(f,{img:enlarge(f.img,k),white:enlarge(f.white,k)}); frames.push(memo.get(f)); } }
-  else for(let n=0;n<8;n++){const t=n*.26+.3;frames.push(pixelise(c=>b.draw(c,t,b.color),170,1.05));} const fist=[1,-1].map(s=>pixelise(c=>drawFoFist(c,s,b.color),50,1)); return foCache[i]={frames,fist}; }
+  else for(let n=0;n<8;n++){const t=n*.26+.3;frames.push(pixelise(c=>b.draw(c,t,b.color),170,1.05));} const fist=FIST.img?[false,true].map(m=>{ const e=enlarge(FIST.img,1.5); if(!m) return {img:e}; const f=mk(e.width,e.height),g=f.getContext('2d'); g.imageSmoothingEnabled=false; g.translate(e.width,0); g.scale(-1,1); g.drawImage(e,0,0); f.hi=true; return {img:f}; }):[1,-1].map(s=>pixelise(c=>drawFoFist(c,s,b.color),50,1)); return foCache[i]={frames,fist}; }
 function drawFoFist(c,s,col){ circle(c,0,0,17);fl(c,'#2a1412');ln(c,col,2.5); for(let k=0;k<4;k++){c.beginPath();c.moveTo(-11+k*7,-1);c.lineTo(-11+k*7,10);ln(c,col,1.6);} poly(c,[[s*-16,-3],[s*-23,-9],[s*-21,6]]);fl(c,'#2a1412');ln(c,col,1.2); }
 function drawWizBack(c){ poly(c,[[-18,28],[-9,-2],[9,-2],[18,28]]);fl(c,'#3956a8');ln(c,GOLD,1.5); poly(c,[[-3,0],[3,0],[4,28],[-4,28]]);fl(c,'#26336f'); poly(c,[[-16,-3],[16,-3],[5,-13],[8,-27],[-5,-14]]);fl(c,'#2a3f85');ln(c,GOLD,1.5); poly(c,[[-18,-3],[18,-3]],false);ln(c,GOLD,3); poly(c,[[21,22],[21,-22]],false);ln(c,'#a9875a',2.5); circle(c,21,-26,5);fl(c,'#ffd27a'); }
 function foStart(){ if(!G.wizBack)G.wizBack=pixelise(drawWizBack,60,1).img; G.fo={lane:1,x:FO_LANES[1],dodge:0,dodgedAt:-9,atk:null,gap:1.2,queue:[],open:0,frozen:0,cd:0}; foFrames(S.stage); G.B.x=W/2;G.B.y=G.H*.3; }
@@ -260,14 +260,15 @@ function portraitHTML(id){ const W=WIZ_SETS[id]; if(W) return `<img alt="" src="
 const pips=(n,max)=>'<i class="pip on"></i>'.repeat(n)+'<i class="pip"></i>'.repeat(Math.max(0,max-n));
 /** between the title and the first card draw: pick a wizard and a run length */
 export function showSetup(){
-  const sel={w:meta.wizards.includes(meta.lastWizard)?meta.lastWizard:'raven',n:meta.runs.includes(meta.lastRun)&&runAvailable(meta.lastRun)?meta.lastRun:16};
+  const sel={w:meta.wizards.includes(meta.lastWizard)?meta.lastWizard:'raven',n:meta.runs.includes(meta.lastRun)&&runAvailable(meta.lastRun)?meta.lastRun:8};
   const paint=()=>{
     show(`<div class="eyebrow">Before the first pull</div><h2>Choose your wizard</h2>${unlockBanner()}
       <div class="eyebrow">Length of the run</div>
       <div class="runs">${RUN_LENGTHS.map(n=>{ const open=meta.runs.includes(n), ready=runAvailable(n); return `<button class="run${n===sel.n?' sel':''}" data-n="${n}" ${open&&ready?'':'disabled'}><b>${n}</b><span>${!open?RUN_UNLOCK[n]:!ready?'More bosses coming':'bosses'+(meta.best[n]?` · best ${meta.best[n]}`:'')}</span></button>`; }).join('')}</div>
       <div class="eyebrow">Wizard</div>
       <div class="wizlist">${WIZARDS.map(w=>{ const open=meta.wizards.includes(w.id); return `<button class="wiz${w.id===sel.w?' sel':''}${open?'':' locked'}" data-w="${w.id}" ${open?'':'disabled'}>${open?`<div class="wport">${portraitHTML(w.id)}</div>`:`<div class="wport lock">?</div>`}<div class="txt"><b>${open?w.name:'Locked'}</b><span>${open?w.blurb:w.unlock}</span>${open?`<div class="stats2"><em>♥ ${pips(w.hearts,6)}</em><em>✦ ${pips(Math.round(w.mana/25),5)}</em><em>↯ ${pips(Math.round((.3-w.rate)/.03)+1,5)}</em></div><small>${w.perkText}</small>`:''}</div></button>`; }).join('')}</div>
-      <button class="go" id="start">Begin the run</button>`);
+      <button class="go" id="start">Begin the run</button><button class="linkbtn" id="unlockall">Unlock everything (testing)</button>`);
+    $('unlockall').onclick=()=>{ unlockEverything(); paint(); };
     ov.querySelectorAll('.wiz').forEach(b=>b.onclick=()=>{ sel.w=b.dataset.w; paint(); });
     ov.querySelectorAll('.run').forEach(b=>b.onclick=()=>{ sel.n=+b.dataset.n; paint(); });
     $('start').onclick=()=>startRun(sel.w,sel.n);
