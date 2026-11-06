@@ -12,7 +12,7 @@ import { inPillar, oaAim, oaBoss, oaMove } from './openArena';
 import { beamStep, trapStep } from './spellFx';
 import { recipeOf } from './spells';
 import { GOLD, TAU, clamp, rnd } from '../core/util';
-import { sfx } from '../core/audio';
+import { setMusicEnergy, sfx } from '../core/audio';
 
 /* ---------- damage and hits ---------- */
 export function damage(d){ if(!G.B||S.mode!=='fight')return; if(S.fo)d*=G.B.open>0?2:.34;
@@ -48,7 +48,7 @@ export function step(dt){
   if(fighting){
     G.DT=dt/(G.B.chill>0?1.4:1)*(.72+.03*S.pos)*(hasGear('hourglass')?.9:1)*(isMod('magician')?1.15:isMod('temperance')?.75:1);
     const ph=G.B.hp<G.B.max/2;
-    if(ph&&!G.B.enraged){G.B.enraged=true;S.flash=.2;S.shake=reduced?0:5;sfx.rage();burst(G.B.x,G.B.y,G.B.color,30);}
+    if(ph&&!G.B.enraged){G.B.enraged=true;setMusicEnergy(3,true);S.flash=.2;S.shake=reduced?0:5;sfx.rage();burst(G.B.x,G.B.y,G.B.color,30);}
     if(S.fo)foStep(dt); else if(S.open){ oaMove(dt); oaBoss(dt); if(S.mode==='fight'&&G.oa.state==='chase')G.B.def.attack(ph); } else G.B.def.attack(ph);
     if(!S.fo&&S.mode==='fight'&&S.echo!==null&&(!S.open||G.oa.state==='chase')) ECHO[S.echo].fn(BOSSES[S.echo].color);
     if(S.orbit) every('bloom',ph?4:5.5,()=>{G.B.bloomOuter=!G.B.bloomOuter;G.bands.push({r:G.B.bloomOuter?RO:RI,w:40,t:0,warn:.85,on:.3,hit:false});});

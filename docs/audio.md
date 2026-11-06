@@ -4,7 +4,36 @@ The game has a built-in synth for every sound, and plays recorded files when it 
 Nothing here is required: with no files, the synth plays.
 
 ## Generated score (default)
-With no music files registered, the game plays a procedural score built in code (`src/core/score.ts`): a pad, bass, arpeggio, drums and a random-walk lead per scene, each with its own tempo, scale and chord loop. Each boss gets its own key. It needs no files and has no licence. Edit `SCENES` in `score.ts` to change tempo, scale, chords or density. Previews of every scene render to `docs/music-preview/*.wav` (git-ignored).
+With no music files registered, the game plays a procedural score built in code (`src/core/score.ts`). Every boss has its own theme:
+
+| Boss | Sound |
+|---|---|
+| Cinder King | fast phrygian-dominant, driving saw bass, square arps |
+| Frost Matron | lydian, glassy 16th-note arps and bells |
+| Hollow Bell | slow, tolling low bell on every bar, sparse |
+| Storm Eye | frantic harmonic minor, 16th bass, snare fills, thunder |
+| Mother of Thorns | a twisted waltz in 3/4 |
+| Bone Tyrant | locrian death march |
+| Mirror Witch | whole-tone, mirrored arpeggios with echoes |
+| Void Sovereign | very slow, droning, choir pad and dissonance |
+| Drowned Queen | slow 6/8 tide with bubbling blips |
+| Clockwork Judge | mechanical: ticking hats, staccato square arps |
+| Hive Mother | buzzing detuned fast arps |
+| Ash Widow | creeping chromatic bass, jazzy sevenths |
+| Sand Prophet | desert phrygian-dominant with hand drums |
+| Emperor | regal four-on-the-floor with brass-style stabs |
+| High Priestess | harp arps and choir, no drums |
+| Devil | relentless double-kick, distorted 16th bass |
+
+Also: `shop`, `reward` (after a win), `draw`, `title`, `victory`, `defeat`.
+
+**Variety rules**
+- *Energy* (0-3) layers the band in: 1 adds arpeggios, 2 adds drums and signature sounds, 3 adds the lead. A fight's energy rises as the run progresses (the first quarter is 1, the middle 2, the end 3); elites get +1 and a faster tempo.
+- *Enrage* switches to full energy plus a frenzy (faster tempo, extra hats).
+- *Arena* changes the tempo: face-off 90%, orbit 97%, open arena 105%.
+- Every third four-bar phrase drops the drums for a breather; each theme alternates two chord loops and repeats a composed four-bar melody.
+- Runs longer than 16 bosses reuse each theme in a new key.
+Previews of every theme render to `docs/music-preview/*.wav` (git-ignored). Edit `THEMES` in `score.ts` to retune.
 Recorded files, when added below, replace it slot by slot.
 
 ## Adding recorded audio

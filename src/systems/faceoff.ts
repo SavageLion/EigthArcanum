@@ -97,7 +97,7 @@ export function startFight(){
   if(isMod('sun'))G.P.hp=G.P.max;
   if(isMod('death')){G.P.heldHp=G.P.hp;G.P.hp=1;}
   stage.style.setProperty('--boss',d.color);
-  setMusic(d.elite?'elite':'battle',S.stage); S.mode='intro';S.t=0; ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
+  { const frac=S.pos/(S.order?S.order.length:16); setMusic(d.elite?'elite':'battle',S.stage,frac<.25?1:frac<.6?2:3,S.arena||'chariot'); } S.mode='intro';S.t=0; ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
   $('bossname').textContent=`${d.num} · ${d.name}`; $('bossname').hidden=false;
   const tag=[d.elite&&'Elite',S.mod&&S.mod.name,!S.fo&&S.echo!==null&&`Echo: ${ECHO[S.echo].name}`].filter(Boolean).join(' · ');
   $('omen').textContent=tag; $('omen').hidden=!tag;
@@ -105,7 +105,7 @@ export function startFight(){
   paintSpells(); hotSave();
 }
 export function win(){
-  setMusic('draw'); S.mode='won';S.t=0; G.P.beam=null; G.traps=[]; G.chestCall=0; if(S.open){$('call').hidden=true;} if(G.fo)G.fo.atk=null; $('hint').hidden=true; $('call').hidden=true;
+  setMusic('reward',S.pos); S.mode='won';S.t=0; G.P.beam=null; G.traps=[]; G.chestCall=0; if(S.open){$('call').hidden=true;} if(G.fo)G.fo.atk=null; $('hint').hidden=true; $('call').hidden=true;
   G.shots.forEach(s=>burst(s.x,s.y,GOLD,1)); G.shots=[];G.rings=[];G.cols=[];G.helpers=[];G.bands=[];
   burst(G.B.x,G.B.y,G.B.color,70); burst(G.B.x,G.B.y,GOLD,40); fxExplosion(G.B.x,G.B.y,1.7); fxHeal(G.P.x,G.P.y+10,'heal'); S.shake=reduced?0:14; S.flash=.6; sfx.win();
   G.P.scale*=1.1; G.P.reward=fightReward(); G.P.gold+=G.P.reward.g;
@@ -186,7 +186,7 @@ export function takeSpell(n){
   S.pendingFuse=opts;
 }
 export function nextBoss(){ G.P.spells.forEach(learnRecipe); sfx.pick(); S.mod=null; if(G.P.extraPick){G.P.extraPick=false;showPick();return;} lootOrShop(); }
-export function openShop(){
+export function openShop(){ setMusic('shop',S.pos);
   const wands=shuffle(WANDS.filter(w=>w.id!==G.P.wand)).slice(0,2);
   S.stock=[...wands.map(w=>({...w,icon:'wand',wand:true})),...shuffle(GOODS.filter(g=>g.ok())).slice(0,2)];
   if(Math.random()<.4){ const pool=GEAR.filter(g=>!hasGear(g.id)); const g=pool[Math.floor(Math.random()*pool.length)]; if(g)S.stock.push({id:g.id,name:g.name,icon:g.slot,c:g.cursed?'#e0405a':'#dcb868',cost:g.value*2+10,desc:`${SLOT_LABEL[g.slot]}. ${g.desc}`,ok:()=>!hasGear(g.id),fx(){equip(g);}}); }

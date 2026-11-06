@@ -31,7 +31,7 @@ function drawOmen(){
 export function showDraw(){
   S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; oaEnd(); S.arena=null; S.t=0;
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
-  setMusic('draw'); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
+  setMusic('draw',S.pos); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);
   const omen=drawOmen(), arena=ARENAS[Math.floor(Math.random()*ARENAS.length)];
   G.pull={i:0,phase:'shuffle',t:0,omen,arena,done:false,fast:reduced};

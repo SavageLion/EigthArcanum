@@ -1,4 +1,4 @@
-import { startScore, stopScore } from './score';
+import { setScoreEnergy, startScore, stopScore } from './score';
 /* Audio: a small synth (always available) plus optional recorded files.
    Drop files into public/assets/audio/{music,sfx}/ and list them in public/assets/audio/manifest.json
    (see docs/audio.md). Anything not in the manifest keeps playing the synth version, so the game never goes silent. */
@@ -69,8 +69,8 @@ export const sfx={
 };
 
 /* ---------- music: one looping track at a time, crossfaded ---------- */
-export type MusicKey='title'|'draw'|'battle'|'elite'|'victory'|'defeat';
-let cur:HTMLAudioElement|null=null, curKey:MusicKey|null=null, wanted:MusicKey|null=null, curSeed=0, wantedSeed=0, started=false;
+export type MusicKey='title'|'draw'|'shop'|'reward'|'battle'|'elite'|'victory'|'defeat';
+let cur:HTMLAudioElement|null=null, curKey:MusicKey|null=null, wanted:MusicKey|null=null, curSeed=0, wantedSeed=0, started=false, wantedEnergy=2, wantedArena='chariot';
 const musicVol=()=>(man.volume?.music??.5);
 function fade(a:HTMLAudioElement,to:number,ms:number,then?:()=>void){
   const from=a.volume, t0=performance.now();
@@ -78,17 +78,19 @@ function fade(a:HTMLAudioElement,to:number,ms:number,then?:()=>void){
   step();
 }
 /** ask for a track; plays once the player has interacted (browsers require it) and the file exists */
-export function setMusic(key:MusicKey|null,seed=0){
-  wanted=key; wantedSeed=seed; if(key===curKey&&seed===curSeed&&started) return; started=false;
+export function setMusic(key:MusicKey|null,seed=0,energy=2,arena='chariot'){
+  wanted=key; wantedSeed=seed; wantedEnergy=energy; wantedArena=arena; if(key===curKey&&seed===curSeed&&started) return; started=false;
   const file=key&&man.music&&man.music[key];
   const old=cur; curKey=key; curSeed=seed; cur=null;
   if(old) fade(old,0,700,()=>{old.pause();});
   stopScore(700);
   if(!key||!snd.ac||snd.muted) return;
-  if(!file){ startScore(snd.ac,key,seed,musicVol()*1.4); started=true; return; }   // no recorded file: play the generated score
+  if(!file){ startScore(snd.ac,key,seed,musicVol()*1.4,undefined,energy,arena); started=true; return; }   // no recorded file: play the generated score
   const a=new Audio(base()+'music/'+file); a.loop=key!=='victory'&&key!=='defeat'; a.volume=0; a.preload='auto';
   a.play().then(()=>fade(a,musicVol(),900)).catch(()=>{});
   cur=a; started=true;
 }
-function musicWake(){ if(wanted&&!started&&snd.ac&&!snd.muted){ curKey=null; setMusic(wanted,wantedSeed); } }
-export function applyMuteToMusic(){ if(snd.muted){ if(cur){cur.pause();} stopScore(200); } else { const k=wanted; curKey=null; cur=null; if(k) setMusic(k,wantedSeed); } }
+function musicWake(){ if(wanted&&!started&&snd.ac&&!snd.muted){ curKey=null; setMusic(wanted,wantedSeed,wantedEnergy,wantedArena); } }
+/** live intensity change during a fight (e.g. the boss enrages) */
+export function setMusicEnergy(energy:number,frenzy=false){ wantedEnergy=energy; setScoreEnergy(energy,frenzy); }
+export function applyMuteToMusic(){ if(snd.muted){ if(cur){cur.pause();} stopScore(200); } else { const k=wanted; curKey=null; cur=null; if(k) setMusic(k,wantedSeed,wantedEnergy,wantedArena); } }
