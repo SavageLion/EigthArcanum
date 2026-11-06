@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { sideEnd } from './sideView';
 import { ctx, cv, muteBtn, ov, reduced, stage } from '../core/dom';
 import { G, S, newPlayer } from '../core/state';
 import { BOSSES, dealOrder } from '../data/bosses';
@@ -24,6 +25,7 @@ const ARENAS=[
  {id:'chariot',num:'VII',name:'The Chariot',desc:'Open field. Roam freely and weave through the shots.'},
  {id:'wheel',num:'X',name:'Wheel of Fortune',desc:'Orbit. Circle the boss on two rings. The inner ring deals 50% more damage.'},
  {id:'justice',num:'XI',name:'Justice',desc:'Face-off. Swipe to dodge, tap to throw bolts, and strike when the boss opens up.'},
+ {id:'fool',num:'0',name:'The Fool',desc:'Side view. Run and jump between platforms while your bolts fly up on their own. Tap or swipe up to jump, twice for a double jump.'},
  {id:'strength',num:'VIII',name:'Strength',desc:'Open arena. Run around a pillared room. You only fire when you stand still. The boss chases and charges you.'}
 ];
 function drawOmen(){
@@ -59,7 +61,7 @@ export function bossCardArt(d,stageIdx){
 function outline(img,col){ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const g=c.getContext('2d'); g.drawImage(img,0,0); g.globalCompositeOperation='source-in'; g.fillStyle=col; g.fillRect(0,0,c.width,c.height); return c; }
 
 export function showDraw(){
-  S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; oaEnd(); S.arena=null; S.t=0;
+  S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; S.side=false; sideEnd(); oaEnd(); S.arena=null; S.t=0;
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
   setMusic('draw',S.pos); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);

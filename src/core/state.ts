@@ -20,6 +20,7 @@ export const G: any = {
   DT: 0,
   bands: [],
   pillars: [],
+  plats: [],
   stick: null,
   stickV: {x:0,y:0},
   still: 0,

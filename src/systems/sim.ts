@@ -8,6 +8,7 @@ import { doCast, has, proc } from './casting';
 import { CY, ECHO, RI, RO, hasPerk, hasWand, isMod, relPos, toBoss, total } from './deck';
 import { die, foStep, showDead, showPick, showVictory, win } from './faceoff';
 import { chestSay, chestStep, hasGear, nearMiss, rateNow } from './gear';
+import { sideMove } from './sideView';
 import { inPillar, oaAim, oaBoss, oaMove } from './openArena';
 import { beamStep, trapStep } from './spellFx';
 import { recipeOf } from './spells';
@@ -35,8 +36,8 @@ export function step(dt){
   S.shake=Math.max(0,S.shake-dt*30); S.flash=Math.max(0,S.flash-dt);
   const fighting=S.mode==='fight';
   if(fighting||S.mode==='intro') S.runSeconds+=dt;
-  if(G.P&&(fighting||S.mode==='intro')){ const kx=(KEYS.right?1:0)-(KEYS.left?1:0), ky=(KEYS.down?1:0)-(KEYS.up?1:0); if(S.open||S.fo){}else if(S.orbit){G.P.a-=kx*2.4*dt;}else{G.P.x+=kx*300*dt; G.P.y+=ky*300*dt;} }
-  if(G.P){ if(S.open){}else if(S.fo&&G.fo){}else if(S.orbit&&G.B){G.P.rr+=(G.P.tr-G.P.rr)*Math.min(1,dt*16);G.P.x=W/2+Math.cos(G.P.a)*G.P.rr;G.P.y=CY()+Math.sin(G.P.a)*G.P.rr;}else{G.P.x=clamp(G.P.x,18,W-18);G.P.y=clamp(G.P.y,G.H*.4,G.H-96);} G.P.inv=Math.max(0,G.P.inv-dt); G.P.vx=G.P.vx*.8+(G.P.x-(G.P.lx??G.P.x))*.2; G.P.lx=G.P.x; }
+  if(G.P&&(fighting||S.mode==='intro')){ const kx=(KEYS.right?1:0)-(KEYS.left?1:0), ky=(KEYS.down?1:0)-(KEYS.up?1:0); if(S.open||S.fo||S.side){}else if(S.orbit){G.P.a-=kx*2.4*dt;}else{G.P.x+=kx*300*dt; G.P.y+=ky*300*dt;} }
+  if(G.P){ if(S.open||S.side){}else if(S.fo&&G.fo){}else if(S.orbit&&G.B){G.P.rr+=(G.P.tr-G.P.rr)*Math.min(1,dt*16);G.P.x=W/2+Math.cos(G.P.a)*G.P.rr;G.P.y=CY()+Math.sin(G.P.a)*G.P.rr;}else{G.P.x=clamp(G.P.x,18,W-18);G.P.y=clamp(G.P.y,G.H*.4,G.H-96);} G.P.inv=Math.max(0,G.P.inv-dt); G.P.vx=G.P.vx*.8+(G.P.x-(G.P.lx??G.P.x))*.2; G.P.lx=G.P.x; }
   if(S.mode==='intro'&&S.t>1.5){S.mode='fight';S.t=0;}
   if(G.B&&S.mode!=='title'){
     G.B.flash=Math.max(0,G.B.flash-dt);
@@ -49,7 +50,7 @@ export function step(dt){
     G.DT=dt/(G.B.chill>0?1.4:1)*(.72+.03*relPos())*(hasGear('hourglass')?.9:1)*(isMod('magician')?1.15:isMod('temperance')?.75:1);
     const ph=G.B.hp<G.B.max/2;
     if(ph&&!G.B.enraged){G.B.enraged=true;setMusicEnergy(3,true);S.flash=.2;S.shake=reduced?0:5;sfx.rage();burst(G.B.x,G.B.y,G.B.color,30);}
-    if(S.fo)foStep(dt); else if(S.open){ oaMove(dt); oaBoss(dt); if(S.mode==='fight'&&G.oa.state==='chase')G.B.def.attack(ph); } else G.B.def.attack(ph);
+    if(S.side)sideMove(dt); if(S.fo)foStep(dt); else if(S.open){ oaMove(dt); oaBoss(dt); if(S.mode==='fight'&&G.oa.state==='chase')G.B.def.attack(ph); } else G.B.def.attack(ph);
     if(!S.fo&&S.mode==='fight'&&S.echo!==null&&(!S.open||G.oa.state==='chase')) ECHO[S.echo].fn(BOSSES[S.echo].color);
     if(S.orbit) every('bloom',ph?4:5.5,()=>{G.B.bloomOuter=!G.B.bloomOuter;G.bands.push({r:G.B.bloomOuter?RO:RI,w:40,t:0,warn:.85,on:.3,hit:false});});
     if(S.mode==='fight')beamStep(dt);

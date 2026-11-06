@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { sideDrawFloor } from '../systems/sideView';
 import { W, ctx, reduced } from '../core/dom';
 import { G, S } from '../core/state';
 import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
@@ -52,7 +53,7 @@ function drawPlayer(){
   const c=ctx, blink=G.P.inv>0&&Math.floor(S.t*14)%2===0;
   if(Math.hypot(G.P.x-(G.P.lx??G.P.x),G.P.y-(G.P.ly??G.P.y))>.4) G.P.moveAt=nowS(); G.P.lx=G.P.x; G.P.ly=G.P.y;
   if(S.fo&&G.fo){ if(blink)c.globalAlpha=.4; { const WS=wizardSprites(G.P.wizard); if(WS.back) blitSprite(c,WS.anim?wizardFrame('large',WS.back,'north'):WS.back,px(G.P.x),px(G.P.y)+28); else blit(c,px(G.P.x),px(G.P.y),foWiz()); } c.globalAlpha=1; for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
-  G.P.face=G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north';
+  G.P.face=S.side?(G.P.sdir||'north'):G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north';
   if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink,G.P.face);
   if(G.P.shield>0&&!(G.P.shield<1&&Math.floor(S.t*10)%2)) arcDots(G.P.x,G.P.y,28,0,TAU,1,'#bfeaf2');
   for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); }
@@ -111,7 +112,7 @@ export function draw(){
   c.drawImage(G.bg,0,0,LW,G.LH); drawArenaLayers(c,LW); vfxStep();
   if(S.mode==='draw'){drawPull();return;}
   if(!G.B||S.mode==='shop') return;
-  if(S.fo&&G.fo)foFloor(c); if(S.open&&G.oa)oaDrawFloor(c);
+  if(S.fo&&G.fo)foFloor(c); if(S.open&&G.oa)oaDrawFloor(c); if(S.side&&G.plats)sideDrawFloor(c);
   if(S.orbit&&G.P){ for(const r of [RI,RO]){ const live=G.P.tr===r,rr=r*K,st=(live?5:7)/(rr*R); c.globalAlpha=live?.75:.3; c.fillStyle=live?BONE:G.B.color; for(let a=S.t*.1;a<TAU+S.t*.1;a+=st)c.fillRect(pr(LW/2+Math.cos(a)*rr),pr(CY()*K+Math.sin(a)*rr),1,1); c.globalAlpha=1; }
     for(const k of G.bands){ const w=px(k.w); if(k.t<k.warn){ if(Math.floor(S.t*12)%2){ arcDots(W/2,CY(),k.r-k.w/2,0,TAU,1,BONE); arcDots(W/2,CY(),k.r+k.w/2,0,TAU,1,BONE); } } else { arcDots(W/2,CY(),k.r,0,TAU,w,G.B.color); arcDots(W/2,CY(),k.r,0,TAU,Math.max(2,w-6),'#fffbee'); } } }
   for(const k of G.cols){
