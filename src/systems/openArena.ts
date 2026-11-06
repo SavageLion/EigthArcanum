@@ -4,6 +4,7 @@ import { G, S } from '../core/state';
 import { KEYS } from '../core/input';
 import { lineDots } from '../render/draw';
 import { LW, SPRITE_OVERRIDES, blitSprite, px } from '../render/sprites';
+import { arenaSeed, arenaTheme } from '../render/arenaArt';
 import { ring } from './attacks';
 import { OA_STYLE } from './bossPlans';
 import { hasPerk, hasWand, isMod, relPos } from './deck';
@@ -11,7 +12,20 @@ import { burst, hurt } from './sim';
 import { $, BONE, TAU, clamp, rnd } from '../core/util';
 import { sfx, tone } from '../core/audio';
 
-function makePillars(){ const a=G.H*.42,b=G.H*.68; G.pillars=[{x:95,y:a,w:48,h:48},{x:305,y:a,w:48,h:48},{x:95,y:b,w:48,h:48},{x:305,y:b,w:48,h:48}]; }
+/** Obstacle layouts and prop kinds for the open arena; picked from the fight's seed so each boss/position has its own room. */
+const KINDS={flag:['pillar','statue','tomb'],ash:['brazier','pillar','tomb'],ice:['crystal','statue','pillar'],moss:['stump','statue','crystal']};
+function makePillars(){
+  const H=G.H, seed=arenaSeed(), kinds=KINDS[arenaTheme()]||KINDS.flag, cx=W/2, cy=H*.5, L=(seed>>>3)%6, o=[];
+  const add=(x,y,w=48)=>o.push({x,y,w,h:w,kind:kinds[((seed>>>7)+o.length)%kinds.length]});
+  if(L===0){ add(95,H*.42); add(305,H*.42); add(95,H*.68); add(305,H*.68); }                       // four corners
+  else if(L===1){ add(135,H*.55); add(265,H*.55); }                                                // a pair
+  else if(L===2){ for(let i=0;i<6;i++){ const a=i*TAU/6; add(cx+Math.cos(a)*105,cy+Math.sin(a)*H*.17,40); } }   // ring
+  else if(L===3){ add(95,H*.4); add(305,H*.4); add(cx,H*.55); add(95,H*.7); add(305,H*.7); }       // five-spot
+  else if(L===4){ add(105,H*.55,44); add(cx,H*.55,44); add(295,H*.55,44); }                        // a wall with gaps
+  else { let r=seed|1; const rn=()=>(r=Math.imul(r^r>>>15,r|1)^r+Math.imul(r^r>>>7,r|61),((r^r>>>14)>>>0)/4294967296);
+    for(let i=0;i<5;i++){ let x,y,n=0; do{ x=60+rn()*(W-120); y=H*.3+rn()*H*.42; }while(n++<30&&(o.some(q=>Math.hypot(q.x-x,q.y-y)<80)||Math.hypot(x-cx,y-(H-150))<90)); add(x,y,40); } }  // scatter
+  G.pillars=o;
+}
 export const inPillar=(x,y,m=0)=>G.pillars.some(p=>Math.abs(x-p.x)<p.w/2+m&&Math.abs(y-p.y)<p.h/2+m);
 export function oaStart(){ makePillars(); G.oa={state:'chase',t:0,tx:0,ty:0,vx:0,vy:0,hint:4,hit:false,patches:[],left:0,slowed:0}; G.still=0; G.stickV={x:0,y:0}; G.B.x=W/2; G.B.y=G.H*.2; G.P.x=W/2; G.P.y=G.H-150; $('hint').textContent='Stand still to fire'; $('hint').hidden=false; }
 export function oaEnd(){ G.oa=null; G.pillars=[]; G.stick=null; G.stickV={x:0,y:0}; }
@@ -50,9 +64,9 @@ export function oaBoss(dt){
 }
 export function oaAim(){ if(isMod('hermit'))return; const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1),sx=G.P.x+(n>1?(i-.5)*14:0),a=Math.atan2(G.B.y-G.P.y,G.B.x-sx); G.bolts.push({x:sx,y:G.P.y,vx:Math.cos(a)*640,vy:Math.sin(a)*640,d:G.P.scale*(crit?5:1),r:crit?5:3,c:crit?'#f0a8d8':'#ffe9a8',basic:true}); } }
 export function oaDrawFloor(c){
-  const pil=SPRITE_OVERRIDES.arena.pillar;
+  const pil=SPRITE_OVERRIDES.arena.pillar, props=SPRITE_OVERRIDES.arena.props||{};
   if(!SPRITE_OVERRIDES.arena.tiles.length){ c.fillStyle='#0b0814'; c.globalAlpha=.3; for(let x=0;x<LW;x+=16)c.fillRect(x,0,1,G.LH); for(let y=0;y<G.LH;y+=16)c.fillRect(0,y,LW,1); c.globalAlpha=1; }
-  if(pil) for(const p of G.pillars){ const fy=px(p.y+p.h/2); c.globalAlpha=.4; c.fillStyle='#0b0814'; c.beginPath(); c.ellipse(px(p.x),fy-.5,11,3,0,0,TAU); c.fill(); c.globalAlpha=1; blitSprite(c,pil,px(p.x),fy+1); }
+  if(pil) for(const p of G.pillars){ const fy=px(p.y+p.h/2); c.globalAlpha=.4; c.fillStyle='#0b0814'; c.beginPath(); c.ellipse(px(p.x),fy-.5,11,3,0,0,TAU); c.fill(); c.globalAlpha=1; blitSprite(c,props[p.kind]||pil,px(p.x),fy+1); if(p.kind==='brazier'){ c.globalAlpha=.16+.06*Math.sin(S.t*9+p.x); c.fillStyle='#ff9a3c'; c.beginPath(); c.arc(px(p.x),fy-24,14,0,TAU); c.fill(); c.globalAlpha=1; } }
   else for(const p of G.pillars){ const x=px(p.x-p.w/2),y=px(p.y-p.h/2),w=px(p.w),h=px(p.h); c.fillStyle='#0b0814';c.fillRect(x-1,y-1,w+2,h+6); c.fillStyle='#3f3a4c';c.fillRect(x,y+h-1,w,5); c.fillStyle='#8a8498';c.fillRect(x,y,w,h); c.fillStyle='#b5afc2';c.fillRect(x,y,w,2);c.fillRect(x,y,2,h); c.fillStyle='#5c566c';c.fillRect(x+6,y+6,w-12,1);c.fillRect(x+6,y+h-7,w-12,1); }
   if(G.oa)for(const q of G.oa.patches){ const cx=px(q.x),cy=px(q.y),col=q.kind==='fire'?(Math.floor(S.t*8+q.x)%2?'#f2a03d':'#e8592c'):q.kind==='ice'?'#bfeaf2':'#d9d2bb'; c.fillStyle=col; c.globalAlpha=q.t<.6&&Math.floor(S.t*10)%2?.3:.85; for(let i=0;i<7;i++){const a=i*.9+q.x;c.fillRect(cx+Math.round(Math.cos(a)*(2+i%4*2)),cy+Math.round(Math.sin(a)*(2+i%4*2)),2,2);} c.globalAlpha=1; }
   if(G.oa&&S.mode==='fight'&&G.oa.state==='windup'&&Math.floor(S.t*12)%2){ lineDots(G.B.x,G.B.y,G.oa.tx,G.oa.ty,'#ff7a6e',2); }

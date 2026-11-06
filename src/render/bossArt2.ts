@@ -50,3 +50,9 @@ export function drawKnight(c,t){                                     // XX The R
   poly(c,[[-3,-56+Math.sin(t*2)*2],[3,-56+Math.sin(t*2)*2],[3,52],[-3,52]]); fl(c,'#cfd7e8'); ln(c,'#6f7a96',1.2);   // sword
   poly(c,[[-14,2],[14,2],[14,7],[-14,7]]); fl(c,'#a86a3c'); ln(c,'#e0b07a',1.2);
 }
+
+/** plain stand-in used until a boss has Pixel Lab art: a glowing orb with a crown of rays and two eyes, in the boss's colour */
+export function drawGeneric(c,t,col='#ffffff'){
+  for(let i=0;i<10;i++){ const an=i/10*TAU+t*.5, x=Math.cos(an)*34, y=Math.sin(an)*34, r=46+Math.sin(t*4+i)*4; poly(c,[[x-7,y],[Math.cos(an)*r,Math.sin(an)*r],[x+7,y]]); fl(c,col); }
+  circle(c,0,0,30); fl(c,'#1a1024'); ln(c,col,2.5); eyes(c,10,-4,5,col); poly(c,[[-9,12],[0,18],[9,12]],false); ln(c,col,2.5);
+}

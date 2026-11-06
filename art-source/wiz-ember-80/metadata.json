@@ -1,0 +1,36 @@
+{
+  "group_id": "7a662149-a6f4-4bbd-a745-a61a7635af86",
+  "states": [
+    {
+      "character": {
+        "id": "c8a5c90d-b963-44d0-8bc1-7067a6576687",
+        "name": "Idle",
+        "prompt": "Cinder Acolyte: a young fire mage in a crimson robe with a pointed hood tipped by a small flame, gold trim, glowing ember-orange eyes under the hood, holding a staff topped with a burning flame. Dark red, orange and gold palette.",
+        "size": {
+          "width": 80,
+          "height": 80
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-11-06T11:59:10.793481+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-06T12:02:03.473052"
+}

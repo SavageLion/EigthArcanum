@@ -16,7 +16,7 @@ import { oaEnd, oaStart } from './openArena';
 import { burst, hurt } from './sim';
 import { blowTrap } from './spellFx';
 import { BOSS_EL, EL, RECIPES, TYPES, fuse, learnRecipe, recipeOf, spellCost, spellDesc, spellKey, spellName } from './spells';
-import { pixelise } from '../render/pixel';
+import { mk, pixelise } from '../render/pixel';
 import { circle, fl, ln, poly } from '../render/bossArt';
 import { $, BONE, GOLD, clamp, rnd } from '../core/util';
 import { setMusic, sfx, tone, wakeAudio } from '../core/audio';
@@ -29,7 +29,11 @@ export const FO_LANES=[95,200,305], FO_ATTACKS={
  spit:{zones:null,hand:'mouth',say:'Move at the last moment'}
 };
 const foCache={};
-function foFrames(i){ if(foCache[i])return foCache[i]; const b=BOSSES[i],frames=[]; for(let n=0;n<8;n++){const t=n*.26+.3;frames.push(pixelise(c=>b.draw(c,t,b.color),170,1.05));} const fist=[1,-1].map(s=>pixelise(c=>drawFoFist(c,s,b.color),50,1)); return foCache[i]={frames,fist}; }
+/** Pixel Lab boss sprites, enlarged for the face-off (128px art -> 256px, 160px -> 256px) so the boss looms over the lanes */
+function enlarge(src,k){ const c=mk(Math.round(src.width*k),Math.round(src.height*k)),g=c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(src,0,0,c.width,c.height); c.hi=true; return c; }
+function foFrames(i){ if(foCache[i])return foCache[i]; const b=BOSSES[i],frames=[]; const ov=SPRITE_OVERRIDES.boss[i];
+  if(ov){ const k=256/ov[0].img.width, memo=new Map(); for(let n=0;n<8;n++){ const f=ov[n%ov.length]; if(!memo.has(f)) memo.set(f,{img:enlarge(f.img,k),white:enlarge(f.white,k)}); frames.push(memo.get(f)); } }
+  else for(let n=0;n<8;n++){const t=n*.26+.3;frames.push(pixelise(c=>b.draw(c,t,b.color),170,1.05));} const fist=[1,-1].map(s=>pixelise(c=>drawFoFist(c,s,b.color),50,1)); return foCache[i]={frames,fist}; }
 function drawFoFist(c,s,col){ circle(c,0,0,17);fl(c,'#2a1412');ln(c,col,2.5); for(let k=0;k<4;k++){c.beginPath();c.moveTo(-11+k*7,-1);c.lineTo(-11+k*7,10);ln(c,col,1.6);} poly(c,[[s*-16,-3],[s*-23,-9],[s*-21,6]]);fl(c,'#2a1412');ln(c,col,1.2); }
 function drawWizBack(c){ poly(c,[[-18,28],[-9,-2],[9,-2],[18,28]]);fl(c,'#3956a8');ln(c,GOLD,1.5); poly(c,[[-3,0],[3,0],[4,28],[-4,28]]);fl(c,'#26336f'); poly(c,[[-16,-3],[16,-3],[5,-13],[8,-27],[-5,-14]]);fl(c,'#2a3f85');ln(c,GOLD,1.5); poly(c,[[-18,-3],[18,-3]],false);ln(c,GOLD,3); poly(c,[[21,22],[21,-22]],false);ln(c,'#a9875a',2.5); circle(c,21,-26,5);fl(c,'#ffd27a'); }
 function foStart(){ if(!G.wizBack)G.wizBack=pixelise(drawWizBack,60,1).img; G.fo={lane:1,x:FO_LANES[1],dodge:0,dodgedAt:-9,atk:null,gap:1.2,queue:[],open:0,frozen:0,cd:0}; foFrames(S.stage); G.B.x=W/2;G.B.y=G.H*.3; }

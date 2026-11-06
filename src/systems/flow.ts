@@ -30,6 +30,34 @@ function drawOmen(){
   const pool=OMENS.filter(o=>o.id!==S.lastOmen&&(!o.spells||G.P.spells.length)&&(o.id!=='hermit'||G.P.spells.some(s=>s.type!=='ward')));
   return pool[Math.floor(Math.random()*pool.length)];
 }
+/** Boss portrait for the pull card, redrawn at the same chunky density as the omen/arena card art (about 36x54 pixels):
+    dithered glow in the boss's colour behind a cropped, downsampled sprite with a dark outline. */
+const BAYER=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+export function bossCardArt(d,stageIdx){
+  const W=36,H=54, out=document.createElement('canvas'); out.width=W; out.height=H; const o=out.getContext('2d');
+  const hex=d.color||'#ffffff', rr=parseInt(hex.slice(1,3),16),gg=parseInt(hex.slice(3,5),16),bb=parseInt(hex.slice(5,7),16);
+  const bg=o.createImageData(W,H);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const dx=(x-W/2)/(W/2), dy=(y-H*.46)/(H/2), dist=Math.min(1,Math.hypot(dx,dy)), glow=(1-dist)*.9, th=BAYER[(y&3)*4+(x&3)]/16;
+    const lit=glow>th*.9, i=(y*W+x)*4;
+    bg.data[i]=lit?rr*.38+14:16; bg.data[i+1]=lit?gg*.38+10:11; bg.data[i+2]=lit?bb*.38+20:30; bg.data[i+3]=255;
+  }
+  o.putImageData(bg,0,0);
+  const src=bossFrames(stageIdx)[0].img, sw=src.width, sh=src.height, t=document.createElement('canvas'); t.width=sw; t.height=sh;
+  const tc=t.getContext('2d'); tc.drawImage(src,0,0); const px=tc.getImageData(0,0,sw,sh).data; let x0=sw,y0=sh,x1=0,y1=0;
+  for(let y=0;y<sh;y++)for(let x=0;x<sw;x++) if(px[(y*sw+x)*4+3]>40){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  const cw=x1-x0+1, ch=y1-y0+1, k=Math.min(30/cw,38/ch), dw=Math.max(1,Math.round(cw*k)), dh=Math.max(1,Math.round(ch*k));
+  const s=document.createElement('canvas'); s.width=dw; s.height=dh; const sc=s.getContext('2d'); sc.imageSmoothingEnabled=true; sc.imageSmoothingQuality='high'; sc.drawImage(src,x0,y0,cw,ch,0,0,dw,dh);
+  const id=sc.getImageData(0,0,dw,dh), a=id.data;
+  for(let i=0;i<a.length;i+=4){ a[i+3]=a[i+3]>110?255:0; if(a[i+3]){ a[i]=Math.round(a[i]/24)*24; a[i+1]=Math.round(a[i+1]/24)*24; a[i+2]=Math.round(a[i+2]/24)*24; } }
+  sc.putImageData(id,0,0);
+  const ox=Math.round((W-dw)/2), oy=Math.round(H*.45-dh/2);
+  o.fillStyle='#0b0814'; for(const [ax,ay] of [[-1,0],[1,0],[0,-1],[0,1]]) o.drawImage(outline(s,'#0b0814'),ox+ax,oy+ay);
+  o.drawImage(s,ox,oy);
+  return out.toDataURL();
+}
+function outline(img,col){ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const g=c.getContext('2d'); g.drawImage(img,0,0); g.globalCompositeOperation='source-in'; g.fillStyle=col; g.fillRect(0,0,c.width,c.height); return c; }
+
 export function showDraw(){
   S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; oaEnd(); S.arena=null; S.t=0;
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
@@ -37,11 +65,11 @@ export function showDraw(){
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);
   const omen=drawOmen(), arena=ARENAS[Math.floor(Math.random()*ARENAS.length)];
   G.pull={i:0,phase:'shuffle',t:0,omen,arena,done:false,fast:reduced};
-  const art=bossFrames(S.stage)[0].img.toDataURL();
+  const art=bossCardArt(d,S.stage);
   ov.className='overlay pullov'; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default';
   ov.innerHTML=`<div class="pullhead"><div class="eyebrow">Pull ${S.pos+1} of ${total()}${d.elite?' · Elite':''}</div><div class="gold" id="pullstatus"></div></div>
     <div class="slots">
-      ${slotHTML(0,d.elite?'elite':'boss',`<img src="${art}" alt=""><b>${d.name}</b>`,d.elite?'Elite':'Boss')}
+      ${slotHTML(0,d.elite?'elite':'boss',`<img class="art" src="${art}" alt=""><b>${d.name}</b>`,d.elite?'Elite':'Boss')}
       ${slotHTML(1,'omencard',`<img class="art" alt="" src="${import.meta.env.BASE_URL}assets/cards/omen/${omen.id}.png"><small class="num">${omen.num}</small><b>${omen.name}</b>`,'Omen')}
       ${slotHTML(2,'arenacard',`<img class="art" alt="" src="${import.meta.env.BASE_URL}assets/cards/arena/${arena.id}.png"><small class="num">${arena.num}</small><b>${arena.name}</b>`,'Arena')}
     </div>

@@ -14,6 +14,11 @@ function dotRing(c,cx,cy,r,col,al,gap=1){ const n=Math.max(8,Math.round(TAU*r/ga
 function dotLine(c,x0,y0,x1,y1,col,al,gap=1){ const n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)/gap)); for(let i=0;i<=n;i++) px1(c,x0+(x1-x0)*i/n,y0+(y1-y0)*i/n,col,al); }
 const orbitCentre=()=>({cx:0,cy:Math.round(G.H*.45*K*R)});
 
+/** Look of this fight's arena. Deterministic from the boss + position, so the card art, the floor and the props always agree. */
+const hash=(a,b)=>{ let h=(a*374761393+b*668265263)^0x5bd1e995; h=Math.imul(h^h>>>13,1274126177); return (h^h>>>16)>>>0; };
+export const arenaSeed=()=>hash(S.stage+1,(S.pos||0)+7);
+export const THEMES=['flag','ash','ice','moss'];
+export const arenaTheme=()=>{ const t=THEMES[arenaSeed()%THEMES.length]; return SPRITE_OVERRIDES.arena.sets&&SPRITE_OVERRIDES.arena.sets[t]?t:'flag'; };
 export const arenaKind=()=>S.fo?'hall':S.orbit?'orbit':S.open?'open':'sky';
 
 export function paintArena(c,b,WP,HP){
@@ -28,8 +33,8 @@ export function paintArena(c,b,WP,HP){
 
 /* ---- open arena: flagstone floor from the Pixel Lab tile set, darkened and tinted toward the boss ---- */
 function flagstones(c,b,WP,HP){
-  const tiles=SPRITE_OVERRIDES.arena.tiles; if(tiles.length<16) return;
-  const rng=mulberry(1234+S.stage*7), T=32, PLAIN=[0,1,8,10,13], CRACK=[2,3,9,15], MOSS=[7,14], INLAY=[4,5,6,11,12];
+  const th=arenaTheme(), tiles=(SPRITE_OVERRIDES.arena.sets&&SPRITE_OVERRIDES.arena.sets[th])||SPRITE_OVERRIDES.arena.tiles; if(tiles.length<16) return; const flag=th==='flag';
+  const rng=mulberry(1234+S.stage*7), T=32, PLAIN=flag?[0,1,8,10,13]:[1,4,8,12,13], CRACK=flag?[2,3,9,15]:[0,7,9,5], MOSS=flag?[7,14]:[2,11], INLAY=flag?[4,5,6,11,12]:[3,6,10,14,15];
   for(let ty=0;ty*T<HP;ty++) for(let tx=0;tx*T<WP;tx++){
     const r=rng(); const i=r<.58?PLAIN[(rng()*5)|0]:r<.8?CRACK[(rng()*4)|0]:r<.9?MOSS[(rng()*2)|0]:INLAY[(rng()*5)|0];
     c.drawImage(tiles[i],tx*T,ty*T);

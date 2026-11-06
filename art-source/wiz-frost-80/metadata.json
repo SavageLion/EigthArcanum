@@ -1,0 +1,36 @@
+{
+  "group_id": "7a0a77e3-af0f-40a4-bb77-19625f6ccb05",
+  "states": [
+    {
+      "character": {
+        "id": "d93047b8-5121-4571-8f8e-45612347e02c",
+        "name": "Idle",
+        "prompt": "Frost Hermit: an old bearded hermit in a heavy pale-blue hooded cloak lined with white fur, a long white beard, frost crystals on the shoulders, holding a staff topped with a glowing ice crystal. Icy blue, white and silver palette.",
+        "size": {
+          "width": 80,
+          "height": 80
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-11-06T11:59:11.062925+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-06T12:02:05.502085"
+}

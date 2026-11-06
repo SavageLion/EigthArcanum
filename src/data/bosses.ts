@@ -66,7 +66,7 @@ BOSSES[7].elite=true;
 export const TOTAL=16, ELITE_POS=[3,7,11,15];
 /** every fourth pull is an elite, and the last pull is the run's final boss */
 const isElitePull=p=>p%4===3;
-export const FINALS={16:7};   // run length -> final boss index (32 and 64 get theirs when those bosses exist)
+export const FINALS={16:7,32:31};   // run length -> final boss index (32 and 64 get theirs when those bosses exist)
 export const runAvailable=n=>n===16||(BOSSES.length>=n&&FINALS[n]!==undefined);
 export function dealOrder(total=16){
   const fin=FINALS[total]??7, pool=BOSSES.map((b,i)=>i).filter(i=>i<total&&i!==fin);

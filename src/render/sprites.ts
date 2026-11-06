@@ -85,6 +85,12 @@ async function loadBosses(){
 async function loadArena(){
   const [pillar,...tiles]=await Promise.all([loadImage('arena/pillar.png'),...Array.from({length:16},(_,i)=>loadImage(`arena/tiles/tile_${i}.png`))]);
   SPRITE_OVERRIDES.arena.tiles=tiles.every(t=>t)?tiles:[]; SPRITE_OVERRIDES.arena.pillar=pillar?analyse(pillar):null;
+  const sets:any={flag:SPRITE_OVERRIDES.arena.tiles};
+  for(const n of ['ash','ice','moss']){ const t=await Promise.all(Array.from({length:16},(_,i)=>loadImage(`arena/tiles-${n}/tile_${i}.png`))); if(t.every(x=>x)) sets[n]=t; }
+  SPRITE_OVERRIDES.arena.sets=sets;
+  const props:any={pillar:SPRITE_OVERRIDES.arena.pillar};
+  for(const n of ['statue','tomb','crystal','brazier','stump']){ const im=await loadImage(`arena/props/${n}.png`); if(im) props[n]=analyse(im); }
+  SPRITE_OVERRIDES.arena.props=props;
 }
 /** Draw a sprite with its feet-centre at logical (x,footY). Returns the staff-orb position in logical px. */
 export function blitSprite(g,s:Sprite,x:number,footY:number){
