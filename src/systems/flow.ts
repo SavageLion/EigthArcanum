@@ -13,7 +13,7 @@ import { BOSS_EL, EL } from './spells';
 import { setMusic, sfx, tone, wakeAudio } from '../core/audio';
 import { $, GOLD, clamp, rnd } from '../core/util';
 import { circle, fl, ln, poly } from '../render/bossArt';
-import { mk, pixelise } from '../render/pixel';
+import { R, mk, pixelise } from '../render/pixel';
 
 /* ---------- flow ---------- */
 export function startRun(){ wakeAudio(); G.P=newPlayer(); S.order=dealOrder(); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
@@ -45,8 +45,10 @@ export function showDraw(){
     </div>
     <div class="reads" id="reads"></div><div class="pullfoot" id="pullfoot"></div>`;
   ov.onclick=pullTap;
-  setStatus(); hotSave();
+  setStatus(); hotSave(); fitCardText(); document.fonts&&document.fonts.ready.then(fitCardText);
 }
+/** shrink each card title until it fits inside its banner (names run from 'Strength' to 'The Mother of Thorns') */
+export function fitCardText(){ ov.querySelectorAll('.slot .front b').forEach(b=>{ b.style.fontSize=''; let fs=parseFloat(getComputedStyle(b).fontSize)||10; while((b.scrollHeight>b.clientHeight+1||b.scrollWidth>b.clientWidth+1)&&fs>5.5){ fs-=.5; b.style.fontSize=fs+'px'; } }); }
 function slotHTML(i,kind,front,label){ return `<div class="slot ${kind}" id="slot${i}"><div class="slotin"><div class="face back"><span>?</span><em>${label}</em></div><div class="face front">${front}</div></div></div>`; }
 function setStatus(){ const e=$('pullstatus'); if(!e||!G.pull)return; e.textContent=G.pull.done?'':G.pull.phase==='wait'?'Tap to turn the card':'Shuffling…'; }
 function pullTap(e){
@@ -60,7 +62,7 @@ function throwCard(){
   sfx.card(); el.style.setProperty('--fx',fx+'px'); el.style.setProperty('--fy',fy+'px'); el.classList.add('landed'); if(!reduced)el.classList.add('fly');
   tone(1250,.07,'square',.03,-500);
 }
-export function turnCard(){
+export function turnCard(){ fitCardText();
   const i=G.pull.i,el=$('slot'+i); el.classList.add('turned'); tone(700+i*120,.1,'triangle',.06);
   addRead(i);
   if(i===1&&G.P.thirdEye){ G.pull.phase='eye'; $('pullfoot').innerHTML=`<div class="shopbtns"><button class="ghost" id="redraw">Third Eye: redraw this omen</button><button class="go" id="keep">Keep this omen</button></div>`; $('redraw').onclick=()=>{ G.P.thirdEye=false; S.lastOmen=G.pull.omen.id; const o=drawOmen(); G.pull.omen=o; el.querySelector('.front').innerHTML=`<small>${o.num}</small><b>${o.name}</b>`; $('read1').innerHTML=readText(1); $('pullfoot').innerHTML=''; tone(880,.1,'triangle',.06); nextDraw(); }; $('keep').onclick=()=>{ G.P.thirdEye=false; $('pullfoot').innerHTML=''; nextDraw(); }; setStatus(); return; }
@@ -105,7 +107,7 @@ export function drawPull(){
     if(G.pull.phase==='shuffle'&&!reduced){ f=Math.floor(T*12)%HA.length; if(Math.floor(T*14)!==G.pull.tick&&Math.random()<.4){ G.pull.tick=Math.floor(T*14); tone(1500+rnd(0,300),.02,'square',.012); } }
     else if(G.pull.phase==='throw'&&!reduced) dy=-Math.round(5*Math.sin(clamp(G.pull.t/.2,0,1)*Math.PI));
     else dy=reduced?0:Math.sin(T*2.5)*1.2;
-    blit(c,80,cy-4+dy,HA[f]); return;
+    { const im=HA[f],k=1.4,w=im.width/R*k,h=im.height/R*k; c.drawImage(im,Math.round((80-w/2)*R)/R,Math.round((cy-4+dy-h/2+4)*R)/R,w,h); } return;   // hands drawn 40% larger than the sprite's native size
   }
   let lx=46,rx=114,ly=cy+20,ry=cy+20;
   if(G.pull.phase==='shuffle'&&!reduced){
