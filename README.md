@@ -11,18 +11,25 @@ npm run smoke      # build first; plays all 16 bosses x 4 arenas in headless Chr
 
 ## Layout
 - `index.html` – shell: canvas and overlay divs
-- `src/main.ts` – game state, simulation, flow, input (still one big closure; see below)
-- `src/core/` – `util` (math, `$`), `audio` (synth)
-- `src/render/` – `pixel` (palette snapping, outline pass), `bossArt` (procedural boss figures)
+- `src/main.ts` – boot, game loop, `window.__arcana` test hook
+- `src/core/` – `dom` (canvas/overlay refs), `state` (shared state), `util`, `audio`, `input`, `size`
+- `src/data/bosses.ts` – the 16 boss definitions
+- `src/systems/` – gameplay: `attacks` (bullet patterns), `bossPlans` (per-boss face-off/open-arena behaviour),
+  `spells`, `casting`, `spellFx`, `gear` (gear + chests), `deck` (boss order, omens, wands, shop goods),
+  `flow` (title, tarot draw, run start), `faceoff` (fight start/win/lose, reward, shop screens),
+  `openArena`, `sim` (damage + per-frame step)
+- `src/render/` – `pixel` (palette snapping), `bossArt` (procedural boss figures), `sprites` (sprite cache, overrides), `draw` (frame drawing)
 - `src/style.css` – all UI styling
-- `public/assets/` – shipped art (Pixel Lab output goes here)
-- `art-source/` – prompts and source images, not shipped
+- `public/assets/` – shipped art (Pixel Lab output goes here); `art-source/` – prompts and sources, not shipped
 - `docs/original-single-file.html` – the original single-file prototype
 
-## Next refactor
-The remaining code in `main.ts` shares mutable state (`P`, `B`, `S`, shot arrays...) through the closure.
-Splitting it further means first moving that state into one exported object, then peeling off systems
-(spells, loot/shop, tarot draw, face-off, open arena). `npm run smoke` is the safety net for that.
+## State
+Everything that used to be a closure variable (`P` player, `B` boss, `shots`, `H`, ...) now lives on one
+exported object: `G` in `core/state.ts` (`G.P`, `G.B`, `G.shots`...). `S` is the run/mode state.
+
+## Typing
+The gameplay modules start with `// @ts-nocheck` (they were written untyped). The next step is to type `G`
+(player, boss, shot, spell interfaces) and then drop that pragma module by module.
 
 ## Art
 `SPRITE_OVERRIDES` in `main.ts` is the slot for final sprites. Any boss or the wizard without an override

@@ -1,0 +1,53 @@
+// @ts-nocheck
+import { W } from './dom';
+import { RO } from '../systems/deck';
+/** Shared mutable game state. Everything that used to be a closure `let` lives here as G.<name>. */
+export const G: any = {
+  H: 720,
+  scale: 1,
+  P: undefined,
+  B: undefined,
+  bolts: [],
+  shots: [],
+  rings: [],
+  cols: [],
+  parts: [],
+  seeds: [],
+  beams: [],
+  helpers: [],
+  bg: null,
+  DT: 0,
+  bands: [],
+  pillars: [],
+  stick: null,
+  stickV: {x:0,y:0},
+  still: 0,
+  oa: null,
+  CHESTIMG: null,
+  chestCall: 0,
+  traps: [],
+  LH: 288,
+  pull: null,
+  handImg: null,
+  handFlip: null,
+  fo: null,
+  foHold: null,
+  wizBack: null,
+  wakeLock: null,
+  btnState: '',
+  drag: null,
+  last: 0,
+};
+
+
+
+/* ---------- audio: small synth, starts from the first button press ---------- */
+
+/* ---------- world state ---------- */
+export const S={mode:'title',stage:0,t:0,shake:0,flash:0,god:false,hits:0,best:0,runSeconds:0,paused:false};
+S.recipes=[];
+try{ S.best=+localStorage.getItem('ea-best')||0; S.recipes=JSON.parse(localStorage.getItem('ea-recipes')||'[]'); }catch(e){}
+
+export function newPlayer(){
+  return {gear:{hat:null,robe:null,charm:null},loot:[],moonUsed:false,sageN:0,slots:2,gold:0,wand:null,thirdEye:false,reward:null,cleanFight:true,a:Math.PI/2,rr:RO,tr:RO,x:W/2,y:G.H-150,vx:0,hp:4,max:4,hit:5,inv:0,scale:1,rate:.2,cast:0,spells:[],mana:0,manaMax:100,cd:0,shield:0,shieldSpell:null,shieldPw:1,boneCasts:0,grazeGlow:0};
+}
