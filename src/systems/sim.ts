@@ -43,7 +43,7 @@ export function step(dt){
     G.B.flash=Math.max(0,G.B.flash-dt);
     if(fighting||S.mode==='intro'){
       G.B.t+=dt;
-      if(S.open){} else if(S.fo){G.B.x=W/2;G.B.y=G.H*.3;} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
+      if(S.open){} else if(S.fo){G.B.x=W/2;G.B.y=G.H*.3;} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(S.side){ G.B.x=W/2+Math.sin(G.B.t*.55)*125; G.B.y=G.H*.44+Math.sin(G.B.t*1.2)*42; } else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
     }
   }
   if(fighting){
@@ -57,7 +57,7 @@ export function step(dt){
     if(S.mode==='fight')trapStep(dt);
     if(S.mode==='fight')chestStep(dt);
     G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?7*(isMod('star')||isMod('hermit')?2:1)*(hasGear('pilgrim')?1.4:1)*dt:0)); G.P.cd=Math.max(0,G.P.cd-dt); G.P.shield=Math.max(0,G.P.shield-dt); if(G.P.shield<=0&&G.P.shieldFx){G.P.shieldFx.drop();G.P.shieldFx=null;} G.B.chill=Math.max(0,G.B.chill-dt);
-    if(!S.fo)G.P.cast-=dt; if(S.open){ if(G.still>.1&&G.P.cast<=0){G.P.cast=rateNow();oaAim();} } else if(!S.fo&&G.P.cast<=0){G.P.cast+=rateNow(); if(!isMod('hermit')){ const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const off=n>1?(i-.5)*14:0, crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1), m=crit?5:1, wc=crit?'#f0a8d8':undefined, sx=G.P.x+off;
+    if(!S.fo)G.P.cast-=dt; if(S.open||S.side){ if((S.side||G.still>.1)&&G.P.cast<=0){G.P.cast=rateNow();oaAim();} } else if(!S.fo&&G.P.cast<=0){G.P.cast+=rateNow(); if(!isMod('hermit')){ const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const off=n>1?(i-.5)*14:0, crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1), m=crit?5:1, wc=crit?'#f0a8d8':undefined, sx=G.P.x+off;
       if(S.orbit)G.bolts.push({x:sx,y:G.P.y,...toBoss(sx,G.P.y,620),d:G.P.scale*m*(G.P.tr===RI?1.5:1),r:crit?5:3,c:wc||'#ffe9a8',basic:true}); else G.bolts.push({x:sx,y:G.P.y-22,vy:-640,d:G.P.scale*m,r:crit?6:4,c:wc,basic:true}); } }}
     if(G.B.burning>0){G.B.burning-=dt;damage(5*G.P.scale*dt);}
     for(const h of G.helpers){ h.life-=dt;h.a+=dt*2.4;h.cd-=dt; const hx=G.P.x+Math.cos(h.a)*42,hy=G.P.y+Math.sin(h.a)*30; h.x=hx;h.y=hy;
