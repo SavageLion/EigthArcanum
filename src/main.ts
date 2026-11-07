@@ -43,6 +43,7 @@ try{ window.claude?.hot?.snapshot?.(()=>({saved:S.saved||null})); }catch(e){}
 Promise.all([loadSprites(),loadAudioManifest()]).finally(()=>{ window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {}); });
 
 import * as _vfx from './render/vfx';
+import './data/elementAssign'
 import './data/newBosses'
 import './data/newBosses64';
 import * as _score from './core/score';

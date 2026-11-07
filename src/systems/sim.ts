@@ -12,7 +12,7 @@ import { sideMove } from './sideView';
 import { labHit, labStep } from './lab';
 import { eventsStep } from './arenaEvents';
 import { inPillar, oaAim, oaBoss, oaMove } from './openArena';
-import { beamStep, trapStep } from './spellFx';
+import { beamStep, spellExtrasStep, trapStep } from './spellFx';
 import { recipeOf } from './spells';
 import { GOLD, TAU, clamp, rnd } from '../core/util';
 import { setMusicEnergy, sfx } from '../core/audio';
@@ -62,6 +62,8 @@ export function step(dt){
     if(!S.fo)G.P.cast-=dt; if(S.open||S.side){ if((S.side||G.still>.1)&&G.P.cast<=0){G.P.cast=rateNow()*(G.P.surge>0?.55:1);oaAim();} } else if(!S.fo&&G.P.cast<=0){G.P.cast+=rateNow()*(G.P.surge>0?.55:1); if(!isMod('hermit')){ const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const off=n>1?(i-.5)*14:0, crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1), m=crit?5:1, wc=crit?'#f0a8d8':undefined, sx=G.P.x+off;
       if(S.orbit)G.bolts.push({x:sx,y:G.P.y,...toBoss(sx,G.P.y,620),d:G.P.scale*m*(G.P.tr===RI?1.5:1),r:crit?5:3,c:wc||'#ffe9a8',basic:true}); else G.bolts.push({x:sx,y:G.P.y-22,vy:-640,d:G.P.scale*m,r:crit?6:4,c:wc,basic:true}); } }}
     if(G.B.burning>0){G.B.burning-=dt;damage(5*G.P.scale*dt);}
+    if(G.B.poison>0){ G.B.poison-=dt; damage(3.5*G.P.scale*dt*(1+Math.min(1,G.B.poison/6))); if(Math.random()<dt*8)burst(G.B.x+rnd(-26,26),G.B.y+rnd(-20,20),'#8ad24a',1); }
+    spellExtrasStep(dt);
     for(const h of G.helpers){ h.life-=dt;h.a+=dt*2.4;h.cd-=dt; const hx=G.P.x+Math.cos(h.a)*42,hy=G.P.y+Math.sin(h.a)*30; h.x=hx;h.y=hy;
       if(h.cd<=0){h.cd=.45;G.bolts.push({x:hx,y:hy,...toBoss(hx,hy,620),d:h.d,r:4.5,c:h.c,spell:h.s,pw:h.pw,pc:.25});} }
     G.helpers=G.helpers.filter(h=>h.life>0);

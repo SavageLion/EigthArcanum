@@ -69,3 +69,6 @@ falls back to the procedural art.
 
 ## Sanctum stations (all six)
 Door, Market, Forge, plus **Codex** (a bestiary of all 64 bosses, filled in as you beat them; \`meta.codex\`), **Daily Run** (the same seeded 8-boss run and arenas for everyone each day, no Market boosts or Forge gear; first win of the day pays a shard bonus that grows with the streak: \`dailyToday\`, \`noteDaily\` in \`data/meta.ts\`, \`startRun(..., daily)\` in \`systems/flow.ts\`) and the **Spell Lab** (\`systems/lab.ts\`: a dummy that cannot die, a spell builder for any type, element pair and tier, unlimited mana and a DPS readout; it runs as a normal fight with \`S.lab\` set).
+
+## Spells: 9 elements and 9 types
+Types: bolt, nova, ward, summon, beam, trap, blink, **meteor** (a delayed, undodgeable hit) and **orbit** (orbs that circle you, erase shots and strike the boss). Elements: fire, frost, sound, storm, thorn, bone, mirror, blood, gold and the newest **poison** (stacking damage over time), **holy** (cleanses nearby shots, brief shield) and **void** (erases shots near the boss for bonus damage). Elements are assigned to bosses in `data/elementAssign.ts`. New recipes: Eclipse Meteor (meteor + void + fire) and Halo Guard (orbit + holy + mirror). Meteor and orbit logic is in `systems/spellFx.ts` (`spellExtrasStep`, `drawSpellExtras`); the Spell Lab builds any combination.

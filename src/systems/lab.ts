@@ -21,7 +21,7 @@ export function enterLab(){
   sideEnd(); oaEnd(); eventsEnd(); G.fo=null; G.hub=null; G.pull=null;
   G.P=newPlayer(meta.lastWizard||'raven'); G.P.spells=[]; G.P.slots=3; G.P.manaMax=999; G.P.mana=999; G.P.hp=G.P.max=99; G.P.x=W/2; G.P.y=G.H-150; G.P.inv=0; G.P.cleanFight=true; G.P.gold=999;
   G.B={name:'Training Dummy',num:'',color:'#c9a867',elite:false,def:{attack(){}},rad:46,x:W/2,y:G.H*.4,max:1e12,hp:1e12,t:0,tm:{},flash:0,burning:0,chill:0,enraged:false,ang:0,jump:3.5,bloomOuter:false,lab:true};
-  G.bolts=[];G.hits=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];G.traps=[]; S.chest=null; S.chestsLeft=0; S.chestT=999;
+  G.bolts=[];G.meteors=[];G.hits=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];G.traps=[]; S.chest=null; S.chestsLeft=0; S.chestT=999;
   G.lab={nums:[],log:[],total:0,type:'bolt',els:['fire'],tier:0};
   G.bg=makeBg(BOSSES[7]); eventsStart(); S.t=0; setMusic('shop',0); ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
   for(const id of ['bossname','omen','hint','call','intro']) $(id).hidden=true;
@@ -51,8 +51,10 @@ function buildUI(){
 }
 function refresh(){ const s=current(), n=$('labname'); if(n)n.textContent=`${spellName(s)} · ${spellCost(s)} mana`; }
 /** the dummy and the floating damage numbers (called from draw.ts) */
+let whiteCache=null;
+const whiteOf=art=>{ if(whiteCache)return whiteCache; const c=document.createElement('canvas'); c.width=art.width; c.height=art.height; const g=c.getContext('2d'); g.drawImage(art,0,0); g.globalCompositeOperation='source-in'; g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); return whiteCache=c; };
 export function drawDummy(c){
   const art=HUB_ART.dummy, B=G.B, wob=B.flash>0?Math.round(Math.sin(S.t*60)*1):0, k=2.1;
-  if(art){ const w=art.width/R*k, h=art.height/R*k; c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px(B.x),px(B.y)+h*.45,w*.35,3,0,0,TAU); c.fill(); c.drawImage(art,Math.round((px(B.x)-w/2+wob)*R)/R,Math.round((px(B.y)-h*.55)*R)/R,w,h); if(B.flash>0){ c.globalAlpha=.4; c.fillStyle='#fff'; c.fillRect(px(B.x)-w*.3,px(B.y)-h*.3,w*.6,h*.6); c.globalAlpha=1; } }
+  if(art){ const w=art.width/R*k, h=art.height/R*k; c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px(B.x),px(B.y)+h*.45,w*.35,3,0,0,TAU); c.fill(); c.drawImage(art,Math.round((px(B.x)-w/2+wob)*R)/R,Math.round((px(B.y)-h*.55)*R)/R,w,h); if(B.flash>0){ const wh=whiteOf(art); c.globalAlpha=.6; c.drawImage(wh,Math.round((px(B.x)-w/2+wob)*R)/R,Math.round((px(B.y)-h*.55)*R)/R,w,h); c.globalAlpha=1; } }
   const L=G.lab; if(L){ c.font='700 6px "Pixelify Sans","Courier New",monospace'; c.textAlign='center'; for(const n of L.nums){ c.globalAlpha=Math.max(0,1-n.t/.9); c.fillStyle='#0b0814'; c.fillText(n.v.toFixed(0),px(n.x)+.5,px(n.y)+.5); c.fillStyle='#ffe9a8'; c.fillText(n.v.toFixed(0),px(n.x),px(n.y)); } c.globalAlpha=1; }
 }

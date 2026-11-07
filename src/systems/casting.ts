@@ -45,6 +45,9 @@ function reflectNear(r,pw,cap){
   let n=0; G.shots=G.shots.filter(q=>{ if(n<cap&&!q.seed&&Math.hypot(q.x-G.P.x,q.y-G.P.y)<r){n++;G.bolts.push({x:q.x,y:q.y,...toBoss(q.x,q.y,640),d:1.5*pw,r:4,c:'#f0a8d8'});return false;} return true; });
 }
 export function proc(s,pw){
+  if(has(s,'poison')){ G.B.poison=Math.min(9,(G.B.poison||0)+3); burst(G.B.x,G.B.y,'#8ad24a',6); }
+  if(has(s,'holy')){ G.P.shield=Math.max(G.P.shield,.8); G.shots=G.shots.filter(q=>{ if(!q.seed&&Math.hypot(q.x-G.P.x,q.y-G.P.y)<80){ burst(q.x,q.y,'#fff2b0',2); return false; } return true; }); burst(G.P.x,G.P.y,'#fff2b0',8); }
+  if(has(s,'void')){ const near=[...G.shots].filter(q=>!q.seed).sort((a,b)=>Math.hypot(a.x-G.B.x,a.y-G.B.y)-Math.hypot(b.x-G.B.x,b.y-G.B.y)).slice(0,6); for(const q of near){ q.dead=true; burst(q.x,q.y,'#8a5cff',3); } if(near.length){ G.shots=G.shots.filter(q=>!q.dead); damage(3*near.length*pw); } burst(G.B.x,G.B.y,'#8a5cff',10); }
   if(has(s,'fire')){G.B.burning=3;}
   if(has(s,'frost')){G.B.chill=Math.max(G.B.chill,3); fxIce(G.B.x,G.B.y+16,'spikes',.7);}
   if(has(s,'storm')){ const r=recipeOf(s),n=r&&r.id==='thunder'?3:1; for(let i=0;i<n;i++){damage(5*pw);{const lx=G.B.x+rnd(-26,26);G.beams.push({x:lx,t:.16});fxLightning(lx,G.B.y+10);}} sfx.strike(); }
@@ -62,6 +65,8 @@ export function doCast(s,mult){
     if(has(s,'frost')) fxIce(G.P.x,G.P.y+12,'nova',1); else fxExplosion(G.P.x,G.P.y,.7+.15*s.tier);
     if(S.fo)foFreeze(); damage((10+Math.min(n,30)*1.5*(r&&r.id==='shock'?3:1))*pw); proc(s,pw);
   }
+  if(s.type==='meteor'){ (G.meteors||(G.meteors=[])).push({tx:G.B.x,ty:G.B.y,t:0,delay:.55,pw:pw*(r&&r.id==='eclipse'?1.5:1),s,col,eclipse:!!(r&&r.id==='eclipse')}); sfx.rage&&sfx.rage(); }
+  if(s.type==='orbit'){ G.P.orbit={t:0,life:8+s.tier,n:r&&r.id==='halo'?5:3,pw,s,col,cdB:0,halo:!!(r&&r.id==='halo')}; }
   if(s.type==='ward'){
     const t=(3+s.tier)*(has(s,'sound')?1.5:1)*(r&&r.id==='hall'?2:1)*(hasPerk('rime')?1.5:1);
     G.P.shield=Math.max(G.P.shield,t); G.P.shieldSpell=s; G.P.shieldPw=pw;
@@ -71,6 +76,7 @@ export function doCast(s,mult){
     const n=(r&&r.id==='ossuary'?3:1)+(has(s,'sound')?1:0);
     for(let i=0;i<n&&G.helpers.length<5;i++) G.helpers.push({a:rnd(0,TAU),life:(9+2*s.tier)*(has(s,'bone')?1.5:1),d:2.2*pw,cd:rnd(.2,.5),s,pw,c:col});
   }
+  if((s.type==='ward'||s.type==='summon'||s.type==='orbit')&&(has(s,'poison')||has(s,'void')||has(s,'holy')))proc(s,pw);
   if(has(s,'frost')){ chillShots(); G.B.chill=Math.max(G.B.chill,3); }
   if(has(s,'thorn')) addSeeds(r&&r.id==='wild'?6:3,3*pw);
   if(has(s,'bone')){ G.P.boneCasts=(G.P.boneCasts||0)+1; if(G.P.boneCasts%3===0&&G.P.hp<G.P.max){G.P.hp++;burst(G.P.x,G.P.y,'#a8f0b0',14);} if(s.type!=='summon'&&G.helpers.length<5) G.helpers.push({a:rnd(0,TAU),life:5,d:1.2*pw,cd:.4,s:{els:[],type:'summon',tier:0},pw,c:'#e9e3cb'}); }

@@ -42,8 +42,8 @@ export function startFight(){
   S.orbit=S.arena==='wheel'; S.fo=S.arena==='justice'; S.open=S.arena==='strength'; S.side=S.arena==='fool'; if(S.side){ ov.hidden=true; S.mode='intro'; resize(); }
   const hp=posHp(S.pos,total())*m*(S.orbit?1.6:S.fo?1.15:S.open?1.3:S.side?1.2:1);
   G.B={...d,def:d,rad:S.fo?105:(d.elite?56:46)*(S.side?.65:1),x:W/2,y:S.orbit?CY():150,max:hp,hp,t:0,tm:{},flash:0,burning:0,chill:0,enraged:false,ang:0,jump:3.5,bloomOuter:false};
-  G.bolts=[];G.hits=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];
-  G.bg=makeBg(d); G.P.x=W/2;G.P.y=G.H-150;G.P.a=Math.PI/2;G.P.tr=RO;G.P.rr=RO;G.P.inv=0;G.P.shield=0;G.P.mana=G.P.spells.length?Math.round(G.P.manaMax/2):0;G.P.cd=0;G.P.cleanFight=true;G.P.moonUsed=false;G.P.beam=null;G.traps=[];S.chest=null;S.chestT=rnd(5,12);S.chestsLeft=(d.elite?1:0)+(Math.random()<.75?(Math.random()<.35?2:1):0);
+  G.bolts=[];G.meteors=[];G.hits=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];
+  G.bg=makeBg(d); G.P.x=W/2;G.P.y=G.H-150;G.P.a=Math.PI/2;G.P.tr=RO;G.P.rr=RO;G.P.inv=0;G.P.shield=0;G.P.mana=G.P.spells.length?Math.round(G.P.manaMax/2):0;G.P.cd=0;G.P.cleanFight=true;G.P.moonUsed=false;G.P.beam=null;G.P.orbit=null;G.traps=[];S.chest=null;S.chestT=rnd(5,12);S.chestsLeft=(d.elite?1:0)+(Math.random()<.75?(Math.random()<.35?2:1):0);
   if(S.fo)foStart(); else G.fo=null; $('hint').hidden=true; $('call').hidden=true; if(S.fo){ $('hint').textContent='Swipe to change lane, jump and slide'; $('hint').hidden=false; } if(S.open)oaStart(); else oaEnd(); if(S.side)sideStart(); else sideEnd(); eventsStart();
   if(isMod('sun'))G.P.hp=G.P.max;
   G.P.freeCast=hasPerk('wildfire')?1:0; if(hasPerk('grave')) G.helpers.push({a:0,life:14,d:2.2*G.P.scale,cd:.4,s:{els:[],type:'summon',tier:0},pw:G.P.scale,c:'#e9e3cb'});
@@ -57,7 +57,7 @@ export function startFight(){
   paintSpells(); hotSave();
 }
 export function win(){
-  setMusic('reward',S.pos); S.mode='won';S.t=0; G.P.beam=null; G.traps=[]; G.chestCall=0; if(S.open){$('call').hidden=true;} if(G.fo)G.fo.atk=null; $('hint').hidden=true; $('call').hidden=true;
+  setMusic('reward',S.pos); S.mode='won';S.t=0; G.P.beam=null; G.P.orbit=null; G.meteors=[]; G.traps=[]; G.chestCall=0; if(S.open){$('call').hidden=true;} if(G.fo)G.fo.atk=null; $('hint').hidden=true; $('call').hidden=true;
   G.shots.forEach(s=>burst(s.x,s.y,GOLD,1)); G.shots=[];G.rings=[];G.cols=[];G.helpers=[];G.bands=[];
   burst(G.B.x,G.B.y,G.B.color,70); burst(G.B.x,G.B.y,GOLD,40); fxExplosion(G.B.x,G.B.y,1.7); fxHeal(G.P.x,G.P.y+10,'heal'); S.shake=reduced?0:14; S.flash=.6; sfx.win();
   G.P.scale*=Math.pow(1.1,15/Math.max(1,total()-1)); noteBoss(!!BOSSES[S.stage].elite,G.P.cleanFight,S.stage); G.P.reward=fightReward(); G.P.gold+=G.P.reward.g;
@@ -92,7 +92,7 @@ export function pixIcon(n){ const m=ICONS[n]; let r=''; m.forEach((row,y)=>[...r
 export function icon(id,fallback){ return SPRITE_OVERRIDES.icons.has(id)?`<img class="ico" alt="" src="${import.meta.env.BASE_URL}assets/icons/${id}.png">`:fallback; }
 /** a spell's icon with its element badge */
 export function spellIcon(s){ const base=icon('spell_'+s.type,sig[s.type]), el=SPRITE_OVERRIDES.icons.has('el_'+s.els[0])?`<img class="icoel" alt="" src="${import.meta.env.BASE_URL}assets/icons/el_${s.els[0]}.png">`:''; return SPRITE_OVERRIDES.icons.has('spell_'+s.type)?`<span class="icowrap">${base}${el}</span>`:base; }
-export const sig={bolt:pixIcon('bolt'),nova:pixIcon('nova'),ward:pixIcon('ward'),summon:pixIcon('summon'),beam:pixIcon('beam'),trap:pixIcon('trap'),blink:pixIcon('blink')};
+export const sig={meteor:pixIcon('nova'),orbit:pixIcon('ward'),bolt:pixIcon('bolt'),nova:pixIcon('nova'),ward:pixIcon('ward'),summon:pixIcon('summon'),beam:pixIcon('beam'),trap:pixIcon('trap'),blink:pixIcon('blink')};
 const wandInfo=()=>WANDS.find(w=>w.id===G.P.wand);
 /** "Your loadout": every spell, wand and piece of gear you carry, with what it does. Shown on the reward, forge and shop screens. */
 const handHTML=()=>{

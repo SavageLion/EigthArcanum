@@ -2,6 +2,7 @@
 import { SPELL_ART } from './sprites';
 import { bulletArt, tintedArt } from '../systems/runnerSpells';
 import { drawHub } from '../systems/hub';
+import { drawSpellExtras } from '../systems/spellFx';
 import { drawCamp } from '../systems/camp';
 import { drawDummy } from '../systems/lab';
 import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
@@ -147,7 +148,7 @@ export function draw(){
   }
   { const HS=SPELL_ART['hit-spark']; if(HS&&G.hits) for(const h of G.hits){ const f=h.t/h.life, z=(10+f*12)*(h.big?1.6:1); c.globalAlpha=1-f; c.drawImage(HS,px(h.x)-z/2,px(h.y)-z/2,z,z); } c.globalAlpha=1; }
   for(const p of G.parts){ c.fillStyle=p.c; const z=p.r>2&&p.t<p.life*.5?2:1; c.fillRect(px(p.x),px(p.y),z,z); }
-  drawChest(c);
+  drawChest(c); drawSpellExtras(c);
   for(const k of G.traps){ const on=k.arm<=0&&Math.floor(S.t*5)%2===0; blit(c,px(k.x),px(k.y),disc(k.c,on?3:2)); c.fillStyle=k.c; for(let i=0;i<4;i++){const a=i*1.57+S.t;c.fillRect(px(k.x)+Math.round(Math.cos(a)*7),px(k.y)+Math.round(Math.sin(a)*7),1,1);} }
   if(G.P&&G.P.beam&&G.B){ const col=EL[G.P.beam.s.els[0]].c; lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#0b0814',5); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,col,3); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#fffbee',1); }
   vfxDraw(c,'back');
