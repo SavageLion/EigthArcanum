@@ -17,7 +17,7 @@ import { GOLD, TAU, clamp, rnd } from '../core/util';
 import { setMusicEnergy, sfx } from '../core/audio';
 
 /* ---------- damage and hits ---------- */
-export function damage(d){ if(!G.B||S.mode!=='fight')return; if(S.fo)d*=G.B.open>0?2:.34;
+export function damage(d){ if(!G.B||S.mode!=='fight')return; 
   if(hasGear('crown'))d*=1.4;
   G.B.hp-=d*(isMod('tower')?1.5:(isMod('moon')||isMod('hanged'))?1.25:1); if(d>=G.P.scale*3)G.B.flash=.05; if(G.B.hp<=0){G.B.hp=0;win();} }
 export function burst(x,y,c,n){ for(let i=0;i<n&&G.parts.length<320;i++){ const a=rnd(0,TAU),s=rnd(30,n>5?260:90); G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,c,life:rnd(.25,.8),t:0,r:rnd(1,3)}); } }
@@ -44,7 +44,7 @@ export function step(dt){
     G.B.flash=Math.max(0,G.B.flash-dt);
     if(fighting||S.mode==='intro'){
       G.B.t+=dt;
-      if(S.open){} else if(S.fo){G.B.x=W/2;G.B.y=G.H*.3;} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(S.side){ G.B.x=W/2+Math.sin(G.B.t*.55)*135; G.B.y=G.H*.5+Math.sin(G.B.t*1.2)*14; } else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
+      if(S.open){} else if(S.fo){} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(S.side){ G.B.x=W/2+Math.sin(G.B.t*.55)*135; G.B.y=G.H*.5+Math.sin(G.B.t*1.2)*14; } else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
     }
   }
   if(fighting){

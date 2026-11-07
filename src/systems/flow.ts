@@ -26,7 +26,7 @@ export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudi
 const ARENAS=[
  {id:'chariot',num:'VII',name:'The Chariot',desc:'Open field. Roam freely and weave through the shots.'},
  {id:'wheel',num:'X',name:'Wheel of Fortune',desc:'Orbit. Circle the boss on two rings. The inner ring deals 50% more damage.'},
- {id:'justice',num:'XI',name:'Justice',desc:'Face-off. Swipe to dodge, tap to throw bolts, and strike when the boss opens up.'},
+ {id:'justice',num:'XI',name:'Justice',desc:'The Run. Race down three lanes at the boss. Its spells fly at you unannounced: swipe to change lane, jump or slide, and your bolts fire on their own.'},
  {id:'strength',num:'VIII',name:'Strength',desc:'Open arena. Run around a pillared room. You only fire when you stand still. The boss chases and charges you.'}
 ];
 function drawOmen(){
@@ -108,7 +108,7 @@ function nextDraw(){
 function readText(i){
   if(i===0){ const d=BOSSES[S.stage]; const note=d.elite?(S.pos===total()-1?'The final elite. No spell follows this card.':'Elite: harder attacks, 25 more gold and a two-element spell.'):S.pos<4?'Drawn early, so weaker.':S.pos>=11?'Drawn late, so stronger.':''; const echo=S.echo===null?'':` Echo of ${BOSSES[S.echo].name}: ${ECHO[S.echo].name} in open-field and orbit fights, and your ${EL[BOSS_EL[S.echo]].noun.toLowerCase()} spells deal 25% more.`; return `<b>${d.name}</b> ${note}${echo}`; }
   if(i===1) return `<b>${G.pull.omen.name}</b> ${G.pull.omen.desc}`;
-  const sig=BOSS_SIG[S.stage], extra=G.pull.arena.id==='justice'?sig.f:G.pull.arena.id==='strength'?sig.s:''; return `<b>${G.pull.arena.name}</b> ${G.pull.arena.desc}${extra?` ${BOSSES[S.stage].name}: ${extra}`:''}`;
+  const sig=BOSS_SIG[S.stage], extra=G.pull.arena.id==='strength'?sig.s:''; return `<b>${G.pull.arena.name}</b> ${G.pull.arena.desc}${extra?` ${BOSSES[S.stage].name}: ${extra}`:''}`;
 }
 function addRead(i){ const p=document.createElement('p'); p.id='read'+i; p.innerHTML=readText(i); $('reads').appendChild(p); }
 function enterArena(){ ov.className='overlay'; ov.onclick=null; S.mod=G.pull.omen; S.lastOmen=G.pull.omen.id; S.arena=G.pull.arena.id; G.pull=null; startFight(); }

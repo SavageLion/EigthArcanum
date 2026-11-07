@@ -4,6 +4,7 @@ import { G, S } from '../core/state';
 import { SPRITE_OVERRIDES, WIZ_ROWS, blit, px } from '../render/sprites';
 import { CY, RI, RO, hasPerk, hasWand, relPos } from './deck';
 import { noteChest, noteMimic } from '../data/meta';
+import { foBodyY, foLaneX } from './runner';
 import { FO_LANES, icon, openShop, pixIcon, show } from './faceoff';
 import { inPillar } from './openArena';
 import { burst, hurt } from './sim';
@@ -57,7 +58,7 @@ const chestImg=()=>G.CHESTIMG||(G.CHESTIMG=mapSprite(["..kkkkkkkkkk..",".ktttttt
 export function chestSay(t,col){ const e=$('call'); e.textContent=t; e.style.color=col||'var(--bone)'; e.hidden=false; G.chestCall=.9; }
 export function spawnChest(){
   const mimic=Math.random()<(hasGear('fool')?.33:.17); let x,y,lane=null;
-  if(S.fo){ lane=Math.random()<.5?0:2; x=FO_LANES[lane]; y=G.H-145; }
+  if(S.fo){ lane=Math.random()<.5?0:2; x=foLaneX(lane); y=foBodyY(); }
   else if(S.orbit){ const r=Math.random()<.5?RO:RI,a=rnd(0,TAU); x=W/2+Math.cos(a)*r; y=CY()+Math.sin(a)*r; }
   else { let n=0; do{ x=rnd(40,W-40); y=rnd(G.H*.42,G.H-110); }while(G.pillars.length&&inPillar(x,y,24)&&n++<20); }
   S.chest={x,y,t:0,life:S.fo?5:6.5,mimic}; chestSay('A chest!','#ffd27a'); tone(1180,.1,'triangle',.05);

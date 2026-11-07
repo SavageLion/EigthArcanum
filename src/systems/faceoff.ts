@@ -26,84 +26,23 @@ import { setMusic, sfx, tone, wakeAudio } from '../core/audio';
 import { fxExplosion, fxHeal } from '../render/vfx';
 
 /* ---------- face-off arena, shared by every boss ---------- */
-export const FO_LANES=[95,200,305], FO_ATTACKS={
+export const FO_ATTACKS={
  left:{zones:[0,1],hand:'l',say:'Dodge right'}, right:{zones:[1,2],hand:'r',say:'Dodge left'},
  slam:{zones:[1],hand:'both',say:'Dodge either way'}, clap:{zones:[0,2],hand:'both',say:'Stay in the middle'},
  spit:{zones:null,hand:'mouth',say:'Move at the last moment'}
 };
-const foCache={};
-/** Pixel Lab boss sprites, enlarged for the face-off (128px art -> 256px, 160px -> 256px) so the boss looms over the lanes */
-function enlarge(src,k){ const c=mk(Math.round(src.width*k),Math.round(src.height*k)),g=c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(src,0,0,c.width,c.height); c.hi=true; return c; }
-function foFrames(i){ if(foCache[i])return foCache[i]; const b=BOSSES[i],frames=[]; const ov=SPRITE_OVERRIDES.boss[i];
-  if(ov){ const k=256/ov[0].img.width, memo=new Map(); for(let n=0;n<8;n++){ const f=ov[n%ov.length]; if(!memo.has(f)) memo.set(f,{img:enlarge(f.img,k),white:enlarge(f.white,k)}); frames.push(memo.get(f)); } }
-  else for(let n=0;n<8;n++){const t=n*.26+.3;frames.push(pixelise(c=>b.draw(c,t,b.color),170,1.05));} const fist=FIST.img?[false,true].map(m=>{ const e=enlarge(FIST.img,1.5); if(!m) return {img:e}; const f=mk(e.width,e.height),g=f.getContext('2d'); g.imageSmoothingEnabled=false; g.translate(e.width,0); g.scale(-1,1); g.drawImage(e,0,0); f.hi=true; return {img:f}; }):[1,-1].map(s=>pixelise(c=>drawFoFist(c,s,b.color),50,1)); return foCache[i]={frames,fist}; }
-function drawFoFist(c,s,col){ circle(c,0,0,17);fl(c,'#2a1412');ln(c,col,2.5); for(let k=0;k<4;k++){c.beginPath();c.moveTo(-11+k*7,-1);c.lineTo(-11+k*7,10);ln(c,col,1.6);} poly(c,[[s*-16,-3],[s*-23,-9],[s*-21,6]]);fl(c,'#2a1412');ln(c,col,1.2); }
-function drawWizBack(c){ poly(c,[[-18,28],[-9,-2],[9,-2],[18,28]]);fl(c,'#3956a8');ln(c,GOLD,1.5); poly(c,[[-3,0],[3,0],[4,28],[-4,28]]);fl(c,'#26336f'); poly(c,[[-16,-3],[16,-3],[5,-13],[8,-27],[-5,-14]]);fl(c,'#2a3f85');ln(c,GOLD,1.5); poly(c,[[-18,-3],[18,-3]],false);ln(c,GOLD,3); poly(c,[[21,22],[21,-22]],false);ln(c,'#a9875a',2.5); circle(c,21,-26,5);fl(c,'#ffd27a'); }
-function foStart(){ if(!G.wizBack)G.wizBack=pixelise(drawWizBack,60,1).img; G.fo={lane:1,x:FO_LANES[1],dodge:0,dodgedAt:-9,atk:null,gap:1.2,queue:[],open:0,frozen:0,cd:0}; foFrames(S.stage); G.B.x=W/2;G.B.y=G.H*.3; }
-function foSpeed(){ return (.72+.03*relPos())*(hasGear('hourglass')?.9:1)*(isMod('magician')?1.15:isMod('temperance')?.75:1)*(G.B.chill>0?.72:1); }
-function foNext(){
-  if(!G.fo.queue.length) G.fo.queue=foPlan(S.stage);
-  const a=G.fo.queue.shift();
-  if(a.zones&&G.fo.linger){ const safe=[0,1,2].filter(z=>!a.zones.includes(z)&&z!==G.fo.linger.lane); if(!safe.length)G.fo.linger=null; }
-  const base=a.warn||(G.B.enraged?.74:.96);
-  G.fo.atk={...a,t:0,warn:Math.max(.34,base/foSpeed()),did:false,last:!G.fo.queue.length};
-  $('hint').textContent=a.say; $('hint').hidden=false;
-}
-function foCall(t,col){ const e=$('call'); e.textContent=t; e.style.color=col||'var(--bone)'; e.hidden=false; G.fo.call=.7; }
-function foStrike(){
-  const a=G.fo.atk; a.did=true; S.shake=reduced?0:7; sfx.toll(); if(a.linger!==undefined&&!G.fo.linger)G.fo.linger={lane:a.linger,t:a.lingerT};
-  const z=a.zones||[a.lock];
-  G.traps.filter(k=>k.lane!==null&&z.includes(k.lane)&&k.arm<=0).forEach(k=>{blowTrap(k,true);if(S.mode==='fight'&&a.last)G.B.open=Math.max(G.B.open,1.2);}); if(S.mode!=='fight')return;
-  if(z.includes(G.fo.lane)){ if(G.P.shield>0){burst(G.P.x,G.P.y,'#8fdcf0',18);sfx.block(); if(a.last){G.B.open=1;foCall('Blocked!','#bfeaf2');}} else { const was=G.P.hp; hurt(); if(G.P.hp<was)foCall('Hit','#ff9d94'); } }
-  else { const perfect=G.B.t-G.fo.dodgedAt<.3&&G.fo.dodge>0; if(perfect)nearMiss(); if(perfect&&G.P.spells.length){G.P.mana=Math.min(G.P.manaMax,G.P.mana+14);G.P.grazeGlow=.25;foCall('Perfect dodge · +14 mana','#a9d4f7');} else if(a.last)foCall('Opening!','#ffd27a'); if(a.last)G.B.open=G.B.enraged?1.15:1.45; }
-}
-export function foStep(dt){
-  if(G.fo.call>0){G.fo.call-=dt;if(G.fo.call<=0)$('call').hidden=true;}
-  G.fo.cd=Math.max(0,G.fo.cd-dt);
-  if(G.fo.linger){G.fo.linger.t-=dt;if(G.fo.linger.t<=0)G.fo.linger=null;else if(G.fo.lane===G.fo.linger.lane&&S.mode==='fight')hurt();}
-  if(!G.fo||S.mode!=='fight')return;
-  if(G.fo.dodge>0){G.fo.dodge-=dt;if(G.fo.dodge<=0)G.fo.lane=1;}
-  G.fo.x+=(FO_LANES[G.fo.lane]-G.fo.x)*Math.min(1,dt*22); G.P.x=G.fo.x; G.P.y=G.H-145;
-  if(G.foHold&&!G.foHold.moved&&performance.now()-G.foHold.t>180)foThrow();
-  if(G.fo.frozen>0)G.fo.frozen-=dt;
-  if(G.B.open>0){G.B.open-=dt;if(G.B.open<=0)G.fo.gap=G.B.enraged?.45:.65;return;}
-  if(G.fo.atk){ const a=G.fo.atk; a.t+=dt; if(a.id==='spit'&&a.lock===undefined&&a.t>=a.warn-.28)a.lock=G.fo.lane; if(!a.did&&a.t>=a.warn)foStrike(); if(S.mode==='fight'&&G.fo.atk&&a.t>=a.warn+.18){G.fo.atk=null;$('hint').hidden=true;if(!a.last)G.fo.gap=.12;else if(G.B.open<=0)G.fo.gap=.5;} return; }
-  G.fo.gap-=dt; if(G.fo.gap<=0)foNext();
-}
-export function foDodge(dir){ if(!S.fo||S.mode!=='fight'||G.fo.dodge>.1)return; const n=G.fo.lane+dir; if(n<0||n>2)return; G.fo.lane=n;G.fo.dodge=.48;G.fo.dodgedAt=G.B.t;tone(520+dir*60,.06,'square',.03); }
-export function foThrow(){
-  if(!S.fo||S.mode!=='fight'||G.fo.cd>0||isMod('hermit'))return; G.fo.cd=rateNow();
-  const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1),sx=G.P.x+(n>1?(i-.5)*14:0),sy=G.P.y-30,tx=G.B.x+rnd(-40,40),ty=G.B.y+rnd(-25,40),a=Math.atan2(ty-sy,tx-sx); G.bolts.push({x:sx,y:sy,vx:Math.cos(a)*640,vy:Math.sin(a)*640,d:3*G.P.scale*(crit?5:1),r:crit?6:4,c:crit?'#f0a8d8':'#ffe9a8',basic:true}); }
-}
-export function foFreeze(){ const cancel=!!(G.fo.atk&&!G.fo.atk.did); if(cancel){G.fo.atk=null;G.fo.queue=[];G.fo.gap=.9;} G.fo.frozen=cancel?1.6:.9; G.B.open=Math.max(G.B.open,G.fo.frozen); $('hint').hidden=true; foCall(cancel?'Frozen mid-swing!':'Frozen','#bfeaf2'); }
-function foZone(c,i,col,alpha,dither){ const top=Math.round(G.LH*.5)+1,bot=G.LH-34; c.fillStyle=col;c.globalAlpha=alpha; for(let y=top;y<bot;y++){const p=(y-top)/(bot-top),w=14+27*p,cx=80+(i-1)*(w*2),x0=Math.round(cx-w),x1=Math.round(cx+w); if(dither){for(let x=x0;x<x1;x++)if((x+y)%2===0)c.fillRect(x,y,1,1);}else c.fillRect(x0,y,x1-x0,1);} c.globalAlpha=1; }
-export function foFloor(c){ const top=Math.round(G.LH*.5),bot=G.LH-34; const drawLinger=()=>{ if(G.fo.linger&&!(G.fo.linger.t<.5&&Math.floor(S.t*10)%2))foZone(c,G.fo.linger.lane,G.B.color,.7,false); }; c.fillStyle='#160a10';c.fillRect(0,top,LW,G.LH-top);
-  { const T=SPRITE_OVERRIDES.arena.tiles; if(T.length>15){ c.save(); c.beginPath(); c.rect(0,top,LW,G.LH-top); c.clip(); for(let ty=top;ty<G.LH;ty+=16)for(let tx=0;tx<LW;tx+=16){ c.globalAlpha=.55; c.drawImage(T[((tx*7+ty*13)>>4)%5===0?(tx>>4)%16:[0,1,8,10,13][((tx>>4)+(ty>>4))%5]],tx,ty,16,16); } c.globalAlpha=.72; c.fillStyle='#160a10'; c.fillRect(0,top,LW,G.LH-top); c.restore(); c.globalAlpha=1; } }
-  c.fillStyle='#2a1a24'; for(let y=top;y<G.LH;y+=Math.max(2,Math.round((y-top)/5)+2))c.fillRect(0,y,LW,1); c.fillStyle='#4a3440'; for(let k=-3;k<=3;k++)for(let y=top;y<G.LH;y++){const p=(y-top)/(bot-top);c.fillRect(Math.round(80+k*(14+27*p)),y,1,1);} c.fillStyle=GOLD;c.fillRect(0,top,LW,1); drawLinger();
-  const a=G.fo.atk; if(a&&S.mode==='fight'){ const f=clamp(a.t/a.warn,0,1); if(isMod('moon')&&f<.6)return; const zs=a.zones||(a.lock!==undefined?[a.lock]:[G.fo.lane]); if(a.hide&&!a.did&&f>.45&&f<.93){}else if(a.fake&&!a.did&&a.warn-a.t>.28)zs.map(z=>2-z).forEach(z=>foZone(c,z,'#e8592c',.55,Math.floor(S.t*12)%2===0)); else if(!a.did)zs.forEach(z=>foZone(c,z,'#e8592c',.25+.5*f,Math.floor(S.t*12)%2===0||f<.5)); else zs.forEach(z=>foZone(c,z,'#fff2c8',.9,false)); } }
-export function foBoss(c){
-  const set=foFrames(S.stage),fr=set.frames[Math.floor(S.t*6)%8],j=G.B.enraged&&!reduced?Math.floor(S.t*14)%2:0,bx=80+j,by=Math.round(G.LH*.3)+(G.B.open>0?7:0);
-  blit(c,bx,by,fr.img); if(G.B.flash>0)blit(c,bx,by,fr.white);
-  if(G.fo.frozen>0){c.globalAlpha=.42;blit(c,bx,by,fr.white);c.globalAlpha=1;c.fillStyle='#bfeaf2';for(let i=0;i<10;i++)c.fillRect(bx+Math.round(Math.cos(i*2.2+S.t)*42),by+Math.round(Math.sin(i*1.7+S.t*1.1)*36),2,2);}
-  if(G.B.open>0&&G.fo.frozen<=0){c.fillStyle='#ffd27a';for(let i=0;i<5;i++){const a=S.t*5+i*1.26;c.fillRect(bx+Math.round(Math.cos(a)*30),by-46+Math.round(Math.sin(a)*6),2,2);}}
-  if(G.B.burning>0&&Math.random()<.5) burst(G.B.x+rnd(-70,70),G.B.y+rnd(-60,60),'#f0813f',1);
-  const lanes=[38,80,122],tgt=Math.round(G.LH*.5)+Math.round((G.LH-34-G.LH*.5)*.55),br=Math.round(Math.sin(S.t*2.4)*2); let lx=bx-56,ly=by+24+br,rx=bx+56,ry=by+24-br; const a=G.fo.atk;
-  if(a&&S.mode==='fight'){ const w=clamp(a.t/a.warn,0,1),up=Math.round(-28*Math.min(1,w*1.6)),h=a.did;
-    const zl=a.zones||[]; const lm=zl.length?lanes[zl[0]]:80, rm=zl.length?lanes[zl[zl.length-1]]:80;
-    if(a.hand==='l'||a.hand==='both'){ if(h){ly=tgt;lx=zl.length===1?lm-14:a.hand==='l'?(lm+rm)/2:lm;}else ly+=up; }
-    if(a.hand==='r'||a.hand==='both'){ if(h){ry=tgt;rx=zl.length===1?rm+14:a.hand==='r'?(lm+rm)/2:rm;}else ry+=up; }
-    if(a.hand==='mouth'){ if(!h)blit(c,bx,by+20,disc(G.B.color,2+Math.round(w*5))); else blit(c,lanes[a.lock??G.fo.lane],tgt,disc(G.B.color,9)); } }
-  blit(c,lx,ly,set.fist[0].img); blit(c,rx,ry,set.fist[1].img);
-}
+/* the face-off is now the runner (systems/runner.ts); these are re-exported so the rest of the game keeps its imports */
+export { FO_LANES, foBoss, foDodge, foFloor, foFreeze, foJump, foPlayer, foSlide, foStart, foStep } from './runner';
+import { foStart } from './runner';
 
 export function startFight(){
   const d=BOSSES[S.stage], m=(isMod('sun')||isMod('temperance'))?1.3:1;
   S.orbit=S.arena==='wheel'; S.fo=S.arena==='justice'; S.open=S.arena==='strength'; S.side=S.arena==='fool'; if(S.side){ ov.hidden=true; S.mode='intro'; resize(); }
-  const hp=posHp(S.pos,total())*m*(S.orbit?1.6:S.fo?4:S.open?1.3:S.side?1.2:1);
+  const hp=posHp(S.pos,total())*m*(S.orbit?1.6:S.fo?1.15:S.open?1.3:S.side?1.2:1);
   G.B={...d,def:d,rad:S.fo?105:(d.elite?56:46)*(S.side?.65:1),x:W/2,y:S.orbit?CY():150,max:hp,hp,t:0,tm:{},flash:0,burning:0,chill:0,enraged:false,ang:0,jump:3.5,bloomOuter:false};
   G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];
   G.bg=makeBg(d); G.P.x=W/2;G.P.y=G.H-150;G.P.a=Math.PI/2;G.P.tr=RO;G.P.rr=RO;G.P.inv=0;G.P.shield=0;G.P.mana=G.P.spells.length?Math.round(G.P.manaMax/2):0;G.P.cd=0;G.P.cleanFight=true;G.P.moonUsed=false;G.P.beam=null;G.traps=[];S.chest=null;S.chestT=rnd(5,12);S.chestsLeft=(d.elite?1:0)+(Math.random()<.75?(Math.random()<.35?2:1):0);
-  if(S.fo)foStart(); else G.fo=null; $('hint').hidden=true; $('call').hidden=true; if(S.open)oaStart(); else oaEnd(); if(S.side)sideStart(); else sideEnd(); eventsStart();
+  if(S.fo)foStart(); else G.fo=null; $('hint').hidden=true; $('call').hidden=true; if(S.fo){ $('hint').textContent='Swipe to change lane, jump and slide'; $('hint').hidden=false; } if(S.open)oaStart(); else oaEnd(); if(S.side)sideStart(); else sideEnd(); eventsStart();
   if(isMod('sun'))G.P.hp=G.P.max;
   G.P.freeCast=hasPerk('wildfire')?1:0; if(hasPerk('grave')) G.helpers.push({a:0,life:14,d:2.2*G.P.scale,cd:.4,s:{els:[],type:'summon',tier:0},pw:G.P.scale,c:'#e9e3cb'});
   if(isMod('death')){G.P.heldHp=G.P.hp;G.P.hp=1;}

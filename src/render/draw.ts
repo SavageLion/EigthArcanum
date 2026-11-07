@@ -5,7 +5,7 @@ import { W, ctx, reduced } from '../core/dom';
 import { G, S } from '../core/state';
 import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
 import { CY, RI, RO, WANDS, isMod } from '../systems/deck';
-import { foBoss, foFloor } from '../systems/faceoff';
+import { foBoss, foFloor, foPlayer } from '../systems/faceoff';
 import { drawPull } from '../systems/flow';
 import { drawChest, foWiz, wizSprite } from '../systems/gear';
 import { oaDrawFloor, oaDrawStick } from '../systems/openArena';
@@ -53,7 +53,7 @@ function drawWizard(x,y,fade,facing='south'){
 function drawPlayer(){
   const c=ctx, blink=G.P.inv>0&&Math.floor(S.t*14)%2===0;
   if(Math.hypot(G.P.x-(G.P.lx??G.P.x),G.P.y-(G.P.ly??G.P.y))>.4) G.P.moveAt=nowS(); G.P.lx=G.P.x; G.P.ly=G.P.y;
-  if(S.fo&&G.fo){ if(blink)c.globalAlpha=.4; { const WS=wizardSprites(G.P.wizard); if(WS.back) blitSprite(c,WS.anim?wizardFrame('large',WS.back,'north'):WS.back,px(G.P.x),px(G.P.y)+28); else blit(c,px(G.P.x),px(G.P.y),foWiz()); } c.globalAlpha=1; for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
+  if(S.fo&&G.fo){ foPlayer(c,blink); for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
   G.P.face=S.side?(G.P.sdir||'north'):G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north';
   if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink,G.P.face);
   if(G.P.shield>0&&!(G.P.shield<1&&Math.floor(S.t*10)%2)) arcDots(G.P.x,G.P.y,28,0,TAU,1,'#bfeaf2');
@@ -140,7 +140,7 @@ export function draw(){
   for(const k of G.traps){ const on=k.arm<=0&&Math.floor(S.t*5)%2===0; blit(c,px(k.x),px(k.y),disc(k.c,on?3:2)); c.fillStyle=k.c; for(let i=0;i<4;i++){const a=i*1.57+S.t;c.fillRect(px(k.x)+Math.round(Math.cos(a)*7),px(k.y)+Math.round(Math.sin(a)*7),1,1);} }
   if(G.P&&G.P.beam&&G.B){ const col=EL[G.P.beam.s.els[0]].c; lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#0b0814',5); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,col,3); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#fffbee',1); }
   vfxDraw(c,'back');
-  if(G.P){ if(S.mode==='dying'||S.mode==='dead'){ if(!S.fo) drawWizard(G.P.x,G.P.y,false,G.P.face||'north'); } else drawPlayer(); }
+  if(G.P){ if(S.mode==='dying'||S.mode==='dead'){ if(S.fo) foPlayer(c,false); else drawWizard(G.P.x,G.P.y,false,G.P.face||'north'); } else drawPlayer(); }
   vfxDraw(c,'front');
   c.setTransform(R,0,0,R,0,0); if(G.P&&S.mode!=='title') drawHUD(); if(S.open&&(S.mode==='fight'||S.mode==='intro')) oaDrawStick(c);
   if(S.flash>0){ c.fillStyle=`rgba(255,240,210,${Math.min(.5,S.flash)})`; c.fillRect(-4,-4,LW+8,G.LH+8); }
