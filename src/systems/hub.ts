@@ -20,26 +20,50 @@ import { spellBar } from './casting';
 import { $, TAU, clamp, rnd } from '../core/util';
 import { setMusic, tone } from '../core/audio';
 
-/* The Sanctum: the base you return to between runs. You walk a small hall and step onto glowing circles: the Door (choose wizard and run
-   length, then begin), the Market (spend Arcana Shards on permanent starting boosts) and the Forge (unlock loadout slots and pick which gear
-   you carry in). Shards are earned from bosses and runs (data/meta.ts). */
-const HUBW=400;
-const wallB=()=>G.H*.19;
-const stations=()=>{ const wb=wallB(), my=G.H*.40; return [
-  {id:'door',name:'THE DOOR',art:'door',k:1.55,fx:HUBW/2,fy:wb+16,ax:HUBW/2,ay:wb+72,ar:34,col:'#b07aff',solid:34},
-  {id:'market',name:'MARKET',art:'market',k:1.5,fx:84,fy:my,ax:84,ay:my+40,ar:34,col:'#ffd27a',solid:30},
-  {id:'forge',name:'FORGE',art:'forge',k:1.5,fx:316,fy:my,ax:316,ay:my+40,ar:34,col:'#ff9a5a',solid:30},
-  {id:'codex',name:'CODEX',art:'codex',k:1.45,fx:70,fy:G.H*.72,ax:70,ay:G.H*.72+40,ar:34,col:'#e8d28a',solid:28},
-  {id:'board',name:'DAILY RUN',art:'board',k:1.45,fx:200,fy:G.H*.72,ax:200,ay:G.H*.72+40,ar:34,col:'#9ad0ff',solid:28},
-  {id:'lab',name:'SPELL LAB',art:'dummy',k:1.4,fx:330,fy:G.H*.72,ax:330,ay:G.H*.72+40,ar:34,col:'#ff8a8a',solid:26},
-]; };
-const tileAt=(T,tx,ty)=>T[((tx*7+ty*13)>>4)%5===0?(tx>>4)%16:[0,1,8,10,13][((tx>>4)+(ty>>4))%5]];
+/* The Sanctum is a small village: a walled gate at the top (the Door), a main street running down to a plaza with a campfire and a well, and the
+   Market, Forge, Codex, Daily Run board and Spell Lab each in their own corner, joined by cobbled lanes, with cottages, lamps and trees around.
+   The view follows you through a world bigger than the screen. Step onto a glowing circle to use a building. Shards are earned from bosses and
+   runs (data/meta.ts). */
+const ZOOM=.74, HUBW=400, WW=900, WH=1000, GATE=175, PLAZA={x:450,y:600,r:80};
+const STATIONS=[
+  {id:'door',name:'THE DOOR',art:'door',k:1.7,fx:450,fy:166,ax:450,ay:236,ar:34,col:'#b07aff',solid:34},
+  {id:'market',name:'MARKET',art:'market',k:1.5,fx:225,fy:430,ax:225,ay:474,ar:34,col:'#ffd27a',solid:30},
+  {id:'forge',name:'FORGE',art:'forge',k:1.5,fx:675,fy:430,ax:675,ay:474,ar:34,col:'#ff9a5a',solid:30},
+  {id:'codex',name:'CODEX',art:'codex',k:1.45,fx:205,fy:790,ax:205,ay:834,ar:34,col:'#e8d28a',solid:28},
+  {id:'board',name:'DAILY RUN',art:'board',k:1.45,fx:450,fy:900,ax:450,ay:942,ar:34,col:'#9ad0ff',solid:28},
+  {id:'lab',name:'SPELL LAB',art:'dummy',k:1.4,fx:695,fy:790,ax:695,ay:834,ar:34,col:'#ff8a8a',solid:26},
+];
+const stations=()=>STATIONS;
+/** lanes: x0,y0,x1,y1,width */
+const LANES=[[450,236,450,942,58],[225,492,675,492,46],[450,600,205,834,40],[450,600,695,834,40],[225,474,225,492,40],[675,474,675,492,40]];
+const laneDist=(x,y)=>{ let d=1e9; for(const [x0,y0,x1,y1,w] of LANES){ const dx=x1-x0, dy=y1-y0, t=clamp(((x-x0)*dx+(y-y0)*dy)/(dx*dx+dy*dy),0,1); d=Math.min(d,Math.hypot(x-(x0+dx*t),y-(y0+dy*t))-w/2); } return Math.min(d,Math.hypot(x-PLAZA.x,y-PLAZA.y)-PLAZA.r); };
+const rngOf=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+/** scenery with a solid footprint, built once: cottages, well, campfire, lamps, then trees filling the edges and gaps */
+let DECO=null, TUFTS=null;
+function buildVillage(){
+  const D=[]; const add=(art,x,y,k,solid,o={})=>D.push({art,x,y,k,solid,...o});
+  for(const [x,y] of [[105,330],[795,330],[100,640],[800,640],[110,900],[790,930]]) add('cottage',x,y,1.55,30);
+  add('well',555,586,1.25,18); add('campfire',450,612,1.1,12,{glow:'#ff9a3c'});
+  for(const [x,y] of [[405,310],[495,310],[405,540],[495,540],[368,690],[532,690],[405,830],[495,830],[330,462],[570,462],[318,790],[582,790]]) add('lamp',x,y,1.25,5,{glow:'#ffb45a'});
+  const r=rngOf(7), free=(x,y,m)=>laneDist(x,y)>m&&D.every(d=>Math.hypot(d.x-x,d.y-y)>(d.solid+m))&&STATIONS.every(s=>Math.hypot(s.fx-x,s.fy-y)>s.solid+m+44&&Math.hypot(s.ax-x,s.ay-y)>56+m);
+  const tree=(x,y)=>add(r()<.4?'pine':'tree',x,y,r()<.4?1.45:1.3,9);
+  for(let y=210;y<=980;y+=84) for(const x0 of [24,876]){ const x=x0+(r()-.5)*40, yy=y+(r()-.5)*30; if(free(x,yy,16)) tree(x,yy); }
+  for(let x=60;x<=840;x+=88){ const x1=x+(r()-.5)*30, yy=984+(r()-.5)*14; if(free(x1,yy,16)) tree(x1,yy); }
+  for(let i=0,n=0;i<900&&n<14;i++){ const x=70+r()*760, y=250+r()*700; if(free(x,y,64)){ tree(x,y); n++; } }
+  DECO=D.sort((a,b)=>a.y-b.y);
+  TUFTS=Array.from({length:900},()=>({x:r()*WW,y:GATE+r()*(WH-GATE),c:Math.floor(r()*3),h:r()<.3?2:1}));
+}
+const mod=(a,n)=>((a%n)+n)%n;
+const tileAt=(T,tx,ty)=>T[mod((tx*7+ty*13)>>4,5)===0?mod(tx>>4,16):[0,1,8,10,13][mod((tx>>4)+(ty>>4),5)]];
+const camOf=()=>{ const vw=HUBW/ZOOM, vh=G.H/ZOOM; return {x:clamp(G.P.x-vw/2,0,Math.max(0,WW-vw)),y:clamp(G.P.y-vh*.52,0,Math.max(0,WH-vh))}; };
 
 export function enterHub(){
+  if(!DECO) buildVillage();
   setMusic('hub',0); S.mode='hub'; S.hub=true; S.mod=null; S.orbit=S.fo=S.open=S.side=false; S.paused=false; S.t=0; sideEnd(); eventsEnd(); oaEnd();
   G.fo=null; G.pull=null; G.B=undefined; G.bolts=[]; G.shots=[]; G.rings=[]; G.cols=[]; G.parts=[]; G.seeds=[]; G.beams=[]; G.helpers=[]; G.bands=[]; G.traps=[]; G.hits=[]; G.pillars=[]; G.stick=null; G.stickV={x:0,y:0};
-  G.P=newPlayer(meta.lastWizard||'raven'); G.P.x=HUBW/2; G.P.y=G.H*.56; G.P.face='south';
-  G.hub={t:0,near:null,hold:0,lock:false,motes:Array.from({length:22},(_,i)=>({x:rnd(0,HUBW),y:rnd(0,G.H),v:rnd(4,14),p:rnd(0,6)}))};
+  G.P=newPlayer(meta.lastWizard||'raven'); G.P.x=PLAZA.x; G.P.y=PLAZA.y+110; G.P.face='north';
+  const c0=camOf();
+  G.hub={t:0,near:null,hold:0,lock:false,cx:c0.x,cy:c0.y,motes:Array.from({length:70},(_,i)=>({x:rnd(0,WW),y:rnd(GATE,WH),v:rnd(3,10),p:rnd(0,6)}))};
   ov.hidden=true; muteBtn.hidden=false; spellBar.hidden=true; for(const id of ['bossname','omen','hint','call','intro']) $(id).hidden=true;
   resize();
 }
@@ -54,12 +78,15 @@ export function hubStep(dt){
   const kx=(KEYS.right?1:0)-(KEYS.left?1:0), ky=(KEYS.down?1:0)-(KEYS.up?1:0); let vx=G.stickV.x+kx, vy=G.stickV.y+ky; const l=Math.hypot(vx,vy); if(l>1){vx/=l;vy/=l;}
   const moving=l>.12&&ov.hidden;
   if(moving){ P.x+=vx*175*dt; P.y+=vy*175*dt; P.face=dirOf(Math.atan2(vy,vx)); P.moveAt=performance.now()/1000; } else if(!ov.hidden){} else P.face=P.face||'south';
-  P.x=clamp(P.x,26,HUBW-26); P.y=clamp(P.y,wallB()+44,G.H-110);
-  for(const s of stations()){ const dx=P.x-s.fx, dy=(P.y+20)-(s.fy-10), d=Math.hypot(dx,dy); if(d<s.solid){ const k=(s.solid-d)/(d||1); P.x+=dx*k; P.y+=dy*k; } }
-  let near=null; for(const s of stations()) if(Math.hypot(P.x-s.ax,P.y-s.ay)<s.ar)near=s;
+  P.x=clamp(P.x,30,WW-30); P.y=clamp(P.y,GATE+56,WH-24);
+  const push=(x,y,r)=>{ const dx=P.x-x, dy=(P.y+20)-(y-8), d=Math.hypot(dx,dy); if(d<r){ const k=(r-d)/(d||1); P.x+=dx*k; P.y+=dy*k; } };
+  for(const s of STATIONS) push(s.fx,s.fy,s.solid);
+  for(const d of DECO) if(Math.abs(d.x-P.x)<50&&Math.abs(d.y-P.y)<60) push(d.x,d.y,d.solid);
+  let near=null; for(const s of STATIONS) if(Math.hypot(P.x-s.ax,P.y-s.ay)<s.ar)near=s;
   if((near&&near.id)!==(h.near&&h.near.id)){ h.near=near; h.hold=0; h.lock=false; }
   if(near&&!h.lock&&ov.hidden){ h.hold+=dt; if(h.hold>=.5){ h.lock=true; h.hold=0; tone(660,.1,'triangle',.05); openStation(near.id); } }
-  for(const m of h.motes){ m.y-=m.v*dt; m.x+=Math.sin(h.t+m.p)*6*dt; if(m.y<0){ m.y=G.H; m.x=rnd(0,HUBW); } }
+  const c=camOf(), k=Math.min(1,dt*8); h.cx+=(c.x-h.cx)*k; h.cy+=(c.y-h.cy)*k;
+  for(const m of h.motes){ m.y-=m.v*dt; m.x+=Math.sin(h.t+m.p)*8*dt; if(m.y<GATE){ m.y=WH; m.x=rnd(0,WW); } }
 }
 function openStation(id){
   if(id==='door'){ showSetup(); return; }
@@ -110,35 +137,48 @@ function showBoard(){
 }
 /* ---------- drawing ---------- */
 const sprW=(im,k)=>im.width/R*k, sprH=(im,k)=>im.height/R*k;
+const lanePath=ex=>{ const p=new Path2D(); for(const [x0,y0,x1,y1,w] of LANES){ const hw=w/2+ex, dx=x1-x0, dy=y1-y0, l=Math.hypot(dx,dy), nx=-dy/l*hw, ny=dx/l*hw; p.moveTo(x0+nx,y0+ny); p.lineTo(x1+nx,y1+ny); p.lineTo(x1-nx,y1-ny); p.lineTo(x0-nx,y0-ny); p.closePath(); p.moveTo(x0+hw,y0); p.arc(x0,y0,hw,0,TAU,true); p.moveTo(x1+hw,y1); p.arc(x1,y1,hw,0,TAU,true); } p.moveTo(PLAZA.x+PLAZA.r+ex,PLAZA.y); p.arc(PLAZA.x,PLAZA.y,PLAZA.r+ex,0,TAU,true); return p; };
+const GRASS=['#1d3328','#264536','#101d17'];
 export function drawHub(c){
-  const h=G.hub; if(!h)return; const t=S.t, wy=px(wallB()), T=SPRITE_OVERRIDES.arena.tiles, has=T.length>15;
-  c.fillStyle='#0f0818'; c.fillRect(0,0,LW,G.LH);
-  if(has) for(let ty=0;ty<G.LH;ty+=16)for(let tx=0;tx<LW;tx+=16){ c.globalAlpha=.75; c.drawImage(tileAt(T,tx,ty),tx,ty,16,16); }
-  c.globalAlpha=.42; c.fillStyle='#110a1c'; c.fillRect(0,0,LW,G.LH); c.globalAlpha=1;
-  // back wall with a lip and a shadow cast on the floor
-  c.globalAlpha=.7; c.fillStyle='#07040d'; c.fillRect(0,0,LW,wy); c.globalAlpha=1;
-  c.fillStyle='#8f7440'; c.fillRect(0,wy,LW,1); c.fillStyle='#4a3a24'; c.fillRect(0,wy+1,LW,1);
-  const sg=c.createLinearGradient(0,wy,0,wy+24); sg.addColorStop(0,'rgba(5,2,10,.7)'); sg.addColorStop(1,'rgba(5,2,10,0)'); c.fillStyle=sg; c.fillRect(0,wy+2,LW,24);
-  // rug from the door to the middle of the hall
-  const rx0=px(150), rx1=px(250); c.fillStyle='#3a1a4a'; c.fillRect(rx0,wy+4,rx1-rx0,G.LH-wy-4); c.fillStyle='#4f2a63'; for(let y=wy+8;y<G.LH;y+=6)c.fillRect(rx0+3,y,rx1-rx0-6,1);
-  c.fillStyle='#dcb868'; c.fillRect(rx0,wy+4,1,G.LH); c.fillRect(rx1-1,wy+4,1,G.LH); c.fillStyle='#8f7440'; c.fillRect(rx0+2,wy+4,1,G.LH); c.fillRect(rx1-3,wy+4,1,G.LH);
-  const st=stations();
+  const h=G.hub; if(!h)return; const t=S.t, T=SPRITE_OVERRIDES.arena.tiles, has=T.length>15;
+  const camX=Math.round(h.cx*K*R)/R, camY=Math.round(h.cy*K*R)/R, vx0=h.cx-70, vx1=h.cx+HUBW/ZOOM+70, vy0=h.cy-90, vy1=h.cy+G.H/ZOOM+70;
+  const seen=(x,y)=>x>vx0&&x<vx1&&y>vy0&&y<vy1;
+  c.fillStyle='#07040d'; c.fillRect(0,0,LW,G.LH);
+  c.save(); c.scale(ZOOM,ZOOM); c.translate(-camX,-camY);
+  // grass with tufts, then the cobbled lanes and plaza over it
+  c.fillStyle='#14231d'; c.fillRect(0,px(GATE-30),px(WW),px(WH-GATE+60));
+  for(const u of TUFTS) if(seen(u.x,u.y)){ c.fillStyle=GRASS[u.c]; c.fillRect(px(u.x),px(u.y),1,u.h); }
+  c.save(); c.scale(K,K); c.fillStyle='#07040d'; c.fill(lanePath(5)); c.fillStyle='#5a4a38'; c.fill(lanePath(3)); c.restore();
+  c.save(); c.scale(K,K); c.clip(lanePath(0)); c.scale(1/K,1/K);
+  c.fillStyle='#2a2033'; c.fillRect(px(h.cx-70),px(h.cy-90),px(HUBW/ZOOM+140),px(G.H/ZOOM+160));
+  if(has){ c.globalAlpha=.85; const x0=Math.floor(px(h.cx-70)/16)*16, y0=Math.floor(px(h.cy-90)/16)*16; for(let ty=y0;ty<px(vy1);ty+=16)for(let tx=x0;tx<px(vx1);tx+=16) c.drawImage(tileAt(T,tx,ty),tx,ty,16,16); c.globalAlpha=1; }
+  c.restore();
+  // the gate wall across the top: stone with a lip, banners and braziers
+  const wy=px(GATE), wh=px(46); c.fillStyle='#2a2233'; c.fillRect(0,wy-wh,px(WW),wh); c.fillStyle='#1c1626'; for(let y=wy-wh+4;y<wy;y+=6)c.fillRect(0,y,px(WW),1); for(let x=0;x<px(WW);x+=14)for(let y=wy-wh;y<wy;y+=12)c.fillRect(x+((y/12|0)%2?7:0),y,1,6);
+  c.fillStyle='#8f7440'; c.fillRect(0,wy-1,px(WW),1); c.fillStyle='#4a3a24'; c.fillRect(0,wy,px(WW),1);
+  const sg=c.createLinearGradient(0,wy,0,wy+22); sg.addColorStop(0,'rgba(5,2,10,.7)'); sg.addColorStop(1,'rgba(5,2,10,0)'); c.fillStyle=sg; c.fillRect(0,wy+1,px(WW),22);
+  c.fillStyle='#07040d'; c.fillRect(0,wy-wh-60,px(WW),60);
   // glowing circles at each station
-  for(const s of st){ const ax=px(s.ax), ay=px(s.ay), p=1+Math.sin(t*3+s.ax)*.08; const g=c.createRadialGradient(ax,ay,2,ax,ay,26*p); g.addColorStop(0,hexA(s.col,.5)); g.addColorStop(1,hexA(s.col,0)); c.fillStyle=g; c.beginPath(); c.ellipse(ax,ay,26*p,9*p,0,0,TAU); c.fill();
+  for(const s of STATIONS){ if(!seen(s.ax,s.ay)) continue; const ax=px(s.ax), ay=px(s.ay), p=1+Math.sin(t*3+s.ax)*.08; const g=c.createRadialGradient(ax,ay,2,ax,ay,26*p); g.addColorStop(0,hexA(s.col,.5)); g.addColorStop(1,hexA(s.col,0)); c.fillStyle=g; c.beginPath(); c.ellipse(ax,ay,26*p,9*p,0,0,TAU); c.fill();
     c.strokeStyle=hexA(s.col,h.near&&h.near.id===s.id?.95:.5); c.lineWidth=1; c.beginPath(); c.ellipse(ax,ay,13,4.4,0,0,TAU); c.stroke();
     if(h.near&&h.near.id===s.id&&h.hold>0){ c.strokeStyle='#fff6d0'; c.lineWidth=1.4; c.beginPath(); c.ellipse(ax,ay,13,4.4,0,-1.57,-1.57+TAU*Math.min(1,h.hold/.5)); c.stroke(); } }
   // everything with height, drawn back to front
-  const items=[];
-  for(const s of st){ const art=HUB_ART[s.art]; if(art) items.push({y:s.fy,f:()=>{ const w=sprW(art,s.k), hh=sprH(art,s.k); c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px(s.fx),px(s.fy),w*.4,2.5,0,0,TAU); c.fill(); c.drawImage(art,Math.round((px(s.fx)-w/2)*R)/R,Math.round((px(s.fy)-hh)*R)/R,w,hh); if(s.id==='door'){ const gg=c.createRadialGradient(px(s.fx),px(s.fy)-hh*.45,2,px(s.fx),px(s.fy)-hh*.45,hh*.7); gg.addColorStop(0,'rgba(176,122,255,'+(.28+.1*Math.sin(t*3)).toFixed(2)+')'); gg.addColorStop(1,'rgba(176,122,255,0)'); c.fillStyle=gg; c.fillRect(px(s.fx)-hh,px(s.fy)-hh*1.2,hh*2,hh*1.4); } } });
-    items.push({y:s.fy+3,f:()=>{ c.font='700 5px "Pixelify Sans","Courier New",monospace'; c.textAlign='center'; const ax=px(s.ax), ay=px(s.ay)+11; c.fillStyle='#0b0814'; c.fillText(s.name,ax+.6,ay+.6); c.fillStyle='#f1e8d4'; c.fillText(s.name,ax,ay); } }); }
+  const items=[], sprite=(art,x,y,k,shadow)=>{ const w=sprW(art,k), hh=sprH(art,k); if(shadow){ c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(px(x),px(y),w*.38,2.4,0,0,TAU); c.fill(); } c.drawImage(art,Math.round((px(x)-w/2)*R)/R,Math.round((px(y)-hh)*R)/R,w,hh); return hh; };
+  for(const s of STATIONS){ if(!seen(s.fx,s.fy)) continue; const art=HUB_ART[s.art]; if(art) items.push({y:s.fy,f:()=>{ const hh=sprH(art,s.k); sprite(art,s.fx,s.fy,s.k,true); if(s.id==='door'){ const gg=c.createRadialGradient(px(s.fx),px(s.fy)-hh*.45,2,px(s.fx),px(s.fy)-hh*.45,hh*.7); gg.addColorStop(0,'rgba(176,122,255,'+(.28+.1*Math.sin(t*3)).toFixed(2)+')'); gg.addColorStop(1,'rgba(176,122,255,0)'); c.fillStyle=gg; c.fillRect(px(s.fx)-hh,px(s.fy)-hh*1.2,hh*2,hh*1.4); } } });
+    items.push({y:s.ay+11,f:()=>{ c.font='700 5px "Pixelify Sans","Courier New",monospace'; c.textAlign='center'; const ax=px(s.ax), ay=px(s.ay)+11; c.fillStyle='#0b0814'; c.fillText(s.name,ax+.6,ay+.6); c.fillStyle='#f1e8d4'; c.fillText(s.name,ax,ay); } }); }
+  for(const d of DECO){ if(!seen(d.x,d.y)) continue; const art=HUB_ART[d.art]; if(!art) continue;
+    items.push({y:d.y,f:()=>{ if(d.glow){ const q=.16+.05*Math.sin(t*7+d.x), g=c.createRadialGradient(px(d.x),px(d.y)-6,2,px(d.x),px(d.y)-6,30); g.addColorStop(0,hexA(d.glow,q*2)); g.addColorStop(1,hexA(d.glow,0)); c.fillStyle=g; c.beginPath(); c.ellipse(px(d.x),px(d.y),30,16,0,0,TAU); c.fill(); } sprite(art,d.x,d.y,d.k,d.art!=='lamp'); } }); }
   const br=SPRITE_OVERRIDES.arena.props&&SPRITE_OVERRIDES.arena.props.brazier, ban=HUB_ART.banner;
-  for(const x of [34,366]) if(br) items.push({y:wallB()+34,f:()=>{ blitSprite(c,br,px(x),px(wallB()+34)); c.fillStyle='rgba(255,154,60,'+(.12+.05*Math.sin(t*9+x)).toFixed(2)+')'; c.beginPath(); c.arc(px(x),px(wallB()+34)-20,16,0,TAU); c.fill(); } });
-  if(ban) for(const x of [128,272]) items.push({y:wallB()-1,f:()=>{ const w=sprW(ban,1.5), hh=sprH(ban,1.5); c.drawImage(ban,Math.round((px(x)-w/2)*R)/R,Math.max(1,wy-hh-1),w,hh); } });
+  if(br) for(const x of [360,540]) items.push({y:GATE+40,f:()=>{ blitSprite(c,br,px(x),px(GATE+40)); c.fillStyle='rgba(255,154,60,'+(.12+.05*Math.sin(t*9+x)).toFixed(2)+')'; c.beginPath(); c.arc(px(x),px(GATE+40)-20,16,0,TAU); c.fill(); } });
+  if(ban) for(const x of [300,600,120,780]) items.push({y:GATE-1,f:()=>{ const w=sprW(ban,1.3), hh=sprH(ban,1.3); c.drawImage(ban,Math.round((px(x)-w/2)*R)/R,Math.max(1,wy-hh-1),w,hh); } });
   items.push({y:G.P.y+20,f:()=>drawWizard(G.P.x,G.P.y,false,G.P.face||'south')});
   items.sort((a,b)=>a.y-b.y); for(const it of items)it.f();
-  // drifting motes and the shard counter
-  for(const m of h.motes){ c.globalAlpha=.25+.25*Math.sin(h.t*2+m.p); c.fillStyle='#e8d8ff'; c.fillRect(px(m.x),px(m.y),1,1); } c.globalAlpha=1;
+  // fireflies drifting over the village
+  for(const m of h.motes){ if(!seen(m.x,m.y)) continue; c.globalAlpha=.3+.4*Math.sin(h.t*2+m.p); c.fillStyle=m.p>3?'#e8ffa8':'#e8d8ff'; c.fillRect(px(m.x),px(m.y),1,1); } c.globalAlpha=1;
+  c.restore();
+  // dusk vignette, shard counter and hint stay fixed on screen
+  const vg=c.createRadialGradient(LW/2,G.LH*.5,LW*.35,LW/2,G.LH*.5,LW*.95); vg.addColorStop(0,'rgba(8,4,16,0)'); vg.addColorStop(1,'rgba(8,4,16,.55)'); c.fillStyle=vg; c.fillRect(0,0,LW,G.LH);
   c.font='700 7px "Pixelify Sans","Courier New",monospace'; c.textAlign='left'; const sx=12, sy=9; c.fillStyle='#0b0814'; c.fillText('✦ '+(meta.shards||0)+' shards',sx+.6,sy+.6); c.fillStyle='#dcb868'; c.fillText('✦ '+(meta.shards||0)+' shards',sx,sy);
-  c.font='700 5px "Pixelify Sans","Courier New",monospace'; c.fillStyle='#bdb09c'; c.fillText('Walk onto a glowing circle',sx,G.LH-6);
+  c.font='700 5px "Pixelify Sans","Courier New",monospace'; c.fillStyle='#bdb09c'; c.fillText('Explore the village. Step onto a glowing circle',sx,G.LH-6);
 }
 function hexA(h,a){ const n=parseInt(h.slice(1,7),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }

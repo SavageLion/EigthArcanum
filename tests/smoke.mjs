@@ -17,7 +17,7 @@ try {
   await page.waitForSelector('#ov .go');
   await page.click('#ov .go');                 // Begin a run (title) -> the Sanctum
   await page.waitForTimeout(600);
-  await page.evaluate(() => { const A = window.__arcana; A.G.P.x = 200; A.G.P.y = A.G.H * 0.19 + 72; });   // walk onto the Door
+  await page.evaluate(() => { const A = window.__arcana; A.G.P.x = 450; A.G.P.y = 236; });   // walk onto the Door
   await page.waitForSelector('#start', { timeout: 8000 }); await page.click('#start');   // setup screen: Begin the run
   await page.waitForTimeout(600);
   // every boss x every arena type, run for a couple of simulated seconds

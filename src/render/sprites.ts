@@ -65,7 +65,7 @@ const SPELL_NAMES=['fireball','crystal','bell','bolt','thorn','skull','eye','bub
 async function loadSpellArt(){ const im=await Promise.all(SPELL_NAMES.map(n=>loadImage(`runner/spells/${n}.png`))); SPELL_NAMES.forEach((n,i)=>{ if(im[i])SPELL_ART[n]=im[i]; }); }
 /** Pixel Lab props for the Sanctum (door, market stall, forge, banner) */
 export const HUB_ART:Record<string,HTMLImageElement>={};
-async function loadHubArt(){ const k=['door','market','forge','banner','campfire','codex','dummy','board']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
+async function loadHubArt(){ const k=['door','market','forge','banner','campfire','codex','dummy','board','tree','pine','well','lamp','cottage']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
 export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
 /** per-wizard animation clips for the unlockable wizards (idle, walk, cast, hurt, death), by wizard id then clip then direction */
 export const WIZ_ANIM:Record<string,Record<string,Record<string,any>>>={};
