@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { bulletArt } from '../systems/runnerSpells';
 import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
 import { pickupDraw } from '../systems/arenaEvents';
 import { W, ctx, reduced } from '../core/dom';
@@ -131,6 +132,7 @@ export function draw(){
     if(isMod('moon')&&G.P&&Math.hypot(s.x-G.P.x,s.y-G.P.y)>135)continue;
     const SS=SPRITE_OVERRIDES.shot[S.stage];
     if(SS&&!s.seed){ c.save(); c.translate(px(s.x),px(s.y)); c.rotate(Math.atan2(s.vy,s.vx)); const z=s.r*K>3.5?16:8; c.drawImage(SS,-z/2,-z/2,z,z); c.restore(); continue; }   // boss's own projectile art
+    if(!SS&&!s.seed){ const BA=bulletArt(S.stage,G.B.color); if(BA){ c.save(); c.translate(px(s.x),px(s.y)); if(BA.spin)c.rotate(S.t*BA.spin*2+s.x*.05); const z=s.r*K>3.5?18:11; c.globalAlpha=.2; c.fillStyle=G.B.color; c.beginPath(); c.arc(0,0,z*.62,0,TAU); c.fill(); c.globalAlpha=1; c.drawImage(BA.img,-z/2,-z/2,z,z); c.restore(); continue; } }
     if(S.stage===0||S.stage===13){ for(let k=3;k>=1;k--){ c.globalAlpha=.55-k*.1; blit(c,px(s.x-s.vx*.011*k),px(s.y-s.vy*.011*k),disc(k>1?'#c0301a':s.c,Math.max(1.5,s.r*K*(1-.2*k)))); } c.globalAlpha=1; }
     blit(c,px(s.x),px(s.y),disc(s.c,Math.max(2,s.r*K)));
     if(s.seed) arcDots(s.x,s.y,s.r+15*clamp(s.fuse/1.15,0,1),0,TAU,1,s.c);

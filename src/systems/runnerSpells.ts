@@ -3,6 +3,9 @@
    ground spell (jump it). The shape says who is attacking: the Cinder King throws fireballs and flame, the Bone Cellist throws notes and
    rolling bones, the Gilded Idol throws spinning coins and boulders. Colours come from the boss, except shapes that have a natural colour. */
 
+/** The boss's flying spell as a bullet sprite for the other arenas (bosses without their own shot art): the same Pixel Lab sprite the Runner uses, tinted for the boss. Returns null if the art is missing. */
+const UPRIGHT=new Set(['note','card','bell','eye','skull','coin','bubble','crystal','fireball','bolt','spore']);
+export function bulletArt(stage,col,t){ const shape=(SPELLS[stage]||SPELLS[0])[0], A=art(shape,col); if(!A)return null; return {img:A,spin:UPRIGHT.has(shape)?0:(SPIN[shape]||2)}; }
 /** per boss index: [flying spell, ground spell]. The final boss (63) rotates through several. */
 export const SPELLS=[
  ['fireball','flame'],['crystal','shard'],['bell','ring'],['bolt','ring'],['thorn','thorns'],['skull','bones'],['crystal','shard'],['eye','ring'],
