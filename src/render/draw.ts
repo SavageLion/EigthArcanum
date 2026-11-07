@@ -3,6 +3,7 @@ import { SPELL_ART } from './sprites';
 import { bulletArt, tintedArt } from '../systems/runnerSpells';
 import { drawHub } from '../systems/hub';
 import { drawCamp } from '../systems/camp';
+import { drawDummy } from '../systems/lab';
 import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
 import { pickupDraw } from '../systems/arenaEvents';
 import { W, ctx, reduced } from '../core/dom';
@@ -66,6 +67,7 @@ function drawPlayer(){
   blit(c,hx,hy,disc('#ffd76a',1.5));
 }
 function drawBoss(){
+  if(S.lab){ drawDummy(ctx); return; }
   const c=ctx,f=bossFrames(S.stage),atk=SPRITE_OVERRIDES.bossAtk[S.stage],age=performance.now()/1000-(G.B.atkAt??-9);
   const fr=(atk&&age<.45)?atk[Math.min(atk.length-1,Math.floor(age*14))]:f[Math.floor(S.t*6)%f.length];
   const j=G.B.enraged&&!reduced?(Math.floor(S.t*14)%2):0;

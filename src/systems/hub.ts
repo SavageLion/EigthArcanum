@@ -3,7 +3,10 @@ import { W, muteBtn, ov } from '../core/dom';
 import { G, S, newPlayer } from '../core/state';
 import { KEYS } from '../core/input';
 import { BOSSES } from '../data/bosses';
-import { BOOSTS, FORGE_COST, meta, saveMeta } from '../data/meta';
+import { BOOSTS, FORGE_COST, dailyStreak, dailyToday, meta, saveMeta } from '../data/meta';
+import { enterLab } from './lab';
+import { startRun, bossCardArt } from './flow';
+import { SPELLS } from './runnerSpells';
 import { HUB_ART, K, LW, R, SPRITE_OVERRIDES, blitSprite, dirOf, makeBg, px } from '../render/sprites';
 import { drawWizard } from '../render/draw';
 import { resize } from '../core/size';
@@ -21,17 +24,20 @@ import { setMusic, tone } from '../core/audio';
    you carry in). Shards are earned from bosses and runs (data/meta.ts). */
 const HUBW=400;
 const wallB=()=>G.H*.19;
-const stations=()=>{ const wb=wallB(), my=G.H*.47; return [
+const stations=()=>{ const wb=wallB(), my=G.H*.40; return [
   {id:'door',name:'THE DOOR',art:'door',k:1.55,fx:HUBW/2,fy:wb+16,ax:HUBW/2,ay:wb+72,ar:34,col:'#b07aff',solid:34},
   {id:'market',name:'MARKET',art:'market',k:1.5,fx:84,fy:my,ax:84,ay:my+40,ar:34,col:'#ffd27a',solid:30},
   {id:'forge',name:'FORGE',art:'forge',k:1.5,fx:316,fy:my,ax:316,ay:my+40,ar:34,col:'#ff9a5a',solid:30},
+  {id:'codex',name:'CODEX',art:'codex',k:1.45,fx:70,fy:G.H*.72,ax:70,ay:G.H*.72+40,ar:34,col:'#e8d28a',solid:28},
+  {id:'board',name:'DAILY RUN',art:'board',k:1.45,fx:200,fy:G.H*.72,ax:200,ay:G.H*.72+40,ar:34,col:'#9ad0ff',solid:28},
+  {id:'lab',name:'SPELL LAB',art:'dummy',k:1.4,fx:330,fy:G.H*.72,ax:330,ay:G.H*.72+40,ar:34,col:'#ff8a8a',solid:26},
 ]; };
 const tileAt=(T,tx,ty)=>T[((tx*7+ty*13)>>4)%5===0?(tx>>4)%16:[0,1,8,10,13][((tx>>4)+(ty>>4))%5]];
 
 export function enterHub(){
   setMusic('reward',0); S.mode='hub'; S.hub=true; S.mod=null; S.orbit=S.fo=S.open=S.side=false; S.paused=false; S.t=0; sideEnd(); eventsEnd(); oaEnd();
   G.fo=null; G.pull=null; G.B=undefined; G.bolts=[]; G.shots=[]; G.rings=[]; G.cols=[]; G.parts=[]; G.seeds=[]; G.beams=[]; G.helpers=[]; G.bands=[]; G.traps=[]; G.hits=[]; G.pillars=[]; G.stick=null; G.stickV={x:0,y:0};
-  G.P=newPlayer(meta.lastWizard||'raven'); G.P.x=HUBW/2; G.P.y=G.H*.74; G.P.face='south';
+  G.P=newPlayer(meta.lastWizard||'raven'); G.P.x=HUBW/2; G.P.y=G.H*.56; G.P.face='south';
   G.hub={t:0,near:null,hold:0,lock:false,motes:Array.from({length:22},(_,i)=>({x:rnd(0,HUBW),y:rnd(0,G.H),v:rnd(4,14),p:rnd(0,6)}))};
   ov.hidden=true; muteBtn.hidden=false; spellBar.hidden=true; for(const id of ['bossname','omen','hint','call','intro']) $(id).hidden=true;
   resize();
@@ -56,7 +62,7 @@ export function hubStep(dt){
 }
 function openStation(id){
   if(id==='door'){ showSetup(); return; }
-  if(id==='market')showMarket(); else showForge();
+  if(id==='market')showMarket(); else if(id==='forge')showForge(); else if(id==='codex')showCodex(); else if(id==='board')showBoard(); else enterLab();
 }
 const back=()=>{ ov.hidden=true; };
 const shardsTag=()=>`<span style="color:var(--gold)">✦ ${meta.shards||0} shards</span>`;
@@ -83,6 +89,24 @@ function showForge(){
   $('hubback').onclick=back;
 }
 
+/** the Codex: all 64 bosses as tarot cards, revealed as you beat them */
+function showCodex(sel=null){
+  const seen=BOSSES.filter((b,i)=>meta.codex[i]>0).length;
+  const cell=i=>{ const d=BOSSES[i], n=meta.codex[i]||0; return n>0?`<button class="cdx seen${sel===i?' sel':''}" data-i="${i}" style="--boss:${d.color}"><img alt="" src="${bossCardArt(d,i)}">${d.elite?'<i>★</i>':''}</button>`:`<button class="cdx" data-i="${i}" disabled><span>?</span></button>`; };
+  const info=sel!==null?(()=>{ const d=BOSSES[sel], sp=SPELLS[sel]||SPELLS[0], t=s=>s[0].toUpperCase()+s.slice(1); return `<div class="cdxinfo" style="--boss:${d.color}"><b>${d.name}${d.elite?' · Elite':''}</b><span>Beaten ${meta.codex[sel]} time${meta.codex[sel]>1?'s':''}. Throws ${t(sp[0])} and ${t(sp[1])} spells.</span></div>`; })():'<p class="muted">Tap a card you have discovered.</p>';
+  show(`<div class="eyebrow">Codex · ${seen} of ${BOSSES.length} discovered</div><h2>The Bestiary</h2>${info}<div class="cdxgrid">${BOSSES.map((b,i)=>cell(i)).join('')}</div><button class="go" id="hubback">Back to the Sanctum</button>`);
+  ov.querySelectorAll('.cdx.seen').forEach(b=>b.onclick=()=>{ const y=ov.scrollTop; showCodex(+b.dataset.i); ov.scrollTop=y; });
+  $('hubback').onclick=back;
+}
+/** the Daily Run board: the same eight bosses and arenas for everyone today, no Market boosts or Forge gear */
+function showBoard(){
+  const d=dailyToday(), st=dailyStreak();
+  show(`<div class="eyebrow">Daily run · ${d.date}</div><h2>Today's challenge</h2>
+    <p class="muted">Eight bosses, the same for everyone today, with no Market boosts or Forge gear. Win it once a day for a shard bonus that grows with your streak.</p>
+    <div class="stats"><div><b>${d.best}/8</b><small>Best today</small></div><div><b>${st}</b><small>Day streak</small></div><div><b>${d.won?'Done':'Open'}</b><small>Today</small></div></div>
+    <button class="go" id="dailygo">${d.best?'Try again':'Start the daily run'}</button><button class="linkbtn" id="hubback">Back to the Sanctum</button>`);
+  $('dailygo').onclick=()=>startRun(meta.lastWizard,8,true); $('hubback').onclick=back;
+}
 /* ---------- drawing ---------- */
 const sprW=(im,k)=>im.width/R*k, sprH=(im,k)=>im.height/R*k;
 export function drawHub(c){

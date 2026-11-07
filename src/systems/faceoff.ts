@@ -13,10 +13,10 @@ import { foPlan } from './bossPlans';
 import { paintSpells, spellBar } from './casting';
 import { CY, ECHO, GOODS, POS_HP, RO, WANDS, fightReward, hasPerk, hasWand, isMod, posHp, relPos, shuffle, spellValue, total } from './deck';
 import { ARENA_LIST, getTestArena, setTestArena, showDraw, startRun } from './flow';
-import { unlockEverything, RUN_LENGTHS, RUN_UNLOCK, WIZARDS, meta, noteBoss, noteRunEnd, takeUnlocks, wizardById } from '../data/meta';
+import { gains, unlockEverything, RUN_LENGTHS, RUN_UNLOCK, WIZARDS, meta, noteBoss, noteRunEnd, takeUnlocks, wizardById } from '../data/meta';
 import { runAvailable } from '../data/bosses';
 import { codedWizardPortrait } from '../render/wizardArt';
-import { GEAR, SLOT_LABEL, equip, gearOf, hasGear, lootOrShop, nearMiss, rateNow } from './gear';
+import { GEAR, SLOT_LABEL, equip, gearOf, hasGear, nearMiss, rateNow } from './gear';
 import { oaEnd, oaStart } from './openArena';
 import { burst, hurt } from './sim';
 import { blowTrap } from './spellFx';
@@ -60,7 +60,7 @@ export function win(){
   setMusic('reward',S.pos); S.mode='won';S.t=0; G.P.beam=null; G.traps=[]; G.chestCall=0; if(S.open){$('call').hidden=true;} if(G.fo)G.fo.atk=null; $('hint').hidden=true; $('call').hidden=true;
   G.shots.forEach(s=>burst(s.x,s.y,GOLD,1)); G.shots=[];G.rings=[];G.cols=[];G.helpers=[];G.bands=[];
   burst(G.B.x,G.B.y,G.B.color,70); burst(G.B.x,G.B.y,GOLD,40); fxExplosion(G.B.x,G.B.y,1.7); fxHeal(G.P.x,G.P.y+10,'heal'); S.shake=reduced?0:14; S.flash=.6; sfx.win();
-  G.P.scale*=Math.pow(1.1,15/Math.max(1,total()-1)); noteBoss(!!BOSSES[S.stage].elite,G.P.cleanFight); G.P.reward=fightReward(); G.P.gold+=G.P.reward.g;
+  G.P.scale*=Math.pow(1.1,15/Math.max(1,total()-1)); noteBoss(!!BOSSES[S.stage].elite,G.P.cleanFight,S.stage); G.P.reward=fightReward(); G.P.gold+=G.P.reward.g;
   if(isMod('death')){G.P.hp=G.P.heldHp;G.P.extraPick=true;}
   G.P.hp=Math.min(G.P.max,G.P.hp+(hasGear('bloodstone')?2:1)); S.chest=null; spellBar.hidden=true; $('omen').hidden=true;
   if(S.pos+1>S.best) saveBest(S.pos+1);
@@ -116,18 +116,6 @@ function cardHTML(s,i,label){
   return `<button class="card${r?' secret':''}" data-i="${i}" style="--boss:${EL[s.els[0]].c}">${spellIcon(s)}<div class="txt">${label?`<small>${r?'Secret recipe · ':''}${label}</small>`:''}<b>${spellName(s)}</b><span>${spellDesc(s)}</span><em>${spellCost(s)} mana</em></div></button>`;
 }
 export function showPick(){ enterCamp(); }
-/** the old stacked reward screens, kept for reference and for the test hooks */
-export function showPickOld(){
-  const d=BOSSES[S.stage], el=BOSS_EL[S.stage]; S.mode='pick';
-  const types=Object.keys(TYPES).sort(()=>Math.random()-.5).slice(0,3);
-  const sec=ELITE_SECOND[S.stage]; const opts=types.map(type=>sec?{type,els:[el,sec],tier:1}:{type,els:[el],tier:0});
-  show(`<div class="eyebrow">${S.pos+1} of ${total()} defeated · one heart restored</div>${unlockBanner()}
-    ${G.P.reward?`<div class="reward"><b>+${G.P.reward.g} gold</b><span>${G.P.reward.parts.join(' · ')}</span></div>`:''}
-    <h2>Take ${d.elite?'an elite':'a'} spell from ${d.name}</h2>
-    <div class="cards">${opts.map((s,i)=>cardHTML(s,i)).join('')}</div>${handHTML()}`);
-  ov.querySelectorAll('.card').forEach(b=>b.onclick=()=>takeSpell(opts[+b.dataset.i]));
-  S.pendingOpts=opts; hotSave();
-}
 export function forgeOptions(n){
   const sp=G.P.spells, out=[], seen=new Set();
   const add=(label,result,apply)=>{ const k=spellKey(result)+apply.slot; if(seen.has(k))return; seen.add(k); out.push({label,result,...apply}); };
@@ -139,55 +127,26 @@ export function forgeOptions(n){
   if(sp.length>=G.P.slots) sp.forEach((s,i)=>add(`Replace ${spellName(s)}`,n,{slot:i}));
   return out;
 }
-export function takeSpell(n){
-  const opts=forgeOptions(n), v=spellValue(n);
-  show(`<div class="eyebrow">Keep it, fuse it or sell it</div><h2>What becomes of ${spellName(n)}?</h2>
-    ${goldHTML()}${G.P.spells.length?'<p class="muted">The first spell sets the type. The second adds its twist.</p>':''}
-    <div class="cards">${opts.map((o,i)=>cardHTML(o.result,i,o.label)).join('')}
-    <button class="sellrow" id="sell"><span class="coin"></span><b>Sell ${spellName(n)}</b><em>+${v} gold</em></button></div>`);
-  ov.querySelectorAll('.card').forEach(b=>b.onclick=()=>{ const o=opts[+b.dataset.i]; G.P.spells[o.slot]=o.result; nextBoss(); });
-  $('sell').onclick=()=>{ G.P.gold+=v; sfx.coin(); nextBoss(); };
-  S.pendingFuse=opts;
-}
-export function nextBoss(){ G.P.spells.forEach(learnRecipe); sfx.pick(); S.mod=null; if(G.P.extraPick){G.P.extraPick=false;showPick();return;} lootOrShop(); }
 export function makeStock(){
   const wands=shuffle(WANDS.filter(w=>w.id!==G.P.wand)).slice(0,2);
   const stock=[...wands.map(w=>({...w,icon:'wand',wand:true})),...shuffle(GOODS.filter(g=>g.ok())).slice(0,2)];
   if(Math.random()<.4){ const pool=GEAR.filter(g=>!hasGear(g.id)); const g=pool[Math.floor(Math.random()*pool.length)]; if(g)stock.push({id:g.id,name:g.name,icon:g.slot,c:g.cursed?'#e0405a':'#dcb868',cost:g.value*2+10,desc:`${SLOT_LABEL[g.slot]}. ${g.desc}`,ok:()=>!hasGear(g.id),fx(){equip(g);}}); }
   return stock;
 }
-export function openShop(){ setMusic('shop',S.pos); S.stock=makeStock(); S.rerolls=0; showShop(); }
 export function leaveShop(){ S.pos++; showDraw(); }
-function rerollCost(){ return 5+5*S.rerolls; }
-export function showShop(){
-  S.mode='shop'; $('bossname').hidden=true; const rc=rerollCost();
-  const row=(it,i)=>{ const sold=it.sold, can=!sold&&G.P.gold>=it.cost&&(it.wand||it.ok());
-    return `<button class="shoprow" data-i="${i}" style="--boss:${it.c}" ${can?'':'disabled'}>${icon(it.wand?'wand_'+it.id:'good_'+it.id,pixIcon(it.icon))}<div class="txt"><b>${it.name}</b><span>${it.desc}${it.wand&&G.P.wand?` Replaces your ${wandInfo().name}.`:''}</span></div><em>${sold?'Sold':it.cost+' gold'}</em></button>`; };
-  show(`<div class="eyebrow">The shop · before pull ${S.pos+2} of ${total()}</div><h2>Spend your gold</h2>
-    <div class="shopstatus">${goldHTML()}<div class="gold">${G.P.hp}/${G.P.max} hearts</div></div>
-    <div class="cards">${S.stock.map(row).join('')}</div>
-    ${G.P.spells.length?`<div class="eyebrow">Sell a spell you own</div><div class="cards">${G.P.spells.map((s,i)=>`<button class="sellrow" data-s="${i}"><span class="coin"></span><b>${spellName(s)}</b><em>+${spellValue(s)} gold</em></button>`).join('')}</div>`:''}
-    ${handHTML()}
-    <div class="shopbtns"><button class="ghost" id="reroll" ${G.P.gold>=rc?'':'disabled'}>New stock · ${rc} gold</button><button class="go" id="leave">Pull the next card</button></div>`);
-  ov.querySelectorAll('.shoprow').forEach(b=>b.onclick=()=>buy(S.stock[+b.dataset.i]));
-  ov.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.s; G.P.gold+=spellValue(G.P.spells[i]); G.P.spells.splice(i,1); sfx.coin(); showShop(); });
-  $('reroll').onclick=()=>{ G.P.gold-=rc; S.rerolls++; const r=S.rerolls; openShop(); S.rerolls=r; sfx.coin(); showShop(); };
-  $('leave').onclick=leaveShop; hotSave();
-}
-export function buy(it){ if(it.sold||G.P.gold<it.cost)return; G.P.gold-=it.cost; it.sold=true; if(it.wand)G.P.wand=it.id; else it.fx(); sfx.coin(); showShop(); }
 const fmt=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 export function showDead(){
-  setMusic('defeat'); S.mode='dead'; const d=BOSSES[S.stage]; noteRunEnd(total(),S.pos,false);
+  setMusic('defeat'); S.mode='dead'; const d=BOSSES[S.stage]; noteRunEnd(total(),S.pos,false,!!S.daily);
   show(`${heroHTML('hurt',true)}${unlockBanner()}<div class="eyebrow">The run ends on pull ${S.pos+1} of ${total()}</div><h2>${d.name} takes the hand</h2>
     <div class="stats"><div><b>${S.pos}</b><small>Bosses beaten</small></div><div><b>${meta.best[total()]||0}</b><small>Best ${total()}-run</small></div><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Recipes</small></div></div>
-    ${handHTML()}<p class="muted">Every spell is gone. The deck is shuffled again.</p>
+    ${handHTML()}<p class="muted">${S.daily?`Daily run over. Best today: ${meta.daily.best} of 8.`:'Every spell is gone. The deck is shuffled again.'}</p>
     <button class="go" id="again">Return to the Sanctum</button>`);
   $('again').onclick=enterHub; $('again').focus({preventScroll:true});
 }
 export function showVictory(){
-  setMusic('victory'); S.mode='victory'; noteRunEnd(total(),S.pos+1,true);
+  setMusic('victory'); S.mode='victory'; noteRunEnd(total(),S.pos+1,true,!!S.daily);
   show(`${heroHTML('idle')}${unlockBanner()}<div class="eyebrow">All ${total()} cards defeated</div><h1>The deck is yours</h1>
-    <p>You cleared the deck in ${fmt(S.runSeconds)}.</p>${handHTML()}
+    <p>You cleared the deck in ${fmt(S.runSeconds)}.${S.daily&&gains.daily?` Daily streak bonus: +${gains.daily} shards.`:''}</p>${handHTML()}
     <div class="stats"><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Secret recipes found</small></div></div>
     <button class="go" id="again">Return to the Sanctum</button>`);
   $('again').onclick=enterHub;

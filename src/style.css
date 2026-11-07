@@ -370,3 +370,37 @@ p{font-size:1.32rem;line-height:1.1}
 .campdock{gap:5px;padding-top:6px}
 .gearhint{display:none}
 .chip{width:30px;height:30px}
+
+/* camp polish: compact reward cards, small icon badges, a bigger scene */
+.camp .rcard{min-height:64px;padding:6px 3px;gap:2px}
+.camp .icowrap{width:28px;height:28px;display:block}
+.camp .icowrap .ico{width:28px;height:28px}
+.camp .icoel{width:13px;height:13px;right:-5px;bottom:-5px}
+.camp .rcard .icowrap{margin:0 auto}
+.camp .slotbtn .icowrap{width:24px;height:24px;flex:none}.camp .slotbtn .icowrap .ico{width:24px;height:24px}
+.camp .dhead .icowrap{width:28px;height:28px}
+.camp .dhead{grid-template-columns:34px minmax(0,1fr)}
+.camp .detail{height:88px}
+.camp .lootrow{grid-template-columns:30px minmax(0,1fr) auto}
+
+/* ---- Codex, daily board and the Spell Lab ---- */
+.cdxgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cdx{appearance:none;position:relative;aspect-ratio:44/56;background:#120a1c;border:2px solid var(--gold-dim);padding:0;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}
+.cdx img{width:100%;height:100%;image-rendering:pixelated;display:block}
+.cdx span{font-family:var(--display);font-size:1.4rem;color:#3a2a4a}
+.cdx:disabled{cursor:default;opacity:.8}
+.cdx.seen{border-color:var(--boss)}
+.cdx.sel{box-shadow:0 0 0 2px var(--gold)}
+.cdx i{position:absolute;right:2px;top:0;font-style:normal;color:var(--gold);font-size:.9rem;text-shadow:1px 1px 0 #0b0814}
+.cdxinfo{display:flex;flex-direction:column;gap:3px;background:#20142a;border:2px solid var(--boss);padding:8px 10px}
+.cdxinfo b{font-family:var(--display);font-size:1.15rem}.cdxinfo span{font-size:1.05rem;color:var(--bone-dim)}
+.labui{position:absolute;left:0;right:0;top:0;z-index:3;background:rgba(14,8,24,.9);border-bottom:2px solid var(--gold-dim);padding:max(6px,env(safe-area-inset-top,0px)) 10px 6px;display:flex;flex-direction:column;gap:5px;font-family:var(--body)}
+.labrow{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.labrow b{font-family:var(--display);font-size:1.05rem;color:var(--gold)}
+.labrow span{font-size:1rem;color:var(--bone)}
+.labrow .ghost{padding:3px 8px;font-size:.95rem}
+.labrow.equip{justify-content:flex-start}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.lchip{appearance:none;background:#20142a;color:var(--bone);border:2px solid var(--c,var(--gold-dim));padding:2px 7px;font:inherit;font-size:.95rem;cursor:pointer;touch-action:manipulation}
+.lchip.on{background:var(--c,var(--gold));color:#140d1f}
+.tierbox{display:flex;gap:4px;align-items:center}

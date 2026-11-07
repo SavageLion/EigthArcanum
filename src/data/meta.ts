@@ -12,10 +12,12 @@ export interface Meta{
   owned:string[];                        // gear ids found in any run
   forge:Record<string,boolean>;          // unlocked loadout slots
   loadout:Record<string,string|null>;    // gear carried into each run
+  codex:Record<number,number>;           // times each boss (by index) has been beaten
+  daily:{date:string;best:number;won:boolean;streak:number;last:string};   // today's seeded 8-boss run
 }
 const KEY='ea-meta-v1';
-const fresh=():Meta=>({wizards:['raven'],runs:[8],counters:{bosses:0,elites:0,clean:0,mimics:0,chests:0,won:{8:0,16:0,32:0,64:0}},best:{8:0,16:0,32:0,64:0},lastWizard:'raven',lastRun:8,shards:0,boosts:{heart:0,purse:0,well:0},owned:[],forge:{hat:false,robe:false,charm:false},loadout:{hat:null,robe:null,charm:null}});
-function load():Meta{ try{ const j=JSON.parse(localStorage.getItem(KEY)||'null'); if(j&&j.counters) return {...fresh(),...j,counters:{...fresh().counters,...j.counters,won:{...fresh().counters.won,...j.counters.won}},best:{...fresh().best,...j.best},boosts:{...fresh().boosts,...(j.boosts||{})},forge:{...fresh().forge,...(j.forge||{})},loadout:{...fresh().loadout,...(j.loadout||{})},owned:Array.isArray(j.owned)?j.owned:[],shards:+j.shards||0}; }catch(e){} return fresh(); }
+const fresh=():Meta=>({wizards:['raven'],runs:[8],counters:{bosses:0,elites:0,clean:0,mimics:0,chests:0,won:{8:0,16:0,32:0,64:0}},best:{8:0,16:0,32:0,64:0},lastWizard:'raven',lastRun:8,shards:0,boosts:{heart:0,purse:0,well:0},owned:[],forge:{hat:false,robe:false,charm:false},loadout:{hat:null,robe:null,charm:null},codex:{},daily:{date:'',best:0,won:false,streak:0,last:''}});
+function load():Meta{ try{ const j=JSON.parse(localStorage.getItem(KEY)||'null'); if(j&&j.counters) return {...fresh(),...j,counters:{...fresh().counters,...j.counters,won:{...fresh().counters.won,...j.counters.won}},best:{...fresh().best,...j.best},boosts:{...fresh().boosts,...(j.boosts||{})},forge:{...fresh().forge,...(j.forge||{})},loadout:{...fresh().loadout,...(j.loadout||{})},owned:Array.isArray(j.owned)?j.owned:[],shards:+j.shards||0,codex:{...(j.codex||{})},daily:{...fresh().daily,...(j.daily||{})}}; }catch(e){} return fresh(); }
 export const meta:Meta=load(); if(!meta.runs.includes(8)) meta.runs.unshift(8);
 export const saveMeta=()=>{ try{ localStorage.setItem(KEY,JSON.stringify(meta)); }catch(e){} };
 
@@ -53,11 +55,22 @@ function check(){
   if(!meta.runs.includes(64)&&meta.counters.won[32]>0){ meta.runs.push(64); pending.push('Unlocked: the 64-boss run'); }
   saveMeta();
 }
-export const gains={boss:0};   // shards from the boss just beaten, shown in the Camp
-export function noteBoss(elite:boolean,clean:boolean){ gains.boss=(elite?3:1)+(clean?1:0); meta.shards=(meta.shards||0)+gains.boss; meta.counters.bosses++; if(elite)meta.counters.elites++; if(clean)meta.counters.clean++; check(); }
+export const gains={boss:0,daily:0};   // shards from the boss just beaten, shown in the Camp
+export function noteBoss(elite:boolean,clean:boolean,stage?:number){ if(stage!==undefined){ meta.codex[stage]=(meta.codex[stage]||0)+1; } gains.boss=(elite?3:1)+(clean?1:0); meta.shards=(meta.shards||0)+gains.boss; meta.counters.bosses++; if(elite)meta.counters.elites++; if(clean)meta.counters.clean++; check(); }
 export function noteMimic(){ meta.counters.mimics++; check(); }
 export function noteChest(){ meta.counters.chests++; saveMeta(); }
-export function noteRunEnd(total:number,bossesBeaten:number,won:boolean){
+const pad=(n:number)=>String(n).padStart(2,'0');
+export const dateKey=(d=new Date())=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+export const todayKey=()=>dateKey();
+export const yesterdayKey=()=>{ const d=new Date(); d.setDate(d.getDate()-1); return dateKey(d); };
+/** how long the current daily streak is, counting a streak that ended yesterday */
+export const dailyStreak=()=>{ const d=meta.daily; return d.last===todayKey()||d.last===yesterdayKey()?d.streak:0; };
+export function dailyToday(){ const d=meta.daily; if(d.date!==todayKey()){ d.date=todayKey(); d.best=0; d.won=false; } return d; }
+/** records the end of a daily run: best bosses today, and a shard bonus for the first win of the day (bigger with a streak) */
+export function noteDaily(beaten:number,won:boolean){ const d=dailyToday(); d.best=Math.max(d.best,beaten); gains.daily=0;
+  if(won&&!d.won){ d.won=true; d.streak=d.last===yesterdayKey()?d.streak+1:1; d.last=todayKey(); gains.daily=10+2*Math.min(5,d.streak-1); meta.shards=(meta.shards||0)+gains.daily; }
+  saveMeta(); }
+export function noteRunEnd(total:number,bossesBeaten:number,won:boolean,daily=false){ if(daily)noteDaily(bossesBeaten,won);
   meta.best[total]=Math.max(meta.best[total]||0,bossesBeaten); meta.shards=(meta.shards||0)+(won?Math.max(3,Math.round(total/2)):Math.floor(bossesBeaten/4));
   if(won) meta.counters.won[total]=(meta.counters.won[total]||0)+1;
   check();

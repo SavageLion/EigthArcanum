@@ -9,6 +9,7 @@ import { CY, ECHO, RI, RO, hasPerk, hasWand, isMod, relPos, toBoss, total } from
 import { die, foStep, showDead, showPick, showVictory, win } from './faceoff';
 import { chestSay, chestStep, hasGear, nearMiss, rateNow } from './gear';
 import { sideMove } from './sideView';
+import { labHit, labStep } from './lab';
 import { eventsStep } from './arenaEvents';
 import { inPillar, oaAim, oaBoss, oaMove } from './openArena';
 import { beamStep, trapStep } from './spellFx';
@@ -17,7 +18,7 @@ import { GOLD, TAU, clamp, rnd } from '../core/util';
 import { setMusicEnergy, sfx } from '../core/audio';
 
 /* ---------- damage and hits ---------- */
-export function damage(d){ if(!G.B||S.mode!=='fight')return; 
+export function damage(d){ if(!G.B||S.mode!=='fight')return; if(S.lab){ d*=(hasGear('crown')?1.4:1)*(isMod('tower')?1.5:(isMod('moon')||isMod('hanged'))?1.25:1); labHit(d); return; } 
   if(hasGear('crown'))d*=1.4;
   G.B.hp-=d*(isMod('tower')?1.5:(isMod('moon')||isMod('hanged'))?1.25:1); if(d>=G.P.scale*3)G.B.flash=.05; if(G.B.hp<=0){G.B.hp=0;win();} }
 export function burst(x,y,c,n){ for(let i=0;i<n&&G.parts.length<320;i++){ const a=rnd(0,TAU),s=rnd(30,n>5?260:90); G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,c,life:rnd(.25,.8),t:0,r:rnd(1,3)}); } }
@@ -44,10 +45,10 @@ export function step(dt){
     G.B.flash=Math.max(0,G.B.flash-dt);
     if(fighting||S.mode==='intro'){
       G.B.t+=dt;
-      if(S.open){} else if(S.fo){} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(S.side){ G.B.x=W/2+Math.sin(G.B.t*.55)*135; G.B.y=G.H*.5+Math.sin(G.B.t*1.2)*14; } else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
+      if(S.open){} else if(S.fo){} else if(S.orbit){G.B.x=W/2;G.B.y=CY()+Math.sin(G.B.t*1.3)*3;} else if(S.lab){ G.B.x=W/2; G.B.y=G.H*.4; } else if(S.side){ G.B.x=W/2+Math.sin(G.B.t*.55)*135; G.B.y=G.H*.5+Math.sin(G.B.t*1.2)*14; } else if(G.B.def.move) G.B.def.move(G.B,dt); else { G.B.x=W/2+Math.sin(G.B.t*.7)*105; G.B.y=150+Math.sin(G.B.t*1.3)*10; }
     }
   }
-  if(fighting){
+  if(fighting){ if(S.lab)labStep(dt);
     G.DT=dt/(G.B.chill>0?1.4:1)*(.72+.03*relPos())*(hasGear('hourglass')?.9:1)*(isMod('magician')?1.15:isMod('temperance')?.75:1);
     const ph=G.B.hp<G.B.max/2;
     if(ph&&!G.B.enraged){G.B.enraged=true;setMusicEnergy(3,true);S.flash=.2;S.shake=reduced?0:5;sfx.rage();burst(G.B.x,G.B.y,G.B.color,30);}

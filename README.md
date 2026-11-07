@@ -66,3 +66,6 @@ falls back to the procedural art.
 
 ## The Camp (between bosses)
 `systems/camp.ts` replaces the stacked reward, fuse, chest and shop screens with one tap-based screen (`showPick` now calls `enterCamp`). Reward spells sit in a tray; tap one, then tap the slot it should go to (keep / fuse / replace come from `forgeOptions`) or sell it. Chest gear appears above the tray with Wear / Sell. The merchant and the wardrobe are props you tap in the scene (`makeStock` in `faceoff.ts` builds the stock). "Next card" asks for a second tap if you are leaving a reward or chest gear behind. The old screens (`takeSpell`, `showShop`, `showLoot`) are still in the code.
+
+## Sanctum stations (all six)
+Door, Market, Forge, plus **Codex** (a bestiary of all 64 bosses, filled in as you beat them; \`meta.codex\`), **Daily Run** (the same seeded 8-boss run and arenas for everyone each day, no Market boosts or Forge gear; first win of the day pays a shard bonus that grows with the streak: \`dailyToday\`, \`noteDaily\` in \`data/meta.ts\`, \`startRun(..., daily)\` in \`systems/flow.ts\`) and the **Spell Lab** (\`systems/lab.ts\`: a dummy that cannot die, a spell builder for any type, element pair and tier, unlimited mana and a DPS readout; it runs as a normal fight with \`S.lab\` set).

@@ -41,7 +41,7 @@ function detailHTML(){
   }
   if(C.slot!==null&&P.spells[C.slot]){ const s=P.spells[C.slot];
     return `<div class="dhead" style="--boss:${col(s)}">${spellIcon(s)}<div class="txt"><b>${spellName(s)} <small>${spellCost(s)} mana</small></b><span>${spellDesc(s)}</span></div></div><button class="ghost copt" id="sellslot">Sell it · +${spellValue(s)} gold</button>`; }
-  return `<p class="muted">${C.claimed?'Reward claimed. ':''}Tap a spell to inspect it, the merchant to shop, or the wardrobe for your gear.</p>`;
+  return `<p class="muted">${C.claimed?'Reward claimed. ':C.sel===null?'Tap a reward to read it. ':''}Tap a spell to inspect it, the merchant to shop, or the wardrobe for your gear.</p>`;
 }
 function sheetHTML(){
   const C=G.camp, P=G.P; if(!C.panel)return '';
@@ -59,7 +59,7 @@ function render(){
   const slots=Array.from({length:P.slots},(_,i)=>{ const s=P.spells[i], tgt=C.sel!==null&&!C.claimed;
     return `<button class="slotbtn${tgt?' target':''}${C.slot===i?' sel':''}" data-slot="${i}" style="--boss:${s?col(s):'var(--gold-dim)'}"><span class="n">${i+1}</span>${s?`${spellIcon(s)}<b>${spellName(s)}</b><em>${spellCost(s)}</em>`:`<b class="emptyslot">${tgt?'Place here':'Empty slot'}</b>`}</button>`; }).join('');
   const wd=P.wand&&WANDS.find(w=>w.id===P.wand);
-  const tray=C.claimed?`<p class="muted trayhint">Reward claimed.</p>`:C.opts.map((s,i)=>`<button class="card rcard${C.sel===i?' sel':''}" data-i="${i}" style="--boss:${col(s)}">${spellIcon(s)}<b>${spellName(s)}</b><span>${spellDesc(s)}</span><em>${spellCost(s)} mana</em></button>`).join('');
+  const tray=C.claimed?`<p class="muted trayhint">Reward claimed.</p>`:C.opts.map((s,i)=>`<button class="card rcard${C.sel===i?' sel':''}" data-i="${i}" style="--boss:${col(s)}">${spellIcon(s)}<b>${spellName(s)}</b><em>${spellCost(s)} mana</em></button>`).join('');
   const nextLabel=C.confirm?(pendingLoot?'Leave the chest gear? Tap again':'Leave the reward? Tap again'):'Next card';
   ov.innerHTML=`<div class="camp">
     <header class="camphead"><div class="eyebrow">${S.pos+1} of ${total()} defeated · ${d.name}</div><div class="campstats"><span class="gold"><span class="coin"></span>${P.gold} gold</span><span>♥ ${P.hp}/${P.max}</span><span>✦ +${gains.boss} shards</span>${P.reward?`<span class="muted">+${P.reward.g} gold earned</span>`:''}</div></header>

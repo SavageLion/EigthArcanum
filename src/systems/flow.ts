@@ -10,7 +10,7 @@ import { SPRITE_OVERRIDES, blit, bossFrames, makeBg } from '../render/sprites';
 import { BOSS_SIG } from './bossPlans';
 import { spellBar } from './casting';
 import { ECHO, OMENS, total } from './deck';
-import { meta, remember } from '../data/meta';
+import { meta, remember, todayKey } from '../data/meta';
 import { runAvailable } from '../data/bosses';
 import { requestWake, startFight } from './faceoff';
 import { oaEnd } from './openArena';
@@ -21,7 +21,11 @@ import { circle, fl, ln, poly } from '../render/bossArt';
 import { R, mk, pixelise } from '../render/pixel';
 
 /* ---------- flow ---------- */
-export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=8; remember(wizardId,runLen); G.P=newPlayer(wizardId); applyHubBonuses(); S.hub=false; G.hub=null; S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
+/** a small seeded random generator, so the daily run deals everyone the same bosses and arenas */
+const seeded=seed=>{ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)|0; let t=Math.imul(a^a>>>15,1|a); t=(t+Math.imul(t^t>>>7,61|t))^t; return ((t^t>>>14)>>>0)/4294967296; }; };
+const hashStr=s=>{ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
+export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun,daily=false){ if(daily)runLen=8; wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=8; remember(wizardId,runLen); G.P=newPlayer(wizardId); if(!daily)applyHubBonuses(); S.hub=false; G.hub=null; S.daily=daily; S.dailyArenas=null;
+  if(daily){ const rng=seeded(hashStr('arcanum-'+todayKey())), orig=Math.random; Math.random=rng; try{ S.order=dealOrder(runLen); S.dailyArenas=Array.from({length:runLen},()=>ARENAS[Math.floor(rng()*ARENAS.length)].id); } finally{ Math.random=orig; } } else S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
 /** testing: force every pull to one arena (chosen on the wizard screen; kept in localStorage) */
 export const getTestArena=()=>{ try{ return localStorage.getItem('ea-test-arena')||''; }catch(e){ return ''; } };
 export const setTestArena=id=>{ try{ if(id)localStorage.setItem('ea-test-arena',id); else localStorage.removeItem('ea-test-arena'); }catch(e){} };
@@ -70,7 +74,7 @@ export function showDraw(){
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
   setMusic('draw',S.pos); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);
-  const arena=ARENAS.find(a=>a.id===getTestArena())||ARENAS[Math.floor(Math.random()*ARENAS.length)]; let omen=drawOmen(); while(arena.id==='fool'&&omen.id==='hanged')omen=drawOmen();   // an upside-down room makes no sense for a platformer
+  const arena=ARENAS.find(a=>a.id===getTestArena())||(S.daily&&S.dailyArenas&&ARENAS.find(a=>a.id===S.dailyArenas[S.pos]))||ARENAS[Math.floor(Math.random()*ARENAS.length)]; let omen=drawOmen(); while(arena.id==='fool'&&omen.id==='hanged')omen=drawOmen();   // an upside-down room makes no sense for a platformer
   G.pull={i:0,phase:'shuffle',t:0,omen,arena,done:false,fast:reduced};
   const art=bossCardArt(d,S.stage);
   ov.className='overlay pullov'; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default';
