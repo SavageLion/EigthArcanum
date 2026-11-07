@@ -23,7 +23,7 @@ export function enterLab(){
   G.B={name:'Training Dummy',num:'',color:'#c9a867',elite:false,def:{attack(){}},rad:46,x:W/2,y:G.H*.4,max:1e12,hp:1e12,t:0,tm:{},flash:0,burning:0,chill:0,enraged:false,ang:0,jump:3.5,bloomOuter:false,lab:true};
   G.bolts=[];G.meteors=[];G.hits=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];G.traps=[]; S.chest=null; S.chestsLeft=0; S.chestT=999;
   G.lab={nums:[],log:[],total:0,type:'bolt',els:['fire'],tier:0};
-  G.bg=makeBg(BOSSES[7]); eventsStart(); S.t=0; setMusic('shop',0); ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
+  G.bg=makeBg(BOSSES[7]); eventsStart(); S.t=0; setMusic('camp',1); ov.hidden=true; muteBtn.hidden=false; stage.style.cursor='grab';
   for(const id of ['bossname','omen','hint','call','intro']) $(id).hidden=true;
   resize(); buildUI(); paintSpells();
 }

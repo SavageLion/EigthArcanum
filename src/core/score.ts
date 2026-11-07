@@ -2,7 +2,7 @@
    Every boss has its own THEME (mode, tempo, time feel, drum pattern, bass style, arpeggio shape, signature sound).
    A fight's ENERGY (0-3) layers the band in as the run goes on, and a boss's enrage adds a frenzy on top.
    The same code runs live (scheduler) or offline (renderScore, used by tests and previews). */
-type Bass='none'|'pulse'|'walk'|'sixteenth'|'tolling'|'drone'|'creep'|'waltz'|'march';
+type Bass='none'|'pulse'|'walk'|'sixteenth'|'tolling'|'drone'|'creep'|'waltz'|'march'|'offbeat';
 type Shape='up'|'updown'|'mirror'|'rand'|'broken';
 interface Theme{
   bpm:number; root:number; scale:number[]; bar?:12|16;               // 16th-note steps per bar (12 = waltz / 6-8 feel)
@@ -18,7 +18,8 @@ const MIN=[0,2,3,5,7,8,10], DOR=[0,2,3,5,7,9,10], PHR=[0,1,3,5,7,8,10], PHD=[0,1
       LYD=[0,2,4,6,7,9,11], MIX=[0,2,4,5,7,9,10], MAJ=[0,2,4,5,7,9,11], LOC=[0,1,3,5,6,8,10], WHOLE=[0,2,4,6,8,10,11];
 
 /* drum patterns: one char per 16th step. k=kick s=snare h=hat o=open hat r=rim t=tom .=rest */
-const DRUMS:Record<string,{k:string;s:string;h:string;t?:string}>={
+const DRUMS:Record<string,{k:string;s:string;h:string;t?:string;o?:string}>={
+  techno:{k:'x...x...x...x...',s:'....x.......x...',h:'x.x.x.x.x.x.x.x.',o:'..x...x...x...x.'},
   none:  {k:'................',s:'................',h:'................'},
   soft:  {k:'x.......x.......',s:'................',h:'..x...x...x...x.'},
   rock:  {k:'x.....x.x.......',s:'....x.......x...',h:'x.x.x.x.x.x.x.x.'},
@@ -34,7 +35,10 @@ const DRUMS:Record<string,{k:string;s:string;h:string;t?:string}>={
 };
 export const THEMES:Record<string,Theme>={
   /* ---- non-boss screens ---- */
-  title:  {bpm:62,root:50,scale:MIN,progs:[[0,5,3,4],[0,3,5,4]],drums:'none',bass:'none',arp:{rate:4,shape:'up',wave:'sine',oct:1},lead:{density:.55,wave:'sine'},pad:{wave:'sawtooth',lp:900,vol:.05},fx:['bells']},
+  /* the three calm screens are four-on-the-floor techno versions of the same dark-tarot palette */
+  title:  {bpm:126,root:50,scale:MIN,progs:[[0,5,3,4],[0,3,5,4]],drums:'techno',bass:'offbeat',arp:{rate:1,shape:'broken',wave:'sawtooth',oct:1},lead:{density:.6,wave:'square'},pad:{wave:'sawtooth',lp:1100,vol:.05},fx:['bells','stabs']},
+  hub:    {bpm:122,root:52,scale:DOR,progs:[[0,3,4,3],[0,5,3,4]],drums:'techno',bass:'offbeat',arp:{rate:2,shape:'updown',wave:'square',oct:2},lead:{density:.55,wave:'triangle'},pad:{wave:'triangle',lp:1500,vol:.06},fx:['stabs']},
+  camp:   {bpm:128,root:55,scale:MIX,progs:[[0,4,3,4],[0,3,0,4]],drums:'techno',bass:'offbeat',arp:{rate:1,shape:'up',wave:'sawtooth',oct:1},lead:{density:.65,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1300,vol:.045},fx:['stabs','wobble']},
   draw:   {bpm:84,root:52,scale:MIN,progs:[[0,3,5,2],[0,5,3,2]],drums:'none',bass:'walk',arp:{rate:2,shape:'updown',wave:'square',oct:1},lead:null,pad:{wave:'sawtooth',lp:900,vol:.05}},
   shop:   {bpm:100,root:55,scale:MIX,progs:[[0,3,4,3],[0,4,3,0]],drums:'soft',bass:'walk',arp:{rate:2,shape:'broken',wave:'triangle',oct:1},lead:{density:.6,wave:'triangle'},pad:{wave:'triangle',lp:1400,vol:.06}},
   reward: {bpm:92,root:57,scale:LYD,progs:[[0,4,1,4],[0,2,4,1]],drums:'none',bass:'walk',arp:{rate:4,shape:'updown',wave:'sine',oct:2},lead:{density:.7,wave:'triangle'},pad:{wave:'triangle',lp:1500,vol:.055},fx:['bells']},
@@ -100,6 +104,7 @@ function step(ac:BaseAudioContext,out:AudioNode,th:Theme,shift:number,rng:()=>nu
   if(fxOn('choir')&&s===0) pad(ac,out,t,[tri[0]+12,tri[2]+12],spb*bar,'sine',2400,.03);
   // bass (always on)
   switch(th.bass){
+    case 'offbeat': if(s%4===2) bassNote(ac,out,t,low+(s%half===half-2&&bi%2?7:0),spb*1.7,.15); break;
     case 'pulse': if(s%2===0) bassNote(ac,out,t,low+(s%half===half-2?7:0),spb*1.6,s%half===0?.16:.1); break;
     case 'walk': if(s%qtr===0) bassNote(ac,out,t,s%half===0?low:fifth,spb*qtr*.85,.12); break;
     case 'sixteenth': bassNote(ac,out,t,low+(s%4===3?12:0)+(s%8===6?7:0),spb*.9,s%4===0?.15:.09,fxOn('dist')||th.drums==='storm'); break;
@@ -114,6 +119,7 @@ function step(ac:BaseAudioContext,out:AudioNode,th:Theme,shift:number,rng:()=>nu
     if(c(D.k)==='x') kick(ac,out,t,.45);
     if(c(D.s)==='x') hit(ac,out,t,.15,1600,.13);
     if(c(D.h)==='x') hit(ac,out,t,.04,7500,E>=3?.05:.035);
+    if(D.o&&c(D.o)==='x') hit(ac,out,t,.11,6500,.05);
     if(D.t&&c(D.t)==='x') tom(ac,out,t,95+((n>>2)%3)*22,.3);
     if(fz&&s%2===1) hit(ac,out,t,.03,9000,.03); }
   else if(E===1&&!breakdown&&th.drums!=='none'&&s===0) kick(ac,out,t,.3);                  // a lone heartbeat at energy 1

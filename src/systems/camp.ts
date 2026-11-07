@@ -21,7 +21,7 @@ import { setMusic, sfx } from '../core/audio';
 const col=s=>EL[s.els[0]].c;
 const newOpts=()=>{ const d=BOSSES[S.stage], el=BOSS_EL[S.stage], types=Object.keys(TYPES).sort(()=>Math.random()-.5).slice(0,3), sec=ELITE_SECOND[S.stage]; return types.map(type=>sec?{type,els:[el,sec],tier:1}:{type,els:[el],tier:0}); };
 export function enterCamp(){
-  S.mode='pick'; S.camp=true; setMusic('shop',S.pos); muteBtn.hidden=false; spellBar.hidden=true; for(const id of ['bossname','omen','hint','call','intro']) $(id).hidden=true;
+  S.mode='pick'; S.camp=true; setMusic('camp',S.pos); muteBtn.hidden=false; spellBar.hidden=true; for(const id of ['bossname','omen','hint','call','intro']) $(id).hidden=true;
   G.camp={opts:newOpts(),claimed:false,sel:null,slot:null,panel:null,stock:makeStock(),rerolls:0,confirm:false,band:null,motes:[]};
   S.pendingOpts=G.camp.opts; ov.classList.add('camp-on'); render(); hotSave();
 }

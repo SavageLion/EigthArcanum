@@ -36,7 +36,7 @@ const stations=()=>{ const wb=wallB(), my=G.H*.40; return [
 const tileAt=(T,tx,ty)=>T[((tx*7+ty*13)>>4)%5===0?(tx>>4)%16:[0,1,8,10,13][((tx>>4)+(ty>>4))%5]];
 
 export function enterHub(){
-  setMusic('reward',0); S.mode='hub'; S.hub=true; S.mod=null; S.orbit=S.fo=S.open=S.side=false; S.paused=false; S.t=0; sideEnd(); eventsEnd(); oaEnd();
+  setMusic('hub',0); S.mode='hub'; S.hub=true; S.mod=null; S.orbit=S.fo=S.open=S.side=false; S.paused=false; S.t=0; sideEnd(); eventsEnd(); oaEnd();
   G.fo=null; G.pull=null; G.B=undefined; G.bolts=[]; G.shots=[]; G.rings=[]; G.cols=[]; G.parts=[]; G.seeds=[]; G.beams=[]; G.helpers=[]; G.bands=[]; G.traps=[]; G.hits=[]; G.pillars=[]; G.stick=null; G.stickV={x:0,y:0};
   G.P=newPlayer(meta.lastWizard||'raven'); G.P.x=HUBW/2; G.P.y=G.H*.56; G.P.face='south';
   G.hub={t:0,near:null,hold:0,lock:false,motes:Array.from({length:22},(_,i)=>({x:rnd(0,HUBW),y:rnd(0,G.H),v:rnd(4,14),p:rnd(0,6)}))};

@@ -69,7 +69,7 @@ export const sfx={
 };
 
 /* ---------- music: one looping track at a time, crossfaded ---------- */
-export type MusicKey='title'|'draw'|'shop'|'reward'|'battle'|'elite'|'victory'|'defeat';
+export type MusicKey='title'|'hub'|'camp'|'draw'|'shop'|'reward'|'battle'|'elite'|'victory'|'defeat';
 let cur:HTMLAudioElement|null=null, curKey:MusicKey|null=null, wanted:MusicKey|null=null, curSeed=0, wantedSeed=0, started=false, wantedEnergy=2, wantedArena='chariot';
 const musicVol=()=>(man.volume?.music??.5);
 function fade(a:HTMLAudioElement,to:number,ms:number,then?:()=>void){
