@@ -13,6 +13,7 @@ import { bossFrames, loadSprites } from './render/sprites';
 import { foPlan } from './systems/bossPlans';
 import { castSpell, syncSpells } from './systems/casting';
 import { CY, GOODS, OMENS, RI, RO, WANDS } from './systems/deck';
+import * as _rn from './systems/runner';
 import * as _rs from './systems/runnerSpells';
 import { buy, foDodge, foJump, foSlide, forgeOptions, leaveShop, nextBoss, openShop, showShop, showTitle, takeSpell } from './systems/faceoff';
 import { quickPull, showDraw, startRun, turnCard, updateDraw } from './systems/flow';
@@ -45,4 +46,4 @@ import './data/newBosses'
 import './data/newBosses64';
 import * as _score from './core/score';
 import * as _meta from './data/meta';
-window.__arcana={G,SPELLS:_rs.SPELLS,meta:_meta,score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,showLoot,lootOrShop,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foJump,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,showShop,openShop,leaveShop,buy,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,takeSpell,forgeOptions,castSpell,spellName,spellCost,nextBoss,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};
+window.__arcana={G,foDebugSpawn:_rn.foDebugSpawn,SPELLS:_rs.SPELLS,meta:_meta,score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,showLoot,lootOrShop,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foJump,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,showShop,openShop,leaveShop,buy,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,takeSpell,forgeOptions,castSpell,spellName,spellCost,nextBoss,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};

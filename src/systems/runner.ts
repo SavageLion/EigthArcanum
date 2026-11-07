@@ -26,7 +26,7 @@ const S_=d=>F/(F+d), X=(lx,d)=>cx+lx*S_(d), Y=(d,h=0)=>hz()+(gy()-hz())*S_(d)-h*
 const lerp=(a,b,t)=>a+(b-a)*t;
 export const FO_LANES=[95,200,305];
 /** hazard kinds: y0..y1 is the height band each occupies, so jumping clears 'low' and 'shard', sliding clears 'high' and 'orb', and 'block' needs a lane change */
-const KIND={ low:{y0:0,y1:44,hw:30}, high:{y0:62,y1:110,hw:30}, block:{y0:0,y1:150,hw:32}, orb:{y0:48,y1:100,hw:24}, shard:{y0:0,y1:38,hw:22} };
+const KIND={ low:{y0:0,y1:44,hw:30}, high:{y0:62,y1:110,hw:30}, block:{y0:0,y1:150,hw:32}, orb:{y0:48,y1:100,hw:24}, shard:{y0:0,y1:38,hw:22}, pick:{y0:20,y1:90,hw:30} };
 
 /* ---------- sprite prep: crop to the opaque box so feet and centre anchor exactly ---------- */
 const prepCache=new WeakMap();
@@ -73,16 +73,35 @@ function add(k,lane,extra={}){ const fl=flavour(); G.fo.obs.push({k,lane,lx:(lan
 function castFx(){ G.B.atkAt=performance.now()/1000; for(let i=0;i<10;i++) G.fo.parts.push({x:cx+rnd(-18,18),y:hz()+rnd(-6,14),vx:rnd(-30,30),vy:rnd(10,60),life:rnd(.3,.7),t:0,c:G.B.color,r:1.5}); }
 const orbOf=()=>{ const sh=S.stage===63?FINAL_ORBS[Math.floor(Math.random()*FINAL_ORBS.length)]:(SPELLS[S.stage]||SPELLS[0])[0], m=MOTION[sh]||MOTION.fireball; return {shape:sh,spd:m.spd,wa:m.wa,wf:m.wf}; };
 const lowOf=()=>({shape:S.stage===63?['ring','flame','shard','boulder'][Math.floor(Math.random()*4)]:(SPELLS[S.stage]||SPELLS[0])[1]});
+/* Patterns: each is a list of hazards with a distance offset, so a "wall" fills all three lanes (only a jump or a slide gets you through) and
+   sequences ask for a rhythm. spawn() returns how long the pattern is, so the next one starts after it has passed. */
+const ALL=[0,1,2], pick1=()=>Math.floor(rnd(0,3));
+const PATTERNS={
+  single(){ const k=['low','low','high','block'][Math.floor(Math.random()*4)], n=k==='block'?1:(Math.random()<.4?2:1); shuffle([...ALL]).slice(0,n).forEach(l=>add(k,l)); return 0; },
+  wallJump(){ ALL.forEach(l=>add('low',l)); return 0; },                                         // full-width barrier: jump it
+  wallSlide(){ ALL.forEach(l=>add('high',l)); return 0; },                                       // full-width hanging blades: slide under
+  stagger(){ const o=Math.random()<.5?[0,1,2]:[2,1,0]; o.forEach((l,i)=>add('low',l,{d:1500+i*170})); return 340; },   // a diagonal line of barriers
+  slalom(){ let l=pick1(); for(let i=0;i<3;i++){ add('block',l,{d:1500+i*300}); l=(l+1+Math.floor(rnd(0,2)))%3; } return 600; },
+  gate(){ const open=pick1(); ALL.filter(l=>l!==open).forEach(l=>add('block',l)); add('high',open); return 0; },      // slide through the one gap
+  rhythm(){ ALL.forEach(l=>add('low',l)); ALL.forEach(l=>add('high',l,{d:1900})); return 400; },                     // jump, then slide
+  rhythm2(){ ALL.forEach(l=>add('high',l)); ALL.forEach(l=>add('low',l,{d:1900})); return 400; },                     // slide, then jump
+  aimed(){ castFx(); add('orb',clamp(G.fo.lane,0,2),orbOf()); if(G.B.enraged||(G.B.def&&G.B.def.elite)){ const o=shuffle([0,1,2].filter(l=>l!==G.fo.lane))[0]; add('orb',o,{...orbOf(),d:1650}); } return 150; },
+  shardMix(){ castFx(); const l=pick1(); add('shard',l,{...lowOf(),spd:300}); if(Math.random()<.6)add('orb',(l+1+Math.floor(rnd(0,2)))%3,{...orbOf(),d:1600}); return 100; },
+  volley(){ castFx(); const gap=pick1(); ALL.forEach((l,i)=>{ if(l!==gap)add('orb',l,{...orbOf(),d:1500+i*120}); else add('shard',l,{...lowOf(),spd:300,d:1500+i*120}); }); return 260; },   // two orbs and a ground spell
+  barrage(){ castFx(); const o=shuffle([...ALL]); o.forEach((l,i)=>{ if(i<2)add('orb',l,{...orbOf(),d:1500+i*260}); else add('shard',l,{...lowOf(),spd:300,d:1500+i*260}); }); return 520; },
+};
 function spawn(){
-  const fl=flavour(), enr=G.B.enraged, r=Math.random(), pl=clamp(G.fo.lane,0,2), elite=G.B.def&&G.B.def.elite;
-  const pObs=.46, pOrb=pObs+fl.orb*.34, pShard=1; // roughly: obstacles ~46%, orbs, then shards
-  if(r<pObs){
-    const q=Math.random();
-    if(q<.45){ const n=Math.random()<.4?2:1; shuffle([0,1,2]).slice(0,n).forEach(l=>add('low',l)); }
-    else if(q<.75){ const open=Math.floor(rnd(0,3)); [0,1,2].filter(l=>l!==open).forEach(l=>add('block',l)); if(enr)add('low',open,{d:1750}); }
-    else { const n=Math.random()<.5?2:1; shuffle([0,1,2]).slice(0,n).forEach(l=>add('high',l)); }
-  } else if(r<pOrb){ castFx(); add('orb',pl,orbOf()); if(enr||elite){ const o=shuffle([0,1,2].filter(l=>l!==pl))[0]; add('orb',o,{...orbOf(),d:1650}); } }
-  else { castFx(); const l=Math.floor(rnd(0,3)); add('shard',l,{...lowOf(),spd:300}); if(Math.random()<.5)add('orb',(l+1+Math.floor(rnd(0,2)))%3,{...orbOf(),d:1600}); }
+  const fl=flavour(), enr=G.B.enraged, lvl=relPos(), spellW=.6+fl.orb;
+  const W_=[['single',30],['wallJump',13],['wallSlide',12],['aimed',20*spellW],['shardMix',11*spellW]];
+  if(lvl>=1)W_.push(['stagger',8]); if(lvl>=2)W_.push(['slalom',8],['gate',7]); if(lvl>=3||enr)W_.push(['volley',9*spellW]); if(lvl>=5||enr)W_.push(['rhythm',8],['rhythm2',6]); if(enr)W_.push(['barrage',9*spellW]);
+  let r=Math.random()*W_.reduce((s,w)=>s+w[1],0), name='single'; for(const w of W_){ r-=w[1]; if(r<=0){ name=w[0]; break; } }
+  G.fo.last=name; return PATTERNS[name]();
+}
+/** a row of mana wisps down one lane (or a heart when you are hurt): worth steering for, sometimes through danger */
+function spawnPickups(){
+  const f=G.fo, lane=pick1();
+  if(G.P.hp<G.P.max&&Math.random()<.35){ add('pick',lane,{sub:'heart',d:1500}); return; }
+  const arc=Math.random()<.35; for(let i=0;i<5;i++) add('pick',lane,{sub:'wisp',d:1500+i*95,arcH:arc?Math.sin(i/4*Math.PI)*55:0});
 }
 
 /* ---------- update ---------- */
@@ -93,10 +112,11 @@ export function foStep(dt){
   f.speed=sp; f.dist+=sp*dt; f.run+=dt*(8+sp/95);
   f.lx=lerp(f.lx,(f.lane-1)*LANE,Math.min(1,dt*14)); f.x=X(f.lx,0)*PX;
   if(f.h>0||f.vy!==0){ f.vy-=1800*dt; f.h+=f.vy*dt; if(f.h<=0){ f.h=0; f.vy=0; for(let i=0;i<5;i++)f.parts.push({x:X(f.lx,0)+rnd(-8,8),y:gy(),vx:rnd(-30,30),vy:rnd(-25,-5),life:.35,t:0,c:'#8a7aa8',r:1.5}); } }
-  if(f.slide>0)f.slide-=dt;
+  if(f.slide>0)f.slide-=dt; if(G.P.surge>0)G.P.surge-=dt;
   if(G.B.atk>0)G.B.atk-=dt;
   // spawn
-  f.spawnT-=dt; if(f.spawnT<=0){ spawn(); const e=G.B.enraged; f.spawnT=(rnd(e?.7:.95,e?1.0:1.35)-.012*relPos())/Math.max(.8,m); }
+  f.spawnT-=dt; if(f.spawnT<=0){ const span=spawn(), e=G.B.enraged; f.spawnT=((rnd(e?.7:.95,e?1.0:1.35)-.012*relPos())/Math.max(.8,m))+span/Math.max(200,sp); }
+  f.pickT=(f.pickT??5)-dt; if(f.pickT<=0){ f.pickT=rnd(6,10); spawnPickups(); }
   // my bolts: the usual auto-fire, aimed at the boss
   G.P.cast-=dt; if(G.P.cast<=0){ G.P.cast=rateNow()*(G.P.surge>0?.55:1); oaAim(); }
   for(const o of f.obs) o.d-=(sp+(o.spd||0)*m)*dt;
@@ -104,7 +124,9 @@ export function foStep(dt){
   for(const k of G.traps){ if(k.lane==null||k.arm>0||k.life<=0)continue; const o=f.obs.find(q=>(q.k==='orb'||q.k==='shard')&&q.lane===k.lane&&q.d<140&&q.d>-30); if(o){ o.gone=true; blowTrap(k,true); } }
   // collisions and grazes
   const px=f.lx, top=f.slide>0?42:112;
-  for(const o of f.obs){ if(o.hit||o.gone)continue; const K_=KIND[o.k], wob=o.wa?Math.sin(f.t*(o.wf||5)+o.seed)*o.wa:0;
+  for(const o of f.obs){ if(o.hit||o.gone)continue; const K_=KIND[o.k];
+    if(o.k==='pick'){ const hh=(o.arcH||0), y0=K_.y0+hh, y1=K_.y1+hh; if(Math.abs(o.d)<30&&Math.abs(o.lx-px)<K_.hw&&f.h<y1&&f.h+top>y0){ o.gone=true; burst(G.P.x,G.P.y-30,o.sub==='heart'?'#ff7a8a':'#7fc4ff',10); tone(o.sub==='heart'?880:760+Math.random()*120,.08,'triangle',.04); if(o.sub==='heart'){ G.P.hp=Math.min(G.P.max,G.P.hp+1); $('call').textContent='+1 heart'; $('call').style.color='#ff9aa8'; $('call').hidden=false; f.call=.6; } else { G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?6:0)); G.P.surge=Math.max(G.P.surge||0,1.2); } } continue; }
+    const wob=o.wa?Math.sin(f.t*(o.wf||5)+o.seed)*o.wa:0;
     if(Math.abs(o.d)<20){ if(Math.abs(o.lx+wob-px)<K_.hw+16 && f.h<K_.y1 && f.h+top>K_.y0){ o.hit=true;
         if(G.P.shield>0){ o.gone=true; burst(G.P.x,G.P.y,'#8fdcf0',14); sfx.block(); const w=G.P.shieldSpell; if(w&&Math.random()<.4)proc(w,G.P.shieldPw); }
         else { const was=G.P.hp; hurt(); if(G.P.hp<was){ $('call').textContent='Hit'; $('call').style.color='#ff9d94'; $('call').hidden=false; f.call=.5; } } } }
@@ -177,6 +199,7 @@ export function foBoss(c){
 function drawObs(c,o,t){
   const s=S_(o.d), wob=o.wa?Math.sin(t*(o.wf||5)+o.seed)*o.wa:0, ramp=(o.k==='orb'||o.k==='shard')?clamp((1500-o.d)/420,0,1):1, lx=lerp(0,o.lx+wob,ramp), x=X(lx,o.d), yb=Y(o.d,0), col=o.col||'#e86bd0', hi=lighten(col);
   if(o.hit)c.globalAlpha=.35;
+  if(o.k==='pick'){ const yy=yb-(55+(o.arcH||0)+Math.sin(t*5+o.d*.02)*3)*s, r=Math.max(2.5,10*s), pc=o.sub==='heart'?'#ff7a8a':'#7fc4ff'; c.fillStyle=hexA(pc,.28); c.beginPath(); c.arc(x,yy,r*2,0,6.3); c.fill(); c.fillStyle='#0b0814'; c.fillRect(x-r-1,yy-r-1,r*2+2,r*2+2); c.fillStyle=pc; if(o.sub==='heart'){ c.fillRect(x-r,yy-r*.7,r*.9,r*.9); c.fillRect(x+r*.1,yy-r*.7,r*.9,r*.9); c.fillRect(x-r*.8,yy-r*.2,r*1.6,r*1.1); c.fillRect(x-r*.3,yy+r*.7,r*.6,r*.5); } else { c.fillRect(x-r*.6,yy-r*.6,r*1.2,r*1.2); c.fillStyle='#fff'; c.fillRect(x-r*.2,yy-r*.2,Math.max(1,r*.4),Math.max(1,r*.4)); } c.globalAlpha=1; return; }
   const art=RUNNER_ART[G.fo.theme||'flag']&&RUNNER_ART[G.fo.theme||'flag'][o.k];
   if(art&&(o.k==='low'||o.k==='high'||o.k==='block')) drawObsSprite(c,o,art,x,yb,s,col);
   else if(o.k==='low'){ const w=58*s,h=40*s; c.fillStyle='#0b0814'; c.fillRect(x-w/2-1,yb-h-1,w+2,h+1); c.fillStyle='#6e5a8c'; c.fillRect(x-w/2,yb-h,w,h); c.fillStyle='#a58ccc'; c.fillRect(x-w/2,yb-h,w,Math.max(1,4*s)); c.fillStyle=col; for(let i=0;i<3;i++){ const rx=x-w/2+w*(.2+i*.3); c.fillRect(rx,yb-h*.7,Math.max(1,5*s),Math.max(2,18*s)); }
@@ -208,3 +231,4 @@ export function foPlayer(c,blink){
   });
 }
 export const foLaneX=lane=>X((lane-1)*LANE,0)*PX, foBodyY=()=>(gy()-50)*PX;
+export const foDebugSpawn=name=>name==='pickups'?spawnPickups():PATTERNS[name]();
