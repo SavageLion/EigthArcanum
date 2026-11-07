@@ -1,0 +1,213 @@
+<title>Mirror Witch Runner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap">
+<style>
+/* Concept: a dark vaulted corridor. The wizard runs toward a boss on the horizon, spells fly down the lanes at you.
+   Single committed look (night violet + mirror pink + gold), so every colour is set explicitly. */
+:root{
+  color-scheme:dark;
+  --ink:#120a1c; --ink-2:#1d1230; --gold:#dcb868; --bone:#f1e8d4; --pink:#e86bd0; --pink-hi:#ffc4f2;
+  --display:"Pixelify Sans","Courier New",monospace;
+}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--bone);overflow:hidden;font-family:var(--display);overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+#wrap{height:100%;display:flex;align-items:center;justify-content:center;background:var(--ink)}
+#stage{position:relative;height:100%;aspect-ratio:270/480;max-width:100%;touch-action:none}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated;background:var(--ink)}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;background:rgba(18,10,28,.72);padding:24px;box-sizing:border-box}
+.ov[hidden]{display:none}
+.ov h1{font-size:clamp(1.7rem,8vw,2.3rem);margin:0;font-weight:700;line-height:1.05;text-wrap:balance}
+.ov p{margin:0;font-size:1.05rem;line-height:1.25;color:#d8cbb3;max-width:24ch}
+.keys{display:grid;grid-template-columns:auto auto;gap:4px 14px;font-size:1rem;color:var(--gold);text-align:left;margin:4px 0}
+.go{appearance:none;border:3px solid var(--gold);background:var(--gold);color:#2a1a0a;font:700 1.25rem var(--display);padding:10px 26px;cursor:pointer;box-shadow:4px 4px 0 #0b0814}
+.go:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #0b0814}
+.go:focus-visible{outline:3px solid var(--pink-hi);outline-offset:3px}
+</style>
+<div id="wrap"><div id="stage">
+  <canvas id="c" width="270" height="480" aria-label="Boss run: a wizard runs down a three-lane corridor toward the Mirror Witch"></canvas>
+  <div class="ov" id="start">
+    <h1>Mirror Witch</h1>
+    <p>Run at her. Her spells fly down the lanes. Your bolts fire on their own.</p>
+    <div class="keys"><span>Swipe left / right</span><span>change lane</span><span>Swipe up or tap</span><span>jump</span><span>Swipe down</span><span>slide</span></div>
+    <button class="go" id="go1">Run</button>
+  </div>
+  <div class="ov" id="end" hidden><h1 id="endt"></h1><p id="endp"></p><button class="go" id="go2">Run again</button></div>
+</div></div>
+<script>
+const ASSETS=/*ASSETS*/;
+(()=>{
+const W=270,H=480,cx=W/2,hz=Math.round(H*.27),gy=Math.round(H*.86),F=190,LANE=78,BOSSD=1500;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
+const BOSS_COL='#e86bd0', BOSS_HI='#ffc4f2';
+const rnd=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), lerp=(a,b,t)=>a+(b-a)*t;
+const S=d=>F/(F+d), X=(lx,d)=>cx+lx*S(d), Y=(d,h=0)=>hz+(gy-hz)*S(d)-h*S(d);
+
+/* ---------- assets: crop every sprite to its opaque box so feet/centre anchoring is exact ---------- */
+function load(src){ return new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.src=src; }); }
+function prep(img){ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const g=c.getContext('2d',{willReadFrequently:true}); g.drawImage(img,0,0);
+  const d=g.getImageData(0,0,c.width,c.height).data; let x0=c.width,y0=c.height,x1=0,y1=0; for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++) if(d[(y*c.width+x)*4+3]>40){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  const w=x1-x0+1,h=y1-y0+1, o=document.createElement('canvas'); o.width=w; o.height=h; o.getContext('2d').drawImage(c,x0,y0,w,h,0,0,w,h);
+  const wt=document.createElement('canvas'); wt.width=w; wt.height=h; const wg=wt.getContext('2d'); wg.drawImage(o,0,0); wg.globalCompositeOperation='source-in'; wg.fillStyle='#fff'; wg.fillRect(0,0,w,h);
+  return {img:o,white:wt,w,h}; }
+let IMG={};
+async function boot(){
+  try{ await document.fonts.load('16px "Pixelify Sans"'); }catch(e){}
+  const L=async a=>Promise.all(a.map(load));
+  const [bi,ba,wz]=await Promise.all([L(ASSETS.bossIdle),L(ASSETS.bossAtk),L(ASSETS.wizWalk)]);
+  IMG.bossIdle=bi.map(prep); IMG.bossAtk=ba.map(prep); IMG.wiz=wz.map(prep);
+  document.getElementById('go1').disabled=false;
+}
+
+/* ---------- state ---------- */
+let P,B,obs,bolts,parts,dist,speed,t,spawnT,shake,flash,state='ready',lastT=0,fireT=0,deadT=0;
+const keys={};
+function reset(){
+  P={lane:1,lx:0,h:0,vy:0,slide:0,hp:3,inv:0,run:0};
+  B={hp:160,max:160,atk:0,hit:0,t:0,castT:1.2,dead:0};
+  obs=[]; bolts=[]; parts=[]; dist=0; speed=380; t=0; spawnT=1.6; shake=0; flash=0; fireT=0; deadT=0; state='run';
+}
+const lanes=[0,1,2];
+const shuffle=a=>{ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+/* hazard kinds: y0..y1 is the height band it occupies, so jumping clears 'low', sliding clears 'high' and 'orb', and 'block' needs a lane change */
+const KIND={ low:{y0:0,y1:44,hw:30}, high:{y0:62,y1:110,hw:30}, block:{y0:0,y1:150,hw:32}, orb:{y0:48,y1:100,hw:24}, shard:{y0:0,y1:38,hw:22} };
+function add(k,lane,extra={}){ obs.push({k,lane,lx:(lane-1)*LANE,d:1500,spd:0,seed:Math.random()*9,...extra}); }
+function cast(){ B.atk=.5; for(let i=0;i<10;i++) parts.push({x:cx+rnd(-18,18),y:hz+rnd(-6,14),vx:rnd(-30,30),vy:rnd(10,60),life:rnd(.3,.7),t:0,c:Math.random()<.5?BOSS_COL:BOSS_HI,r:1.5}); }
+function spawn(){
+  const enr=B.hp<B.max*.5, r=Math.random(), pl=Math.round(P.lx/LANE)+1;
+  if(r<.25){ const n=Math.random()<.4?2:1; shuffle([0,1,2]).slice(0,n).forEach(l=>add('low',l)); }
+  else if(r<.40){ const open=Math.floor(rnd(0,3)); lanes.filter(l=>l!==open).forEach(l=>add('block',l)); if(enr)add('low',open,{d:1750}); }
+  else if(r<.54){ const n=Math.random()<.5?2:1; shuffle([0,1,2]).slice(0,n).forEach(l=>add('high',l)); }
+  else if(r<.80){ cast(); add('orb',clamp(pl,0,2),{spd:240,wob:true}); if(enr){ const o=shuffle([0,1,2].filter(l=>l!==pl))[0]; add('orb',o,{spd:240,wob:true,d:1650}); } }
+  else { cast(); const l=Math.floor(rnd(0,3)); add('shard',l,{spd:300}); if(Math.random()<.5)add('orb',(l+1+Math.floor(rnd(0,2)))%3,{spd:240,wob:true,d:1600}); }
+}
+
+/* ---------- input ---------- */
+function jump(){ if(P.h<=0.5&&state==='run'){ P.vy=560; P.slide=0; tone(520,.07); } }
+function slide(){ if(state!=='run')return; if(P.h>0.5){ P.vy=-700; } P.slide=.7; tone(280,.08); }
+function move(d){ if(state!=='run')return; P.lane=clamp(P.lane+d,0,2); tone(380+d*40,.05); }
+addEventListener('keydown',e=>{ if(e.repeat)return; const k=e.key; if(k==='ArrowLeft'||k==='a')move(-1); else if(k==='ArrowRight'||k==='d')move(1); else if(k==='ArrowUp'||k==='w'||k===' ')jump(); else if(k==='ArrowDown'||k==='s')slide(); else return; e.preventDefault(); });
+let ptr=null;
+const stage=document.getElementById('stage');
+stage.addEventListener('pointerdown',e=>{ if(e.target.closest('.go'))return; ptr={x:e.clientX,y:e.clientY,done:false,t:performance.now()}; try{stage.setPointerCapture(e.pointerId)}catch(_){} });
+stage.addEventListener('pointermove',e=>{ if(!ptr||ptr.done)return; const dx=e.clientX-ptr.x, dy=e.clientY-ptr.y; if(Math.hypot(dx,dy)<26)return; ptr.done=true; if(Math.abs(dx)>Math.abs(dy))move(dx>0?1:-1); else if(dy<0)jump(); else slide(); });
+stage.addEventListener('pointerup',e=>{ if(ptr&&!ptr.done&&performance.now()-ptr.t<260)jump(); ptr=null; });
+stage.addEventListener('pointercancel',()=>{ptr=null;});
+
+/* ---------- sound: tiny synth, started by the first button press ---------- */
+let AC=null; const tone=(f,d,type='square',v=.04)=>{ if(!AC)return; try{ const o=AC.createOscillator(),g=AC.createGain(); o.type=type; o.frequency.value=f; g.gain.value=v; g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d); o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+d); }catch(e){} };
+
+/* ---------- update ---------- */
+function update(dt){
+  t+=dt; if(state==='run'||state==='won'||state==='lost'){
+    if(state==='run'){ dist+=speed*dt; speed=380+Math.min(160,t*3)+(B.hp<B.max*.5?40:0); } else { dist+=speed*dt*.25; }
+  }
+  P.run+=dt*(state==='run'?(9+speed/90):2);
+  P.lx=lerp(P.lx,(P.lane-1)*LANE,Math.min(1,dt*14));
+  if(P.h>0||P.vy!==0){ P.vy-=1800*dt; P.h+=P.vy*dt; if(P.h<=0){ P.h=0; P.vy=0; for(let i=0;i<5;i++)parts.push({x:X(P.lx,0)+rnd(-8,8),y:gy,vx:rnd(-30,30),vy:rnd(-25,-5),life:.35,t:0,c:'#8a7aa8',r:1.5}); } }
+  if(P.slide>0)P.slide-=dt; if(P.inv>0)P.inv-=dt;
+  B.t+=dt; if(B.atk>0)B.atk-=dt; if(B.hit>0)B.hit-=dt;
+  if(state==='run'){
+    B.castT-=dt; spawnT-=dt;
+    if(spawnT<=0){ spawn(); const enr=B.hp<B.max*.5; spawnT=rnd(enr?.7:.9,enr?1.0:1.3); }
+    fireT-=dt; if(fireT<=0){ fireT=.26; bolts.push({d:30,lx:P.lx}); tone(900,.03,'triangle',.02); }
+  }
+  for(const o of obs){ o.d-=(speed+(o.spd||0))*dt; }
+  for(const b of bolts){ b.d+=1800*dt; if(b.d>=BOSSD-30&&!b.dead){ b.dead=true; if(state==='run'){ B.hp-=1; B.hit=.05; parts.push({x:cx+rnd(-30,30),y:hz+rnd(-20,30),vx:rnd(-40,40),vy:rnd(-40,20),life:.3,t:0,c:'#ffe9a8',r:1.5}); if(B.hp<=0)win(); } } }
+  bolts=bolts.filter(b=>!b.dead);
+  // collisions
+  if(state==='run') for(const o of obs){ if(o.hit||Math.abs(o.d)>20)continue; const K=KIND[o.k], wob=o.wob?Math.sin(t*5+o.seed)*14:0; if(Math.abs(o.lx+wob-P.lx)>K.hw+16)continue;
+    const top=P.slide>0?42:112; if(P.h<K.y1&&P.h+top>K.y0){ o.hit=true; hurt(); } }
+  obs=obs.filter(o=>o.d>-60&&!o.gone);
+  for(const p of parts){ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; } parts=parts.filter(p=>p.t<p.life);
+  if(state==='run'&&P.h===0&&Math.random()<dt*14)parts.push({x:X(P.lx,0)+rnd(-8,8),y:gy-1,vx:rnd(-20,20),vy:rnd(-14,-2),life:.3,t:0,c:'#6c5d88',r:1});
+  shake=Math.max(0,shake-dt*30); flash=Math.max(0,flash-dt);
+  if(state!=='run'&&state!=='ready'){ deadT+=dt; if(deadT>1.4&&document.getElementById('end').hidden)showEnd(); }
+}
+function hurt(){ if(P.inv>0)return; P.hp--; P.inv=1.3; shake=7; flash=.3; tone(150,.25,'sawtooth',.06); for(let i=0;i<14;i++)parts.push({x:X(P.lx,0),y:gy-40,vx:rnd(-90,90),vy:rnd(-90,30),life:.5,t:0,c:'#ff7a6e',r:2}); if(P.hp<=0){ state='lost'; deadT=0; } }
+function win(){ state='won'; deadT=0; B.dead=1; shake=10; for(let i=0;i<60;i++)parts.push({x:cx+rnd(-30,30),y:hz+rnd(-20,30),vx:rnd(-160,160),vy:rnd(-160,120),life:rnd(.5,1.3),t:0,c:Math.random()<.5?BOSS_COL:BOSS_HI,r:rnd(1.5,3)}); tone(660,.3,'triangle'); }
+function showEnd(){ const e=document.getElementById('end'); document.getElementById('endt').textContent=state==='won'?'Mirror Witch shattered':'You fell in the corridor'; document.getElementById('endp').textContent=state==='won'?`${3-P.hp===0?'Untouched.':`You took ${3-P.hp} hit${3-P.hp>1?'s':''}.`}`:`She had ${Math.max(0,Math.round(B.hp/B.max*100))}% left.`; e.hidden=false; }
+
+/* ---------- drawing ---------- */
+const mix=(a,b,t)=>{ const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)), A=p(a),Bc=p(b); return '#'+A.map((v,i)=>Math.round(lerp(v,Bc[i],t)).toString(16).padStart(2,'0')).join(''); };
+function drawSky(){
+  const g=ctx.createLinearGradient(0,0,0,hz+30); g.addColorStop(0,'#0c0716'); g.addColorStop(.7,'#1d1030'); g.addColorStop(1,'#3a1844'); ctx.fillStyle=g; ctx.fillRect(0,0,W,hz+30);
+  for(let i=0;i<46;i++){ const x=(i*97+13)%W, y=((i*53)%(hz-6))+2, tw=(Math.sin(t*2+i)+1)/2; ctx.globalAlpha=.25+tw*.6; ctx.fillStyle=i%7?'#e8e0f4':'#ffe9a8'; ctx.fillRect(x,y,1,1); }
+  ctx.globalAlpha=1;
+  const gl=ctx.createRadialGradient(cx,hz,4,cx,hz,120); gl.addColorStop(0,'rgba(232,107,208,.55)'); gl.addColorStop(1,'rgba(232,107,208,0)'); ctx.fillStyle=gl; ctx.fillRect(0,0,W,hz+60);
+}
+function drawFloor(){
+  for(let y=hz;y<H;y++){
+    const s=(y-hz)/(gy-hz); if(s<.012)continue; const d=F/s-F, z=d+dist, par=Math.floor(z/64)&1, rw=1.5*LANE*s;
+    ctx.fillStyle=par?'#150e22':'#1a1229'; ctx.fillRect(0,y,W,1);
+    ctx.fillStyle=par?'#2a2040':'#31264a'; ctx.fillRect(cx-rw,y,rw*2,1);
+    ctx.fillStyle='rgba(232,107,208,'+(.5*Math.min(1,s+.2)).toFixed(2)+')';
+    for(const k of [-1.5,-.5,.5,1.5]){ ctx.fillRect(Math.round(cx+k*LANE*s),y,k===1.5||k===-1.5?2:1,1); }
+  }
+  const fg=ctx.createLinearGradient(0,hz,0,hz+70); fg.addColorStop(0,'rgba(58,24,68,.95)'); fg.addColorStop(1,'rgba(58,24,68,0)'); ctx.fillStyle=fg; ctx.fillRect(0,hz,W,70);
+}
+function drawPillars(){
+  const gap=170, off=dist%gap;
+  for(let i=11;i>=0;i--){ const d=i*gap-off; if(d<-20)continue; const s=S(d), w=30*s, h=250*s, yb=Y(d,0);
+    for(const side of [-1,1]){ const x=cx+side*2.15*LANE*s-w/2; ctx.fillStyle='#241a38'; ctx.fillRect(x,yb-h,w,h); ctx.fillStyle='#3a2c55'; ctx.fillRect(x+(side>0?0:w-Math.max(1,3*s)),yb-h,Math.max(1,3*s),h); ctx.fillStyle='#0f0818'; ctx.fillRect(x-1,yb-h,1,h); ctx.fillRect(x+w,yb-h,1,h);
+      const fy=yb-h*.62, fl=Math.sin(t*9+i*3+side)*.5+.5; ctx.fillStyle='rgba(255,154,60,'+(.18+.1*fl).toFixed(2)+')'; ctx.beginPath(); ctx.arc(x+w/2,fy,Math.max(2,15*s),0,6.3); ctx.fill(); ctx.fillStyle=fl>.5?'#ffcf6e':'#f2a03d'; ctx.fillRect(x+w/2-Math.max(1,2*s),fy-Math.max(2,6*s),Math.max(2,4*s),Math.max(2,8*s)); }
+  }
+}
+function drawBoss(){
+  const idle=IMG.bossIdle, atk=IMG.bossAtk, casting=B.atk>0, fr=casting?atk[Math.min(atk.length-1,Math.floor((.5-B.atk)*atk.length/.5))]:idle[Math.floor(B.t*5)%idle.length];
+  const k=1.25, w=fr.w*k, h=fr.h*k, bx=cx, by=hz-h*.46+Math.sin(B.t*1.6)*3;
+  const gl=ctx.createRadialGradient(bx,by+h*.4,4,bx,by+h*.4,95); gl.addColorStop(0,'rgba(255,196,242,.35)'); gl.addColorStop(1,'rgba(232,107,208,0)'); ctx.fillStyle=gl; ctx.fillRect(bx-100,by-60,200,220);
+  if(B.dead){ ctx.globalAlpha=Math.max(0,1-deadT*.8); }
+  ctx.drawImage(fr.img,Math.round(bx-w/2),Math.round(by),w,h);
+  if(B.hit>0&&!B.dead){ ctx.globalAlpha=.5; ctx.drawImage(fr.white,Math.round(bx-w/2),Math.round(by),w,h); }
+  ctx.globalAlpha=1;
+}
+function drawObs(o){
+  const s=S(o.d), wob=o.wob?Math.sin(t*5+o.seed)*14:0, ramp=o.k==='orb'||o.k==='shard'?clamp((1500-o.d)/420,0,1):1, lx=lerp(0,o.lx+wob,ramp), x=X(lx,o.d), yb=Y(o.d,0), K=KIND[o.k];
+  if(o.hit){ ctx.globalAlpha=.35; }
+  if(o.k==='low'){ const w=58*s,h=40*s; ctx.fillStyle='#0b0814'; ctx.fillRect(x-w/2-1,yb-h-1,w+2,h+1); ctx.fillStyle='#6e5a8c'; ctx.fillRect(x-w/2,yb-h,w,h); ctx.fillStyle='#a58ccc'; ctx.fillRect(x-w/2,yb-h,w,Math.max(1,4*s)); ctx.fillStyle='#e86bd0'; for(let i=0;i<3;i++){ const rx=x-w/2+w*(.2+i*.3); ctx.fillRect(rx,yb-h*.7,Math.max(1,5*s),Math.max(2,18*s)); }
+    ctx.fillStyle='#cfd7e8'; for(let i=0;i<4;i++){ const sx=x-w/2+w*(i/4); ctx.beginPath(); ctx.moveTo(sx,yb-h); ctx.lineTo(sx+w/8,yb-h-12*s); ctx.lineTo(sx+w/4,yb-h); ctx.fill(); } }
+  else if(o.k==='high'){ const w=60*s, y0=yb-110*s, y1=yb-62*s; ctx.fillStyle='#0b0814'; ctx.fillRect(x-w/2-1,y0-1,w+2,y1-y0+2); const g=ctx.createLinearGradient(x-w/2,0,x+w/2,0); g.addColorStop(0,'#7a8fb5'); g.addColorStop(.5,'#e6f0ff'); g.addColorStop(1,'#7a8fb5'); ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(x-w/2,(y0+y1)/2); ctx.lineTo(x-w*.2,y0); ctx.lineTo(x+w*.2,y0); ctx.lineTo(x+w/2,(y0+y1)/2); ctx.lineTo(x+w*.2,y1); ctx.lineTo(x-w*.2,y1); ctx.fill(); ctx.fillStyle='rgba(232,107,208,.7)'; ctx.fillRect(x-w*.3,(y0+y1)/2-1,w*.6,Math.max(1,2*s)); ctx.fillStyle='#3a2c55'; ctx.fillRect(x-Math.max(1,2*s),yb-250*s,Math.max(2,4*s),(y0-(yb-250*s))); }
+  else if(o.k==='block'){ const w=62*s,h=140*s; ctx.fillStyle='#0b0814'; ctx.fillRect(x-w/2-1,yb-h-1,w+2,h+1); ctx.fillStyle='#4a3a6a'; ctx.fillRect(x-w/2,yb-h,w,h); ctx.fillStyle='#6a5891'; ctx.fillRect(x-w/2,yb-h,Math.max(2,8*s),h); ctx.fillStyle='#312447'; ctx.fillRect(x+w/2-Math.max(2,8*s),yb-h,Math.max(2,8*s),h);
+    ctx.fillStyle='rgba(232,107,208,.8)'; ctx.beginPath(); ctx.moveTo(x,yb-h*.78); ctx.lineTo(x+w*.16,yb-h*.55); ctx.lineTo(x,yb-h*.32); ctx.lineTo(x-w*.16,yb-h*.55); ctx.fill(); }
+  else if(o.k==='orb'){ const r=Math.max(3,26*s), y=yb-74*s, pulse=1+Math.sin(t*14+o.seed)*.12;
+    ctx.fillStyle='rgba(232,107,208,.28)'; ctx.beginPath(); ctx.arc(x,y,r*1.9*pulse,0,6.3); ctx.fill(); ctx.fillStyle='rgba(255,196,242,.45)'; ctx.beginPath(); ctx.arc(x,y,r*1.25,0,6.3); ctx.fill();
+    ctx.fillStyle='#e86bd0'; ctx.beginPath(); ctx.arc(x,y,r,0,6.3); ctx.fill(); ctx.fillStyle='#ffe3f8'; ctx.beginPath(); ctx.arc(x-r*.2,y-r*.2,r*.5,0,6.3); ctx.fill();
+    for(let i=0;i<4;i++){ const a=t*7+i*1.6+o.seed; ctx.fillStyle='#ffc4f2'; ctx.fillRect(x+Math.cos(a)*r*1.5,y+Math.sin(a)*r*1.5,Math.max(1,2*s),Math.max(1,2*s)); } }
+  else if(o.k==='shard'){ const w=44*s,h=52*s, y=yb-h*.5, spin=t*6+o.seed; ctx.fillStyle='rgba(143,220,240,.25)'; ctx.beginPath(); ctx.arc(x,y,w*.9,0,6.3); ctx.fill();
+    ctx.fillStyle='#0b0814'; ctx.beginPath(); ctx.moveTo(x,yb-h-1); ctx.lineTo(x+w*.5+1,yb-h*.35); ctx.lineTo(x+w*.25,yb+1); ctx.lineTo(x-w*.25,yb+1); ctx.lineTo(x-w*.5-1,yb-h*.35); ctx.fill();
+    ctx.fillStyle='#8fdcf0'; ctx.beginPath(); ctx.moveTo(x,yb-h); ctx.lineTo(x+w*.5,yb-h*.35); ctx.lineTo(x+w*.25,yb); ctx.lineTo(x-w*.25,yb); ctx.lineTo(x-w*.5,yb-h*.35); ctx.fill(); ctx.fillStyle='#e6fbff'; ctx.fillRect(x-w*.12+Math.sin(spin)*w*.12,yb-h*.85,Math.max(1,w*.14),h*.55); }
+  ctx.globalAlpha=1;
+}
+function drawBolts(){ for(const b of bolts){ const s=S(b.d), x=X(b.lx,b.d), y=Y(b.d,66); ctx.fillStyle='rgba(255,233,168,.35)'; ctx.beginPath(); ctx.arc(x,y,Math.max(2,6*s+1),0,6.3); ctx.fill(); ctx.fillStyle='#fff6d0'; ctx.fillRect(x-1,y-1,Math.max(2,3*s*1.5),Math.max(2,3*s*1.5)); } }
+function drawPlayer(){
+  const fr=IMG.wiz[Math.floor(P.run)%IMG.wiz.length], air=P.h>1, k=1.6, w=fr.w*k, h=fr.h*k*(P.slide>0?.58:1), x=X(P.lx,0), foot=gy-P.h, bob=air||state!=='run'?0:Math.abs(Math.sin(P.run*Math.PI/3))*2.2;
+  ctx.fillStyle='rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(x,gy+1,14-P.h*.08,4,0,0,6.3); ctx.fill();
+  if(P.inv>0&&Math.floor(t*16)%2)ctx.globalAlpha=.35;
+  ctx.save(); ctx.translate(x,foot-bob); if(P.slide>0)ctx.rotate(-.18); ctx.drawImage(fr.img,Math.round(-w/2),Math.round(-h),w,h); ctx.restore(); ctx.globalAlpha=1;
+}
+function drawHUD(){
+  // boss bar
+  const bw=190,bx=(W-bw)/2,by=14, f=Math.max(0,B.hp/B.max);
+  ctx.fillStyle='#0b0814'; ctx.fillRect(bx-3,by-3,bw+6,12); ctx.fillStyle='#dcb868'; ctx.fillRect(bx-2,by-2,bw+4,10); ctx.fillStyle='#1d1230'; ctx.fillRect(bx,by,bw,6); ctx.fillStyle=f>.5?'#e86bd0':'#ff7a6e'; ctx.fillRect(bx,by,bw*f,6); ctx.fillStyle='rgba(255,255,255,.35)'; ctx.fillRect(bx,by,bw*f,1);
+  ctx.font='700 11px "Pixelify Sans","Courier New",monospace'; ctx.textAlign='center'; ctx.fillStyle='#0b0814'; ctx.fillText('VII  The Mirror Witch',W/2+1,by+24); ctx.fillStyle='#f1e8d4'; ctx.fillText('VII  The Mirror Witch',W/2,by+23);
+  for(let i=0;i<3;i++){ const x=10+i*17, y=H-24, full=i<P.hp; ctx.fillStyle='#0b0814'; ctx.fillRect(x-1,y-1,15,13); ctx.fillStyle=full?'#ff6b86':'#3a2a4a'; ctx.fillRect(x,y,5,4); ctx.fillRect(x+8,y,5,4); ctx.fillRect(x,y+2,13,5); ctx.fillRect(x+2,y+7,9,2); ctx.fillRect(x+4,y+9,5,2); if(full){ ctx.fillStyle='#ffc4cf'; ctx.fillRect(x+1,y+1,2,2); } }
+}
+function frame(now){
+  const dt=Math.min(.05,(now-lastT)/1000||0); lastT=now;
+  if(state!=='ready')update(dt); else { t+=dt; dist+=120*dt; B&&(B.t+=dt); }
+  ctx.save(); if(shake>0)ctx.translate(Math.round(rnd(-shake,shake)*.4),Math.round(rnd(-shake,shake)*.4));
+  drawSky(); drawFloor(); drawPillars(); if(!B){ctx.restore(); requestAnimationFrame(frame); return;}
+  drawBoss();
+  const items=[...obs.map(o=>({d:o.d,f:()=>drawObs(o)})),...bolts.map(b=>({d:b.d,f:()=>{} }))].sort((a,b)=>b.d-a.d); for(const it of items)it.f();
+  drawBolts(); drawPlayer();
+  for(const p of parts){ ctx.globalAlpha=1-p.t/p.life; ctx.fillStyle=p.c; ctx.fillRect(Math.round(p.x),Math.round(p.y),p.r,p.r); } ctx.globalAlpha=1;
+  if(flash>0){ ctx.fillStyle='rgba(255,70,70,'+(flash*.9).toFixed(2)+')'; ctx.fillRect(0,0,W,H); }
+  const vg=ctx.createRadialGradient(cx,H*.55,H*.25,cx,H*.55,H*.75); vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(8,4,14,.55)'); ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  ctx.restore(); drawHUD();
+  requestAnimationFrame(frame);
+}
+function begin(){ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); AC.resume(); }catch(e){} document.getElementById('start').hidden=true; document.getElementById('end').hidden=true; reset(); }
+document.getElementById('go1').onclick=begin; document.getElementById('go2').onclick=begin;
+document.getElementById('go1').disabled=true;
+reset(); state='ready';
+boot().then(()=>requestAnimationFrame(frame));
+})();
+</script>
