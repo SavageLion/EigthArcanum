@@ -73,7 +73,7 @@ async function loadWizSets(){
   for(const id of ['ember','frost','bone','gambler']){
     const imgs=await Promise.all(DIRS.map(d=>loadImage(`wizard/sets/${id}/${d}.png`)));
     if(imgs.some(i=>!i)) continue;
-    const k=id==='ember'?1.35:1, dirs={}; DIRS.forEach((d,i)=>dirs[d]=analyse(k===1?imgs[i]:scaled(imgs[i],k)));
+    const k=id==='ember'?1:1, dirs={}; DIRS.forEach((d,i)=>dirs[d]=analyse(k===1?imgs[i]:scaled(imgs[i],k)));
     const N=DIRS.indexOf('north'), S0=DIRS.indexOf('south');
     WIZ_SETS[id]={dirs,back:analyse(scaled(imgs[N],1.4*k)),front:analyse(scaled(imgs[S0],1.4*k))};
   }
