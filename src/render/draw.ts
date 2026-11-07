@@ -2,6 +2,7 @@
 import { SPELL_ART } from './sprites';
 import { bulletArt, tintedArt } from '../systems/runnerSpells';
 import { drawHub } from '../systems/hub';
+import { drawCamp } from '../systems/camp';
 import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
 import { pickupDraw } from '../systems/arenaEvents';
 import { W, ctx, reduced } from '../core/dom';
@@ -113,6 +114,7 @@ export function draw(){
   const c=ctx; c.setTransform(R,0,0,R,0,0); c.imageSmoothingEnabled=false;
   c.fillStyle='#0b0814';c.fillRect(0,0,LW,G.LH);
   if(S.mode==='hub'){ drawHub(c); return; }
+  if(S.camp&&G.camp){ drawCamp(c); return; }
   if(S.shake>0) c.translate(Math.round(rnd(-S.shake,S.shake)*.2),Math.round(rnd(-S.shake,S.shake)*.2));
   if(isMod('hanged')&&S.mode!=='draw'){c.translate(0,G.LH);c.scale(1,-1);}
   c.drawImage(G.bg,0,0,LW,G.LH); drawArenaLayers(c,LW); vfxStep();

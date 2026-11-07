@@ -47,11 +47,11 @@ try {
       await page.evaluate(() => window.__arcana.damage(1e9));
       // click through whatever the game shows until the next fight (or victory) begins
       const trail = [];
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 20; i++) {
         await page.waitForTimeout(350);
         const mode = await page.evaluate(() => window.__arcana.S.mode);
         if (mode === 'fight' || mode === 'intro' || mode === 'victory') { trail.push(mode); break; }
-        const sel = ['#ov .card', '#ov #sell', '#ov .shoprow .buy', '#ov .go', '#ov button'];
+        const sel = ['#ov .optbtn', '#ov .rcard', '#ov #sellnew', '#ov #campnext', '#ov .card', '#ov #sell', '#ov .go', '#ov button'];   // the Camp: pick a reward, a slot, an option, then Next card (twice if something is left behind)
         let clicked = null;
         for (const q of sel) { const el = await page.$(q); if (el && await el.isVisible()) { await el.click({ timeout: 1000 }).catch(() => {}); clicked = q; break; } }
         trail.push(mode + (clicked ? '>' + clicked.replace('#ov ', '') : ''));

@@ -5,6 +5,7 @@ import { BOSSES, ELITE_SECOND } from '../data/bosses';
 import { hotSave } from '../main';
 import { sideEnd, sideStart } from './sideView';
 import { enterHub } from './hub';
+import { enterCamp } from './camp';
 import { resize } from '../core/size';
 import { eventsEnd, eventsStart } from './arenaEvents';
 import { FIST, LW, SPRITE_OVERRIDES, WIZ_SETS, blit, disc, makeBg } from '../render/sprites';
@@ -114,7 +115,9 @@ function cardHTML(s,i,label){
   const r=recipeOf(s);
   return `<button class="card${r?' secret':''}" data-i="${i}" style="--boss:${EL[s.els[0]].c}">${spellIcon(s)}<div class="txt">${label?`<small>${r?'Secret recipe · ':''}${label}</small>`:''}<b>${spellName(s)}</b><span>${spellDesc(s)}</span><em>${spellCost(s)} mana</em></div></button>`;
 }
-export function showPick(){
+export function showPick(){ enterCamp(); }
+/** the old stacked reward screens, kept for reference and for the test hooks */
+export function showPickOld(){
   const d=BOSSES[S.stage], el=BOSS_EL[S.stage]; S.mode='pick';
   const types=Object.keys(TYPES).sort(()=>Math.random()-.5).slice(0,3);
   const sec=ELITE_SECOND[S.stage]; const opts=types.map(type=>sec?{type,els:[el,sec],tier:1}:{type,els:[el],tier:0});
@@ -147,12 +150,13 @@ export function takeSpell(n){
   S.pendingFuse=opts;
 }
 export function nextBoss(){ G.P.spells.forEach(learnRecipe); sfx.pick(); S.mod=null; if(G.P.extraPick){G.P.extraPick=false;showPick();return;} lootOrShop(); }
-export function openShop(){ setMusic('shop',S.pos);
+export function makeStock(){
   const wands=shuffle(WANDS.filter(w=>w.id!==G.P.wand)).slice(0,2);
-  S.stock=[...wands.map(w=>({...w,icon:'wand',wand:true})),...shuffle(GOODS.filter(g=>g.ok())).slice(0,2)];
-  if(Math.random()<.4){ const pool=GEAR.filter(g=>!hasGear(g.id)); const g=pool[Math.floor(Math.random()*pool.length)]; if(g)S.stock.push({id:g.id,name:g.name,icon:g.slot,c:g.cursed?'#e0405a':'#dcb868',cost:g.value*2+10,desc:`${SLOT_LABEL[g.slot]}. ${g.desc}`,ok:()=>!hasGear(g.id),fx(){equip(g);}}); }
-  S.rerolls=0; showShop();
+  const stock=[...wands.map(w=>({...w,icon:'wand',wand:true})),...shuffle(GOODS.filter(g=>g.ok())).slice(0,2)];
+  if(Math.random()<.4){ const pool=GEAR.filter(g=>!hasGear(g.id)); const g=pool[Math.floor(Math.random()*pool.length)]; if(g)stock.push({id:g.id,name:g.name,icon:g.slot,c:g.cursed?'#e0405a':'#dcb868',cost:g.value*2+10,desc:`${SLOT_LABEL[g.slot]}. ${g.desc}`,ok:()=>!hasGear(g.id),fx(){equip(g);}}); }
+  return stock;
 }
+export function openShop(){ setMusic('shop',S.pos); S.stock=makeStock(); S.rerolls=0; showShop(); }
 export function leaveShop(){ S.pos++; showDraw(); }
 function rerollCost(){ return 5+5*S.rerolls; }
 export function showShop(){

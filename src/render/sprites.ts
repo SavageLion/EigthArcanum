@@ -65,7 +65,7 @@ const SPELL_NAMES=['fireball','crystal','bell','bolt','thorn','skull','eye','bub
 async function loadSpellArt(){ const im=await Promise.all(SPELL_NAMES.map(n=>loadImage(`runner/spells/${n}.png`))); SPELL_NAMES.forEach((n,i)=>{ if(im[i])SPELL_ART[n]=im[i]; }); }
 /** Pixel Lab props for the Sanctum (door, market stall, forge, banner) */
 export const HUB_ART:Record<string,HTMLImageElement>={};
-async function loadHubArt(){ const k=['door','market','forge','banner']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
+async function loadHubArt(){ const k=['door','market','forge','banner','campfire']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
 export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
 export const WIZ_SETS:Record<string,{dirs:Record<string,Sprite>,back:Sprite,front:Sprite}>={};
 function scaled(img:HTMLImageElement,k:number){ const c=mk(Math.round(img.width*k),Math.round(img.height*k)),g=c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(img,0,0,c.width,c.height); return c as any; }

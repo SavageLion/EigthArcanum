@@ -53,7 +53,8 @@ function check(){
   if(!meta.runs.includes(64)&&meta.counters.won[32]>0){ meta.runs.push(64); pending.push('Unlocked: the 64-boss run'); }
   saveMeta();
 }
-export function noteBoss(elite:boolean,clean:boolean){ meta.shards=(meta.shards||0)+(elite?3:1)+(clean?1:0); meta.counters.bosses++; if(elite)meta.counters.elites++; if(clean)meta.counters.clean++; check(); }
+export const gains={boss:0};   // shards from the boss just beaten, shown in the Camp
+export function noteBoss(elite:boolean,clean:boolean){ gains.boss=(elite?3:1)+(clean?1:0); meta.shards=(meta.shards||0)+gains.boss; meta.counters.bosses++; if(elite)meta.counters.elites++; if(clean)meta.counters.clean++; check(); }
 export function noteMimic(){ meta.counters.mimics++; check(); }
 export function noteChest(){ meta.counters.chests++; saveMeta(); }
 export function noteRunEnd(total:number,bossesBeaten:number,won:boolean){

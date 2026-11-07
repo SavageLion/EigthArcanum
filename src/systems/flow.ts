@@ -66,7 +66,7 @@ export function bossCardArt(d,stageIdx){
 function outline(img,col){ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const g=c.getContext('2d'); g.drawImage(img,0,0); g.globalCompositeOperation='source-in'; g.fillStyle=col; g.fillRect(0,0,c.width,c.height); return c; }
 
 export function showDraw(){
-  S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; S.side=false; sideEnd(); eventsEnd(); oaEnd(); S.arena=null; S.t=0;
+  S.mode='draw'; S.stage=S.order[S.pos]; S.mod=null; S.orbit=false; S.fo=false; S.open=false; S.side=false; S.camp=false; sideEnd(); eventsEnd(); oaEnd(); S.arena=null; S.t=0;
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
   setMusic('draw',S.pos); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);
