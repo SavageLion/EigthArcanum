@@ -6,18 +6,18 @@ Boss-rush roguelike on Canvas 2D. Vite + TypeScript, no game engine.
 npm install
 npm run dev        # dev server (reachable from your phone on the LAN)
 npm run build      # typecheck + production build into dist/
-npm run smoke      # build first; plays all 16 bosses x 4 arenas in headless Chrome, fails on any error
+npm run smoke      # build first; plays the first 16 bosses x 4 arenas in headless Chrome, fails on any error
 ```
 
 ## Layout
 - `index.html` – shell: canvas and overlay divs
 - `src/main.ts` – boot, game loop, `window.__arcana` test hook
 - `src/core/` – `dom` (canvas/overlay refs), `state` (shared state), `util`, `audio`, `input`, `size`
-- `src/data/bosses.ts` – the 16 boss definitions
+- `src/data/` – `bosses.ts` (the first 16 bosses and the run order), `newBosses.ts` (bosses 16-31), `newBosses64.ts` (bosses 32-63), `meta.ts` (saves, wizards, run lengths 8/16/32/64)
 - `src/systems/` – gameplay: `attacks` (bullet patterns), `bossPlans` (per-boss face-off/open-arena behaviour),
   `spells`, `casting`, `spellFx`, `gear` (gear + chests), `deck` (boss order, omens, wands, shop goods),
   `flow` (title, tarot draw, run start), `faceoff` (fight start/win/lose, reward, shop screens),
-  `openArena`, `sim` (damage + per-frame step)
+  `openArena`, `runner` + `runnerSpells` (the Justice arena), `sideView` (switched off platformer), `arenaEvents` (pickups, phase events), `sim` (damage + per-frame step)
 - `src/render/` – `pixel` (palette snapping), `bossArt` (procedural boss figures), `sprites` (sprite cache, overrides), `draw` (frame drawing)
 - `src/style.css` – all UI styling
 - `public/assets/` – shipped art (Pixel Lab output goes here); `art-source/` – prompts and sources, not shipped
@@ -51,3 +51,12 @@ The gameplay modules start with `// @ts-nocheck` (they were written untyped). Th
 ## Art
 `SPRITE_OVERRIDES` in `main.ts` is the slot for final sprites. Any boss or the wizard without an override
 falls back to the procedural art.
+
+## The four arenas
+- **The Chariot** (open field), **Wheel of Fortune** (orbit), **Strength** (pillared room): see `systems/sim.ts` and `systems/openArena.ts`.
+- **Justice = The Run** (`systems/runner.ts`): a three-lane perspective corridor. The player and boss keep proxy positions in world units that match their screen positions, so bolts, beams, shields and VFX from the other arenas still land correctly. The scene is drawn in a 270-wide space scaled into the 160-unit canvas.
+  - Hazards: low barriers (jump), hanging blades (slide), monoliths (change lane), flying spells (slide under or swap lane) and ground spells (jump). Patterns are listed in `PATTERNS`; some bosses have signature patterns (`SIG`).
+  - Art: obstacles and wall columns come from `public/assets/runner/<flag|ash|ice|moss>/`, spells from `public/assets/runner/spells/` (Pixel Lab; the coded shapes in `runnerSpells.ts` are the fallback). Boss spell shapes are listed per boss in `SPELLS`.
+  - Pickups: mana wisps, hearts, shields, magnets. Combo: grazes, passed obstacles and wisps add up and raise bolt damage.
+- `systems/sideView.ts` is a side-on platformer fight that is switched off (add its entry back to `ARENAS` in `flow.ts` to bring it back).
+- Testing: the wizard screen has "Unlock everything" and "Force arena" options. `prototypes/boss-runner.html` is the standalone runner test page (`node tools/build-runner.mjs`).

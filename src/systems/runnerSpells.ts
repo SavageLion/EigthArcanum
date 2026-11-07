@@ -21,13 +21,23 @@ export const MOTION={ fireball:{spd:240,wa:14,wf:5}, crystal:{spd:265,wa:8,wf:4}
 const PAL={ coin:['#e0b050','#ffe9a8'], skull:['#d9d3b8','#fffbe6'], card:['#f1e8d4','#ffffff'], bones:['#d9d3b8','#fffbe6'], boulder:['#6a5d78','#a89bb8'], sand:['#d8b878','#f4e2b0'], spikes:['#cfd7e8','#ffffff'], thorns:['#4a7a44','#9bd68a'] };
 export const palette=(shape,col,hi)=>PAL[shape]||[col,hi];
 
+import { SPELL_ART } from '../render/sprites';
 const T=6.2832;
+/** shapes that keep their own colours; everything else is tinted toward the boss's colour */
+const NATURAL=new Set(['coin','skull','card','bell','cog','note','g-bones','g-boulder','g-sand','g-spikes','g-thorns']);
+const SPIN={blade:5,thorn:2.5,star:2,cog:3};
+const tintCache={};
+function art(name,col){ const im=SPELL_ART[name]; if(!im)return null; if(NATURAL.has(name))return im; const k=name+col; if(tintCache[k])return tintCache[k]; const c=document.createElement('canvas'); c.width=im.width; c.height=im.height; const g=c.getContext('2d'); g.drawImage(im,0,0); g.globalCompositeOperation='source-atop'; g.fillStyle=rgba(col,.38); g.fillRect(0,0,c.width,c.height); return tintCache[k]=c; }
 const arc=(c,x,y,r)=>{ c.beginPath(); c.arc(x,y,Math.max(.5,r),0,T); };
 const poly=(c,pts)=>{ c.beginPath(); pts.forEach(([a,b],i)=>i?c.lineTo(a,b):c.moveTo(a,b)); c.closePath(); };
 const rgba=(h,a)=>{ const n=parseInt(h.slice(1,7),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; };
 
 /** flying spell, centred on (x,y) with radius r (already perspective-scaled) */
 export function drawOrb(c,shape,x,y,r,t,seed,col,hi){
+  const A=art(shape,col);
+  if(A){ const sz=r*3.1, sw=shape==='coin'||shape==='card'?Math.max(.15,Math.abs(Math.cos(t*(shape==='coin'?6:5)+seed))):1;
+    { const rr=r*2.1*(1+Math.sin(t*14+seed)*.08), g=c.createRadialGradient(x,y,1,x,y,rr); g.addColorStop(0,rgba(col,.4)); g.addColorStop(1,rgba(col,0)); c.fillStyle=g; c.beginPath(); c.arc(x,y,rr,0,T); c.fill(); }
+    c.save(); c.translate(x,y); if(SPIN[shape])c.rotate(t*SPIN[shape]+seed); c.scale(sw,1); c.drawImage(A,-sz/2,-sz/2,sz,sz); c.restore(); return; }
   const [m,h]=palette(shape,col,hi), glow=()=>{ c.fillStyle=rgba(m,.26); arc(c,x,y,r*1.9*(1+Math.sin(t*14+seed)*.1)); c.fill(); };
   switch(shape){
     case 'fireball': { for(let i=4;i>=1;i--){ c.fillStyle=rgba(i%2?m:h,.38-.07*i); arc(c,x+Math.sin(t*9+i+seed)*r*.25,y-i*r*.55,r*(1-.17*i)); c.fill(); }
@@ -53,6 +63,10 @@ export function drawOrb(c,shape,x,y,r,t,seed,col,hi){
 
 /** ground spell with its base on (x,yb); s = perspective scale. Jump it. */
 export function drawLow(c,shape,x,yb,s,t,seed,col,hi){
+  const G_=art('g-'+shape,col)||(shape==='cog'?art('cog',col):null);
+  if(G_&&shape!=='ring'){ const spin=shape==='boulder'||shape==='cog', w=(shape==='cog'?46:66)*s, h=(shape==='cog'?46:44)*s; c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x,yb,w*.45,h*.12,0,0,T); c.fill();
+    if(spin){ c.save(); c.translate(x,yb-h*.5); c.rotate(t*4+seed); c.drawImage(G_,-w/2,-h/2,w,h); c.restore(); } else c.drawImage(G_,x-w/2,yb-h,w,h); return; }
+  if(G_&&shape==='ring'){ const w=70*s, h=46*s, p=(t*2+seed)%1; c.globalAlpha=.8; c.drawImage(G_,x-w/2*(1+p*.1),yb-h*.75,w*(1+p*.1),h*.9); c.globalAlpha=1; return; }
   const [m,h]=palette(shape,col,hi), w=46*s, hh=44*s;
   switch(shape){
     case 'flame': { c.fillStyle=rgba(m,.28); c.beginPath(); c.ellipse(x,yb,w*.9,hh*.35,0,0,T); c.fill(); for(let i=0;i<4;i++){ const fx=x+(i-1.5)*w*.42, fl=Math.sin(t*10+i*2+seed)*.2+1, fh=hh*(.7+.3*((i*7)%3)/2)*fl; c.fillStyle=i%2?m:h; poly(c,[[fx-w*.22,yb],[fx+Math.sin(t*8+i)*w*.08,yb-fh],[fx+w*.22,yb]]); c.fill(); } c.fillStyle='#fff6d0'; poly(c,[[x-w*.1,yb],[x,yb-hh*.45],[x+w*.1,yb]]); c.fill(); break; }

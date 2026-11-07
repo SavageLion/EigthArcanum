@@ -14,6 +14,8 @@ import { BOSS_EL, EL } from './spells';
 import { FINAL_ORBS, MOTION, SPELLS, drawLow, drawOrb } from './runnerSpells';
 import { $, clamp, rnd } from '../core/util';
 import { sfx, tone } from '../core/audio';
+import { fxShield } from '../render/vfx';
+const buzz=p=>{ try{ if(navigator.vibrate)navigator.vibrate(p); }catch(e){} };
 
 /* The Runner (the "Justice" arena): you run down a three-lane corridor toward the boss on the horizon. Its spells fly down the lanes with no
    warning, and obstacles (low barriers, hanging blades, solid blocks) come with them. Jump, slide or change lane. Your bolts, spells and gear
@@ -27,6 +29,8 @@ const lerp=(a,b,t)=>a+(b-a)*t;
 export const FO_LANES=[95,200,305];
 /** hazard kinds: y0..y1 is the height band each occupies, so jumping clears 'low' and 'shard', sliding clears 'high' and 'orb', and 'block' needs a lane change */
 const KIND={ low:{y0:0,y1:44,hw:30}, high:{y0:62,y1:110,hw:30}, block:{y0:0,y1:150,hw:32}, orb:{y0:48,y1:100,hw:24}, shard:{y0:0,y1:38,hw:22}, pick:{y0:20,y1:90,hw:30} };
+/** boss signature patterns (weighted up for these bosses): gears keep a beat, singers sing a melody, bulls stampede, hives swarm, frost bosses draw ice lines */
+const SIG={9:'metronome',22:'metronome',37:'metronome',34:'melody',41:'melody',59:'melody',44:'melody',55:'stampede',3:'stampede',40:'stampede',10:'swarm',39:'swarm',48:'swarm',29:'swarm',18:'swarm',20:'swarm',1:'shardline',45:'shardline',60:'shardline',61:'shardline'};
 
 /* ---------- sprite prep: crop to the opaque box so feet and centre anchor exactly ---------- */
 const prepCache=new WeakMap();
@@ -62,14 +66,15 @@ const flavour=()=>{ const el=BOSS_EL[S.stage], seed=(S.stage*2654435761>>>0)%100
 
 /* ---------- input ---------- */
 export function foDodge(dir){ if(!S.fo||S.mode!=='fight'||!G.fo)return; const n=clamp(G.fo.lane+dir,0,2); if(n===G.fo.lane)return; G.fo.lane=n; G.fo.dodgedAt=G.B.t; tone(380+dir*40,.05,'square',.03); }
-export function foJump(){ const f=G.fo; if(!S.fo||S.mode!=='fight'||!f)return; if(f.h<=.5){ f.vy=560; f.slide=0; tone(520,.07,'square',.03); } }
-export function foSlide(){ const f=G.fo; if(!S.fo||S.mode!=='fight'||!f)return; if(f.h>.5)f.vy=-700; f.slide=.7; tone(280,.08,'square',.03); }
+export function foJump(){ const f=G.fo; if(!S.fo||S.mode!=='fight'||!f)return; if(f.h<=.5){ f.vy=560; f.slide=0; tone(520,.07,'square',.03); buzz(8); } }
+export function foSlide(){ const f=G.fo; if(!S.fo||S.mode!=='fight'||!f)return; if(f.h>.5)f.vy=-700; f.slide=.7; tone(280,.08,'square',.03); buzz(8); }
 /** nova in the runner: shatters every spell in flight (obstacles stay) */
 export function foFreeze(){ const f=G.fo; let n=0; f.obs=f.obs.filter(o=>{ if(o.k==='orb'||o.k==='shard'){ n++; burst(X(o.lx,o.d)*PX,Y(o.d,50)*PX,o.col,6); return false; } return true; }); f.call=.8; const e=$('call'); e.textContent=n?'Spells shattered!':'Nova'; e.style.color='#bfeaf2'; e.hidden=false; }
 
 /* ---------- spawning ---------- */
 const shuffle=a=>{ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 function add(k,lane,extra={}){ const fl=flavour(); G.fo.obs.push({k,lane,lx:(lane-1)*LANE,d:1500,spd:0,seed:Math.random()*9,col:k==='shard'?fl.spell:fl.col,...extra}); }
+function combo(n){ const f=G.fo; const before=f.combo||0; f.combo=before+n; if(Math.floor(f.combo/10)>Math.floor(before/10)){ if(G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+10); const e=$('call'); e.textContent='Combo x'+f.combo+'!'; e.style.color='#ffe9a8'; e.hidden=false; f.call=.8; tone(980,.12,'triangle',.05); } }
 function castFx(){ G.B.atkAt=performance.now()/1000; for(let i=0;i<10;i++) G.fo.parts.push({x:cx+rnd(-18,18),y:hz()+rnd(-6,14),vx:rnd(-30,30),vy:rnd(10,60),life:rnd(.3,.7),t:0,c:G.B.color,r:1.5}); }
 const orbOf=()=>{ const sh=S.stage===63?FINAL_ORBS[Math.floor(Math.random()*FINAL_ORBS.length)]:(SPELLS[S.stage]||SPELLS[0])[0], m=MOTION[sh]||MOTION.fireball; return {shape:sh,spd:m.spd,wa:m.wa,wf:m.wf}; };
 const lowOf=()=>({shape:S.stage===63?['ring','flame','shard','boulder'][Math.floor(Math.random()*4)]:(SPELLS[S.stage]||SPELLS[0])[1]});
@@ -88,11 +93,18 @@ const PATTERNS={
   aimed(){ castFx(); add('orb',clamp(G.fo.lane,0,2),orbOf()); if(G.B.enraged||(G.B.def&&G.B.def.elite)){ const o=shuffle([0,1,2].filter(l=>l!==G.fo.lane))[0]; add('orb',o,{...orbOf(),d:1650}); } return 150; },
   shardMix(){ castFx(); const l=pick1(); add('shard',l,{...lowOf(),spd:300}); if(Math.random()<.6)add('orb',(l+1+Math.floor(rnd(0,2)))%3,{...orbOf(),d:1600}); return 100; },
   volley(){ castFx(); const gap=pick1(); ALL.forEach((l,i)=>{ if(l!==gap)add('orb',l,{...orbOf(),d:1500+i*120}); else add('shard',l,{...lowOf(),spd:300,d:1500+i*120}); }); return 260; },   // two orbs and a ground spell
+  spellWall(){ castFx(); ALL.forEach(l=>add('shard',l,{...lowOf(),spd:120})); return 0; },                    // a wall of this boss's own ground spell: jump it
+  metronome(){ for(let i=0;i<3;i++) ALL.forEach(l=>add(i===1?'high':'low',l,{d:1500+i*280})); return 560; },     // jump, slide, jump in time
+  melody(){ castFx(); [0,1,2,1,0].forEach((l,i)=>add('orb',l,{...orbOf(),d:1500+i*150})); return 600; },
+  stampede(){ let gap=pick1(); for(let i=0;i<4;i++){ ALL.filter(l=>l!==gap).forEach(l=>add('block',l,{d:1500+i*230})); gap=clamp(gap+(Math.random()<.5?-1:1),0,2); } return 690; },
+  swarm(){ castFx(); for(let i=0;i<6;i++) add('orb',pick1(),{...orbOf(),d:1500+i*110}); return 550; },
+  shardline(){ castFx(); ALL.forEach(l=>add('shard',l,{...lowOf(),spd:300,d:1500+((l*2)%3)*130})); return 400; },
   barrage(){ castFx(); const o=shuffle([...ALL]); o.forEach((l,i)=>{ if(i<2)add('orb',l,{...orbOf(),d:1500+i*260}); else add('shard',l,{...lowOf(),spd:300,d:1500+i*260}); }); return 520; },
 };
 function spawn(){
   const fl=flavour(), enr=G.B.enraged, lvl=relPos(), spellW=.6+fl.orb;
   const W_=[['single',30],['wallJump',13],['wallSlide',12],['aimed',20*spellW],['shardMix',11*spellW]];
+  const sig=SIG[S.stage]; if(sig)W_.push([sig,18]); if(lvl>=1)W_.push(['spellWall',12*(.6+(1-fl.orb)+.3)]);
   if(lvl>=1)W_.push(['stagger',8]); if(lvl>=2)W_.push(['slalom',8],['gate',7]); if(lvl>=3||enr)W_.push(['volley',9*spellW]); if(lvl>=5||enr)W_.push(['rhythm',8],['rhythm2',6]); if(enr)W_.push(['barrage',9*spellW]);
   let r=Math.random()*W_.reduce((s,w)=>s+w[1],0), name='single'; for(const w of W_){ r-=w[1]; if(r<=0){ name=w[0]; break; } }
   G.fo.last=name; return PATTERNS[name]();
@@ -100,13 +112,18 @@ function spawn(){
 /** a row of mana wisps down one lane (or a heart when you are hurt): worth steering for, sometimes through danger */
 function spawnPickups(){
   const f=G.fo, lane=pick1();
-  if(G.P.hp<G.P.max&&Math.random()<.35){ add('pick',lane,{sub:'heart',d:1500}); return; }
+  const r=Math.random();
+  if(G.P.hp<G.P.max&&r<.3){ add('pick',lane,{sub:'heart',d:1500}); return; }
+  if(r<.42){ add('pick',lane,{sub:'shield',d:1500}); return; }
+  if(r<.54){ add('pick',lane,{sub:'magnet',d:1500}); return; }
   const arc=Math.random()<.35; for(let i=0;i<5;i++) add('pick',lane,{sub:'wisp',d:1500+i*95,arcH:arc?Math.sin(i/4*Math.PI)*55:0});
 }
 
 /* ---------- update ---------- */
 export function foStep(dt){
   const f=G.fo; if(!f||S.mode!=='fight')return;
+  if(G.B.enraged&&!f.enr){ f.enr=true; f.slow=.9; S.shake=reduced?0:10; S.flash=.25; buzz(180); const e=$('call'); e.textContent='ENRAGED'; e.style.color='#ff7a6e'; e.hidden=false; f.call=1.1; }
+  if(f.slow>0){ f.slow-=dt; dt*=.35; }
   f.t+=dt; if(f.call>0){ f.call-=dt; if(f.call<=0)$('call').hidden=true; } if(f.hint>0){ f.hint-=dt; if(f.hint<=0)$('hint').hidden=true; }
   const m=mod(), base=(320+14*relPos())*m, sp=base+(G.B.enraged?35:0);
   f.speed=sp; f.dist+=sp*dt; f.run+=dt*(8+sp/95);
@@ -118,19 +135,25 @@ export function foStep(dt){
   f.spawnT-=dt; if(f.spawnT<=0){ const span=spawn(), e=G.B.enraged; f.spawnT=((rnd(e?.7:.95,e?1.0:1.35)-.012*relPos())/Math.max(.8,m))+span/Math.max(200,sp); }
   f.pickT=(f.pickT??5)-dt; if(f.pickT<=0){ f.pickT=rnd(6,10); spawnPickups(); }
   // my bolts: the usual auto-fire, aimed at the boss
-  G.P.cast-=dt; if(G.P.cast<=0){ G.P.cast=rateNow()*(G.P.surge>0?.55:1); oaAim(); }
+  G.P.cast-=dt; if(G.P.cast<=0){ G.P.cast=rateNow()*(G.P.surge>0?.55:1); const sc=G.P.scale; G.P.scale=sc*(1+Math.min(.6,(f.combo||0)*.015)); oaAim(); G.P.scale=sc; }
   for(const o of f.obs) o.d-=(sp+(o.spd||0)*m)*dt;
   // runes (trap spells): destroy any spell that crosses their lane
   for(const k of G.traps){ if(k.lane==null||k.arm>0||k.life<=0)continue; const o=f.obs.find(q=>(q.k==='orb'||q.k==='shard')&&q.lane===k.lane&&q.d<140&&q.d>-30); if(o){ o.gone=true; blowTrap(k,true); } }
+  if(f.magnet>0){ f.magnet-=dt; for(const o of f.obs) if(o.k==='pick'&&o.sub!=='shield'&&o.sub!=='magnet'&&o.d<900) o.lx=lerp(o.lx,f.lx,Math.min(1,dt*4)); }
   // collisions and grazes
   const px=f.lx, top=f.slide>0?42:112;
   for(const o of f.obs){ if(o.hit||o.gone)continue; const K_=KIND[o.k];
-    if(o.k==='pick'){ const hh=(o.arcH||0), y0=K_.y0+hh, y1=K_.y1+hh; if(Math.abs(o.d)<30&&Math.abs(o.lx-px)<K_.hw&&f.h<y1&&f.h+top>y0){ o.gone=true; burst(G.P.x,G.P.y-30,o.sub==='heart'?'#ff7a8a':'#7fc4ff',10); tone(o.sub==='heart'?880:760+Math.random()*120,.08,'triangle',.04); if(o.sub==='heart'){ G.P.hp=Math.min(G.P.max,G.P.hp+1); $('call').textContent='+1 heart'; $('call').style.color='#ff9aa8'; $('call').hidden=false; f.call=.6; } else { G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?6:0)); G.P.surge=Math.max(G.P.surge||0,1.2); } } continue; }
+    if(o.k==='pick'){ const hh=(o.arcH||0), y0=K_.y0+hh, y1=K_.y1+hh; if(Math.abs(o.d)<30&&Math.abs(o.lx-px)<K_.hw&&f.h<y1&&f.h+top>y0){ o.gone=true; burst(G.P.x,G.P.y-30,o.sub==='heart'?'#ff7a8a':'#7fc4ff',10); tone(o.sub==='heart'?880:760+Math.random()*120,.08,'triangle',.04); buzz(10); const say=(tx,cl)=>{ $('call').textContent=tx; $('call').style.color=cl; $('call').hidden=false; f.call=.7; };
+      if(o.sub==='heart'){ G.P.hp=Math.min(G.P.max,G.P.hp+1); say('+1 heart','#ff9aa8'); combo(1); }
+      else if(o.sub==='shield'){ G.P.shield=Math.max(G.P.shield,4); G.P.shieldSpell=null; if(G.P.shieldFx)G.P.shieldFx.drop(); G.P.shieldFx=fxShield('#bfeaf2'); say('Shield','#bfeaf2'); }
+      else if(o.sub==='magnet'){ f.magnet=7; say('Magnet','#ffb0a0'); }
+      else { combo(1); G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?6:0)); G.P.surge=Math.max(G.P.surge||0,1.2); } } continue; }
     const wob=o.wa?Math.sin(f.t*(o.wf||5)+o.seed)*o.wa:0;
     if(Math.abs(o.d)<20){ if(Math.abs(o.lx+wob-px)<K_.hw+16 && f.h<K_.y1 && f.h+top>K_.y0){ o.hit=true;
         if(G.P.shield>0){ o.gone=true; burst(G.P.x,G.P.y,'#8fdcf0',14); sfx.block(); const w=G.P.shieldSpell; if(w&&Math.random()<.4)proc(w,G.P.shieldPw); }
-        else { const was=G.P.hp; hurt(); if(G.P.hp<was){ $('call').textContent='Hit'; $('call').style.color='#ff9d94'; $('call').hidden=false; f.call=.5; } } } }
-    if(!o.grazed&&o.d<-10&&(o.k==='orb'||o.k==='shard')){ o.grazed=true; if(!o.hit&&Math.abs(o.lx+wob-px)<K_.hw+16+LANE*.55){ nearMiss(); if(G.P.spells.length){ G.P.mana=Math.min(G.P.manaMax,G.P.mana+5); G.P.grazeGlow=.25; } } } }
+        else { const was=G.P.hp; hurt(); if(G.P.hp<was){ f.combo=0; $('call').textContent='Hit'; $('call').style.color='#ff9d94'; $('call').hidden=false; f.call=.5; } } } }
+    if(!o.grazed&&o.d<-10&&(o.k==='orb'||o.k==='shard')){ o.grazed=true; if(!o.hit&&Math.abs(o.lx+wob-px)<K_.hw+16+LANE*.55){ nearMiss(); combo(1); if(G.P.spells.length){ G.P.mana=Math.min(G.P.manaMax,G.P.mana+5); G.P.grazeGlow=.25; } } }
+    if(!o.passed&&o.d<-25&&(o.k==='low'||o.k==='high'||o.k==='block')){ o.passed=true; if(!o.hit)combo(1); } }
   f.obs=f.obs.filter(o=>o.d>-60&&!o.gone);
   for(const p of f.parts){ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; } f.parts=f.parts.filter(p=>p.t<p.life);
   if(f.h===0&&Math.random()<dt*14)f.parts.push({x:X(f.lx,0)+rnd(-8,8),y:gy()-1,vx:rnd(-20,20),vy:rnd(-14,-2),life:.3,t:0,c:'#6c5d88',r:1});
@@ -193,13 +216,16 @@ export function foBoss(c){
     if(G.B.chill>0){ c.globalAlpha=.3; c.drawImage(white(sprite.img),Math.round(bx-w/2),Math.round(by),w,h); c.globalAlpha=1; }
     // hazards, far to near
     const items=[...f.obs].sort((a,b)=>b.d-a.d); for(const o of items) drawObs(c,o,t);
+    if((f.combo||0)>=3){ c.font='700 15px "Pixelify Sans",monospace'; c.textAlign='center'; const pulse=1+Math.sin(t*8)*.04; c.save(); c.translate(cx,70); c.scale(pulse,pulse); c.fillStyle='#0b0814'; c.fillText('COMBO x'+f.combo,1,1); c.fillStyle='#ffe9a8'; c.fillText('COMBO x'+f.combo,0,0); c.restore(); }
     for(const q of f.parts){ c.globalAlpha=1-q.t/q.life; c.fillStyle=q.c; c.fillRect(Math.round(q.x),Math.round(q.y),q.r,q.r); } c.globalAlpha=1;
   });
 }
 function drawObs(c,o,t){
   const s=S_(o.d), wob=o.wa?Math.sin(t*(o.wf||5)+o.seed)*o.wa:0, ramp=(o.k==='orb'||o.k==='shard')?clamp((1500-o.d)/420,0,1):1, lx=lerp(0,o.lx+wob,ramp), x=X(lx,o.d), yb=Y(o.d,0), col=o.col||'#e86bd0', hi=lighten(col);
   if(o.hit)c.globalAlpha=.35;
-  if(o.k==='pick'){ const yy=yb-(55+(o.arcH||0)+Math.sin(t*5+o.d*.02)*3)*s, r=Math.max(2.5,10*s), pc=o.sub==='heart'?'#ff7a8a':'#7fc4ff'; c.fillStyle=hexA(pc,.28); c.beginPath(); c.arc(x,yy,r*2,0,6.3); c.fill(); c.fillStyle='#0b0814'; c.fillRect(x-r-1,yy-r-1,r*2+2,r*2+2); c.fillStyle=pc; if(o.sub==='heart'){ c.fillRect(x-r,yy-r*.7,r*.9,r*.9); c.fillRect(x+r*.1,yy-r*.7,r*.9,r*.9); c.fillRect(x-r*.8,yy-r*.2,r*1.6,r*1.1); c.fillRect(x-r*.3,yy+r*.7,r*.6,r*.5); } else { c.fillRect(x-r*.6,yy-r*.6,r*1.2,r*1.2); c.fillStyle='#fff'; c.fillRect(x-r*.2,yy-r*.2,Math.max(1,r*.4),Math.max(1,r*.4)); } c.globalAlpha=1; return; }
+  if(o.k==='pick'){ const yy=yb-(55+(o.arcH||0)+Math.sin(t*5+o.d*.02)*3)*s, r=Math.max(2.5,10*s), pc=o.sub==='heart'?'#ff7a8a':'#7fc4ff'; c.fillStyle=hexA(pc,.28); c.beginPath(); c.arc(x,yy,r*2,0,6.3); c.fill(); c.fillStyle='#0b0814'; c.fillRect(x-r-1,yy-r-1,r*2+2,r*2+2); c.fillStyle=pc; if(o.sub==='shield'){ c.fillStyle='#bfeaf2'; c.beginPath(); c.moveTo(x-r*.9,yy-r*.8); c.lineTo(x+r*.9,yy-r*.8); c.lineTo(x+r*.8,yy+r*.2); c.lineTo(x,yy+r*1.1); c.lineTo(x-r*.8,yy+r*.2); c.fill(); c.fillStyle='#4a7aa0'; c.fillRect(x-Math.max(.5,r*.12),yy-r*.5,Math.max(1,r*.24),r*1.1); }
+    else if(o.sub==='magnet'){ c.fillStyle='#ff7a6e'; c.fillRect(x-r*.9,yy-r*.9,r*.6,r*1.2); c.fillRect(x+r*.3,yy-r*.9,r*.6,r*1.2); c.fillRect(x-r*.9,yy+r*.2,r*1.8,r*.6); c.fillStyle='#e6f0ff'; c.fillRect(x-r*.9,yy-r*.9,r*.6,r*.4); c.fillRect(x+r*.3,yy-r*.9,r*.6,r*.4); }
+    else if(o.sub==='heart'){ c.fillRect(x-r,yy-r*.7,r*.9,r*.9); c.fillRect(x+r*.1,yy-r*.7,r*.9,r*.9); c.fillRect(x-r*.8,yy-r*.2,r*1.6,r*1.1); c.fillRect(x-r*.3,yy+r*.7,r*.6,r*.5); } else { c.fillRect(x-r*.6,yy-r*.6,r*1.2,r*1.2); c.fillStyle='#fff'; c.fillRect(x-r*.2,yy-r*.2,Math.max(1,r*.4),Math.max(1,r*.4)); } c.globalAlpha=1; return; }
   const art=RUNNER_ART[G.fo.theme||'flag']&&RUNNER_ART[G.fo.theme||'flag'][o.k];
   if(art&&(o.k==='low'||o.k==='high'||o.k==='block')) drawObsSprite(c,o,art,x,yb,s,col);
   else if(o.k==='low'){ const w=58*s,h=40*s; c.fillStyle='#0b0814'; c.fillRect(x-w/2-1,yb-h-1,w+2,h+1); c.fillStyle='#6e5a8c'; c.fillRect(x-w/2,yb-h,w,h); c.fillStyle='#a58ccc'; c.fillRect(x-w/2,yb-h,w,Math.max(1,4*s)); c.fillStyle=col; for(let i=0;i<3;i++){ const rx=x-w/2+w*(.2+i*.3); c.fillRect(rx,yb-h*.7,Math.max(1,5*s),Math.max(2,18*s)); }
@@ -221,12 +247,15 @@ function drawObsSprite(c,o,art,x,yb,s,col){
 }
 const lighten=h=>{ const n=parseInt(h.slice(1,7),16), r=n>>16&255,g=n>>8&255,b=n&255, m=v=>Math.round(v+(255-v)*.55).toString(16).padStart(2,'0'); return '#'+m(r)+m(g)+m(b); };
 /** the wizard seen from behind, running: drawn after the other world sprites so bolts leave from in front of it */
+const foot0=()=>gy();
 export function foPlayer(c,blink){
   if(!G.fo||!G.P)return; const f=G.fo, frames=wizFrames(), dead=S.mode==='dying'||S.mode==='dead', age=dead?(performance.now()/1000-(G.P.deathAt??performance.now()/1000)):0;
   const fr=frames[Math.floor(f.run)%frames.length], p=prep(fr), air=f.h>1, sliding=f.slide>0&&!dead;
   scene(c,()=>{
     const k=96/p.h, w=p.w*k, h=p.h*k*(sliding?.58:1), x=X(f.lx,0), foot=gy()-f.h, bob=air||S.mode!=='fight'||dead?0:Math.abs(Math.sin(f.run*Math.PI/3))*2.2;
+    { const gg=c.createRadialGradient(x,gy(),2,x,gy(),36); gg.addColorStop(0,'rgba(255,233,168,'+(.34+.08*Math.sin(S.t*6)).toFixed(2)+')'); gg.addColorStop(1,'rgba(255,233,168,0)'); c.fillStyle=gg; c.beginPath(); c.ellipse(x,gy()+1,36,11,0,0,6.3); c.fill(); }   // a soft pool of light marks your lane
     c.fillStyle='rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(x,gy()+1,14-f.h*.08,4,0,0,6.3); c.fill();
+    if(f.magnet>0){ c.strokeStyle='rgba(255,122,110,'+(.4+.3*Math.sin(S.t*10)).toFixed(2)+')'; c.lineWidth=1.5; c.beginPath(); c.ellipse(x,foot0()-40,46,56,0,0,6.3); c.stroke(); }
     if(blink)c.globalAlpha=.4; c.save(); c.translate(x,foot-bob); if(sliding)c.rotate(-.18); if(dead)c.rotate(Math.min(age*3.2,1.45)); c.drawImage(p.img,Math.round(-w/2),Math.round(-h),w,h); c.restore(); c.globalAlpha=1;
   });
 }
