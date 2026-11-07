@@ -16,7 +16,8 @@ import { ARENA_LIST, getTestArena, setTestArena, showDraw, startRun } from './fl
 import { gains, unlockEverything, RUN_LENGTHS, RUN_UNLOCK, WIZARDS, meta, noteBoss, noteRunEnd, takeUnlocks, wizardById } from '../data/meta';
 import { runAvailable } from '../data/bosses';
 import { codedWizardPortrait } from '../render/wizardArt';
-import { GEAR, SLOT_LABEL, equip, gearOf, hasGear, nearMiss, rateNow } from './gear';
+import { GEAR, SLOT_LABEL, equip, gearFx, gearOf, hasGear, nearMiss, pickGear, rateNow } from './gear';
+import { RARITY } from '../data/rarity';
 import { oaEnd, oaStart } from './openArena';
 import { burst, hurt } from './sim';
 import { blowTrap } from './spellFx';
@@ -43,7 +44,7 @@ export function startFight(){
   const hp=posHp(S.pos,total())*m*(S.orbit?1.6:S.fo?1.15:S.open?1.3:S.side?1.2:1);
   G.B={...d,def:d,rad:S.fo?105:(d.elite?56:46)*(S.side?.65:1),x:W/2,y:S.orbit?CY():150,max:hp,hp,t:0,tm:{},flash:0,burning:0,chill:0,enraged:false,ang:0,jump:3.5,bloomOuter:false};
   G.bolts=[];G.meteors=[];G.hits=[];G.shots=[];G.rings=[];G.cols=[];G.seeds=[];G.beams=[];G.parts=[];G.helpers=[];G.bands=[];
-  G.bg=makeBg(d); G.P.x=W/2;G.P.y=G.H-150;G.P.a=Math.PI/2;G.P.tr=RO;G.P.rr=RO;G.P.inv=0;G.P.shield=0;G.P.mana=G.P.spells.length?Math.round(G.P.manaMax/2):0;G.P.cd=0;G.P.cleanFight=true;G.P.moonUsed=false;G.P.beam=null;G.P.orbit=null;G.traps=[];S.chest=null;S.chestT=rnd(5,12);S.chestsLeft=(d.elite?1:0)+(Math.random()<.75?(Math.random()<.35?2:1):0);
+  G.bg=makeBg(d); G.P.x=W/2;G.P.y=G.H-150;G.P.a=Math.PI/2;G.P.tr=RO;G.P.rr=RO;G.P.inv=0;G.P.shield=0;G.P.mana=G.P.spells.length?Math.round(G.P.manaMax/2):0;G.P.cd=0;G.P.cleanFight=true;G.P.moonUsed=false;G.P.tearUsed=false;G.P.beam=null;G.P.orbit=null;G.traps=[];S.chest=null;S.chestT=rnd(5,12);S.chestsLeft=(d.elite?1:0)+(Math.random()<.75?(Math.random()<.35?2:1):0);
   if(S.fo)foStart(); else G.fo=null; $('hint').hidden=true; $('call').hidden=true; if(S.fo){ $('hint').textContent='Swipe to change lane, jump and slide'; $('hint').hidden=false; } if(S.open)oaStart(); else oaEnd(); if(S.side)sideStart(); else sideEnd(); eventsStart();
   if(isMod('sun'))G.P.hp=G.P.max;
   G.P.freeCast=hasPerk('wildfire')?1:0; if(hasPerk('grave')) G.helpers.push({a:0,life:14,d:2.2*G.P.scale,cd:.4,s:{els:[],type:'summon',tier:0},pw:G.P.scale,c:'#e9e3cb'});
@@ -62,7 +63,8 @@ export function win(){
   burst(G.B.x,G.B.y,G.B.color,70); burst(G.B.x,G.B.y,GOLD,40); fxExplosion(G.B.x,G.B.y,1.7); fxHeal(G.P.x,G.P.y+10,'heal'); S.shake=reduced?0:14; S.flash=.6; sfx.win();
   G.P.scale*=Math.pow(1.1,15/Math.max(1,total()-1)); noteBoss(!!BOSSES[S.stage].elite,G.P.cleanFight,S.stage); G.P.reward=fightReward(); G.P.gold+=G.P.reward.g;
   if(isMod('death')){G.P.hp=G.P.heldHp;G.P.extraPick=true;}
-  G.P.hp=Math.min(G.P.max,G.P.hp+(hasGear('bloodstone')?2:1)); S.chest=null; spellBar.hidden=true; $('omen').hidden=true;
+  if(BOSSES[S.stage].elite&&S.pos<total()-1){ const dg=pickGear({min:'uncommon'}); if(dg)G.P.loot.push(dg.id); }
+  G.P.hp=Math.min(G.P.max,G.P.hp+1+gearFx('winHeal')); S.chest=null; spellBar.hidden=true; $('omen').hidden=true;
   if(S.pos+1>S.best) saveBest(S.pos+1);
 }
 function saveBest(v){ S.best=v; try{localStorage.setItem('ea-best',String(v));}catch(e){} }
@@ -129,8 +131,8 @@ export function forgeOptions(n){
 }
 export function makeStock(){
   const wands=shuffle(WANDS.filter(w=>w.id!==G.P.wand)).slice(0,2);
-  const stock=[...wands.map(w=>({...w,icon:'wand',wand:true})),...shuffle(GOODS.filter(g=>g.ok())).slice(0,2)];
-  if(Math.random()<.4){ const pool=GEAR.filter(g=>!hasGear(g.id)); const g=pool[Math.floor(Math.random()*pool.length)]; if(g)stock.push({id:g.id,name:g.name,icon:g.slot,c:g.cursed?'#e0405a':'#dcb868',cost:g.value*2+10,desc:`${SLOT_LABEL[g.slot]}. ${g.desc}`,ok:()=>!hasGear(g.id),fx(){equip(g);}}); }
+  const stock=[...wands.map(w=>({...w,icon:'wand',wand:true,c:RARITY[w.rarity].c,desc:`${RARITY[w.rarity].name} wand. ${w.desc}`})),...shuffle(GOODS.filter(g=>g.ok())).slice(0,2)];
+  if(Math.random()<.45){ const g=pickGear(); if(g)stock.push({id:g.id,name:g.name,icon:g.slot,gear:true,c:RARITY[g.rarity].c,cost:g.value*2+10,desc:`${RARITY[g.rarity].name} ${SLOT_LABEL[g.slot].toLowerCase()}. ${g.desc}`,ok:()=>!hasGear(g.id),fx(){equip(g);}}); }
   return stock;
 }
 export function leaveShop(){ S.pos++; showDraw(); }

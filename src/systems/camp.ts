@@ -5,7 +5,8 @@ import { BOSSES, ELITE_SECOND } from '../data/bosses';
 import { gains } from '../data/meta';
 import { HUB_ART, LW, R, SPRITE_OVERRIDES, blitSprite, px } from '../render/sprites';
 import { drawWizard } from '../render/draw';
-import { equip, gearOf, SLOT_LABEL } from './gear';
+import { equip, gearOf, rarityTag, SLOT_LABEL } from './gear';
+import { RARITY } from '../data/rarity';
 import { WANDS, spellValue, total } from './deck';
 import { BOSS_EL, EL, TYPES, learnRecipe, spellCost, spellDesc, spellName } from './spells';
 import { forgeOptions, icon, leaveShop, makeStock, pixIcon, spellIcon } from './faceoff';
@@ -26,10 +27,10 @@ export function enterCamp(){
 }
 export function leaveCamp(){ S.camp=false; G.camp=null; ov.classList.remove('camp-on'); }
 
-const gearChip=(slot)=>{ const id=G.P.gear[slot], g=id&&gearOf(id); return `<button class="chip" data-panel="gear" title="${SLOT_LABEL[slot]}">${g?icon('gear_'+g.id,pixIcon(slot)):`<span class="empty">${SLOT_LABEL[slot][0]}</span>`}</button>`; };
+const gearChip=(slot)=>{ const id=G.P.gear[slot], g=id&&gearOf(id); return `<button class="chip" data-panel="gear" title="${SLOT_LABEL[slot]}"${g?` style="border-color:${RARITY[g.rarity].c}"`:''}>${g?icon('gear_'+g.id,pixIcon(slot)):`<span class="empty">${SLOT_LABEL[slot][0]}</span>`}</button>`; };
 function lootHTML(){
   const id=G.P.loot[0]; if(!id)return ''; const g=gearOf(id), old=G.P.gear[g.slot]&&gearOf(G.P.gear[g.slot]);
-  return `<div class="lootrow" style="--boss:${g.cursed?'#e0405a':'var(--gold)'}">${icon('gear_'+g.id,pixIcon(g.slot))}<div class="txt"><small>From the chest · ${SLOT_LABEL[g.slot]}</small><b>${g.name}</b><span>${g.desc}${old?` Replaces ${old.name}.`:''}</span></div><div class="lootbtns"><button class="go copt" id="wear">${old?`Swap +${old.value}`:'Wear'}</button><button class="ghost copt" id="sellg">Sell +${g.value}</button></div></div>`;
+  return `<div class="lootrow" style="--boss:${RARITY[g.rarity].c}">${icon('gear_'+g.id,pixIcon(g.slot))}<div class="txt"><small>From the chest · ${RARITY[g.rarity].name} ${SLOT_LABEL[g.slot]}</small><b style="color:${RARITY[g.rarity].c}">${g.name}</b><span>${g.desc}${old?` Replaces ${old.name}.`:''}</span></div><div class="lootbtns"><button class="go copt" id="wear">${old?`Swap +${old.value}`:'Wear'}</button><button class="ghost copt" id="sellg">Sell +${g.value}</button></div></div>`;
 }
 function detailHTML(){
   const C=G.camp, P=G.P;
@@ -50,8 +51,8 @@ function sheetHTML(){
       return `<button class="shoprow" data-i="${i}" style="--boss:${it.c}" ${can?'':'disabled'}>${icon(it.wand?'wand_'+it.id:'good_'+it.id,pixIcon(it.icon))}<div class="txt"><b>${it.name}</b><span>${it.desc}</span></div><em>${sold?'Sold':it.cost+' gold'}</em></button>`; };
     return `<div class="sheet"><div class="eyebrow">The merchant</div><div class="gold"><span class="coin"></span>${P.gold} gold</div><div class="cards">${C.stock.map(row).join('')}</div><div class="shopbtns"><button class="ghost" id="reroll" ${P.gold>=rc?'':'disabled'}>New stock · ${rc} gold</button><button class="go" id="closesheet">Back to camp</button></div></div>`; }
   const wd=P.wand&&WANDS.find(w=>w.id===P.wand);
-  const rows=['hat','robe','charm'].map(slot=>{ const g=P.gear[slot]&&gearOf(P.gear[slot]); return `<div class="shoprow" style="--boss:${g?(g.cursed?'#e0405a':'var(--gold)'):'var(--gold-dim)'}">${g?icon('gear_'+g.id,pixIcon(slot)):''}<div class="txt"><b>${SLOT_LABEL[slot]}: ${g?g.name:'empty'}</b><span>${g?g.desc:'Chests and the merchant sometimes have one.'}</span></div></div>`; });
-  rows.push(`<div class="shoprow" style="--boss:${wd?wd.c:'var(--gold-dim)'}">${wd?icon('wand_'+wd.id,pixIcon('wand')):''}<div class="txt"><b>Wand: ${wd?wd.name:'none'}</b><span>${wd?wd.desc:'The merchant sells wands.'}</span></div></div>`);
+  const rows=['hat','robe','charm'].map(slot=>{ const g=P.gear[slot]&&gearOf(P.gear[slot]); return `<div class="shoprow" style="--boss:${g?RARITY[g.rarity].c:'var(--gold-dim)'}">${g?icon('gear_'+g.id,pixIcon(slot)):''}<div class="txt"><b>${SLOT_LABEL[slot]}: ${g?g.name:'empty'} ${g?rarityTag(g):''}</b><span>${g?g.desc:'Chests and the merchant sometimes have one.'}</span></div></div>`; });
+  rows.push(`<div class="shoprow" style="--boss:${wd?RARITY[wd.rarity].c:'var(--gold-dim)'}">${wd?icon('wand_'+wd.id,pixIcon('wand')):''}<div class="txt"><b>Wand: ${wd?wd.name:'none'} ${wd?`<small class="rar" style="color:${RARITY[wd.rarity].c}">${RARITY[wd.rarity].name} Wand</small>`:''}</b><span>${wd?wd.desc:'The merchant sells wands.'}</span></div></div>`);
   return `<div class="sheet"><div class="eyebrow">The wardrobe</div><p class="muted">What you are wearing. New gear from chests is offered at the top of the camp.</p><div class="cards">${rows.join('')}</div><div class="shopbtns"><button class="go" id="closesheet">Back to camp</button></div></div>`;
 }
 function render(){

@@ -11,7 +11,8 @@ import { HUB_ART, K, LW, R, SPRITE_OVERRIDES, blitSprite, dirOf, makeBg, px } fr
 import { drawWizard } from '../render/draw';
 import { resize } from '../core/size';
 import { eventsEnd } from './arenaEvents';
-import { GEAR, SLOT_LABEL, gearOf } from './gear';
+import { GEAR, SLOT_LABEL, applyStats, gearOf, rarityTag } from './gear';
+import { RARITY, rankOf } from '../data/rarity';
 import { icon, pixIcon, show, showSetup } from './faceoff';
 import { oaEnd } from './openArena';
 import { sideEnd } from './sideView';
@@ -45,7 +46,7 @@ export function enterHub(){
 /** applies the permanent boosts and the forged loadout to a fresh run */
 export function applyHubBonuses(){
   const b=meta.boosts||{}; G.P.max+=b.heart||0; G.P.hp+=b.heart||0; G.P.gold+=15*(b.purse||0); G.P.manaMax+=10*(b.well||0);
-  for(const slot of ['hat','robe','charm']){ const id=meta.loadout&&meta.loadout[slot]; if(id&&meta.forge[slot]&&meta.owned.includes(id)){ G.P.gear[slot]=id; if(id==='crown'){ G.P.max=Math.max(1,G.P.max-1); G.P.hp=Math.min(G.P.hp,G.P.max); } } }
+  for(const slot of ['hat','robe','charm']){ const id=meta.loadout&&meta.loadout[slot]; if(id&&meta.forge[slot]&&meta.owned.includes(id)){ G.P.gear[slot]=id; applyStats(gearOf(id),1); } }
 }
 
 export function hubStep(dt){
@@ -78,9 +79,9 @@ function showForge(){
   const slots=['hat','robe','charm'];
   const sec=slot=>{
     if(!meta.forge[slot]){ const c=FORGE_COST[slot], can=(meta.shards||0)>=c; return `<div class="eyebrow">${SLOT_LABEL[slot]}</div><button class="shoprow" data-unlock="${slot}" style="--boss:#ff9a5a" ${can?'':'disabled'}><div class="wport" style="width:34px;height:34px;display:grid;place-items:center;font-size:1.2rem;color:#ff9a5a">🔒</div><div class="txt"><b>Unlock the ${SLOT_LABEL[slot].toLowerCase()} slot</b><span>Start every run wearing a ${SLOT_LABEL[slot].toLowerCase()} you have found before.</span></div><em>${c} ✦</em></button>`; }
-    const owned=GEAR.filter(g=>g.slot===slot&&meta.owned.includes(g.id)), cur=meta.loadout[slot];
+    const owned=GEAR.filter(g=>g.slot===slot&&meta.owned.includes(g.id)).sort((a,b)=>rankOf(b.rarity)-rankOf(a.rarity)), cur=meta.loadout[slot];
     const none=`<button class="shoprow" data-slot="${slot}" data-gear="" style="--boss:${!cur?'#ff9a5a':'var(--gold-dim)'}"><div class="wport" style="width:34px;height:34px"></div><div class="txt"><b>Nothing</b><span>Start with this slot empty.</span></div><em>${!cur?'Chosen':''}</em></button>`;
-    const rows=owned.map(g=>`<button class="shoprow" data-slot="${slot}" data-gear="${g.id}" style="--boss:${cur===g.id?'#ff9a5a':'var(--gold-dim)'}">${icon('gear_'+g.id,pixIcon(slot))}<div class="txt"><b>${g.name}</b><span>${g.desc}</span></div><em>${cur===g.id?'Chosen':''}</em></button>`).join('');
+    const rows=owned.map(g=>`<button class="shoprow" data-slot="${slot}" data-gear="${g.id}" style="--boss:${RARITY[g.rarity].c}">${icon('gear_'+g.id,pixIcon(slot))}<div class="txt"><b>${g.name} ${rarityTag(g)}</b><span>${g.desc}</span></div><em>${cur===g.id?'Chosen':''}</em></button>`).join('');
     return `<div class="eyebrow">${SLOT_LABEL[slot]}</div>${none}${rows||'<p class="muted">Gear you find in chests shows up here.</p>'}`;
   };
   show(`<div class="eyebrow">Forge · ${shardsTag()}</div><h2>The Arcane Forge</h2><p class="muted">Unlock a slot, then choose the gear you carry into every run. Gear you have worn before is kept here.</p><div class="shop">${slots.map(sec).join('')}</div><button class="go" id="hubback">Back to the Sanctum</button>`);

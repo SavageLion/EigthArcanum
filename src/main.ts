@@ -17,7 +17,8 @@ import * as _rn from './systems/runner';
 import * as _rs from './systems/runnerSpells';
 import { foDodge, foJump, foSlide, forgeOptions, leaveShop, showTitle } from './systems/faceoff';
 import { enterArena, quickPull, showDraw, startRun, turnCard, updateDraw } from './systems/flow';
-import { GEAR, chestLoot, equip, gearOf, nearMiss, rateNow, spawnChest } from './systems/gear';
+import { GEAR, applyStats, chestLoot, equip, gearFx, gearOf, nearMiss, pickGear, rateNow, spawnChest } from './systems/gear';
+import { RARITY } from './data/rarity';
 import { damage, hurt, step } from './systems/sim';
 import { foSlide as _foSlide } from './systems/faceoff';
 import { fightReward, posHp, relPos } from './systems/deck';
@@ -52,4 +53,4 @@ import './data/newBosses'
 import './data/newBosses64';
 import * as _score from './core/score';
 import * as _meta from './data/meta';
-window.__arcana={enterArena,foSlide:_foSlide,KEYS,hurt,nearMiss,rateNow,fightReward,posHp,relPos,lab:_lab,camp:_camp,G,foDebugSpawn:_rn.foDebugSpawn,SPELLS:_rs.SPELLS,meta:_meta,score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foJump,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,leaveShop,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,forgeOptions,castSpell,spellName,spellCost,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};
+window.__arcana={pickGear,gearFx,applyStats,RARITY,enterArena,foSlide:_foSlide,KEYS,hurt,nearMiss,rateNow,fightReward,posHp,relPos,lab:_lab,camp:_camp,G,foDebugSpawn:_rn.foDebugSpawn,SPELLS:_rs.SPELLS,meta:_meta,score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foJump,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,leaveShop,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,forgeOptions,castSpell,spellName,spellCost,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};

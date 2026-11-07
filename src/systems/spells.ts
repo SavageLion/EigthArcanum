@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { gearFx } from './gear';
 import { S } from '../core/state';
 import { hasWand, isMod } from './deck';
 
@@ -44,7 +45,7 @@ export function spellName(s){
   const base=r?r.name:[...s.els.slice(1).reverse().map(e=>EL[e].adj),EL[s.els[0]].noun,TYPES[s.type].label].join(' ');
   return roman?`${base} ${roman}`:base;
 }
-export const spellCost=s=>Math.round((TYPES[s.type].cost+7*(s.els.length-1)+4*s.tier)*(isMod('magician')?.5:1)*(hasWand('thrift')?.8:1));
+export const spellCost=s=>Math.round((TYPES[s.type].cost+7*(s.els.length-1)+4*s.tier)*(isMod('magician')?.5:1)*(hasWand('thrift')?.8:1)*(1-gearFx('cost')));
 export function spellDesc(s){
   const r=recipeOf(s); const tw=s.els.map(e=>EL[e].twist).join('. ');
   return `${TYPES[s.type].desc} ${tw}.${s.tier?` Power ${s.tier+1}.`:''}${r?` ${r.desc}`:''}`;

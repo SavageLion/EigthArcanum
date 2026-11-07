@@ -404,3 +404,7 @@ p{font-size:1.32rem;line-height:1.1}
 .lchip{appearance:none;background:#20142a;color:var(--bone);border:2px solid var(--c,var(--gold-dim));padding:2px 7px;font:inherit;font-size:.95rem;cursor:pointer;touch-action:manipulation}
 .lchip.on{background:var(--c,var(--gold));color:#140d1f}
 .tierbox{display:flex;gap:4px;align-items:center}
+
+/* item rarity */
+.rar{font-family:var(--body);font-weight:400;font-size:.85rem;margin-left:4px;letter-spacing:.03em}
+.camp .lootrow span{-webkit-line-clamp:2}

@@ -7,7 +7,7 @@ import { every } from './attacks';
 import { doCast, has, proc } from './casting';
 import { CY, ECHO, RI, RO, hasPerk, hasWand, isMod, relPos, toBoss, total } from './deck';
 import { die, foStep, showDead, showPick, showVictory, win } from './faceoff';
-import { chestSay, chestStep, hasGear, nearMiss, rateNow } from './gear';
+import { chestSay, chestStep, gearFx, hasGear, nearMiss, rateNow } from './gear';
 import { sideMove } from './sideView';
 import { labHit, labStep } from './lab';
 import { eventsStep } from './arenaEvents';
@@ -18,8 +18,8 @@ import { GOLD, TAU, clamp, rnd } from '../core/util';
 import { setMusicEnergy, sfx } from '../core/audio';
 
 /* ---------- damage and hits ---------- */
-export function damage(d){ if(!G.B||S.mode!=='fight')return; if(S.lab){ d*=(hasGear('crown')?1.4:1)*(isMod('tower')?1.5:(isMod('moon')||isMod('hanged'))?1.25:1); labHit(d); return; } 
-  if(hasGear('crown'))d*=1.4;
+export function damage(d){ if(!G.B||S.mode!=='fight')return; if(S.lab){ d*=(1+gearFx('dmg')+(hasGear('eclipse')&&G.P.hp<=1?.25:0))*(isMod('tower')?1.5:(isMod('moon')||isMod('hanged'))?1.25:1); labHit(d); return; } 
+  d*=1+gearFx('dmg')+(hasGear('eclipse')&&G.P.hp<=1?.25:0);
   G.B.hp-=d*(isMod('tower')?1.5:(isMod('moon')||isMod('hanged'))?1.25:1); if(d>=G.P.scale*3)G.B.flash=.05; if(G.B.hp<=0){G.B.hp=0;win();} }
 export function burst(x,y,c,n){ for(let i=0;i<n&&G.parts.length<320;i++){ const a=rnd(0,TAU),s=rnd(30,n>5?260:90); G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,c,life:rnd(.25,.8),t:0,r:rnd(1,3)}); } }
 function clearNear(r){ G.shots=G.shots.filter(s=>{ if(Math.hypot(s.x-G.P.x,s.y-G.P.y)<r){burst(s.x,s.y,GOLD,1);return false} return true; }); }
@@ -27,9 +27,14 @@ import { fxExplosion, fxImpact, fxShield, fxShieldHit } from '../render/vfx';
 export function hurt(){
   if(G.P.inv>0||S.mode!=='fight'||G.P.shield>0)return;
   if(!S.god&&hasGear('moon')&&!G.P.moonUsed){G.P.moonUsed=true;G.P.inv=1;burst(G.P.x,G.P.y,'#e6dcef',16);sfx.block();chestSay('Blocked by the locket','#e6dcef');return;}
+  if(!S.god&&hasGear('voidshroud')&&G.P.mana>=40){G.P.mana-=40;G.P.inv=1;burst(G.P.x,G.P.y,'#8a5cff',18);sfx.block();chestSay('The shroud drinks the blow','#b78cff');return;}
   if(S.god){S.hits++;G.P.inv=1.4;G.P.hurtAt=performance.now()/1000;return;}
-  G.P.hurtAt=performance.now()/1000; fxImpact(G.P.x,G.P.y,'#ff7a6e'); G.P.cleanFight=false; if(hasGear('blood'))G.P.mana=G.P.manaMax; G.P.hp-=isMod('tower')?2:1; if(hasWand('warding')&&G.P.hp>0){G.P.shield=2;G.P.shieldSpell=null; if(G.P.shieldFx)G.P.shieldFx.drop(); G.P.shieldFx=fxShield('#bfeaf2');} S.hits++; G.P.inv=1.5; S.shake=reduced?0:8; S.flash=.28; try{ if(navigator.vibrate)navigator.vibrate([30,20,50]); }catch(e){} sfx.hurt(); burst(G.P.x,G.P.y,'#ff7a6e',16); clearNear(90);
-  if(G.P.hp<=0) die();
+  G.P.hurtAt=performance.now()/1000; fxImpact(G.P.x,G.P.y,'#ff7a6e'); G.P.cleanFight=false; if(hasGear('blood'))G.P.mana=G.P.manaMax; G.P.hp-=isMod('tower')?2:1; if(hasWand('warding')&&G.P.hp>0){G.P.shield=2;G.P.shieldSpell=null; if(G.P.shieldFx)G.P.shieldFx.drop(); G.P.shieldFx=fxShield('#bfeaf2');} S.hits++; G.P.inv=1.5; if(hasGear('thornweave')){ for(let i=0;i<3;i++) G.seeds.push({x:G.P.x,y:G.P.y-14,vx:rnd(-170,170),vy:rnd(-220,-90),homing:true,d:3*G.P.scale,life:4}); } if(hasGear('frostmantle')&&G.B)G.B.chill=Math.max(G.B.chill,2); S.shake=reduced?0:8; S.flash=.28; try{ if(navigator.vibrate)navigator.vibrate([30,20,50]); }catch(e){} sfx.hurt(); burst(G.P.x,G.P.y,'#ff7a6e',16); clearNear(90);
+  if(G.P.hp<=0){
+    if(hasGear('phoenix')&&!G.P.phoenixUsed){ G.P.phoenixUsed=true; G.P.hp=2; G.P.inv=2.5; burst(G.P.x,G.P.y,'#ffb347',30); chestSay('Reborn from the ashes','#ffb347'); return; }
+    if(hasGear('tear')&&!G.P.tearUsed){ G.P.tearUsed=true; G.P.hp=1; G.P.inv=2; burst(G.P.x,G.P.y,'#fff2b0',20); chestSay("An angel's tear saves you",'#fff2b0'); return; }
+    die();
+  }
 }
 
 /* ---------- simulation ---------- */
@@ -58,7 +63,7 @@ export function step(dt){
     if(S.mode==='fight')beamStep(dt); eventsStep(dt);
     if(S.mode==='fight')trapStep(dt);
     if(S.mode==='fight')chestStep(dt);
-    G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?7*(isMod('star')||isMod('hermit')?2:1)*(hasGear('pilgrim')?1.4:1)*dt:0)); G.P.cd=Math.max(0,G.P.cd-dt); G.P.shield=Math.max(0,G.P.shield-dt); if(G.P.shield<=0&&G.P.shieldFx){G.P.shieldFx.drop();G.P.shieldFx=null;} G.B.chill=Math.max(0,G.B.chill-dt);
+    G.P.mana=Math.min(G.P.manaMax,G.P.mana+(G.P.spells.length?7*(isMod('star')||isMod('hermit')?2:1)*(1+gearFx('regen'))*dt:0)); G.P.cd=Math.max(0,G.P.cd-dt); G.P.shield=Math.max(0,G.P.shield-dt); if(G.P.shield<=0&&G.P.shieldFx){G.P.shieldFx.drop();G.P.shieldFx=null;} G.B.chill=Math.max(0,G.B.chill-dt);
     if(!S.fo)G.P.cast-=dt; if(S.open||S.side){ if((S.side||G.still>.1)&&G.P.cast<=0){G.P.cast=rateNow()*(G.P.surge>0?.55:1);oaAim();} } else if(!S.fo&&G.P.cast<=0){G.P.cast+=rateNow()*(G.P.surge>0?.55:1); if(!isMod('hermit')){ const n=hasWand('fork')?2:1; for(let i=0;i<n;i++){ const off=n>1?(i-.5)*14:0, crit=(hasWand('gambler')&&Math.random()<.15)||(hasPerk('lucky')&&Math.random()<.1), m=crit?5:1, wc=crit?'#f0a8d8':undefined, sx=G.P.x+off;
       if(S.orbit)G.bolts.push({x:sx,y:G.P.y,...toBoss(sx,G.P.y,620),d:G.P.scale*m*(G.P.tr===RI?1.5:1),r:crit?5:3,c:wc||'#ffe9a8',basic:true}); else G.bolts.push({x:sx,y:G.P.y-22,vy:-640,d:G.P.scale*m,r:crit?6:4,c:wc,basic:true}); } }}
     if(G.B.burning>0){G.B.burning-=dt;damage(5*G.P.scale*dt);}
@@ -69,7 +74,7 @@ export function step(dt){
     G.helpers=G.helpers.filter(h=>h.life>0);
   }
   const hurtR=G.P?G.P.hit:5;
-  for(const b of G.bolts){ if(b.basic&&hasWand('hunter')&&fighting){const v=toBoss(b.x,b.y,640);b.vx=(b.vx||0)+(v.vx-(b.vx||0))*Math.min(1,dt*7);} b.x+=(b.vx||0)*dt;b.y+=b.vy*dt; if(fighting&&Math.hypot(b.x-G.B.x,b.y-G.B.y)<G.B.rad+b.r){b.dead=true;if(b.spell||b.d>5)fxImpact(b.x,b.y,b.c||'#ffe9a8');if(b.basic&&hasWand('siphon')&&G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+1);damage(b.d);burst(b.x,b.y,b.c||G.B.color,b.spell?6:1); if(!b.spell&&G.hits&&G.hits.length<24)G.hits.push({x:b.x,y:b.y,t:0,life:.2,big:b.r>=5});if(b.spell&&Math.random()<(b.pc??1))proc(b.spell,b.pw);} if(b.y<-20||b.y>G.H+20||b.x<-20||b.x>W+20)b.dead=true; if(!b.dead&&G.pillars.length&&inPillar(b.x,b.y)){b.dead=true;burst(b.x,b.y,'#b5afc2',2);} }
+  for(const b of G.bolts){ if(b.basic&&hasWand('hunter')&&fighting){const v=toBoss(b.x,b.y,640);b.vx=(b.vx||0)+(v.vx-(b.vx||0))*Math.min(1,dt*7);} b.x+=(b.vx||0)*dt;b.y+=b.vy*dt; if(fighting&&Math.hypot(b.x-G.B.x,b.y-G.B.y)<G.B.rad+b.r){b.dead=true;if(b.spell||b.d>5)fxImpact(b.x,b.y,b.c||'#ffe9a8');if(b.basic&&hasWand('siphon')&&G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+1);damage(b.d*(b.basic&&hasGear('fang')&&((G.P.fangN=(G.P.fangN||0)+1)%5===0)?3:1));burst(b.x,b.y,b.c||G.B.color,b.spell?6:1); if(!b.spell&&G.hits&&G.hits.length<24)G.hits.push({x:b.x,y:b.y,t:0,life:.2,big:b.r>=5});if(b.spell&&Math.random()<(b.pc??1))proc(b.spell,b.pw);} if(b.y<-20||b.y>G.H+20||b.x<-20||b.x>W+20)b.dead=true; if(!b.dead&&G.pillars.length&&inPillar(b.x,b.y)){b.dead=true;burst(b.x,b.y,'#b5afc2',2);} }
   G.bolts=G.bolts.filter(b=>!b.dead);
   for(const s of G.seeds){
     if(s.recast){s.delay-=dt;if(s.delay<=0){s.dead=true;if(fighting)doCast(s.recast,.6);}continue;}

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { gearFx } from './gear';
 import { W } from '../core/dom';
 import { G, S } from '../core/state';
 import { BOSSES, boomerang, curtain, hands, mines, swarm } from '../data/bosses';
@@ -47,14 +48,14 @@ export const OMENS=[
  {id:'hanged',num:'XII',name:'The Hanged Man',desc:'The arena turns upside down. You deal 25% more damage.'}
 ];
 export const WANDS=[
- {id:'ash',name:'Ashwood Wand',c:'#f0813f',cost:35,desc:'Your bolts fire 25% faster.'},
- {id:'fork',name:'Forked Wand',c:'#f0dc55',cost:50,desc:'Fires two bolts at once.'},
- {id:'hunter',name:"Hunter's Wand",c:'#9dbb6a',cost:30,desc:'Your bolts curve toward the boss.'},
- {id:'siphon',name:'Siphon Wand',c:'#5aa8f0',cost:40,desc:'Each bolt that hits gives you 1 mana.'},
- {id:'gambler',name:"Gambler's Wand",c:'#f0a8d8',cost:40,desc:'Bolts have a 15% chance to deal five times the damage.'},
- {id:'thrift',name:'Thrifty Wand',c:'#8fdcf0',cost:30,desc:'Spells cost 20% less mana.'},
- {id:'warding',name:'Warding Wand',c:'#bfeaf2',cost:35,desc:'Taking a hit raises a shield for 2 seconds.'},
- {id:'greedy',name:'Greedy Wand',c:'#dcb868',cost:25,desc:'Earn 50% more gold after each fight.'}
+ {id:'ash',rarity:'uncommon',name:'Ashwood Wand',c:'#f0813f',cost:35,desc:'Your bolts fire 25% faster.'},
+ {id:'fork',rarity:'epic',name:'Forked Wand',c:'#f0dc55',cost:50,desc:'Fires two bolts at once.'},
+ {id:'hunter',rarity:'rare',name:"Hunter's Wand",c:'#9dbb6a',cost:30,desc:'Your bolts curve toward the boss.'},
+ {id:'siphon',rarity:'uncommon',name:'Siphon Wand',c:'#5aa8f0',cost:40,desc:'Each bolt that hits gives you 1 mana.'},
+ {id:'gambler',rarity:'rare',name:"Gambler's Wand",c:'#f0a8d8',cost:40,desc:'Bolts have a 15% chance to deal five times the damage.'},
+ {id:'thrift',rarity:'common',name:'Thrifty Wand',c:'#8fdcf0',cost:30,desc:'Spells cost 20% less mana.'},
+ {id:'warding',rarity:'rare',name:'Warding Wand',c:'#bfeaf2',cost:35,desc:'Taking a hit raises a shield for 2 seconds.'},
+ {id:'greedy',rarity:'uncommon',name:'Greedy Wand',c:'#dcb868',cost:25,desc:'Earn 50% more gold after each fight.'}
 ];
 export const hasWand=id=>G.P&&G.P.wand===id;
 export const GOODS=[
@@ -71,6 +72,8 @@ export function fightReward(){
   if(G.P.cleanFight){g+=10;parts.push('10 for no hits');if(hasGear('coin')){g+=15;parts.push('15 from your coin');}}
   if(['tower','death','moon','hanged'].some(isMod)){g+=8;parts.push('8 for the omen');}
   if(hasWand('greedy')){const x=Math.round(g*.5);g+=x;parts.push(`${x} from your wand`);}
+  const gm=gearFx('gold'); if(gm){ const x=Math.round(g*gm); g+=x; parts.push(`${x} from your gear`); }
+  const gf=gearFx('goldFlat'); if(gf){ g+=gf; parts.push(`${gf} from your gear`); }
   return {g,parts};
 }
 export function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
