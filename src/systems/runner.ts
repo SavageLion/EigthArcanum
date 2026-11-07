@@ -21,9 +21,9 @@ const buzz=p=>{ try{ if(navigator.vibrate)navigator.vibrate(p); }catch(e){} };
    warning, and obstacles (low barriers, hanging blades, solid blocks) come with them. Jump, slide or change lane. Your bolts, spells and gear
    work as in the other arenas: the player and boss keep "proxy" positions in world units that match where they appear on screen, so bolts,
    beams, shields and effects all land in the right place. The scene is drawn in a 270-unit-wide space (PS maps it to the 160-unit canvas). */
-const PS=LW/270, PX=PS/K;               // scene unit -> canvas unit, scene unit -> world unit
+const ps=()=>LW/270, px=()=>ps()/K;               // scene unit -> canvas unit, scene unit -> world unit (functions: LW is not initialised yet while the import cycle loads)
 const F=190, LANE=78, BOSSD=1500, HZ=.27, GY=.86;
-const sceneH=()=>G.LH/PS, hz=()=>Math.round(sceneH()*HZ), gy=()=>Math.round(sceneH()*GY), cx=135;
+const sceneH=()=>G.LH/ps(), hz=()=>Math.round(sceneH()*HZ), gy=()=>Math.round(sceneH()*GY), cx=135;
 const S_=d=>F/(F+d), X=(lx,d)=>cx+lx*S_(d), Y=(d,h=0)=>hz()+(gy()-hz())*S_(d)-h*S_(d);
 const lerp=(a,b,t)=>a+(b-a)*t;
 export const FO_LANES=[95,200,305];
@@ -58,7 +58,7 @@ export function foStart(){
   G.fo.theme=runTheme(); G.foHold=null; G.B.rad=70; syncProxies(); G.fo.hint=4;
 }
 function syncProxies(){
-  const f=G.fo; G.B.x=cx*PX; G.B.y=(hz()+4)*PX; G.P.x=X(f.lx,0)*PX; G.P.y=(gy()-f.h-50)*PX; G.fo.x=G.P.x;
+  const f=G.fo; G.B.x=cx*px(); G.B.y=(hz()+4)*px(); G.P.x=X(f.lx,0)*px(); G.P.y=(gy()-f.h-50)*px(); G.fo.x=G.P.x;
 }
 const mod=()=>{ const rp=.72+.03*relPos(); return (G.B.chill>0?.72:1)*(isMod('magician')?1.15:isMod('temperance')?.75:1)*(hasGearHourglass()?.9:1); };
 const hasGearHourglass=()=>G.P&&G.P.gear&&Object.values(G.P.gear).some(g=>g&&g.id==='hourglass');
@@ -69,7 +69,7 @@ export function foDodge(dir){ if(!S.fo||S.mode!=='fight'||!G.fo)return; const n=
 export function foJump(){ const f=G.fo; if(!S.fo||S.mode!=='fight'||!f)return; if(f.h<=.5){ f.vy=560; f.slide=0; tone(520,.07,'square',.03); buzz(8); } }
 export function foSlide(){ const f=G.fo; if(!S.fo||S.mode!=='fight'||!f)return; if(f.h>.5)f.vy=-700; f.slide=.7; tone(280,.08,'square',.03); buzz(8); }
 /** nova in the runner: shatters every spell in flight (obstacles stay) */
-export function foFreeze(){ const f=G.fo; let n=0; f.obs=f.obs.filter(o=>{ if(o.k==='orb'||o.k==='shard'){ n++; burst(X(o.lx,o.d)*PX,Y(o.d,50)*PX,o.col,6); return false; } return true; }); f.call=.8; const e=$('call'); e.textContent=n?'Spells shattered!':'Nova'; e.style.color='#bfeaf2'; e.hidden=false; }
+export function foFreeze(){ const f=G.fo; let n=0; f.obs=f.obs.filter(o=>{ if(o.k==='orb'||o.k==='shard'){ n++; burst(X(o.lx,o.d)*px(),Y(o.d,50)*px(),o.col,6); return false; } return true; }); f.call=.8; const e=$('call'); e.textContent=n?'Spells shattered!':'Nova'; e.style.color='#bfeaf2'; e.hidden=false; }
 
 /* ---------- spawning ---------- */
 const shuffle=a=>{ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
@@ -127,7 +127,7 @@ export function foStep(dt){
   f.t+=dt; if(f.call>0){ f.call-=dt; if(f.call<=0)$('call').hidden=true; } if(f.hint>0){ f.hint-=dt; if(f.hint<=0)$('hint').hidden=true; }
   const m=mod(), base=(320+14*relPos())*m, sp=base+(G.B.enraged?35:0);
   f.speed=sp; f.dist+=sp*dt; f.run+=dt*(8+sp/95);
-  f.lx=lerp(f.lx,(f.lane-1)*LANE,Math.min(1,dt*14)); f.x=X(f.lx,0)*PX;
+  f.lx=lerp(f.lx,(f.lane-1)*LANE,Math.min(1,dt*14)); f.x=X(f.lx,0)*px();
   if(f.h>0||f.vy!==0){ f.vy-=1800*dt; f.h+=f.vy*dt; if(f.h<=0){ f.h=0; f.vy=0; for(let i=0;i<5;i++)f.parts.push({x:X(f.lx,0)+rnd(-8,8),y:gy(),vx:rnd(-30,30),vy:rnd(-25,-5),life:.35,t:0,c:'#8a7aa8',r:1.5}); } }
   if(f.slide>0)f.slide-=dt; if(G.P.surge>0)G.P.surge-=dt;
   if(G.B.atk>0)G.B.atk-=dt; if(f.burst>0)f.burst-=dt;
@@ -161,7 +161,7 @@ export function foStep(dt){
 }
 
 /* ---------- drawing ---------- */
-function scene(c,fn){ c.save(); c.scale(PS,PS); fn(); c.restore(); }
+function scene(c,fn){ c.save(); c.scale(ps(),ps()); fn(); c.restore(); }
 /** a seamless 128px floor texture built from the arena tile set for this material */
 const floorTex={};
 function floorTexture(theme){
@@ -277,5 +277,5 @@ export function foPlayer(c,blink){
     if(blink)c.globalAlpha=.4; c.save(); c.translate(x,foot-bob); if(sliding)c.rotate(-.18); if(dead)c.rotate(Math.min(age*3.2,1.45)); c.drawImage(p.img,Math.round(-w/2),Math.round(-h),w,h); c.restore(); c.globalAlpha=1;
   });
 }
-export const foLaneX=lane=>X((lane-1)*LANE,0)*PX, foBodyY=()=>(gy()-50)*PX;
+export const foLaneX=lane=>X((lane-1)*LANE,0)*px(), foBodyY=()=>(gy()-50)*px();
 export const foDebugSpawn=name=>name==='pickups'?spawnPickups():PATTERNS[name]();
