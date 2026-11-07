@@ -36,7 +36,7 @@ const nowS=()=>performance.now()/1000;
 /** the sprite set for a wizard: the Raven uses the animated Pixel Lab art, the others their coded art (static, with a little bob) */
 const codedCache={};
 /** how big each unlockable wizard is drawn relative to the Raven (their sprites come in different canvas sizes) */
-const WIZ_DRAW_K={ember:.9};
+const WIZ_DRAW_K={ember:.9,frost:.9};
 function wizardSprites(id){ if(!id||id==='raven') return {dirs:SPRITE_OVERRIDES.wizardDirs,back:SPRITE_OVERRIDES.wizardBack,anim:true}; const W=WIZ_SETS[id]; if(W) return {dirs:W.dirs,back:W.back,anim:!!WIZ_ANIM[id],clips:WIZ_ANIM[id]}; return codedCache[id]||(codedCache[id]={dirs:codedWizardSet(id),back:codedWizardLarge(id),anim:false}); }
 /** What the wizard is doing: one-shots (hurt, cast) win over walk, which wins over idle. Returns [clip name, seconds into it]. */
 function wizardAction(P){ const t=nowS();
