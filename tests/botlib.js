@@ -118,7 +118,7 @@
   function playRun(opts) {
     skill = opts.skill ?? 0.8; A.meta.unlockEverything(); A.S.god = false;
     const res = { wizard: opts.wizard, len: opts.len, skill, fights: [], stalls: 0, won: false, beaten: 0, simSeconds: 0, death: null };
-    A.startRun(opts.wizard, opts.len); bot = { t: 0, dx: 0, dy: 0, dir: 0, sx: 0, sy: 0 };
+    A.startRun(opts.wizard, opts.len); if (opts.gear) A.equip(A.gearOf(opts.gear)); if (opts.wand) G.P.wand = opts.wand; bot = { t: 0, dx: 0, dy: 0, dir: 0, sx: 0, sy: 0 };
     let cur = null, guard = 0, lastMode = '';
     while (guard++ < 3e6) {
       const m = S.mode;
