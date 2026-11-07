@@ -285,3 +285,11 @@ p{font-size:1.32rem;line-height:1.1}
 .slot.omencard .front .art,.slot.arenacard .front .art{position:absolute;left:14%;top:9.5%;width:75%;height:62.5%;max-height:none;object-fit:contain;image-rendering:pixelated;z-index:0}
 .slot.omencard .front b,.slot.arenacard .front b{z-index:2;top:77.2%;height:9.2%;left:16%;right:16%}
 .slot.omencard .front .num,.slot.arenacard .front .num{top:2.4%;font-size:.7rem;letter-spacing:.06em;color:var(--gold);opacity:1}
+
+/* the frame is drawn ABOVE the art (its window is transparent), so the ornate corners are never covered */
+.slot .front{background:linear-gradient(#1d152d,#1d152d) 12.6% 8.2%/79% 65.6% no-repeat}
+.slot .front::before{z-index:1}
+.slot.boss .front .art,.slot.elite .front .art{left:11.5%;top:7%;width:81%;height:68%}
+.slot.omencard .front .art,.slot.arenacard .front .art{left:11.5%;top:7%;width:81%;height:68%;object-fit:cover}
+.slot .front .num,.slot .front b{z-index:2}
+.slot.boss .front::before{background-image:url(/assets/cards/front_boss.png)}
