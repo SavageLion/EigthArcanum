@@ -67,6 +67,8 @@ async function loadSpellArt(){ const im=await Promise.all(SPELL_NAMES.map(n=>loa
 export const HUB_ART:Record<string,HTMLImageElement>={};
 async function loadHubArt(){ const k=['door','market','forge','banner','campfire','codex','dummy','board']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
 export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
+/** per-wizard animation clips for the unlockable wizards (idle, walk, cast, hurt, death), by wizard id then clip then direction */
+export const WIZ_ANIM:Record<string,Record<string,Record<string,any>>>={};
 export const WIZ_SETS:Record<string,{dirs:Record<string,Sprite>,back:Sprite,front:Sprite}>={};
 function scaled(img:HTMLImageElement,k:number){ const c=mk(Math.round(img.width*k),Math.round(img.height*k)),g=c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(img,0,0,c.width,c.height); return c as any; }
 async function loadWizSets(){
@@ -78,11 +80,23 @@ async function loadWizSets(){
     WIZ_SETS[id]={dirs,back:analyse(scaled(imgs[N],1.4*k)),front:analyse(scaled(imgs[S0],1.4*k))};
   }
 }
+/** wizard/anim-sets/manifest.json lists which wizards have clips; each clip is drawn anchored on that wizard's still pose */
+async function loadWizClips(){
+  let man; try{ const r=await fetch(import.meta.env.BASE_URL+'assets/wizard/anim-sets/manifest.json'); if(!r.ok) return; man=await r.json(); }catch(e){ return; }
+  const jobs=[];
+  for(const [id,clips] of Object.entries<any>(man)){ const W_=WIZ_SETS[id]; if(!W_) continue;
+    for(const [name,m] of Object.entries<any>(clips)) for(const dir of m.dirs) jobs.push((async()=>{
+      const imgs=await Promise.all(Array.from({length:m.frames},(_,n)=>loadImage(`wizard/anim-sets/${id}/${name}/${dir}/${n}.png`)));
+      if(imgs.some(i=>!i)) return;
+      ((WIZ_ANIM[id] ||= {})[name] ||= {})[dir]={fps:m.fps,loop:m.loop,frames:imgs.map(i=>analyse(i,W_.dirs[dir]))};
+    })()); }
+  await Promise.all(jobs);
+}
 /** Loads Pixel Lab art from public/assets. Anything missing or failing to load keeps the procedural fallback. */
 export async function loadSprites(){
   const [arena,large]=await Promise.all([loadSet('arena'),loadSet('large')]);
   SPRITE_OVERRIDES.wizardDirs=arena; SPRITE_OVERRIDES.wizardBack=large?large.north:null; SPRITE_OVERRIDES.wizardFront=large?large.south:null;
-  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadHubArt(),loadRunnerArt(),loadSpellArt(),loadWizSets(),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
+  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadHubArt(),loadRunnerArt(),loadSpellArt(),loadWizSets().then(loadWizClips),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
 }
 async function loadHands(){ const f=await Promise.all(Array.from({length:9},(_,i)=>loadImage(`hands/${i}.png`))); if(f.some(i=>!i)) return; f.forEach(i=>{(i as any).hi=true;}); SPRITE_OVERRIDES.hands=f; }
 async function loadChest(){

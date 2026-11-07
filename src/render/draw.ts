@@ -9,7 +9,7 @@ import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
 import { pickupDraw } from '../systems/arenaEvents';
 import { W, ctx, reduced } from '../core/dom';
 import { G, S } from '../core/state';
-import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
+import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, WIZ_ANIM, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
 import { CY, RI, RO, WANDS, isMod } from '../systems/deck';
 import { foBoss, foFloor, foPlayer } from '../systems/faceoff';
 import { drawPull } from '../systems/flow';
@@ -35,7 +35,9 @@ export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.rou
 const nowS=()=>performance.now()/1000;
 /** the sprite set for a wizard: the Raven uses the animated Pixel Lab art, the others their coded art (static, with a little bob) */
 const codedCache={};
-function wizardSprites(id){ if(!id||id==='raven') return {dirs:SPRITE_OVERRIDES.wizardDirs,back:SPRITE_OVERRIDES.wizardBack,anim:true}; const W=WIZ_SETS[id]; if(W) return {dirs:W.dirs,back:W.back,anim:false}; return codedCache[id]||(codedCache[id]={dirs:codedWizardSet(id),back:codedWizardLarge(id),anim:false}); }
+/** how big each unlockable wizard is drawn relative to the Raven (their sprites come in different canvas sizes) */
+const WIZ_DRAW_K={ember:.9};
+function wizardSprites(id){ if(!id||id==='raven') return {dirs:SPRITE_OVERRIDES.wizardDirs,back:SPRITE_OVERRIDES.wizardBack,anim:true}; const W=WIZ_SETS[id]; if(W) return {dirs:W.dirs,back:W.back,anim:!!WIZ_ANIM[id],clips:WIZ_ANIM[id]}; return codedCache[id]||(codedCache[id]={dirs:codedWizardSet(id),back:codedWizardLarge(id),anim:false}); }
 /** What the wizard is doing: one-shots (hurt, cast) win over walk, which wins over idle. Returns [clip name, seconds into it]. */
 function wizardAction(P){ const t=nowS();
   if(S.mode==='dying'||S.mode==='dead') return ['death',t-(P.deathAt??t)];
@@ -43,14 +45,14 @@ function wizardAction(P){ const t=nowS();
   if(P.castAt!==undefined&&t-P.castAt<.5) return ['cast',t-P.castAt];
   return t-(P.moveAt??-9)<.15?['walk',t]:['idle',t]; }
 /** The frame to draw for a direction: the current clip if that clip exists, else idle, else the still pose. */
-function wizardFrame(set,rest,dir){ const [name,age]=G.P?wizardAction(G.P):['idle',nowS()], A=SPRITE_OVERRIDES.anim[set]; const clip=A[name]?.[dir]||A.idle?.[dir]; return clip?clipFrame(clip,age):rest; }
+function wizardFrame(set,rest,dir,clips){ const [name,age]=G.P?wizardAction(G.P):['idle',nowS()], A=clips||SPRITE_OVERRIDES.anim[set]; const clip=A[name]?.[dir]||A.idle?.[dir]; return clip?clipFrame(clip,age):rest; }
 /** facing: one of the 8 directions (south = towards the camera). Falls back to the procedural wizard if the art is missing. */
 export function drawWizard(x,y,fade,facing='south'){
   const c=ctx; if(fade)c.globalAlpha=.4;
   const WS=wizardSprites(G.P&&G.P.wizard), set=WS.dirs; let tip;
-  if(set&&WS.anim){ const side=S.side&&G.plats&&G.plats.length, air=side&&G.P.air, af=air?SPRITE_OVERRIDES.anim.arena.walk?.[facing]?.frames[2]:null; tip=blitSprite(c,af||wizardFrame('arena',set[facing],facing),px(x),px(y)+(side?SIDE_FEET*K:8),side?SIDE_K:1); }
+  if(set&&WS.anim){ const side=S.side&&G.plats&&G.plats.length, air=side&&G.P.air, af=air?(WS.clips||SPRITE_OVERRIDES.anim.arena).walk?.[facing]?.frames[2]:null; tip=blitSprite(c,af||wizardFrame('arena',set[facing],facing,WS.clips),px(x),px(y)+(side?SIDE_FEET*K:8),(side?SIDE_K:1)*(WIZ_DRAW_K[G.P&&G.P.wizard]||1)); }
   else if(set){ const k=S.side&&G.plats&&G.plats.length?SIDE_K:1, dead=S.mode==='dying'||S.mode==='dead', age=dead?nowS()-(G.P.deathAt??nowS()):0, bob=dead?0:Math.round(Math.sin(nowS()*3.2)*R)/R*.8;
-    if(dead){ c.save(); c.translate(px(x),px(y)+8); c.rotate(Math.min(age*3.2,1.45)); tip=blitSprite(c,set[facing],0,0); c.restore(); } else tip=blitSprite(c,set[facing],px(x),px(y)+8+bob,k); }          // feet 8 logical px below the hitbox centre
+    if(dead){ c.save(); c.translate(px(x),px(y)+8); c.rotate(Math.min(age*3.2,1.45)); tip=blitSprite(c,set[facing],0,0); c.restore(); } else tip=blitSprite(c,set[facing],px(x),px(y)+8+bob,k*(WIZ_DRAW_K[G.P&&G.P.wizard]||1)); }          // feet 8 logical px below the hitbox centre
   else { blit(c,px(x),px(y)-2,wizSprite()); tip={x:px(x)+6,y:px(y)-11}; }
   if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);blit(c,tip.x,tip.y,disc(w.c,1.5));}
   if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(tip.x-.25,tip.y-.25,.5,.5);}

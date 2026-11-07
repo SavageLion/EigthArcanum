@@ -2,7 +2,7 @@
 import { W, reduced } from '../core/dom';
 import { G, S } from '../core/state';
 import { BOSSES } from '../data/bosses';
-import { K, LW, RUNNER_ART, SPRITE_OVERRIDES, WIZ_SETS, bossFrames } from '../render/sprites';
+import { K, LW, RUNNER_ART, SPRITE_OVERRIDES, WIZ_ANIM, WIZ_SETS, bossFrames } from '../render/sprites';
 import { codedWizardSet } from '../render/wizardArt';
 import { nearMiss, rateNow } from './gear';
 import { burst, hurt } from './sim';
@@ -47,7 +47,7 @@ const white=img=>{ const p=prep(img); if(p.white)return p.white; const c=documen
 function wizFrames(){
   const id=G.P&&G.P.wizard, raven=!id||id==='raven';
   if(raven){ const w=SPRITE_OVERRIDES.anim.arena.walk&&SPRITE_OVERRIDES.anim.arena.walk.north; if(w) return w.frames.map(f=>f.img); const d=SPRITE_OVERRIDES.wizardDirs; if(d)return [d.north.img]; }
-  const W_=WIZ_SETS[id]; if(W_)return [W_.dirs.north.img]; return [codedWizardSet(id).north.img];
+  const W_=WIZ_SETS[id]; if(W_){ const w=WIZ_ANIM[id]&&WIZ_ANIM[id].walk&&WIZ_ANIM[id].walk.north; return w?w.frames.map(f=>f.img):[W_.dirs.north.img]; } return [codedWizardSet(id).north.img];
 }
 
 /** material set for this boss: fire bosses get ash and ember, frost bosses ice, thorn bosses moss, the rest rotate through the four */

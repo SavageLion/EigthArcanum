@@ -1,0 +1,79 @@
+{
+ "ember": {
+  "idle": {
+   "fps": 6,
+   "loop": true,
+   "frames": 4,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
+  "cast": {
+   "fps": 12,
+   "loop": false,
+   "frames": 6,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
+  "death": {
+   "fps": 9,
+   "loop": false,
+   "frames": 7,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
+  "hurt": {
+   "fps": 12,
+   "loop": false,
+   "frames": 6,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  },
+  "walk": {
+   "fps": 12,
+   "loop": true,
+   "frames": 6,
+   "dirs": [
+    "east",
+    "north",
+    "north-east",
+    "north-west",
+    "south",
+    "south-east",
+    "south-west",
+    "west"
+   ]
+  }
+ }
+}
