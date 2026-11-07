@@ -277,3 +277,6 @@ p{font-size:1.32rem;line-height:1.1}
 #stage.side #call{top:30%}
 #stage.side #intro{top:35%}
 #stage.side #spells{bottom:6px}
+
+/* card-back label: a dark plaque so it reads over the ornament */
+.slot .back em{left:22%;right:22%;bottom:9.5%;padding:3px 0 2px;background:#140d1f;border:2px solid var(--gold);box-shadow:0 0 0 1px #0b0814,2px 2px 0 #0b0814;font-family:var(--display);font-style:normal;font-weight:700;font-size:1.05rem;line-height:1;letter-spacing:.12em;text-align:center;color:#f6e4b0;text-shadow:none}
