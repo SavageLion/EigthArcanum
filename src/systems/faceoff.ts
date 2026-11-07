@@ -10,7 +10,7 @@ import { FIST, LW, SPRITE_OVERRIDES, WIZ_SETS, blit, disc, makeBg } from '../ren
 import { foPlan } from './bossPlans';
 import { paintSpells, spellBar } from './casting';
 import { CY, ECHO, GOODS, POS_HP, RO, WANDS, fightReward, hasPerk, hasWand, isMod, posHp, relPos, shuffle, spellValue, total } from './deck';
-import { showDraw, startRun } from './flow';
+import { ARENA_LIST, getTestArena, setTestArena, showDraw, startRun } from './flow';
 import { unlockEverything, RUN_LENGTHS, RUN_UNLOCK, WIZARDS, meta, noteBoss, noteRunEnd, takeUnlocks, wizardById } from '../data/meta';
 import { runAvailable } from '../data/bosses';
 import { codedWizardPortrait } from '../render/wizardArt';
@@ -209,8 +209,9 @@ export function showSetup(){
       <div class="runs">${RUN_LENGTHS.map(n=>{ const open=meta.runs.includes(n), ready=runAvailable(n); return `<button class="run${n===sel.n?' sel':''}" data-n="${n}" ${open&&ready?'':'disabled'}><b>${n}</b><span>${!open?RUN_UNLOCK[n]:!ready?'More bosses coming':'bosses'+(meta.best[n]?` · best ${meta.best[n]}`:'')}</span></button>`; }).join('')}</div>
       <div class="eyebrow">Wizard</div>
       <div class="wizlist">${WIZARDS.map(w=>{ const open=meta.wizards.includes(w.id); return `<button class="wiz${w.id===sel.w?' sel':''}${open?'':' locked'}" data-w="${w.id}" ${open?'':'disabled'}>${open?`<div class="wport">${portraitHTML(w.id)}</div>`:`<div class="wport lock">?</div>`}<div class="txt"><b>${open?w.name:'Locked'}</b><span>${open?w.blurb:w.unlock}</span>${open?`<div class="stats2"><em>♥ ${pips(w.hearts,6)}</em><em>✦ ${pips(Math.round(w.mana/25),5)}</em><em>↯ ${pips(Math.round((.3-w.rate)/.03)+1,5)}</em></div><small>${w.perkText}</small>`:''}</div></button>`; }).join('')}</div>
-      <button class="go" id="start">Begin the run</button><button class="linkbtn" id="unlockall">Unlock everything (testing)</button>`);
+      <button class="go" id="start">Begin the run</button><div class="testbox"><button class="linkbtn" id="unlockall">Unlock everything (testing)</button><label class="testrow">Force arena (testing)<select id="testarena"><option value="">Random</option>${ARENA_LIST().map(a=>`<option value="${a.id}"${getTestArena()===a.id?' selected':''}>${a.name}</option>`).join('')}</select></label></div>`);
     $('unlockall').onclick=()=>{ unlockEverything(); paint(); };
+    $('testarena').onchange=e=>setTestArena(e.target.value);
     ov.querySelectorAll('.wiz').forEach(b=>b.onclick=()=>{ sel.w=b.dataset.w; paint(); });
     ov.querySelectorAll('.run').forEach(b=>b.onclick=()=>{ sel.n=+b.dataset.n; paint(); });
     $('start').onclick=()=>startRun(sel.w,sel.n);

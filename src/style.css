@@ -293,3 +293,7 @@ p{font-size:1.32rem;line-height:1.1}
 .slot.omencard .front .art,.slot.arenacard .front .art{left:11.5%;top:7%;width:81%;height:68%;object-fit:cover}
 .slot .front .num,.slot .front b{z-index:2}
 .slot.boss .front::before{background-image:url(/assets/cards/front_boss.png)}
+
+.testbox{display:flex;flex-direction:column;gap:6px}
+.testrow{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px dashed var(--gold-dim);padding:6px 8px;color:var(--bone-dim);font-family:var(--body);font-size:.95rem}
+.testrow select{background:#20142a;color:var(--bone);border:2px solid var(--gold-dim);font:inherit;padding:3px 6px}

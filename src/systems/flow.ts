@@ -21,6 +21,10 @@ import { R, mk, pixelise } from '../render/pixel';
 
 /* ---------- flow ---------- */
 export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=8; remember(wizardId,runLen); G.P=newPlayer(wizardId); S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
+/** testing: force every pull to one arena (chosen on the wizard screen; kept in localStorage) */
+export const getTestArena=()=>{ try{ return localStorage.getItem('ea-test-arena')||''; }catch(e){ return ''; } };
+export const setTestArena=id=>{ try{ if(id)localStorage.setItem('ea-test-arena',id); else localStorage.removeItem('ea-test-arena'); }catch(e){} };
+export const ARENA_LIST=()=>ARENAS.map(a=>({id:a.id,name:a.name}));
 /* ---------- the three blind draws ---------- */
 /* The side-view platformer ('fool' arena, systems/sideView.ts) is switched off: add its entry back here to bring it back. */
 const ARENAS=[
@@ -65,7 +69,7 @@ export function showDraw(){
   spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true; $('hint').hidden=true; muteBtn.hidden=false;
   setMusic('draw',S.pos); const d=BOSSES[S.stage]; S.echo=S.pos?S.order[S.pos-1]:null;
   G.bg=makeBg(d); stage.style.setProperty('--boss',d.color);
-  const arena=ARENAS[Math.floor(Math.random()*ARENAS.length)]; let omen=drawOmen(); while(arena.id==='fool'&&omen.id==='hanged')omen=drawOmen();   // an upside-down room makes no sense for a platformer
+  const arena=ARENAS.find(a=>a.id===getTestArena())||ARENAS[Math.floor(Math.random()*ARENAS.length)]; let omen=drawOmen(); while(arena.id==='fool'&&omen.id==='hanged')omen=drawOmen();   // an upside-down room makes no sense for a platformer
   G.pull={i:0,phase:'shuffle',t:0,omen,arena,done:false,fast:reduced};
   const art=bossCardArt(d,S.stage);
   ov.className='overlay pullov'; ov.hidden=false; ov.scrollTop=0; stage.style.cursor='default';
