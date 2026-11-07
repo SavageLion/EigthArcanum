@@ -49,7 +49,7 @@ export function doBlink(s,pw){
 }
 
 /** where the orbit spell's orbs are right now (shared by the simulation and the drawing) */
-export function orbitPositions(){ const o=G.P&&G.P.orbit; if(!o)return []; const t=performance.now()/1000, out=[]; for(let i=0;i<o.n;i++){ const a=t*3.2+i*Math.PI*2/o.n; out.push({x:G.P.x+Math.cos(a)*46,y:G.P.y-16+Math.sin(a)*34}); } return out; }
+export function orbitPositions(){ const o=G.P&&G.P.orbit; if(!o)return []; const t=S.t, out=[]; for(let i=0;i<o.n;i++){ const a=t*3.2+i*Math.PI*2/o.n; out.push({x:G.P.x+Math.cos(a)*46,y:G.P.y-16+Math.sin(a)*34}); } return out; }
 export function spellExtrasStep(dt){
   for(const m of (G.meteors||[])){ m.t+=dt; if(m.t>=m.delay&&!m.done){ m.done=true; damage(32*m.pw); fxExplosion(m.tx,m.ty,1.4); S.shake=reduced?0:Math.max(S.shake,7); sfx.toll&&sfx.toll(); burst(m.tx,m.ty,m.col,30); if(m.eclipse){ for(const q of G.shots)burst(q.x,q.y,'#8a5cff',2); G.shots=[]; } if(S.mode==='fight')proc(m.s,m.pw); } }
   G.meteors=(G.meteors||[]).filter(m=>m.t<m.delay+.25);

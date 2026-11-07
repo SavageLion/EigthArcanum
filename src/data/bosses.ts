@@ -20,10 +20,10 @@ export const BOSSES=[
  attack(ph){ every('ring',1.7,()=>gapRing(ph?26:20,125,4));
    if(ph) every('shard',.62,()=>fan(1,0,250,{r:4.5,c:'#e6f7fa'})); },},
 {num:'III',name:'The Hollow Bell',hp:230,color:'#f0d9a5',rays:'#c9a76b',bg:['#3b2a1a','#150e12'],draw:drawBell,
- attack(ph){ every('wave',ph?1.5:2.1,()=>{wave(165,.62);sfx.toll();});
+ attack(ph){ every('wave',ph?1.8:2.4,()=>{wave(165,.62);sfx.toll();});
    every('fan',ph?1.3:1.9,()=>fan(3,.34,170,{r:5,c:'#ffe9bd'})); },},
 {num:'IV',name:'The Storm Eye',hp:300,color:'#f0dc55',rays:'#8c97c9',bg:['#232a52','#0c0e20'],draw:drawStorm,
- attack(ph){ every('col',ph?.95:1.3,()=>{column(G.P.x); if(ph)column(G.P.x+rnd(70,140)*(Math.random()<.5?-1:1));});
+ attack(ph){ every('col',ph?1.2:1.65,()=>{column(G.P.x); if(ph)column(G.P.x+rnd(70,140)*(Math.random()<.5?-1:1));});
    every('spark',ph?1.5:2.2,()=>fan(5,.9,190,{r:4.5,c:'#fff2a0'})); },},
 {num:'V',name:'The Mother of Thorns',hp:380,color:'#e46a80',rays:'#9dbb6a',bg:['#23401f','#0d1610'],draw:drawThorn,
  attack(ph){ every('seed',ph?1.1:1.55,()=>{seed(ph?10:8); if(ph)seed(8);});
@@ -55,7 +55,7 @@ const NEW_BOSSES=[
  {num:'XI',name:'The Hive Mother',color:'#f2a03d',rays:'#e4c946',bg:['#4a3412','#171007'],draw:drawHive,attack(ph){ every('sw',ph?1.25:1.8,()=>swarm(ph?7:5)); if(ph) every('r',2.5,()=>ring(10,105,{r:4.5,c:'#e4c946'})); }},
  {num:'XII',name:'The Ash Widow',color:'#e8592c',rays:'#f0813f',bg:['#3b1712','#130807'],draw:drawWidow,attack(ph){ every('mine',ph?1.7:2.3,()=>mines(ph?10:8)); every('fan',ph?1.6:2.4,()=>fan(3,.4,180,{r:5,c:'#ffd27a'})); }},
  {num:'XIII',name:'The Sand Prophet',color:'#f0d9a5',rays:'#a9875a',bg:['#57401f','#1a120b'],draw:drawProphet,attack(ph){ every('boom',ph?1.7:2.3,()=>boomerang(ph?16:12)); if(ph) every('sp',.2,()=>spiral(1,.4,120,{r:4.5,c:'#f2a03d'})); else every('a',1.8,()=>fan(2,.26,190,{r:5,c:'#f2a03d'})); }},
- {num:'XIV',name:'The Emperor',elite:true,color:'#f2a03d',rays:'#e8592c',bg:['#55201a','#1b0a0a'],draw:drawEmperor,attack(ph){ every('fan',ph?.95:1.3,()=>fan(ph?9:7,1.2,180)); every('col',ph?1.3:1.9,()=>{column(G.P.x);if(ph)column(G.P.x+rnd(80,150)*(Math.random()<.5?-1:1));}); every('rain',2.6,()=>{for(let i=0;i<5;i++)shot(rnd(25,W-25),30,Math.PI/2,rnd(130,180),{r:6,c:'#ffc15e'});}); }},
+ {num:'XIV',name:'The Emperor',elite:true,color:'#f2a03d',rays:'#e8592c',bg:['#55201a','#1b0a0a'],draw:drawEmperor,attack(ph){ every('fan',ph?1.15:1.55,()=>fan(ph?8:6,1.2,175)); every('col',ph?1.7:2.4,()=>{column(G.P.x);if(ph)column(G.P.x+rnd(80,150)*(Math.random()<.5?-1:1));}); every('rain',3.2,()=>{for(let i=0;i<4;i++)shot(rnd(25,W-25),30,Math.PI/2,rnd(130,180),{r:6,c:'#ffc15e'});}); }},
  {num:'XV',name:'The High Priestess',elite:true,color:'#b9c4f5',rays:'#bfeaf2',bg:['#262a63','#0b0d24'],draw:drawPriestess,
   move(b,dt){ b.jump-=dt; if(b.jump<=0){ b.jump=4.6; burst(b.x,b.y,'#b9c4f5',14); b.x=rnd(80,W-80); b.flash=.15; } b.y=150+Math.sin(b.t*1.3)*8; },
   attack(ph){ every('gr',ph?1.3:1.7,()=>gapRing(ph?28:24,125,4)); every('b',ph?1.5:2.1,()=>fan(5,1.5,160,{bounce:ph?3:2,floor:ph,r:5.5,c:'#f0a8d8'})); if(ph) every('h',.6,()=>hands(2,{c:'#ffffff',r:4.5})); }},
@@ -69,7 +69,7 @@ const isElitePull=p=>p%4===3;
 export const FINALS={8:7,16:7,32:31};   // run length -> final boss index (32 and 64 get theirs when those bosses exist)
 export const runAvailable=n=>n<=16||(BOSSES.length>=n&&FINALS[n]!==undefined);
 export function dealOrder(total=16){
-  const fin=FINALS[total]??7, pool=BOSSES.map((b,i)=>i).filter(i=>(i<total||(total<16&&BOSSES[i].elite&&i<16))&&i!==fin);   // the 8-run borrows an elite from the 16 for its mid-run elite pull
+  const fin=FINALS[total]??7, pool=BOSSES.map((b,i)=>i).filter(i=>(i<total||(total<16&&(i===14||i===15)))&&i!==fin);   // the 8-run borrows an elite from the 16 for its mid-run elite pull
   const regular=shuffle(pool.filter(i=>!BOSSES[i].elite&&i<total)), elites=shuffle(pool.filter(i=>BOSSES[i].elite)), any=shuffle(pool);
   const out=[];
   for(let p=0;p<total;p++) out.push(p===total-1?fin:(isElitePull(p)?(elites.shift()??any[p%any.length]):(regular.shift()??any[p%any.length])));

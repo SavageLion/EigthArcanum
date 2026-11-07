@@ -72,3 +72,8 @@ Door, Market, Forge, plus **Codex** (a bestiary of all 64 bosses, filled in as y
 
 ## Spells: 9 elements and 9 types
 Types: bolt, nova, ward, summon, beam, trap, blink, **meteor** (a delayed, undodgeable hit) and **orbit** (orbs that circle you, erase shots and strike the boss). Elements: fire, frost, sound, storm, thorn, bone, mirror, blood, gold and the newest **poison** (stacking damage over time), **holy** (cleanses nearby shots, brief shield) and **void** (erases shots near the boss for bonus damage). Elements are assigned to bosses in `data/elementAssign.ts`. New recipes: Eclipse Meteor (meteor + void + fire) and Halo Guard (orbit + holy + mirror). Meteor and orbit logic is in `systems/spellFx.ts` (`spellExtrasStep`, `drawSpellExtras`); the Spell Lab builds any combination.
+
+## Testing: smoke, audit and balance bots
+- `npm run smoke`: plays the first 16 bosses in all four arenas and clicks through the Camp (fails on any console or page error).
+- `node tests/audit.mjs`: about 440 mechanic checks (every boss in every arena including enrage, all 9 types x 12 elements, wands, gear, wizards, omens, Runner rules and pickups, the Camp flows, Sanctum economy, daily seed, Spell Lab). Needs a build first. Exits 1 on any failure.
+- `node tests/bot.mjs --len 8,16 --runs 30 --skills 0.8 --wizards raven,ember`: balance bots (`tests/botlib.js`) play whole runs by stepping the simulation without rendering, then print win rates by run length, wizard, arena, omen and boss, the deadliest bosses and the slowest kills. A bot's `skill` is how fast it reacts and how often it slips; it sees every shot, so treat results as relative (compare arenas, bosses and wizards), not as a prediction of human win rates.

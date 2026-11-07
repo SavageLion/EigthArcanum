@@ -39,7 +39,7 @@ const ARENAS=[
  {id:'strength',num:'VIII',name:'Strength',desc:'Open arena. Run around a pillared room. You only fire when you stand still. The boss chases and charges you.'}
 ];
 function drawOmen(){
-  const pool=OMENS.filter(o=>o.id!==S.lastOmen&&(!o.spells||G.P.spells.length)&&(o.id!=='hermit'||G.P.spells.some(s=>s.type!=='ward')));
+  const early=S.pos<2, pool=OMENS.filter(o=>o.id!==S.lastOmen&&!(early&&(o.id==='death'||o.id==='tower'))&&!(o.id==='death'&&!G.P.spells.length)&&(!o.spells||G.P.spells.length)&&(o.id!=='hermit'||G.P.spells.some(s=>s.type!=='ward')));
   return pool[Math.floor(Math.random()*pool.length)];
 }
 /** Boss portrait for the pull card, redrawn at the same chunky density as the omen/arena card art (about 36x54 pixels):
@@ -120,7 +120,7 @@ function readText(i){
   const sig=BOSS_SIG[S.stage], extra=G.pull.arena.id==='strength'?sig.s:''; return `<b>${G.pull.arena.name}</b> ${G.pull.arena.desc}${extra?` ${BOSSES[S.stage].name}: ${extra}`:''}`;
 }
 function addRead(i){ const p=document.createElement('p'); p.id='read'+i; p.innerHTML=readText(i); $('reads').appendChild(p); }
-function enterArena(){ ov.className='overlay'; ov.onclick=null; S.mod=G.pull.omen; S.lastOmen=G.pull.omen.id; S.arena=G.pull.arena.id; G.pull=null; startFight(); }
+export function enterArena(){ ov.className='overlay'; ov.onclick=null; S.mod=G.pull.omen; S.lastOmen=G.pull.omen.id; S.arena=G.pull.arena.id; G.pull=null; startFight(); }
 export function quickPull(modId,arena){ G.pull={omen:OMENS.find(o=>o.id===modId)||drawOmen(),arena:ARENAS.find(a=>a.id===arena)||ARENAS[0]}; if(G.pull.arena.id==='fool'&&G.pull.omen.id==='hanged')G.pull.omen=OMENS.find(o=>o.id!=='hanged'); enterArena(); }
 export function updateDraw(dt){
   if(!G.pull||G.pull.done)return; G.pull.t+=dt;
