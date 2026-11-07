@@ -1,0 +1,20 @@
+{
+ "monk": {
+  "frames": 6,
+  "dirs": [
+   "east",
+   "north",
+   "south",
+   "west"
+  ],
+  "fps": 9
+ },
+ "cat": {
+  "frames": 4,
+  "dirs": [
+   "east",
+   "west"
+  ],
+  "fps": 10
+ }
+}

@@ -65,7 +65,12 @@ const SPELL_NAMES=['fireball','crystal','bell','bolt','thorn','skull','eye','bub
 async function loadSpellArt(){ const im=await Promise.all(SPELL_NAMES.map(n=>loadImage(`runner/spells/${n}.png`))); SPELL_NAMES.forEach((n,i)=>{ if(im[i])SPELL_ART[n]=im[i]; }); }
 /** Pixel Lab props for the Sanctum (door, market stall, forge, banner) */
 export const HUB_ART:Record<string,HTMLImageElement>={};
-async function loadHubArt(){ const k=['door','market','forge','banner','campfire','codex','dummy','board','tree','pine','well','lamp','cottage','statue']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
+/** wandering villagers: walk cycles per direction plus the still rotations (public/assets/hub/npc, packed by tools/pack-npc.mjs) */
+export const NPC_ART:Record<string,{frames:number,fps:number,dirs:string[],walk:Record<string,HTMLImageElement[]>,rot:Record<string,HTMLImageElement>}>={};
+async function loadNpcs(){ let man; try{ const r=await fetch(import.meta.env.BASE_URL+'assets/hub/npc/manifest.json'); if(!r.ok) return; man=await r.json(); }catch(e){ return; }
+  for(const [id,m] of Object.entries<any>(man)){ const A={frames:m.frames,fps:m.fps,dirs:m.dirs,walk:{},rot:{}}; const all=['east','north-east','north','north-west','west','south-west','south','south-east'];
+    await Promise.all([...all.map(async d=>{ const im=await loadImage(`hub/npc/${id}/rot/${d}.png`); if(im)A.rot[d]=im; }),...m.dirs.map(async d=>{ const f=await Promise.all(Array.from({length:m.frames},(_,n)=>loadImage(`hub/npc/${id}/${d}/${n}.png`))); if(f.every(Boolean))A.walk[d]=f; })]); NPC_ART[id]=A; } }
+async function loadHubArt(){ const k=['door','market','forge','banner','campfire','codex','dummy','board','tree','pine','well','lamp','cottage','statue','observatory','belltower','townhouse','crates','astrolabe','yew','mushrooms','moontree']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
 export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
 /** per-wizard animation clips for the unlockable wizards (idle, walk, cast, hurt, death), by wizard id then clip then direction */
 export const WIZ_ANIM:Record<string,Record<string,Record<string,any>>>={};
@@ -96,7 +101,7 @@ async function loadWizClips(){
 export async function loadSprites(){
   const [arena,large]=await Promise.all([loadSet('arena'),loadSet('large')]);
   SPRITE_OVERRIDES.wizardDirs=arena; SPRITE_OVERRIDES.wizardBack=large?large.north:null; SPRITE_OVERRIDES.wizardFront=large?large.south:null;
-  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadHubArt(),loadRunnerArt(),loadSpellArt(),loadWizSets().then(loadWizClips),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
+  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadHubArt(),loadNpcs(),loadRunnerArt(),loadSpellArt(),loadWizSets().then(loadWizClips),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
 }
 async function loadHands(){ const f=await Promise.all(Array.from({length:9},(_,i)=>loadImage(`hands/${i}.png`))); if(f.some(i=>!i)) return; f.forEach(i=>{(i as any).hi=true;}); SPRITE_OVERRIDES.hands=f; }
 async function loadChest(){
