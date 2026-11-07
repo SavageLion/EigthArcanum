@@ -43,7 +43,8 @@ let DECO=null, TUFTS=null;
 function buildVillage(){
   const D=[]; const add=(art,x,y,k,solid,o={})=>D.push({art,x,y,k,solid,...o});
   for(const [x,y] of [[105,330],[795,330],[100,640],[800,640],[110,900],[790,930]]) add('cottage',x,y,1.55,30);
-  add('well',555,586,1.25,18); add('campfire',450,612,1.1,12,{glow:'#ff9a3c'});
+  for(const [x,y] of [[352,596],[548,640]]) add('statue',x,y,1.2,12); for(const [x,y] of [[340,300],[560,300]]) add('statue',x,y,1.2,12);
+  add('well',555,560,1.25,18); add('campfire',450,612,1.1,12,{glow:'#ff9a3c'});
   for(const [x,y] of [[405,310],[495,310],[405,540],[495,540],[368,690],[532,690],[405,830],[495,830],[330,462],[570,462],[318,790],[582,790]]) add('lamp',x,y,1.25,5,{glow:'#ffb45a'});
   const r=rngOf(7), free=(x,y,m)=>laneDist(x,y)>m&&D.every(d=>Math.hypot(d.x-x,d.y-y)>(d.solid+m))&&STATIONS.every(s=>Math.hypot(s.fx-x,s.fy-y)>s.solid+m+44&&Math.hypot(s.ax-x,s.ay-y)>56+m);
   const tree=(x,y)=>add(r()<.4?'pine':'tree',x,y,r()<.4?1.45:1.3,9);
@@ -138,7 +139,7 @@ function showBoard(){
 /* ---------- drawing ---------- */
 const sprW=(im,k)=>im.width/R*k, sprH=(im,k)=>im.height/R*k;
 const lanePath=ex=>{ const p=new Path2D(); for(const [x0,y0,x1,y1,w] of LANES){ const hw=w/2+ex, dx=x1-x0, dy=y1-y0, l=Math.hypot(dx,dy), nx=-dy/l*hw, ny=dx/l*hw; p.moveTo(x0+nx,y0+ny); p.lineTo(x1+nx,y1+ny); p.lineTo(x1-nx,y1-ny); p.lineTo(x0-nx,y0-ny); p.closePath(); p.moveTo(x0+hw,y0); p.arc(x0,y0,hw,0,TAU,true); p.moveTo(x1+hw,y1); p.arc(x1,y1,hw,0,TAU,true); } p.moveTo(PLAZA.x+PLAZA.r+ex,PLAZA.y); p.arc(PLAZA.x,PLAZA.y,PLAZA.r+ex,0,TAU,true); return p; };
-const GRASS=['#1d3328','#264536','#101d17'];
+const GRASS=['#1c2238','#262e4a','#0c0f1b'];
 export function drawHub(c){
   const h=G.hub; if(!h)return; const t=S.t, T=SPRITE_OVERRIDES.arena.tiles, has=T.length>15;
   const camX=Math.round(h.cx*K*R)/R, camY=Math.round(h.cy*K*R)/R, vx0=h.cx-70, vx1=h.cx+HUBW/ZOOM+70, vy0=h.cy-90, vy1=h.cy+G.H/ZOOM+70;
@@ -146,7 +147,7 @@ export function drawHub(c){
   c.fillStyle='#07040d'; c.fillRect(0,0,LW,G.LH);
   c.save(); c.scale(ZOOM,ZOOM); c.translate(-camX,-camY);
   // grass with tufts, then the cobbled lanes and plaza over it
-  c.fillStyle='#14231d'; c.fillRect(0,px(GATE-30),px(WW),px(WH-GATE+60));
+  c.fillStyle='#121626'; c.fillRect(0,px(GATE-30),px(WW),px(WH-GATE+60));
   for(const u of TUFTS) if(seen(u.x,u.y)){ c.fillStyle=GRASS[u.c]; c.fillRect(px(u.x),px(u.y),1,u.h); }
   c.save(); c.scale(K,K); c.fillStyle='#07040d'; c.fill(lanePath(5)); c.fillStyle='#5a4a38'; c.fill(lanePath(3)); c.restore();
   c.save(); c.scale(K,K); c.clip(lanePath(0)); c.scale(1/K,1/K);
@@ -174,7 +175,7 @@ export function drawHub(c){
   items.push({y:G.P.y+20,f:()=>drawWizard(G.P.x,G.P.y,false,G.P.face||'south')});
   items.sort((a,b)=>a.y-b.y); for(const it of items)it.f();
   // fireflies drifting over the village
-  for(const m of h.motes){ if(!seen(m.x,m.y)) continue; c.globalAlpha=.3+.4*Math.sin(h.t*2+m.p); c.fillStyle=m.p>3?'#e8ffa8':'#e8d8ff'; c.fillRect(px(m.x),px(m.y),1,1); } c.globalAlpha=1;
+  for(const m of h.motes){ if(!seen(m.x,m.y)) continue; c.globalAlpha=.3+.4*Math.sin(h.t*2+m.p); c.fillStyle=m.p>3?'#ffe9a0':'#cfe0ff'; c.fillRect(px(m.x),px(m.y),1,1); } c.globalAlpha=1;
   c.restore();
   // dusk vignette, shard counter and hint stay fixed on screen
   const vg=c.createRadialGradient(LW/2,G.LH*.5,LW*.35,LW/2,G.LH*.5,LW*.95); vg.addColorStop(0,'rgba(8,4,16,0)'); vg.addColorStop(1,'rgba(8,4,16,.55)'); c.fillStyle=vg; c.fillRect(0,0,LW,G.LH);
