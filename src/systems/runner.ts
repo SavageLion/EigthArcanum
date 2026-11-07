@@ -11,6 +11,7 @@ import { blowTrap } from './spellFx';
 import { proc } from './casting';
 import { relPos, isMod } from './deck';
 import { BOSS_EL, EL } from './spells';
+import { FINAL_ORBS, MOTION, SPELLS, drawLow, drawOrb } from './runnerSpells';
 import { $, clamp, rnd } from '../core/util';
 import { sfx, tone } from '../core/audio';
 
@@ -68,6 +69,8 @@ export function foFreeze(){ const f=G.fo; let n=0; f.obs=f.obs.filter(o=>{ if(o.
 const shuffle=a=>{ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 function add(k,lane,extra={}){ const fl=flavour(); G.fo.obs.push({k,lane,lx:(lane-1)*LANE,d:1500,spd:0,seed:Math.random()*9,col:k==='shard'?fl.spell:fl.col,...extra}); }
 function castFx(){ G.B.atkAt=performance.now()/1000; for(let i=0;i<10;i++) G.fo.parts.push({x:cx+rnd(-18,18),y:hz()+rnd(-6,14),vx:rnd(-30,30),vy:rnd(10,60),life:rnd(.3,.7),t:0,c:G.B.color,r:1.5}); }
+const orbOf=()=>{ const sh=S.stage===63?FINAL_ORBS[Math.floor(Math.random()*FINAL_ORBS.length)]:(SPELLS[S.stage]||SPELLS[0])[0], m=MOTION[sh]||MOTION.fireball; return {shape:sh,spd:m.spd,wa:m.wa,wf:m.wf}; };
+const lowOf=()=>({shape:S.stage===63?['ring','flame','shard','boulder'][Math.floor(Math.random()*4)]:(SPELLS[S.stage]||SPELLS[0])[1]});
 function spawn(){
   const fl=flavour(), enr=G.B.enraged, r=Math.random(), pl=clamp(G.fo.lane,0,2), elite=G.B.def&&G.B.def.elite;
   const pObs=.46, pOrb=pObs+fl.orb*.34, pShard=1; // roughly: obstacles ~46%, orbs, then shards
@@ -76,8 +79,8 @@ function spawn(){
     if(q<.45){ const n=Math.random()<.4?2:1; shuffle([0,1,2]).slice(0,n).forEach(l=>add('low',l)); }
     else if(q<.75){ const open=Math.floor(rnd(0,3)); [0,1,2].filter(l=>l!==open).forEach(l=>add('block',l)); if(enr)add('low',open,{d:1750}); }
     else { const n=Math.random()<.5?2:1; shuffle([0,1,2]).slice(0,n).forEach(l=>add('high',l)); }
-  } else if(r<pOrb){ castFx(); add('orb',pl,{spd:240,wob:true}); if(enr||elite){ const o=shuffle([0,1,2].filter(l=>l!==pl))[0]; add('orb',o,{spd:240,wob:true,d:1650}); } }
-  else { castFx(); const l=Math.floor(rnd(0,3)); add('shard',l,{spd:300}); if(Math.random()<.5)add('orb',(l+1+Math.floor(rnd(0,2)))%3,{spd:240,wob:true,d:1600}); }
+  } else if(r<pOrb){ castFx(); add('orb',pl,orbOf()); if(enr||elite){ const o=shuffle([0,1,2].filter(l=>l!==pl))[0]; add('orb',o,{...orbOf(),d:1650}); } }
+  else { castFx(); const l=Math.floor(rnd(0,3)); add('shard',l,{...lowOf(),spd:300}); if(Math.random()<.5)add('orb',(l+1+Math.floor(rnd(0,2)))%3,{...orbOf(),d:1600}); }
 }
 
 /* ---------- update ---------- */
@@ -99,7 +102,7 @@ export function foStep(dt){
   for(const k of G.traps){ if(k.lane==null||k.arm>0||k.life<=0)continue; const o=f.obs.find(q=>(q.k==='orb'||q.k==='shard')&&q.lane===k.lane&&q.d<140&&q.d>-30); if(o){ o.gone=true; blowTrap(k,true); } }
   // collisions and grazes
   const px=f.lx, top=f.slide>0?42:112;
-  for(const o of f.obs){ if(o.hit||o.gone)continue; const K_=KIND[o.k], wob=o.wob?Math.sin(f.t*5+o.seed)*14:0;
+  for(const o of f.obs){ if(o.hit||o.gone)continue; const K_=KIND[o.k], wob=o.wa?Math.sin(f.t*(o.wf||5)+o.seed)*o.wa:0;
     if(Math.abs(o.d)<20){ if(Math.abs(o.lx+wob-px)<K_.hw+16 && f.h<K_.y1 && f.h+top>K_.y0){ o.hit=true;
         if(G.P.shield>0){ o.gone=true; burst(G.P.x,G.P.y,'#8fdcf0',14); sfx.block(); const w=G.P.shieldSpell; if(w&&Math.random()<.4)proc(w,G.P.shieldPw); }
         else { const was=G.P.hp; hurt(); if(G.P.hp<was){ $('call').textContent='Hit'; $('call').style.color='#ff9d94'; $('call').hidden=false; f.call=.5; } } } }
@@ -145,20 +148,15 @@ export function foBoss(c){
   });
 }
 function drawObs(c,o,t){
-  const s=S_(o.d), wob=o.wob?Math.sin(t*5+o.seed)*14:0, ramp=(o.k==='orb'||o.k==='shard')?clamp((1500-o.d)/420,0,1):1, lx=lerp(0,o.lx+wob,ramp), x=X(lx,o.d), yb=Y(o.d,0), col=o.col||'#e86bd0', hi=lighten(col);
+  const s=S_(o.d), wob=o.wa?Math.sin(t*(o.wf||5)+o.seed)*o.wa:0, ramp=(o.k==='orb'||o.k==='shard')?clamp((1500-o.d)/420,0,1):1, lx=lerp(0,o.lx+wob,ramp), x=X(lx,o.d), yb=Y(o.d,0), col=o.col||'#e86bd0', hi=lighten(col);
   if(o.hit)c.globalAlpha=.35;
   if(o.k==='low'){ const w=58*s,h=40*s; c.fillStyle='#0b0814'; c.fillRect(x-w/2-1,yb-h-1,w+2,h+1); c.fillStyle='#6e5a8c'; c.fillRect(x-w/2,yb-h,w,h); c.fillStyle='#a58ccc'; c.fillRect(x-w/2,yb-h,w,Math.max(1,4*s)); c.fillStyle=col; for(let i=0;i<3;i++){ const rx=x-w/2+w*(.2+i*.3); c.fillRect(rx,yb-h*.7,Math.max(1,5*s),Math.max(2,18*s)); }
     c.fillStyle='#cfd7e8'; for(let i=0;i<4;i++){ const sx=x-w/2+w*(i/4); c.beginPath(); c.moveTo(sx,yb-h); c.lineTo(sx+w/8,yb-h-12*s); c.lineTo(sx+w/4,yb-h); c.fill(); } }
   else if(o.k==='high'){ const w=60*s, y0=yb-110*s, y1=yb-62*s; c.fillStyle='#0b0814'; c.fillRect(x-w/2-1,y0-1,w+2,y1-y0+2); const g=c.createLinearGradient(x-w/2,0,x+w/2,0); g.addColorStop(0,'#7a8fb5'); g.addColorStop(.5,'#e6f0ff'); g.addColorStop(1,'#7a8fb5'); c.fillStyle=g; c.beginPath(); c.moveTo(x-w/2,(y0+y1)/2); c.lineTo(x-w*.2,y0); c.lineTo(x+w*.2,y0); c.lineTo(x+w/2,(y0+y1)/2); c.lineTo(x+w*.2,y1); c.lineTo(x-w*.2,y1); c.fill(); c.fillStyle=col; c.fillRect(x-w*.3,(y0+y1)/2-1,w*.6,Math.max(1,2*s)); c.fillStyle='#3a2c55'; c.fillRect(x-Math.max(1,2*s),yb-250*s,Math.max(2,4*s),(y0-(yb-250*s))); }
   else if(o.k==='block'){ const w=62*s,h=140*s; c.fillStyle='#0b0814'; c.fillRect(x-w/2-1,yb-h-1,w+2,h+1); c.fillStyle='#4a3a6a'; c.fillRect(x-w/2,yb-h,w,h); c.fillStyle='#6a5891'; c.fillRect(x-w/2,yb-h,Math.max(2,8*s),h); c.fillStyle='#312447'; c.fillRect(x+w/2-Math.max(2,8*s),yb-h,Math.max(2,8*s),h);
     c.fillStyle=col; c.beginPath(); c.moveTo(x,yb-h*.78); c.lineTo(x+w*.16,yb-h*.55); c.lineTo(x,yb-h*.32); c.lineTo(x-w*.16,yb-h*.55); c.fill(); }
-  else if(o.k==='orb'){ const r=Math.max(3,26*s), y=yb-74*s, pulse=1+Math.sin(t*14+o.seed)*.12;
-    c.fillStyle=hexA(col,.28); c.beginPath(); c.arc(x,y,r*1.9*pulse,0,6.3); c.fill(); c.fillStyle=hexA(hi,.45); c.beginPath(); c.arc(x,y,r*1.25,0,6.3); c.fill();
-    c.fillStyle=col; c.beginPath(); c.arc(x,y,r,0,6.3); c.fill(); c.fillStyle=hi; c.beginPath(); c.arc(x-r*.2,y-r*.2,r*.5,0,6.3); c.fill();
-    for(let i=0;i<4;i++){ const a=t*7+i*1.6+o.seed; c.fillStyle=hi; c.fillRect(x+Math.cos(a)*r*1.5,y+Math.sin(a)*r*1.5,Math.max(1,2*s),Math.max(1,2*s)); } }
-  else if(o.k==='shard'){ const w=44*s,h=52*s, y=yb-h*.5, spin=t*6+o.seed; c.fillStyle=hexA(col,.25); c.beginPath(); c.arc(x,y,w*.9,0,6.3); c.fill();
-    c.fillStyle='#0b0814'; c.beginPath(); c.moveTo(x,yb-h-1); c.lineTo(x+w*.5+1,yb-h*.35); c.lineTo(x+w*.25,yb+1); c.lineTo(x-w*.25,yb+1); c.lineTo(x-w*.5-1,yb-h*.35); c.fill();
-    c.fillStyle=col; c.beginPath(); c.moveTo(x,yb-h); c.lineTo(x+w*.5,yb-h*.35); c.lineTo(x+w*.25,yb); c.lineTo(x-w*.25,yb); c.lineTo(x-w*.5,yb-h*.35); c.fill(); c.fillStyle=hi; c.fillRect(x-w*.12+Math.sin(spin)*w*.12,yb-h*.85,Math.max(1,w*.14),h*.55); }
+  else if(o.k==='orb') drawOrb(c,o.shape||'fireball',x,yb-74*s,Math.max(3,26*s),t,o.seed,col,hi);
+  else if(o.k==='shard') drawLow(c,o.shape||'shard',x,yb,s,t,o.seed,col,hi);
   c.globalAlpha=1;
 }
 const lighten=h=>{ const n=parseInt(h.slice(1,7),16), r=n>>16&255,g=n>>8&255,b=n&255, m=v=>Math.round(v+(255-v)*.55).toString(16).padStart(2,'0'); return '#'+m(r)+m(g)+m(b); };
