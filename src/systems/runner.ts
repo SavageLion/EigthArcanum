@@ -172,35 +172,51 @@ function floorTexture(theme){
   return floorTex[theme]=c;
 }
 const TEXEL=1.6;
+/** wall and vault colours per material */
+const WALLS={ flag:['#2b2338','#241d30','#171122'], ash:['#33201f','#2a1a19','#1a0f0f'], ice:['#233a4c','#1d3040','#101c28'], moss:['#1f3123','#192a1d','#0e1810'] };
+const WALL=3*LANE, CEIL=430;
+/** The Run's hall: one continuous stone corridor with walls, a vaulted ceiling with ribs, columns and a textured floor that all converge on the boss,
+    who stands in the glow at the far end. Nothing sits behind the boss but the dark and fog of the hall itself. */
 export function foFloor(c){
-  if(!G.fo)return; const f=G.fo, t=S.t, H=sceneH(), col=G.B.color, theme=f.theme||'flag'; syncProxies();
+  if(!G.fo)return; const f=G.fo, t=S.t, H=sceneH(), col=G.B.color, theme=f.theme||'flag', pal=WALLS[theme]||WALLS.flag; syncProxies();
   scene(c,()=>{
-    // sky and a gothic gate on the horizon, lit in the boss's colour
-    const g=c.createLinearGradient(0,0,0,hz()+30); g.addColorStop(0,'#0a0614'); g.addColorStop(.7,'#171028'); g.addColorStop(1,'#2a1638'); c.fillStyle=g; c.fillRect(0,0,270,hz()+30);
-    const gl=c.createRadialGradient(cx,hz()-20,4,cx,hz()-20,140); gl.addColorStop(0,hexA(col,.55)); gl.addColorStop(1,hexA(col,0)); c.fillStyle=gl; c.fillRect(0,0,270,hz()+60);
-    const hy=hz()+2; c.fillStyle='#0c0716'; c.beginPath(); c.moveTo(cx-92,hy); c.lineTo(cx-92,hy-70); c.quadraticCurveTo(cx-92,hy-130,cx,hy-168); c.quadraticCurveTo(cx+92,hy-130,cx+92,hy-70); c.lineTo(cx+92,hy); c.fill();
-    c.fillStyle='#1d1430'; c.beginPath(); c.moveTo(cx-78,hy); c.lineTo(cx-78,hy-70); c.quadraticCurveTo(cx-78,hy-118,cx,hy-152); c.quadraticCurveTo(cx+78,hy-118,cx+78,hy-70); c.lineTo(cx+78,hy); c.fill();
-    const ig=c.createRadialGradient(cx,hy-60,6,cx,hy-60,100); ig.addColorStop(0,hexA(col,.7)); ig.addColorStop(1,hexA(col,.05)); c.fillStyle=ig; c.beginPath(); c.moveTo(cx-66,hy); c.lineTo(cx-66,hy-68); c.quadraticCurveTo(cx-66,hy-108,cx,hy-138); c.quadraticCurveTo(cx+66,hy-108,cx+66,hy-68); c.lineTo(cx+66,hy); c.fill();
-    for(let i=0;i<40;i++){ const x=(i*97+13)%270, y=((i*53)%(hz()-30))+2, tw=(Math.sin(t*2+i)+1)/2; c.globalAlpha=.2+tw*.5; c.fillStyle=i%7?'#e8e0f4':'#ffe9a8'; c.fillRect(x,y,1,1); } c.globalAlpha=1;
-    for(const sx of [-70,0,70]){ c.fillStyle=hexA(col,.05); c.beginPath(); c.moveTo(cx+sx-8,0); c.lineTo(cx+sx+8,0); c.lineTo(cx+sx*2.2+26,hz()+40); c.lineTo(cx+sx*2.2-26,hz()+40); c.fill(); }   // faint light shafts
-    // textured stone floor in perspective; fades into fog towards the horizon
+    c.fillStyle=pal[2]; c.fillRect(0,0,270,H);                                         // the vault above and the dark beyond
+    const far=1800, step=45, ds=[]; for(let d=far;d>=90;d-=step)ds.push(d);
+    // ceiling bands between the two walls, scrolling toward you
+    for(let i=0;i<ds.length-1;i++){ const d0=ds[i], d1=ds[i+1], s0=S_(d0), s1=S_(d1), band=Math.floor((d0+f.dist)/90)&1;
+      c.fillStyle=band?pal[2]:pal[1]; c.beginPath(); c.moveTo(cx-WALL*s0,Y(d0,CEIL)); c.lineTo(cx+WALL*s0,Y(d0,CEIL)); c.lineTo(cx+WALL*s1,Y(d1,CEIL)); c.lineTo(cx-WALL*s1,Y(d1,CEIL)); c.fill(); }
+    // textured stone floor, fading into the fog
     const tex=floorTexture(theme), gh=gy()-hz();
-    c.fillStyle='#120b1e'; c.fillRect(0,hz(),270,H-hz());
+    c.fillStyle=pal[2]; c.fillRect(0,hz(),270,H-hz());
     if(tex){ c.imageSmoothingEnabled=false;
-      for(let y=hz();y<H;y+=2){ const s=(y+1-hz())/gh; if(s<.2)continue; const d=F/s-F, z=d+f.dist, vrow=Math.floor(((z/TEXEL)%128+128)%128), srcW=270/s/TEXEL, k=270/srcW;
-        let start=(((-cx/s)/TEXEL)%128+128)%128, left=srcW, dx=0; c.globalAlpha=clamp((s-.2)/.28,0,1)*.95;
+      for(let y=hz();y<H;y+=2){ const s=(y+1-hz())/gh; if(s<.16)continue; const d=F/s-F, z=d+f.dist, vrow=Math.floor(((z/TEXEL)%128+128)%128), srcW=270/s/TEXEL, k=270/srcW;
+        let start=(((-cx/s)/TEXEL)%128+128)%128, left=srcW, dx=0; c.globalAlpha=clamp((s-.16)/.3,0,1)*.95;
         while(left>0.5){ const seg=Math.min(128-start,left); c.drawImage(tex,start,vrow,seg,1,dx,y,seg*k,2); dx+=seg*k; left-=seg; start=0; } }
       c.globalAlpha=1; }
-    const sh=c.createLinearGradient(0,hz(),0,H); sh.addColorStop(0,'rgba(8,4,16,.75)'); sh.addColorStop(.5,'rgba(8,4,16,.5)'); sh.addColorStop(1,'rgba(8,4,16,.35)'); c.fillStyle=sh; c.fillRect(0,hz(),270,H-hz());
-    const fg=c.createLinearGradient(0,hz(),0,hz()+90); fg.addColorStop(0,hexA(col,.35)); fg.addColorStop(1,hexA(col,0)); c.fillStyle=fg; c.fillRect(0,hz(),270,90);
-    // wall columns down both sides
-    const colArt=RUNNER_ART[theme]&&RUNNER_ART[theme].column, gap=190, off=f.dist%gap;
+    const sh=c.createLinearGradient(0,hz(),0,H); sh.addColorStop(0,'rgba(8,4,16,.8)'); sh.addColorStop(.5,'rgba(8,4,16,.5)'); sh.addColorStop(1,'rgba(8,4,16,.35)'); c.fillStyle=sh; c.fillRect(0,hz(),270,H-hz());
+    // side walls: brick bands that run down the hall and blend into the fog
+    for(const side of [-1,1]) for(let i=0;i<ds.length-1;i++){ const d0=ds[i], d1=ds[i+1], s0=S_(d0), s1=S_(d1), band=Math.floor((d0+f.dist)/95)&1, fog=clamp(1-s0*2.6,0,.85);
+      const x0=cx+side*WALL*s0, x1=cx+side*WALL*s1; c.fillStyle=band?pal[0]:pal[1]; c.beginPath(); c.moveTo(x0,Y(d0,CEIL)); c.lineTo(x1,Y(d1,CEIL)); c.lineTo(x1,Y(d1,0)); c.lineTo(x0,Y(d0,0)); c.fill();
+      c.fillStyle='rgba(6,3,12,'+(.25+fog*.6).toFixed(2)+')'; c.fill();
+      c.fillStyle='rgba(255,255,255,.06)'; c.beginPath(); c.moveTo(x1,Y(d1,CEIL)); c.lineTo(x1,Y(d1,0)); c.lineTo(x1+side*1,Y(d1,0)); c.lineTo(x1+side*1,Y(d1,CEIL)); c.fill(); }
+    // ceiling ribs: stone arches that spring from the walls, lit from below by the boss
+    const gap=190, off=f.dist%gap;
+    for(let i=10;i>=0;i--){ const d=i*gap-off+95; if(d<60||d>far)continue; const s=S_(d), ya=Y(d,CEIL), apex=Y(d,CEIL+110), fogA=clamp(1-s*2.4,0,.8);
+      c.lineWidth=Math.max(1.2,7*s); c.strokeStyle=pal[0]; c.beginPath(); c.moveTo(cx-WALL*s,ya); c.quadraticCurveTo(cx-WALL*s*.55,apex,cx,apex); c.quadraticCurveTo(cx+WALL*s*.55,apex,cx+WALL*s,ya); c.stroke();
+      c.lineWidth=Math.max(.6,2*s); c.strokeStyle=hexA(col,.22*(1-fogA)); c.stroke(); }
+    // columns and torches along the walls
+    const colArt=RUNNER_ART[theme]&&RUNNER_ART[theme].column;
     for(let i=10;i>=0;i--){ const d=i*gap-off; if(d<-30)continue; const s=S_(d), yb=Y(d,0);
       for(const side of [-1,1]){
-        if(colArt){ const p=prep(colArt), k=210/p.h, w=p.w*k*s, h=p.h*k*s, x=cx+side*2.2*LANE*s; c.globalAlpha=clamp((1500-d)/350,0,1); if(side<0){ c.drawImage(p.img,x-w/2,yb-h,w,h); } else { c.save(); c.translate(x,0); c.scale(-1,1); c.drawImage(p.img,-w/2,yb-h,w,h); c.restore(); } c.globalAlpha=1; }
+        if(colArt){ const p=prep(colArt), k=210/p.h, w=p.w*k*s, h=p.h*k*s, x=cx+side*2.3*LANE*s; c.globalAlpha=clamp((1500-d)/350,0,1); if(side<0){ c.drawImage(p.img,x-w/2,yb-h,w,h); } else { c.save(); c.translate(x,0); c.scale(-1,1); c.drawImage(p.img,-w/2,yb-h,w,h); c.restore(); } c.globalAlpha=1; }
         else { const w=30*s, h=250*s, x=cx+side*2.15*LANE*s-w/2; c.fillStyle='#241a38'; c.fillRect(x,yb-h,w,h); c.fillStyle='#0f0818'; c.fillRect(x-1,yb-h,1,h); c.fillRect(x+w,yb-h,1,h); }
       } }
-    const vg=c.createLinearGradient(0,0,270,0); vg.addColorStop(0,'rgba(6,3,12,.55)'); vg.addColorStop(.2,'rgba(6,3,12,0)'); vg.addColorStop(.8,'rgba(6,3,12,0)'); vg.addColorStop(1,'rgba(6,3,12,.55)'); c.fillStyle=vg; c.fillRect(0,hz(),270,H-hz());
+    // the far end: the boss's light pools down the hall; fog and a soft vignette tie everything together
+    const gl=c.createRadialGradient(cx,hz()+8,6,cx,hz()+8,150); gl.addColorStop(0,hexA(col,.62)); gl.addColorStop(.35,hexA(col,.26)); gl.addColorStop(1,hexA(col,0)); c.fillStyle=gl; c.fillRect(0,0,270,hz()+160);
+    const fg=c.createLinearGradient(0,hz()-30,0,hz()+110); fg.addColorStop(0,'rgba(10,5,18,0)'); fg.addColorStop(.4,hexA(col,.18)); fg.addColorStop(1,'rgba(10,5,18,0)'); c.fillStyle=fg; c.fillRect(0,hz()-30,270,140);
+    for(let i=0;i<26;i++){ const px_=((i*83+t*(6+i%5))%270), py_=(hz()-40+((i*61+t*(10+i%4)*2)%200)), a=.15+.25*Math.sin(t*2+i); c.globalAlpha=Math.max(0,a); c.fillStyle=hexA(col,.8); c.fillRect(px_,py_,1,1); } c.globalAlpha=1;   // drifting motes in the light
+    const vg=c.createLinearGradient(0,0,270,0); vg.addColorStop(0,'rgba(6,3,12,.5)'); vg.addColorStop(.22,'rgba(6,3,12,0)'); vg.addColorStop(.78,'rgba(6,3,12,0)'); vg.addColorStop(1,'rgba(6,3,12,.5)'); c.fillStyle=vg; c.fillRect(0,0,270,H);
+    const vt=c.createLinearGradient(0,0,0,70); vt.addColorStop(0,'rgba(6,3,12,.7)'); vt.addColorStop(1,'rgba(6,3,12,0)'); c.fillStyle=vt; c.fillRect(0,0,270,70);
   });
 }
 function hexA(h,a){ const n=parseInt(h.slice(1,7),16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
