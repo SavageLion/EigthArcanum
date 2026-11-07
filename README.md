@@ -60,3 +60,6 @@ falls back to the procedural art.
   - Pickups: mana wisps, hearts, shields, magnets. Combo: grazes, passed obstacles and wisps add up and raise bolt damage.
 - `systems/sideView.ts` is a side-on platformer fight that is switched off (add its entry back to `ARENAS` in `flow.ts` to bring it back).
 - Testing: the wizard screen has "Unlock everything" and "Force arena" options. `prototypes/boss-runner.html` is the standalone runner test page (`node tools/build-runner.mjs`).
+
+## The Sanctum (base)
+`systems/hub.ts`: the hall you return to between runs (`S.mode==='hub'`). The wizard walks it with the stick or arrow keys and steps onto glowing circles: the **Door** (opens the wizard and run-length screen), the **Market** (spend Arcana Shards on permanent starting boosts) and the **Forge** (unlock gear slots, choose the gear you carry into each run). Shards, boosts, owned gear and the loadout live in `data/meta.ts` (`shards`, `boosts`, `owned`, `forge`, `loadout`); shards are earned per boss and per finished run. `applyHubBonuses()` applies them in `startRun`. Props are Pixel Lab art in `public/assets/hub/`. Next steps: a Spell Lab with a training dummy, a Codex of bosses, daily runs.

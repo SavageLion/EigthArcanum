@@ -4,6 +4,7 @@ import { G, S } from '../core/state';
 import { BOSSES, ELITE_SECOND } from '../data/bosses';
 import { hotSave } from '../main';
 import { sideEnd, sideStart } from './sideView';
+import { enterHub } from './hub';
 import { resize } from '../core/size';
 import { eventsEnd, eventsStart } from './arenaEvents';
 import { FIST, LW, SPRITE_OVERRIDES, WIZ_SETS, blit, disc, makeBg } from '../render/sprites';
@@ -176,16 +177,16 @@ export function showDead(){
   show(`${heroHTML('hurt',true)}${unlockBanner()}<div class="eyebrow">The run ends on pull ${S.pos+1} of ${total()}</div><h2>${d.name} takes the hand</h2>
     <div class="stats"><div><b>${S.pos}</b><small>Bosses beaten</small></div><div><b>${meta.best[total()]||0}</b><small>Best ${total()}-run</small></div><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Recipes</small></div></div>
     ${handHTML()}<p class="muted">Every spell is gone. The deck is shuffled again.</p>
-    <button class="go" id="again">Start again</button>`);
-  $('again').onclick=showSetup; $('again').focus({preventScroll:true});
+    <button class="go" id="again">Return to the Sanctum</button>`);
+  $('again').onclick=enterHub; $('again').focus({preventScroll:true});
 }
 export function showVictory(){
   setMusic('victory'); S.mode='victory'; noteRunEnd(total(),S.pos+1,true);
   show(`${heroHTML('idle')}${unlockBanner()}<div class="eyebrow">All ${total()} cards defeated</div><h1>The deck is yours</h1>
     <p>You cleared the deck in ${fmt(S.runSeconds)}.</p>${handHTML()}
     <div class="stats"><div><b>${S.recipes.length}/${RECIPES.length}</b><small>Secret recipes found</small></div></div>
-    <button class="go" id="again">Play another run</button>`);
-  $('again').onclick=showSetup;
+    <button class="go" id="again">Return to the Sanctum</button>`);
+  $('again').onclick=enterHub;
 }
 export function showTitle(){
   setMusic('title'); S.mode='title'; G.pull=null; muteBtn.hidden=true; spellBar.hidden=true; $('bossname').hidden=true; $('omen').hidden=true;
@@ -194,7 +195,7 @@ export function showTitle(){
     <details class="how"><summary>How it plays</summary><p class="muted">The arena card decides how you fight: open field, orbit, face-off or open arena. Chests appear mid-fight with gear, gold or mana. If one wiggles it's a mimic, so cast a spell near it before you touch it. Tap spells with your other thumb. Near misses and perfect dodges refill mana.</p></details>
     ${S.best||S.recipes.length?`<div class="stats"><div><b>${S.best} / 16</b><small>Best run</small></div><div><b>${S.recipes.length} / ${RECIPES.length}</b><small>Recipes</small></div></div>`:''}
     <button class="go" id="begin">Begin a run</button>`);
-  $('begin').onclick=showSetup;
+  $('begin').onclick=enterHub;
 }
 /** pending unlock messages (new wizard, new run length) as a banner */
 export function unlockBanner(){ const u=takeUnlocks(); return u.length?`<div class="unlock">${u.map(t=>`<b>★ ${t}</b>`).join('')}</div>`:''; }
@@ -209,8 +210,8 @@ export function showSetup(){
       <div class="runs">${RUN_LENGTHS.map(n=>{ const open=meta.runs.includes(n), ready=runAvailable(n); return `<button class="run${n===sel.n?' sel':''}" data-n="${n}" ${open&&ready?'':'disabled'}><b>${n}</b><span>${!open?RUN_UNLOCK[n]:!ready?'More bosses coming':'bosses'+(meta.best[n]?` · best ${meta.best[n]}`:'')}</span></button>`; }).join('')}</div>
       <div class="eyebrow">Wizard</div>
       <div class="wizlist">${WIZARDS.map(w=>{ const open=meta.wizards.includes(w.id); return `<button class="wiz${w.id===sel.w?' sel':''}${open?'':' locked'}" data-w="${w.id}" ${open?'':'disabled'}>${open?`<div class="wport">${portraitHTML(w.id)}</div>`:`<div class="wport lock">?</div>`}<div class="txt"><b>${open?w.name:'Locked'}</b><span>${open?w.blurb:w.unlock}</span>${open?`<div class="stats2"><em>♥ ${pips(w.hearts,6)}</em><em>✦ ${pips(Math.round(w.mana/25),5)}</em><em>↯ ${pips(Math.round((.3-w.rate)/.03)+1,5)}</em></div><small>${w.perkText}</small>`:''}</div></button>`; }).join('')}</div>
-      <button class="go" id="start">Begin the run</button><div class="testbox"><button class="linkbtn" id="unlockall">Unlock everything (testing)</button><label class="testrow">Force arena (testing)<select id="testarena"><option value="">Random</option>${ARENA_LIST().map(a=>`<option value="${a.id}"${getTestArena()===a.id?' selected':''}>${a.name}</option>`).join('')}</select></label></div>`);
-    $('unlockall').onclick=()=>{ unlockEverything(); paint(); };
+      <button class="go" id="start">Begin the run</button><button class="linkbtn" id="tosanct">Back to the Sanctum</button><div class="testbox"><button class="linkbtn" id="unlockall">Unlock everything (testing)</button><label class="testrow">Force arena (testing)<select id="testarena"><option value="">Random</option>${ARENA_LIST().map(a=>`<option value="${a.id}"${getTestArena()===a.id?' selected':''}>${a.name}</option>`).join('')}</select></label></div>`);
+    $('unlockall').onclick=()=>{ unlockEverything(); paint(); }; $('tosanct').onclick=()=>{ ov.hidden=true; };
     $('testarena').onchange=e=>setTestArena(e.target.value);
     ov.querySelectorAll('.wiz').forEach(b=>b.onclick=()=>{ sel.w=b.dataset.w; paint(); });
     ov.querySelectorAll('.run').forEach(b=>b.onclick=()=>{ sel.n=+b.dataset.n; paint(); });

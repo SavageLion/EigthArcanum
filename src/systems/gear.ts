@@ -3,7 +3,7 @@ import { W } from '../core/dom';
 import { G, S } from '../core/state';
 import { SPRITE_OVERRIDES, WIZ_ROWS, blit, px } from '../render/sprites';
 import { CY, RI, RO, hasPerk, hasWand, relPos } from './deck';
-import { noteChest, noteMimic } from '../data/meta';
+import { noteChest, noteMimic, recordGear } from '../data/meta';
 import { foBodyY, foLaneX } from './runner';
 import { FO_LANES, icon, openShop, pixIcon, show } from './faceoff';
 import { inPillar } from './openArena';
@@ -36,7 +36,7 @@ export const rateNow=()=>G.P.rate/(hasWand('ash')?1.25:1)/(hasGear('brim')&&G.P.
 export function equip(g){
   const old=G.P.gear[g.slot]; let sold=0;
   if(old){ sold=gearOf(old).value; G.P.gold+=sold; if(old==='crown'){G.P.max++;G.P.hp++;} }
-  G.P.gear[g.slot]=g.id;
+  G.P.gear[g.slot]=g.id; recordGear(g.id);
   if(g.id==='crown'){G.P.max=Math.max(1,G.P.max-1);G.P.hp=Math.min(G.P.hp,G.P.max);}
   return sold;
 }

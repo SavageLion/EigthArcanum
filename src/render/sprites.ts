@@ -63,6 +63,9 @@ async function loadRunnerArt(){ for(const set of ['flag','ash','ice','moss']){ c
 export const SPELL_ART:Record<string,HTMLImageElement>={};
 const SPELL_NAMES=['fireball','crystal','bell','bolt','thorn','skull','eye','bubble','cog','spore','star','coin','blade','card','note','g-flame','g-shard','g-thorns','g-bones','g-wave','g-boulder','g-spikes','g-sand','g-ring','bolt-player','hit-spark','g-cog','p-wisp','p-heart','p-shield','p-magnet','burst'];
 async function loadSpellArt(){ const im=await Promise.all(SPELL_NAMES.map(n=>loadImage(`runner/spells/${n}.png`))); SPELL_NAMES.forEach((n,i)=>{ if(im[i])SPELL_ART[n]=im[i]; }); }
+/** Pixel Lab props for the Sanctum (door, market stall, forge, banner) */
+export const HUB_ART:Record<string,HTMLImageElement>={};
+async function loadHubArt(){ const k=['door','market','forge','banner']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
 export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
 export const WIZ_SETS:Record<string,{dirs:Record<string,Sprite>,back:Sprite,front:Sprite}>={};
 function scaled(img:HTMLImageElement,k:number){ const c=mk(Math.round(img.width*k),Math.round(img.height*k)),g=c.getContext('2d'); g.imageSmoothingEnabled=false; g.drawImage(img,0,0,c.width,c.height); return c as any; }
@@ -79,7 +82,7 @@ async function loadWizSets(){
 export async function loadSprites(){
   const [arena,large]=await Promise.all([loadSet('arena'),loadSet('large')]);
   SPRITE_OVERRIDES.wizardDirs=arena; SPRITE_OVERRIDES.wizardBack=large?large.north:null; SPRITE_OVERRIDES.wizardFront=large?large.south:null;
-  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadRunnerArt(),loadSpellArt(),loadWizSets(),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
+  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadHubArt(),loadRunnerArt(),loadSpellArt(),loadWizSets(),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
 }
 async function loadHands(){ const f=await Promise.all(Array.from({length:9},(_,i)=>loadImage(`hands/${i}.png`))); if(f.some(i=>!i)) return; f.forEach(i=>{(i as any).hi=true;}); SPRITE_OVERRIDES.hands=f; }
 async function loadChest(){

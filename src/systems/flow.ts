@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { sideEnd } from './sideView';
+import { applyHubBonuses } from './hub';
 import { eventsEnd } from './arenaEvents';
 import { ctx, cv, muteBtn, ov, reduced, stage } from '../core/dom';
 import { G, S, newPlayer } from '../core/state';
@@ -20,7 +21,7 @@ import { circle, fl, ln, poly } from '../render/bossArt';
 import { R, mk, pixelise } from '../render/pixel';
 
 /* ---------- flow ---------- */
-export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=8; remember(wizardId,runLen); G.P=newPlayer(wizardId); S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
+export function startRun(wizardId=meta.lastWizard,runLen=meta.lastRun){ wakeAudio(); if(typeof wizardId!=='string'||!meta.wizards.includes(wizardId))wizardId='raven'; if(typeof runLen!=='number'||!meta.runs.includes(runLen)||!runAvailable(runLen))runLen=8; remember(wizardId,runLen); G.P=newPlayer(wizardId); applyHubBonuses(); S.hub=false; G.hub=null; S.order=dealOrder(runLen); S.pos=0; S.stage=S.order[0]; S.mod=null; S.orbit=false; S.echo=null; S.lastOmen=null; S.arena=null; S.fo=false; S.open=false; S.runSeconds=0; S.hits=0; G.B=null; G.bolts=[];G.shots=[];G.rings=[];G.cols=[];G.bands=[];G.parts=[];G.seeds=[];G.beams=[];G.helpers=[]; showDraw(); requestWake(); }
 /** testing: force every pull to one arena (chosen on the wizard screen; kept in localStorage) */
 export const getTestArena=()=>{ try{ return localStorage.getItem('ea-test-arena')||''; }catch(e){ return ''; } };
 export const setTestArena=id=>{ try{ if(id)localStorage.setItem('ea-test-arena',id); else localStorage.removeItem('ea-test-arena'); }catch(e){} };

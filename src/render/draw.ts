@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { SPELL_ART } from './sprites';
 import { bulletArt, tintedArt } from '../systems/runnerSpells';
+import { drawHub } from '../systems/hub';
 import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
 import { pickupDraw } from '../systems/arenaEvents';
 import { W, ctx, reduced } from '../core/dom';
@@ -41,7 +42,7 @@ function wizardAction(P){ const t=nowS();
 /** The frame to draw for a direction: the current clip if that clip exists, else idle, else the still pose. */
 function wizardFrame(set,rest,dir){ const [name,age]=G.P?wizardAction(G.P):['idle',nowS()], A=SPRITE_OVERRIDES.anim[set]; const clip=A[name]?.[dir]||A.idle?.[dir]; return clip?clipFrame(clip,age):rest; }
 /** facing: one of the 8 directions (south = towards the camera). Falls back to the procedural wizard if the art is missing. */
-function drawWizard(x,y,fade,facing='south'){
+export function drawWizard(x,y,fade,facing='south'){
   const c=ctx; if(fade)c.globalAlpha=.4;
   const WS=wizardSprites(G.P&&G.P.wizard), set=WS.dirs; let tip;
   if(set&&WS.anim){ const side=S.side&&G.plats&&G.plats.length, air=side&&G.P.air, af=air?SPRITE_OVERRIDES.anim.arena.walk?.[facing]?.frames[2]:null; tip=blitSprite(c,af||wizardFrame('arena',set[facing],facing),px(x),px(y)+(side?SIDE_FEET*K:8),side?SIDE_K:1); }
@@ -111,6 +112,7 @@ function drawHUD(){
 export function draw(){
   const c=ctx; c.setTransform(R,0,0,R,0,0); c.imageSmoothingEnabled=false;
   c.fillStyle='#0b0814';c.fillRect(0,0,LW,G.LH);
+  if(S.mode==='hub'){ drawHub(c); return; }
   if(S.shake>0) c.translate(Math.round(rnd(-S.shake,S.shake)*.2),Math.round(rnd(-S.shake,S.shake)*.2));
   if(isMod('hanged')&&S.mode!=='draw'){c.translate(0,G.LH);c.scale(1,-1);}
   c.drawImage(G.bg,0,0,LW,G.LH); drawArenaLayers(c,LW); vfxStep();
