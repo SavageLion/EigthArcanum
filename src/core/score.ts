@@ -2,7 +2,7 @@
    Every boss has its own THEME (mode, tempo, time feel, drum pattern, bass style, arpeggio shape, signature sound).
    A fight's ENERGY (0-3) layers the band in as the run goes on, and a boss's enrage adds a frenzy on top.
    The same code runs live (scheduler) or offline (renderScore, used by tests and previews). */
-type Bass='none'|'pulse'|'walk'|'sixteenth'|'tolling'|'drone'|'creep'|'waltz'|'march'|'offbeat';
+type Bass='none'|'pulse'|'walk'|'sixteenth'|'tolling'|'drone'|'creep'|'waltz'|'march'|'offbeat'|'rolling';
 type Shape='up'|'updown'|'mirror'|'rand'|'broken';
 interface Theme{
   bpm:number; root:number; scale:number[]; bar?:12|16;               // 16th-note steps per bar (12 = waltz / 6-8 feel)
@@ -19,6 +19,11 @@ const MIN=[0,2,3,5,7,8,10], DOR=[0,2,3,5,7,9,10], PHR=[0,1,3,5,7,8,10], PHD=[0,1
 
 /* drum patterns: one char per 16th step. k=kick s=snare h=hat o=open hat r=rim t=tom .=rest */
 const DRUMS:Record<string,{k:string;s:string;h:string;t?:string;o?:string}>={
+  minimal:{k:'x...x...x...x...',s:'................',h:'................',o:'..x...x...x...x.'},
+  tech16:{k:'x...x...x...x...',s:'....x.......x...',h:'xxxxxxxxxxxxxxxx',o:'..x...x...x...x.'},
+  hard:  {k:'x...x...x...x.x.',s:'....x.......x..x',h:'x.x.x.x.x.x.x.x.',o:'..x...x...x...x.'},
+  tribal:{k:'x...x...x...x...',s:'....x.......x...',h:'..x...x...x...x.',o:'..x...x...x...x.',t:'..x.x...x.x...x.'},
+  waltz3:{k:'x...x...x...',s:'............',h:'x.x.x.x.x.x.',o:'..x...x...x.'},
   techno:{k:'x...x...x...x...',s:'....x.......x...',h:'x.x.x.x.x.x.x.x.',o:'..x...x...x...x.'},
   none:  {k:'................',s:'................',h:'................'},
   soft:  {k:'x.......x.......',s:'................',h:'..x...x...x...x.'},
@@ -40,27 +45,28 @@ export const THEMES:Record<string,Theme>={
   hub:    {bpm:122,root:52,scale:DOR,progs:[[0,3,4,3],[0,5,3,4]],drums:'techno',bass:'offbeat',arp:{rate:2,shape:'updown',wave:'square',oct:2},lead:{density:.55,wave:'triangle'},pad:{wave:'triangle',lp:1500,vol:.06},fx:['stabs']},
   camp:   {bpm:128,root:55,scale:MIX,progs:[[0,4,3,4],[0,3,0,4]],drums:'techno',bass:'offbeat',arp:{rate:1,shape:'up',wave:'sawtooth',oct:1},lead:{density:.65,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1300,vol:.045},fx:['stabs','wobble']},
   draw:   {bpm:84,root:52,scale:MIN,progs:[[0,3,5,2],[0,5,3,2]],drums:'none',bass:'walk',arp:{rate:2,shape:'updown',wave:'square',oct:1},lead:null,pad:{wave:'sawtooth',lp:900,vol:.05}},
-  shop:   {bpm:100,root:55,scale:MIX,progs:[[0,3,4,3],[0,4,3,0]],drums:'soft',bass:'walk',arp:{rate:2,shape:'broken',wave:'triangle',oct:1},lead:{density:.6,wave:'triangle'},pad:{wave:'triangle',lp:1400,vol:.06}},
-  reward: {bpm:92,root:57,scale:LYD,progs:[[0,4,1,4],[0,2,4,1]],drums:'none',bass:'walk',arp:{rate:4,shape:'updown',wave:'sine',oct:2},lead:{density:.7,wave:'triangle'},pad:{wave:'triangle',lp:1500,vol:.055},fx:['bells']},
-  victory:{bpm:108,root:57,scale:MAJ,progs:[[0,4,5,0]],drums:'soft',bass:'walk',arp:{rate:2,shape:'up',wave:'square',oct:1},lead:{density:.95,wave:'triangle'},pad:{wave:'sawtooth',lp:1300,vol:.05},fx:['stabs'],once:11},
-  defeat: {bpm:54,root:45,scale:MIN,progs:[[0,5,3,0]],drums:'none',bass:'none',arp:null,lead:{density:.6,wave:'sine'},pad:{wave:'sawtooth',lp:700,vol:.05},once:13},
+  /* the whole soundtrack is techno now: each boss keeps its own key, scale, tempo band and signature sound, but plays four on the floor with its own drum and bass flavour */
+  shop:   {bpm:122,root:55,scale:MIX,progs:[[0,3,4,3],[0,4,3,0]],drums:'techno',bass:'offbeat',arp:{rate:2,shape:'broken',wave:'triangle',oct:1},lead:{density:.6,wave:'triangle'},pad:{wave:'triangle',lp:1400,vol:.06},fx:['stabs']},
+  reward: {bpm:124,root:57,scale:LYD,progs:[[0,4,1,4],[0,2,4,1]],drums:'techno',bass:'offbeat',arp:{rate:1,shape:'updown',wave:'sine',oct:2},lead:{density:.7,wave:'triangle'},pad:{wave:'triangle',lp:1500,vol:.055},fx:['bells']},
+  victory:{bpm:128,root:57,scale:MAJ,progs:[[0,4,5,0]],drums:'techno',bass:'offbeat',arp:{rate:1,shape:'up',wave:'square',oct:1},lead:{density:.95,wave:'triangle'},pad:{wave:'sawtooth',lp:1300,vol:.05},fx:['stabs'],once:11},
+  defeat: {bpm:100,root:45,scale:MIN,progs:[[0,5,3,0]],drums:'minimal',bass:'offbeat',arp:null,lead:{density:.6,wave:'sine'},pad:{wave:'sawtooth',lp:700,vol:.05},once:13},
+  b0: {bpm:132,root:45,scale:PHD,progs:[[0,0,5,4],[0,1,0,4]],drums:'hard',bass:'rolling',arp:{rate:1,shape:'up',wave:'sawtooth',oct:1},lead:{density:.7,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1100,vol:.045},fx:['stabs']},                      // Cinder King: fiery, driving
+  b1: {bpm:124,root:52,scale:LYD,progs:[[0,4,1,5],[0,2,4,1]],drums:'techno',bass:'offbeat',arp:{rate:1,shape:'updown',wave:'sine',oct:2},lead:{density:.5,wave:'sine'},pad:{wave:'triangle',lp:2000,vol:.05},fx:['bells']},   // Frost Matron: glassy, icy 16ths
+  b2: {bpm:120,root:43,scale:MIN,progs:[[0,0,5,3],[0,5,0,4]],drums:'minimal',bass:'offbeat',arp:{rate:4,shape:'up',wave:'sine',oct:1},lead:{density:.4,wave:'sine'},pad:{wave:'sawtooth',lp:600,vol:.06},fx:['bells']},          // Hollow Bell: dub techno, tolling
+  b3: {bpm:150,root:47,scale:HMIN,progs:[[0,5,3,4],[0,3,4,0]],drums:'hard',bass:'rolling',arp:{rate:1,shape:'rand',wave:'sawtooth',oct:1},lead:{density:.6,wave:'sawtooth'},pad:{wave:'sawtooth',lp:800,vol:.04},fx:['thunder']}, // Storm Eye: frantic
+  b4: {bpm:126,root:50,scale:DOR,bar:12,progs:[[0,4,3,4],[0,3,1,4]],drums:'waltz3',bass:'offbeat',arp:{rate:2,shape:'broken',wave:'triangle',oct:1},lead:{density:.7,wave:'triangle'},pad:{wave:'triangle',lp:1500,vol:.055}}, // Mother of Thorns: techno in three
+  b5: {bpm:118,root:41,scale:LOC,progs:[[0,1,0,4],[0,0,5,1]],drums:'techno',bass:'rolling',arp:{rate:2,shape:'mirror',wave:'square',oct:1},lead:{density:.5,wave:'square'},pad:{wave:'sawtooth',lp:700,vol:.06},fx:['stabs']}, // Bone Tyrant: marching
+  b6: {bpm:124,root:49,scale:WHOLE,progs:[[0,2,4,2],[0,3,0,4]],drums:'techno',bass:'offbeat',arp:{rate:2,shape:'mirror',wave:'triangle',oct:2},lead:{density:.7,wave:'sine',echo:true},pad:{wave:'sine',lp:1800,vol:.06}}, // Mirror Witch: reflected arpeggios
+  b7: {bpm:128,root:38,scale:LOC,progs:[[0,1,0,6],[0,6,1,0]],drums:'minimal',bass:'rolling',arp:{rate:4,shape:'rand',wave:'sine',oct:2},lead:{density:.35,wave:'sine'},pad:{wave:'sawtooth',lp:500,vol:.075},fx:['choir','bells']},   // Void Sovereign: vast, dissonant
+  b8: {bpm:120,root:47,scale:MIN,bar:12,progs:[[0,5,3,4],[0,3,5,2]],drums:'waltz3',bass:'offbeat',arp:{rate:2,shape:'updown',wave:'sine',oct:2},lead:{density:.5,wave:'sine'},pad:{wave:'sine',lp:1600,vol:.07},fx:['bubbles']},               // Drowned Queen: slow tide in three
+  b9: {bpm:130,root:48,scale:MIX,progs:[[0,3,0,4],[0,4,3,4]],drums:'tech16',bass:'rolling',arp:{rate:2,shape:'up',wave:'square',oct:1},lead:{density:.55,wave:'square'},pad:{wave:'sawtooth',lp:1000,vol:.04},fx:['ticks']}, // Clockwork Judge: mechanical
+  b10:{bpm:144,root:46,scale:HMIN,progs:[[0,0,3,0],[0,3,4,0]],drums:'hard',bass:'rolling',arp:{rate:1,shape:'updown',wave:'sawtooth',oct:1},lead:{density:.6,wave:'sawtooth'},pad:{wave:'sawtooth',lp:900,vol:.04},fx:['wobble']}, // Hive Mother: buzzing swarm
+  b11:{bpm:124,root:44,scale:HMIN,progs:[[0,5,0,4],[0,3,5,4]],drums:'techno',bass:'offbeat',arp:{rate:4,shape:'broken',wave:'square',oct:1},lead:{density:.45,wave:'triangle'},pad:{wave:'sawtooth',lp:700,vol:.05},fx:['sevenths']}, // Ash Widow: creeping, jazzy menace
+  b12:{bpm:118,root:50,scale:PHD,progs:[[0,1,0,4],[0,4,1,0]],drums:'tribal',bass:'offbeat',arp:{rate:2,shape:'broken',wave:'triangle',oct:1},lead:{density:.8,wave:'triangle',echo:true},pad:{wave:'triangle',lp:1200,vol:.05}}, // Sand Prophet: desert hand-drums
+  b13:{bpm:126,root:43,scale:DOR,progs:[[0,3,4,0],[0,4,3,4]],drums:'techno',bass:'offbeat',arp:{rate:2,shape:'up',wave:'square',oct:1},lead:{density:.7,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1500,vol:.055},fx:['stabs']}, // Emperor: regal, four on the floor
+  b14:{bpm:122,root:54,scale:LYD,progs:[[0,4,1,5],[0,2,5,4]],drums:'minimal',bass:'offbeat',arp:{rate:1,shape:'updown',wave:'sine',oct:2},lead:{density:.55,wave:'sine'},pad:{wave:'triangle',lp:2200,vol:.065},fx:['choir','bells']}, // High Priestess: harp and choir
+  b15:{bpm:156,root:40,scale:PHD,progs:[[0,1,0,4],[0,0,1,5]],drums:'hard',bass:'rolling',arp:{rate:2,shape:'up',wave:'sawtooth',oct:1},lead:{density:.7,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1000,vol:.05},fx:['dist','stabs']}, // Devil: relentless
   /* ---- the 16 bosses (index = BOSSES order) ---- */
-  b0: {bpm:138,root:45,scale:PHD,progs:[[0,0,5,4],[0,1,0,4]],drums:'rock',bass:'pulse',arp:{rate:2,shape:'up',wave:'square',oct:1},lead:{density:.7,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1100,vol:.045}},                       // Cinder King: fiery, driving
-  b1: {bpm:118,root:52,scale:LYD,progs:[[0,4,1,5],[0,2,4,1]],drums:'soft',bass:'walk',arp:{rate:1,shape:'updown',wave:'sine',oct:2},lead:{density:.5,wave:'sine'},pad:{wave:'triangle',lp:2000,vol:.05},fx:['bells']},   // Frost Matron: glassy, icy 16ths
-  b2: {bpm:80,root:43,scale:MIN,progs:[[0,0,5,3],[0,5,0,4]],drums:'heart',bass:'tolling',arp:{rate:4,shape:'up',wave:'sine',oct:1},lead:{density:.4,wave:'sine'},pad:{wave:'sawtooth',lp:600,vol:.06},fx:['bells']},          // Hollow Bell: tolling, sparse
-  b3: {bpm:152,root:47,scale:HMIN,progs:[[0,5,3,4],[0,3,4,0]],drums:'storm',bass:'sixteenth',arp:{rate:1,shape:'rand',wave:'sawtooth',oct:1},lead:{density:.6,wave:'sawtooth'},pad:{wave:'sawtooth',lp:800,vol:.04},fx:['thunder']}, // Storm Eye: frantic
-  b4: {bpm:96,root:50,scale:DOR,bar:12,progs:[[0,4,3,4],[0,3,1,4]],drums:'waltz',bass:'waltz',arp:{rate:2,shape:'broken',wave:'triangle',oct:1},lead:{density:.7,wave:'triangle'},pad:{wave:'triangle',lp:1500,vol:.055}}, // Mother of Thorns: a twisted waltz
-  b5: {bpm:112,root:41,scale:LOC,progs:[[0,1,0,4],[0,0,5,1]],drums:'march',bass:'march',arp:null,lead:{density:.5,wave:'square'},pad:{wave:'sawtooth',lp:700,vol:.06},fx:['stabs']},                                          // Bone Tyrant: a death march
-  b6: {bpm:104,root:49,scale:WHOLE,progs:[[0,2,4,2],[0,3,0,4]],drums:'rock',bass:'walk',arp:{rate:2,shape:'mirror',wave:'triangle',oct:2},lead:{density:.7,wave:'sine',echo:true},pad:{wave:'sine',lp:1800,vol:.06}}, // Mirror Witch: reflected arpeggios
-  b7: {bpm:66,root:38,scale:LOC,progs:[[0,1,0,6],[0,6,1,0]],drums:'heart',bass:'drone',arp:{rate:4,shape:'rand',wave:'sine',oct:2},lead:{density:.35,wave:'sine'},pad:{wave:'sawtooth',lp:500,vol:.075},fx:['choir','bells']},   // Void Sovereign: vast, dissonant
-  b8: {bpm:72,root:47,scale:MIN,bar:12,progs:[[0,5,3,4],[0,3,5,2]],drums:'swell',bass:'drone',arp:{rate:2,shape:'updown',wave:'sine',oct:2},lead:{density:.5,wave:'sine'},pad:{wave:'sine',lp:1600,vol:.07},fx:['bubbles']},               // Drowned Queen: slow tide in 6/8
-  b9: {bpm:124,root:48,scale:MIX,progs:[[0,3,0,4],[0,4,3,4]],drums:'tick',bass:'pulse',arp:{rate:2,shape:'up',wave:'square',oct:1},lead:{density:.55,wave:'square'},pad:{wave:'sawtooth',lp:1000,vol:.04},fx:['ticks']}, // Clockwork Judge: mechanical
-  b10:{bpm:146,root:46,scale:HMIN,progs:[[0,0,3,0],[0,3,4,0]],drums:'double',bass:'pulse',arp:{rate:1,shape:'updown',wave:'sawtooth',oct:1},lead:{density:.6,wave:'sawtooth'},pad:{wave:'sawtooth',lp:900,vol:.04},fx:['wobble']}, // Hive Mother: buzzing swarm
-  b11:{bpm:116,root:44,scale:HMIN,progs:[[0,5,0,4],[0,3,5,4]],drums:'rock',bass:'creep',arp:{rate:4,shape:'broken',wave:'square',oct:1},lead:{density:.45,wave:'triangle'},pad:{wave:'sawtooth',lp:700,vol:.05},fx:['sevenths']}, // Ash Widow: creeping, jazzy menace
-  b12:{bpm:92,root:50,scale:PHD,progs:[[0,1,0,4],[0,4,1,0]],drums:'tom',bass:'walk',arp:{rate:2,shape:'broken',wave:'triangle',oct:1},lead:{density:.8,wave:'triangle',echo:true},pad:{wave:'triangle',lp:1200,vol:.05}}, // Sand Prophet: desert hand-drums
-  b13:{bpm:126,root:43,scale:DOR,progs:[[0,3,4,0],[0,4,3,4]],drums:'four',bass:'pulse',arp:{rate:2,shape:'up',wave:'square',oct:1},lead:{density:.7,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1500,vol:.055},fx:['stabs']}, // Emperor: regal, four on the floor
-  b14:{bpm:76,root:54,scale:LYD,progs:[[0,4,1,5],[0,2,5,4]],drums:'none',bass:'drone',arp:{rate:1,shape:'updown',wave:'sine',oct:2},lead:{density:.55,wave:'sine'},pad:{wave:'triangle',lp:2200,vol:.065},fx:['choir','bells']}, // High Priestess: harp and choir
-  b15:{bpm:162,root:40,scale:PHD,progs:[[0,1,0,4],[0,0,1,5]],drums:'double',bass:'sixteenth',arp:{rate:2,shape:'up',wave:'sawtooth',oct:1},lead:{density:.7,wave:'sawtooth'},pad:{wave:'sawtooth',lp:1000,vol:.05},fx:['dist','stabs']}, // Devil: relentless double-kick
 };
 /** which theme a request maps to: bosses by index (runs past 16 bosses reuse the themes in a new key) */
 export function themeKeyFor(key:string,seed:number){ return key==='battle'||key==='elite'?'b'+(seed%16):key; }
@@ -105,6 +111,7 @@ function step(ac:BaseAudioContext,out:AudioNode,th:Theme,shift:number,rng:()=>nu
   // bass (always on)
   switch(th.bass){
     case 'offbeat': if(s%4===2) bassNote(ac,out,t,low+(s%half===half-2&&bi%2?7:0),spb*1.7,.15); break;
+    case 'rolling': if(s%4!==0) bassNote(ac,out,t,low+(s%8===6?7:s%8===3?12:0),spb*.8,s%4===2?.14:.09,fxOn('dist')||th.drums==='hard'); break;
     case 'pulse': if(s%2===0) bassNote(ac,out,t,low+(s%half===half-2?7:0),spb*1.6,s%half===0?.16:.1); break;
     case 'walk': if(s%qtr===0) bassNote(ac,out,t,s%half===0?low:fifth,spb*qtr*.85,.12); break;
     case 'sixteenth': bassNote(ac,out,t,low+(s%4===3?12:0)+(s%8===6?7:0),spb*.9,s%4===0?.15:.09,fxOn('dist')||th.drums==='storm'); break;
@@ -122,7 +129,7 @@ function step(ac:BaseAudioContext,out:AudioNode,th:Theme,shift:number,rng:()=>nu
     if(D.o&&c(D.o)==='x') hit(ac,out,t,.11,6500,.05);
     if(D.t&&c(D.t)==='x') tom(ac,out,t,95+((n>>2)%3)*22,.3);
     if(fz&&s%2===1) hit(ac,out,t,.03,9000,.03); }
-  else if(E===1&&!breakdown&&th.drums!=='none'&&s===0) kick(ac,out,t,.3);                  // a lone heartbeat at energy 1
+  else if(E===1&&!breakdown&&th.drums!=='none'){ const D=DRUMS[th.drums]||DRUMS.none; if(D.k[s%D.k.length]==='x') kick(ac,out,t,.3); if(D.o&&D.o[s%D.o.length]==='x') hit(ac,out,t,.1,6500,.03); }                  // a lone heartbeat at energy 1
   // arpeggio (from energy 1)
   if(th.arp&&E>=1){ const A=th.arp, every=A.rate===1?1:A.rate===2?2:4*(bar===12?1:1), k=Math.floor(s/every);
     if(s%every===0){ const seq=A.shape==='up'?[0,1,2,3,4,5,6,7]:A.shape==='updown'?[0,1,2,3,4,3,2,1]:A.shape==='mirror'?[0,1,2,3,3,2,1,0]:A.shape==='broken'?[0,2,1,3,2,4,3,5]:null;

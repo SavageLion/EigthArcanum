@@ -5,6 +5,8 @@ import { setScoreEnergy, startScore, stopScore } from './score';
 export const snd:{ac:AudioContext|null,muted:boolean}={ac:null,muted:false};
 try{ snd.muted = localStorage.getItem('ea-mute')==='1'; }catch(e){}
 export function wakeAudio(){ try{ snd.ac = snd.ac || new (window.AudioContext||(window as any).webkitAudioContext)(); snd.ac.resume(); }catch(e){} musicWake(); }
+/** browsers keep audio locked until a touch or key: wake it on the first one anywhere (so the title music starts) and again if the phone suspends it */
+if(typeof window!=='undefined') for(const ev of ['pointerdown','touchend','keydown','click']) window.addEventListener(ev,()=>{ if(!snd.ac||snd.ac.state!=='running') wakeAudio(); },{capture:true,passive:true});
 export function tone(f,d,type:OscillatorType='sine',v=.1,slide=0,delay=0){
   const ac=snd.ac; if(!ac||snd.muted) return;
   const t=ac.currentTime+delay,o=ac.createOscillator(),g=ac.createGain();
