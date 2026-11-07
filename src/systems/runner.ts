@@ -11,7 +11,7 @@ import { blowTrap } from './spellFx';
 import { proc } from './casting';
 import { relPos, isMod } from './deck';
 import { BOSS_EL, EL } from './spells';
-import { FINAL_ORBS, MOTION, SPELLS, drawLow, drawOrb } from './runnerSpells';
+import { FINAL_ORBS, MOTION, SPELLS, drawLow, drawOrb, spellArt } from './runnerSpells';
 import { $, clamp, rnd } from '../core/util';
 import { sfx, tone } from '../core/audio';
 import { fxShield } from '../render/vfx';
@@ -75,7 +75,7 @@ export function foFreeze(){ const f=G.fo; let n=0; f.obs=f.obs.filter(o=>{ if(o.
 const shuffle=a=>{ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 function add(k,lane,extra={}){ const fl=flavour(); G.fo.obs.push({k,lane,lx:(lane-1)*LANE,d:1500,spd:0,seed:Math.random()*9,col:k==='shard'?fl.spell:fl.col,...extra}); }
 function combo(n){ const f=G.fo; const before=f.combo||0; f.combo=before+n; if(Math.floor(f.combo/10)>Math.floor(before/10)){ if(G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+10); const e=$('call'); e.textContent='Combo x'+f.combo+'!'; e.style.color='#ffe9a8'; e.hidden=false; f.call=.8; tone(980,.12,'triangle',.05); } }
-function castFx(){ G.B.atkAt=performance.now()/1000; for(let i=0;i<10;i++) G.fo.parts.push({x:cx+rnd(-18,18),y:hz()+rnd(-6,14),vx:rnd(-30,30),vy:rnd(10,60),life:rnd(.3,.7),t:0,c:G.B.color,r:1.5}); }
+function castFx(){ G.fo.burst=.5; G.B.atkAt=performance.now()/1000; for(let i=0;i<10;i++) G.fo.parts.push({x:cx+rnd(-18,18),y:hz()+rnd(-6,14),vx:rnd(-30,30),vy:rnd(10,60),life:rnd(.3,.7),t:0,c:G.B.color,r:1.5}); }
 const orbOf=()=>{ const sh=S.stage===63?FINAL_ORBS[Math.floor(Math.random()*FINAL_ORBS.length)]:(SPELLS[S.stage]||SPELLS[0])[0], m=MOTION[sh]||MOTION.fireball; return {shape:sh,spd:m.spd,wa:m.wa,wf:m.wf}; };
 const lowOf=()=>({shape:S.stage===63?['ring','flame','shard','boulder'][Math.floor(Math.random()*4)]:(SPELLS[S.stage]||SPELLS[0])[1]});
 /* Patterns: each is a list of hazards with a distance offset, so a "wall" fills all three lanes (only a jump or a slide gets you through) and
@@ -130,7 +130,7 @@ export function foStep(dt){
   f.lx=lerp(f.lx,(f.lane-1)*LANE,Math.min(1,dt*14)); f.x=X(f.lx,0)*PX;
   if(f.h>0||f.vy!==0){ f.vy-=1800*dt; f.h+=f.vy*dt; if(f.h<=0){ f.h=0; f.vy=0; for(let i=0;i<5;i++)f.parts.push({x:X(f.lx,0)+rnd(-8,8),y:gy(),vx:rnd(-30,30),vy:rnd(-25,-5),life:.35,t:0,c:'#8a7aa8',r:1.5}); } }
   if(f.slide>0)f.slide-=dt; if(G.P.surge>0)G.P.surge-=dt;
-  if(G.B.atk>0)G.B.atk-=dt;
+  if(G.B.atk>0)G.B.atk-=dt; if(f.burst>0)f.burst-=dt;
   // spawn
   f.spawnT-=dt; if(f.spawnT<=0){ const span=spawn(), e=G.B.enraged; f.spawnT=((rnd(e?.7:.95,e?1.0:1.35)-.012*relPos())/Math.max(.8,m))+span/Math.max(200,sp); }
   f.pickT=(f.pickT??5)-dt; if(f.pickT<=0){ f.pickT=rnd(6,10); spawnPickups(); }
@@ -216,6 +216,7 @@ export function foBoss(c){
     if(G.B.chill>0){ c.globalAlpha=.3; c.drawImage(white(sprite.img),Math.round(bx-w/2),Math.round(by),w,h); c.globalAlpha=1; }
     // hazards, far to near
     const items=[...f.obs].sort((a,b)=>b.d-a.d); for(const o of items) drawObs(c,o,t);
+    if(f.burst>0){ const bA=spellArt('burst',G.B.color), p=1-f.burst/.5, z=40+p*70; if(bA){ c.globalAlpha=Math.min(1,f.burst*3); c.save(); c.translate(cx,hz()+22); c.rotate(p*2); c.drawImage(bA,-z/2,-z/2,z,z); c.restore(); c.globalAlpha=1; } }
     if((f.combo||0)>=3){ c.font='700 15px "Pixelify Sans",monospace'; c.textAlign='center'; const pulse=1+Math.sin(t*8)*.04; c.save(); c.translate(cx,70); c.scale(pulse,pulse); c.fillStyle='#0b0814'; c.fillText('COMBO x'+f.combo,1,1); c.fillStyle='#ffe9a8'; c.fillText('COMBO x'+f.combo,0,0); c.restore(); }
     for(const q of f.parts){ c.globalAlpha=1-q.t/q.life; c.fillStyle=q.c; c.fillRect(Math.round(q.x),Math.round(q.y),q.r,q.r); } c.globalAlpha=1;
   });
@@ -223,7 +224,8 @@ export function foBoss(c){
 function drawObs(c,o,t){
   const s=S_(o.d), wob=o.wa?Math.sin(t*(o.wf||5)+o.seed)*o.wa:0, ramp=(o.k==='orb'||o.k==='shard')?clamp((1500-o.d)/420,0,1):1, lx=lerp(0,o.lx+wob,ramp), x=X(lx,o.d), yb=Y(o.d,0), col=o.col||'#e86bd0', hi=lighten(col);
   if(o.hit)c.globalAlpha=.35;
-  if(o.k==='pick'){ const yy=yb-(55+(o.arcH||0)+Math.sin(t*5+o.d*.02)*3)*s, r=Math.max(2.5,10*s), pc=o.sub==='heart'?'#ff7a8a':'#7fc4ff'; c.fillStyle=hexA(pc,.28); c.beginPath(); c.arc(x,yy,r*2,0,6.3); c.fill(); c.fillStyle='#0b0814'; c.fillRect(x-r-1,yy-r-1,r*2+2,r*2+2); c.fillStyle=pc; if(o.sub==='shield'){ c.fillStyle='#bfeaf2'; c.beginPath(); c.moveTo(x-r*.9,yy-r*.8); c.lineTo(x+r*.9,yy-r*.8); c.lineTo(x+r*.8,yy+r*.2); c.lineTo(x,yy+r*1.1); c.lineTo(x-r*.8,yy+r*.2); c.fill(); c.fillStyle='#4a7aa0'; c.fillRect(x-Math.max(.5,r*.12),yy-r*.5,Math.max(1,r*.24),r*1.1); }
+  if(o.k==='pick'){ const yy=yb-(55+(o.arcH||0)+Math.sin(t*5+o.d*.02)*3)*s, r=Math.max(2.5,10*s), pc=o.sub==='heart'?'#ff7a8a':'#7fc4ff', PA=spellArt('p-'+(o.sub==='wisp'?'wisp':o.sub),'#ffffff');
+    if(PA){ const z=r*3.6; c.fillStyle=hexA(pc,.22); c.beginPath(); c.arc(x,yy,z*.7,0,6.3); c.fill(); c.drawImage(PA,x-z/2,yy-z/2,z,z); c.globalAlpha=1; return; } c.fillStyle=hexA(pc,.28); c.beginPath(); c.arc(x,yy,r*2,0,6.3); c.fill(); c.fillStyle='#0b0814'; c.fillRect(x-r-1,yy-r-1,r*2+2,r*2+2); c.fillStyle=pc; if(o.sub==='shield'){ c.fillStyle='#bfeaf2'; c.beginPath(); c.moveTo(x-r*.9,yy-r*.8); c.lineTo(x+r*.9,yy-r*.8); c.lineTo(x+r*.8,yy+r*.2); c.lineTo(x,yy+r*1.1); c.lineTo(x-r*.8,yy+r*.2); c.fill(); c.fillStyle='#4a7aa0'; c.fillRect(x-Math.max(.5,r*.12),yy-r*.5,Math.max(1,r*.24),r*1.1); }
     else if(o.sub==='magnet'){ c.fillStyle='#ff7a6e'; c.fillRect(x-r*.9,yy-r*.9,r*.6,r*1.2); c.fillRect(x+r*.3,yy-r*.9,r*.6,r*1.2); c.fillRect(x-r*.9,yy+r*.2,r*1.8,r*.6); c.fillStyle='#e6f0ff'; c.fillRect(x-r*.9,yy-r*.9,r*.6,r*.4); c.fillRect(x+r*.3,yy-r*.9,r*.6,r*.4); }
     else if(o.sub==='heart'){ c.fillRect(x-r,yy-r*.7,r*.9,r*.9); c.fillRect(x+r*.1,yy-r*.7,r*.9,r*.9); c.fillRect(x-r*.8,yy-r*.2,r*1.6,r*1.1); c.fillRect(x-r*.3,yy+r*.7,r*.6,r*.5); } else { c.fillRect(x-r*.6,yy-r*.6,r*1.2,r*1.2); c.fillStyle='#fff'; c.fillRect(x-r*.2,yy-r*.2,Math.max(1,r*.4),Math.max(1,r*.4)); } c.globalAlpha=1; return; }
   const art=RUNNER_ART[G.fo.theme||'flag']&&RUNNER_ART[G.fo.theme||'flag'][o.k];

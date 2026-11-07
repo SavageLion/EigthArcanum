@@ -29,6 +29,7 @@ const T=6.2832;
 /** shapes that keep their own colours; everything else is tinted toward the boss's colour */
 const NATURAL=new Set(['coin','skull','card','bell','cog','note','g-bones','g-boulder','g-sand','g-spikes','g-thorns']);
 const SPIN={blade:5,thorn:2.5,star:2,cog:3};
+export const spellArt=(n,c)=>art(n,c);
 const tintCache={};
 function art(name,col){ const im=SPELL_ART[name]; if(!im)return null; if(NATURAL.has(name))return im; const k=name+col; if(tintCache[k])return tintCache[k]; const c=document.createElement('canvas'); c.width=im.width; c.height=im.height; const g=c.getContext('2d'); g.drawImage(im,0,0); g.globalCompositeOperation='source-atop'; g.fillStyle=rgba(col,.38); g.fillRect(0,0,c.width,c.height); return tintCache[k]=c; }
 const arc=(c,x,y,r)=>{ c.beginPath(); c.arc(x,y,Math.max(.5,r),0,T); };
@@ -67,7 +68,7 @@ export function drawOrb(c,shape,x,y,r,t,seed,col,hi){
 /** ground spell with its base on (x,yb); s = perspective scale. Jump it. */
 export function drawLow(c,shape,x,yb,s,t,seed,col,hi){
   const G_=art('g-'+shape,col)||(shape==='cog'?art('cog',col):null);
-  if(G_&&shape!=='ring'){ const spin=shape==='boulder'||shape==='cog', w=(shape==='cog'?46:66)*s, h=(shape==='cog'?46:44)*s; c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x,yb,w*.45,h*.12,0,0,T); c.fill();
+  if(G_&&shape!=='ring'){ const spin=shape==='boulder'||shape==='cog', w=(shape==='cog'?60:66)*s, h=(shape==='cog'?40:44)*s; c.fillStyle='rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(x,yb,w*.45,h*.12,0,0,T); c.fill();
     if(spin){ c.save(); c.translate(x,yb-h*.5); c.rotate(t*4+seed); c.drawImage(G_,-w/2,-h/2,w,h); c.restore(); } else c.drawImage(G_,x-w/2,yb-h,w,h); return; }
   if(G_&&shape==='ring'){ const w=70*s, h=46*s, p=(t*2+seed)%1; c.globalAlpha=.8; c.drawImage(G_,x-w/2*(1+p*.1),yb-h*.75,w*(1+p*.1),h*.9); c.globalAlpha=1; return; }
   const [m,h]=palette(shape,col,hi), w=46*s, hh=44*s;

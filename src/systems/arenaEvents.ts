@@ -44,9 +44,11 @@ function phaseEvent(){
   if(S.side){ G.hot={t:0,warn:1.1,on:2.3}; say('The floor ignites!','#ffb070'); }
   else if(S.open&&G.oa){ say('Fire pools!','#ffb070'); for(let i=0;i<7;i++){ const p=spot(); if(p)G.oa.patches.push({x:p.x,y:p.y,kind:'fire',t:7}); } }
 }
+import { SPELL_ART } from '../render/sprites';
 export function pickupDraw(c){
   if(!G.pickups)return;
-  for(const k of G.pickups){ if(k.t<2&&Math.floor(S.t*10)%2)continue; const x=px(k.x), y=px(k.y+Math.sin(k.age*4)*3), col=k.kind==='heart'?'#ff7a8a':'#7fc4ff';
+  for(const k of G.pickups){ if(k.t<2&&Math.floor(S.t*10)%2)continue; const x=px(k.x), y=px(k.y+Math.sin(k.age*4)*3), col=k.kind==='heart'?'#ff7a8a':'#7fc4ff', PA=SPELL_ART[k.kind==='heart'?'p-heart':'p-wisp'];
+    if(PA){ c.globalAlpha=.25+.08*Math.sin(S.t*8); c.fillStyle=col; c.beginPath(); c.arc(x,y,7,0,TAU); c.fill(); c.globalAlpha=1; c.drawImage(PA,x-8,y-8,16,16); continue; }
     c.globalAlpha=.25+.08*Math.sin(S.t*8); c.fillStyle=col; c.beginPath(); c.arc(x,y,6,0,TAU); c.fill(); c.globalAlpha=1;
     c.fillStyle='#0b0814'; c.fillRect(x-3,y-3,6,6); c.fillStyle=col; if(k.kind==='heart'){ c.fillRect(x-3,y-2,2,2); c.fillRect(x+1,y-2,2,2); c.fillRect(x-2,y-1,4,3); c.fillRect(x-1,y+2,2,1); } else { c.fillRect(x-2,y-2,4,4); c.fillStyle='#ffffff'; c.fillRect(x-1,y-1,1,1); } }
   if(G.hot){ const gy=px(groundY()), w=G.hot.t<G.hot.warn; if(!w||Math.floor(S.t*12)%2){ c.globalAlpha=w?.35:.8; c.fillStyle=w?'#ff7a6e':(Math.floor(S.t*14)%2?'#f2a03d':'#e8592c'); c.fillRect(0,gy-(w?0:3),px(W),w?3:5); c.globalAlpha=1; } }
