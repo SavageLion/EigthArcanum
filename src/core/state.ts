@@ -9,6 +9,7 @@ export const G: any = {
   P: undefined,
   B: undefined,
   bolts: [],
+  hits: [],
   shots: [],
   rings: [],
   cols: [],

@@ -30,6 +30,9 @@ const T=6.2832;
 const NATURAL=new Set(['coin','skull','card','bell','cog','note','g-bones','g-boulder','g-sand','g-spikes','g-thorns']);
 const SPIN={blade:5,thorn:2.5,star:2,cog:3};
 export const spellArt=(n,c)=>art(n,c);
+const strongCache={};
+/** the sprite tinted strongly toward a colour (player bolts take their spell's colour) */
+export function tintedArt(name,col,a=.6){ const im=SPELL_ART[name]; if(!im)return null; const k=name+col+a; if(strongCache[k])return strongCache[k]; const c=document.createElement('canvas'); c.width=im.width; c.height=im.height; const g=c.getContext('2d'); g.drawImage(im,0,0); g.globalCompositeOperation='source-atop'; g.fillStyle=rgba(col,a); g.fillRect(0,0,c.width,c.height); return strongCache[k]=c; }
 const tintCache={};
 function art(name,col){ const im=SPELL_ART[name]; if(!im)return null; if(NATURAL.has(name))return im; const k=name+col; if(tintCache[k])return tintCache[k]; const c=document.createElement('canvas'); c.width=im.width; c.height=im.height; const g=c.getContext('2d'); g.drawImage(im,0,0); g.globalCompositeOperation='source-atop'; g.fillStyle=rgba(col,.38); g.fillRect(0,0,c.width,c.height); return tintCache[k]=c; }
 const arc=(c,x,y,r)=>{ c.beginPath(); c.arc(x,y,Math.max(.5,r),0,T); };

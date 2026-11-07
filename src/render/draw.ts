@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { bulletArt } from '../systems/runnerSpells';
+import { SPELL_ART } from './sprites';
+import { bulletArt, tintedArt } from '../systems/runnerSpells';
 import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
 import { pickupDraw } from '../systems/arenaEvents';
 import { W, ctx, reduced } from '../core/dom';
@@ -126,7 +127,8 @@ export function draw(){
   for(const r of G.rings){ const w=Math.max(1,Math.round(r.w*K)); if(r.gap>=TAU-.01) arcDots(r.x,r.y,r.rad,0,TAU,w,r.c); else { arcDots(r.x,r.y,r.rad,r.a+r.gap,r.a-r.gap+TAU,w+2,'#0b0814'); arcDots(r.x,r.y,r.rad,r.a+r.gap,r.a-r.gap+TAU,w,r.c);} }
   if(!['won','pick','victory'].includes(S.mode)){ if(S.fo&&G.fo)foBoss(c); else drawBoss(); }
   for(const b of G.beams){ if(b.sy!==undefined) lineDots(b.sx,b.sy,G.B.x,G.B.y,GOLD); else { lineDots(b.x,0,b.x+rnd(-10,10),G.B.y*.5,'#fff2a0',2); lineDots(b.x,G.B.y*.5,b.x,G.B.y,'#fff2a0',2);} }
-  for(const b of G.bolts){ if(b.c) blit(c,px(b.x),px(b.y),disc(b.c,Math.max(1,b.r*K))); else { c.fillStyle='#7d5a22';c.fillRect(px(b.x)-1,px(b.y),3,6);c.fillStyle='#ffe9a8';c.fillRect(px(b.x),px(b.y)-1,1,6); } }
+  for(const b of G.bolts){ const BS=SPELL_ART['bolt-player']; if(BS){ const col=b.c, im=col?tintedArt('bolt-player',col,.55):BS, w=Math.max(6,b.r*1.9*K*2), h=w*2; c.save(); c.translate(px(b.x),px(b.y)); c.rotate(Math.atan2(b.vy||-1,b.vx||0)+Math.PI/2); c.drawImage(im,-w/2,-h*.6,w,h); c.restore(); continue; }
+    if(b.c) blit(c,px(b.x),px(b.y),disc(b.c,Math.max(1,b.r*K))); else { c.fillStyle='#7d5a22';c.fillRect(px(b.x)-1,px(b.y),3,6);c.fillStyle='#ffe9a8';c.fillRect(px(b.x),px(b.y)-1,1,6); } }
   for(const s of G.seeds){ if(s.homing) blit(c,px(s.x),px(s.y),disc('#9dbb6a',1)); }
   for(const s of G.shots){
     if(isMod('moon')&&G.P&&Math.hypot(s.x-G.P.x,s.y-G.P.y)>135)continue;
@@ -137,6 +139,7 @@ export function draw(){
     blit(c,px(s.x),px(s.y),disc(s.c,Math.max(2,s.r*K)));
     if(s.seed) arcDots(s.x,s.y,s.r+15*clamp(s.fuse/1.15,0,1),0,TAU,1,s.c);
   }
+  { const HS=SPELL_ART['hit-spark']; if(HS&&G.hits) for(const h of G.hits){ const f=h.t/h.life, z=(10+f*12)*(h.big?1.6:1); c.globalAlpha=1-f; c.drawImage(HS,px(h.x)-z/2,px(h.y)-z/2,z,z); } c.globalAlpha=1; }
   for(const p of G.parts){ c.fillStyle=p.c; const z=p.r>2&&p.t<p.life*.5?2:1; c.fillRect(px(p.x),px(p.y),z,z); }
   drawChest(c);
   for(const k of G.traps){ const on=k.arm<=0&&Math.floor(S.t*5)%2===0; blit(c,px(k.x),px(k.y),disc(k.c,on?3:2)); c.fillStyle=k.c; for(let i=0;i<4;i++){const a=i*1.57+S.t;c.fillRect(px(k.x)+Math.round(Math.cos(a)*7),px(k.y)+Math.round(Math.sin(a)*7),1,1);} }

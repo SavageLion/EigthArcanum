@@ -66,7 +66,7 @@ export function step(dt){
     G.helpers=G.helpers.filter(h=>h.life>0);
   }
   const hurtR=G.P?G.P.hit:5;
-  for(const b of G.bolts){ if(b.basic&&hasWand('hunter')&&fighting){const v=toBoss(b.x,b.y,640);b.vx=(b.vx||0)+(v.vx-(b.vx||0))*Math.min(1,dt*7);} b.x+=(b.vx||0)*dt;b.y+=b.vy*dt; if(fighting&&Math.hypot(b.x-G.B.x,b.y-G.B.y)<G.B.rad+b.r){b.dead=true;if(b.spell||b.d>5)fxImpact(b.x,b.y,b.c||'#ffe9a8');if(b.basic&&hasWand('siphon')&&G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+1);damage(b.d);burst(b.x,b.y,b.c||G.B.color,b.spell?6:1);if(b.spell&&Math.random()<(b.pc??1))proc(b.spell,b.pw);} if(b.y<-20||b.y>G.H+20||b.x<-20||b.x>W+20)b.dead=true; if(!b.dead&&G.pillars.length&&inPillar(b.x,b.y)){b.dead=true;burst(b.x,b.y,'#b5afc2',2);} }
+  for(const b of G.bolts){ if(b.basic&&hasWand('hunter')&&fighting){const v=toBoss(b.x,b.y,640);b.vx=(b.vx||0)+(v.vx-(b.vx||0))*Math.min(1,dt*7);} b.x+=(b.vx||0)*dt;b.y+=b.vy*dt; if(fighting&&Math.hypot(b.x-G.B.x,b.y-G.B.y)<G.B.rad+b.r){b.dead=true;if(b.spell||b.d>5)fxImpact(b.x,b.y,b.c||'#ffe9a8');if(b.basic&&hasWand('siphon')&&G.P.spells.length)G.P.mana=Math.min(G.P.manaMax,G.P.mana+1);damage(b.d);burst(b.x,b.y,b.c||G.B.color,b.spell?6:1); if(!b.spell&&G.hits&&G.hits.length<24)G.hits.push({x:b.x,y:b.y,t:0,life:.2,big:b.r>=5});if(b.spell&&Math.random()<(b.pc??1))proc(b.spell,b.pw);} if(b.y<-20||b.y>G.H+20||b.x<-20||b.x>W+20)b.dead=true; if(!b.dead&&G.pillars.length&&inPillar(b.x,b.y)){b.dead=true;burst(b.x,b.y,'#b5afc2',2);} }
   G.bolts=G.bolts.filter(b=>!b.dead);
   for(const s of G.seeds){
     if(s.recast){s.delay-=dt;if(s.delay<=0){s.dead=true;if(fighting)doCast(s.recast,.6);}continue;}
@@ -111,6 +111,7 @@ export function step(dt){
   G.beams.forEach(b=>b.t-=dt); G.beams=G.beams.filter(b=>b.t>0);
   for(const p of G.parts){p.t+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.97;p.vy*=.97;}
   G.parts=G.parts.filter(p=>p.t<p.life);
+  if(G.hits){ for(const h of G.hits)h.t+=dt; G.hits=G.hits.filter(h=>h.t<h.life); }
   if(G.P&&G.P.grazeGlow>0)G.P.grazeGlow-=dt;
   if(S.mode==='won'&&S.t>1.5){ if(S.pos===total()-1)showVictory(); else showPick(); }
   if(S.mode==='dying'&&S.t>1.3) showDead();

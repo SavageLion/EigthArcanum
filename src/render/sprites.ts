@@ -61,7 +61,7 @@ export const RUNNER_ART:Record<string,Record<string,HTMLImageElement>>={};
 async function loadRunnerArt(){ for(const set of ['flag','ash','ice','moss']){ const o={}; const k=['low','high','block','column']; const im=await Promise.all(k.map(n=>loadImage(`runner/${set}/${n}.png`))); k.forEach((n,i)=>{ if(im[i])o[n]=im[i]; }); RUNNER_ART[set]=o; } }
 /** Pixel Lab spell sprites for the Runner: flying spells by shape name, ground spells as 'g-<shape>' */
 export const SPELL_ART:Record<string,HTMLImageElement>={};
-const SPELL_NAMES=['fireball','crystal','bell','bolt','thorn','skull','eye','bubble','cog','spore','star','coin','blade','card','note','g-flame','g-shard','g-thorns','g-bones','g-wave','g-boulder','g-spikes','g-sand','g-ring','g-cog','p-wisp','p-heart','p-shield','p-magnet','burst'];
+const SPELL_NAMES=['fireball','crystal','bell','bolt','thorn','skull','eye','bubble','cog','spore','star','coin','blade','card','note','g-flame','g-shard','g-thorns','g-bones','g-wave','g-boulder','g-spikes','g-sand','g-ring','bolt-player','hit-spark','g-cog','p-wisp','p-heart','p-shield','p-magnet','burst'];
 async function loadSpellArt(){ const im=await Promise.all(SPELL_NAMES.map(n=>loadImage(`runner/spells/${n}.png`))); SPELL_NAMES.forEach((n,i)=>{ if(im[i])SPELL_ART[n]=im[i]; }); }
 export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
 export const WIZ_SETS:Record<string,{dirs:Record<string,Sprite>,back:Sprite,front:Sprite}>={};
