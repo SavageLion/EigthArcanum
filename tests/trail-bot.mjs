@@ -11,12 +11,12 @@ const RUNS = +process.argv[2] || 3, SEASON = process.argv.includes('--season'), 
 const shotDir = arg('--shots', ''), fixed = process.argv.includes('--effort') ? +arg('--effort') : null;
 const root = path.resolve('prototypes/trail');
 const MIME = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg' };
-const srv = http.createServer((q, s) => { const p = q.url.split('?')[0], f = path.join(root, p === '/' ? 'index.html' : p.replace(/../g, '')); try { s.setHeader('Content-Type', MIME[path.extname(f)] || 'text/plain'); s.end(fs.readFileSync(f)); } catch (e) { s.statusCode = 404; s.end(); } }).listen(0);
+const srv = http.createServer((q, s) => { const p = q.url.split('?')[0], f = path.join(root, p === '/' ? 'index.html' : p.split('..').join('')); try { s.setHeader('Content-Type', MIME[path.extname(f)] || 'text/plain'); s.end(fs.readFileSync(f)); } catch (e) { s.statusCode = 404; s.end(); } }).listen(0);
 const port = srv.address().port;
 const browser = await chromium.launch({ channel: 'chrome' }), errs = new Set();
 const NAMES = ['Pine', 'Canyon', 'Sky', 'Summit', 'Hills', 'Long', 'Heat', 'Recovery'];
 try {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const page = await browser.newPage({ viewport: { width: 844, height: 390 } });
   page.setDefaultTimeout(0);
   page.on('pageerror', e => errs.add('pageerror: ' + e.message)); page.on('console', m => { if (m.type() === 'error') errs.add('console: ' + m.text().slice(0, 160)); });
   await page.goto(`http://localhost:${port}/`); await page.waitForTimeout(800);
@@ -33,6 +33,18 @@ try {
       }
       const ok = T.state().PH && T.state().PH.res && T.state().PH.res.ok; T.leave(); return !!ok;
     };
+    // plays the open bear fight like a human: reacts to the swipe telegraph after rt seconds, punches when the bear is open
+    window.__bear = (rt, acc) => {
+      let g = 0, seen = null, wait = 0;
+      while (T.state().scene === 'bear' && !T.state().BR.over && g++ < 60000) {
+        const B = T.state().BR;
+        if (B.state === 'wind') { if (seen !== B.t0) { seen = B.t0 = (B.t0 || B.t); wait = rt + Math.random() * .1; } wait -= 1 / 60; if (wait <= 0 && B.dcd <= 0 && Math.random() < acc) T.dodge(-B.side); }
+        else { B.t0 = 0; seen = null; }
+        if (B.state === 'open' && B.pcd <= 0 && Math.random() < .8) T.punch();
+        T.step(1 / 60);
+      }
+      return T.state().BR.over;
+    };
     window.__run = (idx, fixed, acc) => {
       T.start(idx); let guard = 0, treated = 0;
       while (guard++ < 400000) {
@@ -42,7 +54,8 @@ try {
           if (!st.R_.tentUsed && st.save.inj.length) { T.treat('tent', st.save.inj[0].k); window.__solve(acc); treated++; continue; }
           if (st.R_.draft.length) T.draft(Math.floor(Math.random() * st.R_.draft.length)); else T.cont(); continue;
         }
-        if (sc === 'event') { T.choose(Math.random() < .35 ? 1 : 0); continue; }
+        if (sc === 'bear') { window.__bear(.3, .9); T.bearEnd(); continue; }
+        if (sc === 'event') { T.choose(st.P.ev.k === 'bear' ? (Math.random() < .5 ? 0 : 1) : Math.random() < .35 ? 1 : 0); continue; }
         if (sc === 'run') {
           const P = st.P, g = T.seg().g;
           if (fixed != null) T.setEffort(fixed); else T.setEffort(T.sweet(g, st.S.heat) + (.74 - P.hr) * 1.3);
@@ -91,6 +104,12 @@ try {
       console.log('--- season', s + 1); console.log(log.join('\n'));
     }
   }
+  if (process.argv.includes('--bear')) {
+    for (const [rt, acc] of [[.2, .95], [.35, .9], [.5, .8], [.7, .7]]) {
+      const res = await page.evaluate(([rt, acc]) => { const T = window.__trail, o = { win: 0, lose: 0, hits: 0, secs: 0 }; for (let i = 0; i < 20; i++) { T.reset(); T.bearStart('test'); const r = window.__bear(rt, acc), B = T.state().BR; o[r]++; o.hits += B.hits; o.secs += B.t; T.bearEnd(); } return o; }, [rt, acc]);
+      console.log(`bear reaction ${rt}s aim ${acc}: wins ${res.win}/20  avg hits ${(res.hits / 20).toFixed(1)}  avg fight ${(res.secs / 20).toFixed(0)}s`);
+    }
+  }
   if (shotDir) {
     const shot = async (name, fn) => { await page.evaluate(fn); await page.waitForTimeout(250); await page.screenshot({ path: `${shotDir}/trail_${name}.png` }); };
     await shot('map', () => { const T = window.__trail; T.reset(); T.goto('map'); });
@@ -101,6 +120,7 @@ try {
     await shot('run', () => { const T = window.__trail; T.start(1); for (let i = 0; i < 400; i++) { T.setEffort(.5); T.step(1 / 30); } });
     await shot('physio', () => { const T = window.__trail; T.goto('base'); T.treat('base', 'knee'); T.step(.4); });
     await shot('aid', () => { const T = window.__trail; T.start(1); T.setEffort(.8); let g = 0; while (T.state().scene !== 'aid' && g++ < 90000) { const st = T.state(); if (st.scene === 'event') T.choose(0); else { if (st.P.water < 40) T.drink(); T.step(1 / 30); } } });
+    await shot('bear', () => { const T = window.__trail; T.reset(); T.bearStart('test'); for (let i = 0; i < 110; i++) T.step(1 / 60); });
     await shot('result', () => { window.__run(0, null, .8); });
   }
 } finally { await browser.close(); srv.close(); }

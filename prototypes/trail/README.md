@@ -21,3 +21,9 @@ A standalone trail-running **management** roguelike for phones. One self-contain
 - `node tests/trail-bot.mjs 4` plays every race and training trail with a pacing bot on a fresh save (and treats injuries at the tent).
 - `node tests/trail-bot.mjs --season 3` plays whole seasons with a management bot (train, rest, physio, shop, race) and prints the day-by-day log.
 - Add `--shots <dir>` for screenshots of every screen.
+
+## Landscape, fullscreen and the bear fight
+- The game is a 480x270 landscape canvas. Held upright, the canvas is rotated 90 degrees by CSS (touch input is mapped back), so it is always landscape. The corner button (or the F key) toggles fullscreen and asks the browser to lock landscape (works on Android Chrome; iPhone Safari has no fullscreen API, use Add to Home Screen).
+- **Bear fight** (old-school boxing): the bear telegraphs a swipe from one side with a red "!". Tap DODGE toward the opposite side as the swipe lands (the dodge lasts half a second, so do not go too early). A dodged swipe leaves the bear dizzy for a moment: tap PUNCH to hit it, combos hit harder. Punching a guarding bear does nothing. It gets faster and feints as it weakens. Keys: A/D or arrows dodge, space/J punch.
+- It appears as the "Bear Den" test node on the map, and as a rare trail event in the 15K and longer races (fight it for +25 coins and +12 legs, or back away and lose 8 s; losing costs 25 legs and 3 s).
+- Art: Pine Ridge uses a scenic backdrop image and the runner is a pixel-art sprite (both in `assets/`). `node tests/trail-bot.mjs 2 --bear` also plays bear fights at several reaction times.
