@@ -38,7 +38,7 @@ try {
               if (sc > bs) { bs = sc; bb = [dx, dy]; } }
             S.bot(bb[0], bb[1]); }
           S.step(1 / 30); }
-        else if (st.scene === 'panel') { S.bot(0, 0); const ok = best('.card[data-sp]', prefSp) || best('.card[data-mod]', ['multi', 'power', 'haste', 'pierce', 'split', 'bounce', 'echo', 'size', 'frost', 'burn']) || click('.card[data-i]:not([disabled])') || click('#geq') || click('#r2') || click('#g1') || click('#g3') || click('#leave'); if (!ok) S.step(.1); }
+        else if (st.scene === 'panel') { S.bot(0, 0); const ok = best('.card[data-sp]', prefSp) || best('.card[data-mod]', ['multi', 'power', 'haste', 'pierce', 'split', 'bounce', 'echo', 'size', 'frost', 'burn']) || click('.card[data-i]:not([disabled])') || click('#geq') || click('#lnew') || click('#lsell') || click('#r2') || click('#g1') || click('#g3') || click('#leave'); if (!ok) S.step(.1); }
         else if (st.scene === 'dead' || st.scene === 'won') return { res: st.scene, keys: st.keys, spells: st.spells.length, rooms: st.stats.rooms, dark: st.dark };
         else S.step(.05);
       } return { res: 'timeout' }; });

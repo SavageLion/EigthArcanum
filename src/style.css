@@ -441,6 +441,25 @@ p{font-size:1.32rem;line-height:1.1}
 #hunt .chip[disabled]{opacity:.35;cursor:default}
 #hmenu,#hmute{position:absolute;top:calc(var(--s)*2px);font:inherit;font-size:calc(var(--s)*8px);color:#a79bc0;background:rgba(7,4,15,.7);border:1px solid #3a2d5c;padding:calc(var(--s)*1px) calc(var(--s)*5px);cursor:pointer;z-index:2}
 #hmenu{right:calc(var(--s)*2px);top:calc(var(--s)*40px)}#hmute{right:calc(var(--s)*28px);top:calc(var(--s)*40px)}#hfull{position:absolute;right:calc(var(--s)*62px);top:calc(var(--s)*40px);font:inherit;font-size:calc(var(--s)*8px);color:#a79bc0;background:rgba(7,4,15,.7);border:1px solid #3a2d5c;padding:calc(var(--s)*1px) calc(var(--s)*5px);cursor:pointer;z-index:2}#hfull[hidden]{display:none}
-#hrotate{position:fixed;inset:0;background:#07040f;display:none;place-items:center;text-align:center;z-index:5;color:#dcb868;font-size:22px;padding:24px}
-#hrotate small{display:block;margin-top:10px;font-family:'VT323','Courier New',monospace;font-size:18px;color:#a79bc0}
-@media (orientation:portrait){#hunt:not([hidden]) #hrotate{display:grid}}
+#rotate{position:fixed;inset:0;background:#07040f;display:none;place-items:center;text-align:center;z-index:60;color:#dcb868;font-family:var(--display,'Pixelify Sans',monospace);font-size:22px;padding:24px}
+#rotate small{display:block;margin-top:10px;font-family:'VT323','Courier New',monospace;font-size:18px;color:#a79bc0}
+@media (orientation:portrait){#rotate{display:grid}}
+
+/* landscape: overlays are a centred panel over the village */
+.overlay{background:rgba(11,8,20,.9)!important;padding-top:max(10px,env(safe-area-inset-top,0px))}
+.inner{margin:auto!important;max-width:560px;width:100%}
+#hunt .card.static{cursor:default;flex:1 1 0;min-width:0;max-width:calc(var(--s)*118px)}
+#hunt .card.static:active{background:#171027;border-color:#5a4a82}
+#hunt .btn.small{font-size:calc(var(--s)*8px);padding:calc(var(--s)*2px) calc(var(--s)*7px)}
+@media (max-height:560px){
+  .inner{gap:6px!important}
+  .inner h2{font-size:1.5rem!important;margin:0!important}.inner h1{font-size:1.9rem!important;margin:0!important}
+  .inner p{font-size:.78rem!important;margin:0!important;line-height:1.15}
+  .inner .eyebrow{font-size:.62rem!important}
+  .inner>.go:last-child{position:static!important;margin-top:4px;padding-block:8px!important}
+  .hero img{height:74px!important;width:auto!important}
+  .shoprow{padding:5px 8px!important;min-height:0!important}
+  .shoprow .txt span{font-size:.7rem!important}
+  .cdxgrid{gap:4px!important}
+  .stats{margin:0!important}
+}

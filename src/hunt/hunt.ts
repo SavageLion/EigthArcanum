@@ -241,8 +241,9 @@ function offerGear(n,done){
   setMusic('reward',room?room.id:0);
   setPanel(`<h2>${n>1?'Treasure (1 of '+n+')':'Treasure'}</h2><div class="row" style="justify-content:center">${gearCardHTML(g,'eq')}${cur?`<div style="display:flex;align-items:center;font-family:var(--small);color:#a79bc0;font-size:calc(var(--s)*10px)">replaces</div>${gearCardHTML(cur,'small')}`:''}</div>
     <div class="row" style="justify-content:center"><button class="btn" id="geq">Wear it</button><button class="btn ghost" id="gsell">Take ${g.value} stardust</button></div>`);
-  $('geq').onclick=()=>{equipGear(g);sfxT('chest',.1);n>1?offerGear(n-1,done):done();};
-  $('gsell').onclick=()=>{P.dust+=g.value;n>1?offerGear(n-1,done):done();};
+  const nx=()=>{if(n>1)offerGear(n-1,done);else{closePanel();done();}};
+  $('geq').onclick=()=>{equipGear(g);sfxT('chest',.1);nx();};
+  $('gsell').onclick=()=>{P.dust+=g.value;nx();};
 }
 /* ---------- the two newest spell shapes from the classic game: a sweeping beam and rune traps ---------- */
 function castBeam(s){
@@ -499,8 +500,8 @@ function genWorld(bossId){
 function enterRoom(c0,dir){
   room=c0;c0.visited=true;for(const d in c0.link)world.cells[c0.link[d]].seen=true;
   enemies=[];shots=[];eshots=[];marks=[];zones=[];blasts=[];later=[];beams=[];traps=[];boss=null;guard=null;rewardWait=0;altarHold=0;roomTear=false;
-  const pos={N:[240,AR.y1-16],S:[240,AR.y0+18],W:[AR.x1-16,140],E:[AR.x0+16,140]};
-  if(dir){P.x=pos[dir][0];P.y=pos[dir][1];}else{P.x=240;P.y=150;}
+  const pos={N:[P.x,AR.y1-18],S:[P.x,AR.y0+20],W:[AR.x1-18,P.y],E:[AR.x0+20,P.y]};
+  if(dir){P.x=clamp(pos[dir][0],AR.x0+24,AR.x1-24);P.y=clamp(pos[dir][1],AR.y0+24,AR.y1-14);}else{P.x=240;P.y=150;}
   P.inv=Math.max(P.inv,.8);scene='wave';fade=.35;
   if(!c0.cleared)startRoomWave(c0);else{locked=false;twist=null;banner=ROOMK[c0.kind].n.toUpperCase();bannerT=1.1;}
   roomMusic();
@@ -537,7 +538,7 @@ function openAltar(){
 }
 function checkDoors(){
   if(locked)return;
-  const hit={N:P.y<AR.y0+10&&Math.abs(P.x-240)<22,S:P.y>AR.y1-6&&Math.abs(P.x-240)<22,W:P.x<AR.x0+8&&Math.abs(P.y-140)<22,E:P.x>AR.x1-8&&Math.abs(P.y-140)<22};
+  const hit={N:P.y<AR.y0+10,S:P.y>AR.y1-6,W:P.x<AR.x0+8,E:P.x>AR.x1-8};
   for(const d in hit)if(hit[d]&&room.link[d]!=null){tryGo(d);return;}
 }
 function tryGo(d){
@@ -582,14 +583,45 @@ function chooseTarget(modId,done){
 function modSummary(s){return [s.el?ELS[s.el].n+' infusion':null,(s.tier||0)?'Level '+((s.tier||0)+1):null,...Object.entries(s.m).filter(([,v])=>v).map(([k,v])=>MODS[k].name+(v>1?' x'+v:''))].filter(Boolean).join(', ');}
 function applyMod(s,k){if(k.startsWith('el_')){s.el=MODS[k].el;fxHeal(P.x,P.y-8,'mana');return;}s.m[k]++;if(k==='haste')s.cd=Math.min(s.cd,sCd(s));}
 function addSpell(id){const o=spells.find(q=>q.id===id);if(o){o.tier=(o.tier||0)+1;texts.push({x:P.x,y:P.y-22,s:'LEVEL UP',t:1,c:'#ffd27a'});return;}spells.push(mkSpell(id));}
+/* ---------- spell slots and fusing ---------- */
+const SLOTS=4;
+const spellCardStatic=(s,btns)=>`<div class="card static" style="--c:${SP[s.id].col}">${letterIcon(s.id)}<b>${SP[s.id].name}</b><span>${modSummary(s)||'No upgrades yet'}</span><div class="row" style="gap:calc(var(--s)*3px)">${btns}</div></div>`;
+/** merge src into keep: levels add up (plus one), upgrades and element carry over, and a different spell lends one extra projectile or target */
+function fuseSpells(keep,src){
+  keep.tier=(keep.tier||0)+1+(src.tier||0);for(const k in src.m)keep.m[k]+=src.m[k];if(!keep.el&&src.el)keep.el=src.el;
+  if(src.id!==keep.id){keep.fused=(keep.fused||[]).concat(src.id);keep.m.multi+=1;}
+  keep.cd=Math.min(keep.cd,sCd(keep));texts.push({x:P.x,y:P.y-22,s:'FUSED',t:1.1,c:'#ffd27a'});fxHeal(P.x,P.y-8,'mana');
+}
+function learnFlow(id,done){
+  const def=SP[id],free=spells.length<SLOTS;
+  setPanel(`<h2>${def.name}</h2><p>${def.desc}  -  slots ${spells.length} of ${SLOTS}. ${free?'Learn it, or fuse it into a spell you carry.':'Your slots are full: replace a spell, or fuse it into one.'}</p>
+    <div class="row">${spells.map((s,i)=>spellCardStatic(s,`${free?'':`<button class="btn small" data-rep="${i}">Replace</button>`}<button class="btn small ghost" data-fuse="${i}">Fuse</button>`)).join('')}</div>
+    <div class="row" style="justify-content:center">${free?'<button class="btn" id="lnew">Learn it</button>':''}<button class="btn ghost" id="lsell">Sell it (+18 stardust)</button></div>`);
+  const fin=()=>{closePanel();done();};
+  panel.querySelectorAll('[data-rep]').forEach(b=>b.onclick=()=>{spells[+b.dataset.rep]=mkSpell(id);fin();});
+  panel.querySelectorAll('[data-fuse]').forEach(b=>b.onclick=()=>{fuseSpells(spells[+b.dataset.fuse],mkSpell(id));fin();});
+  if(free)$('lnew').onclick=()=>{spells.push(mkSpell(id));fin();};
+  $('lsell').onclick=()=>{P.dust+=18;fin();};
+}
+/** at a campfire: merge two spells you carry into one slot */
+function fuseFlow(done,back){
+  setPanel(`<h2>Fuse two spells</h2><p>Choose the spell to KEEP. The next one is folded into it.</p><div class="row">${spells.map((s,i)=>`<button class="card" data-k="${i}" style="--c:${SP[s.id].col}">${letterIcon(s.id)}<b>${SP[s.id].name}</b><span>${modSummary(s)||'No upgrades yet'}</span></button>`).join('')}</div><button class="btn ghost" id="fback">Back</button>`);
+  $('fback').onclick=back;
+  panel.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
+    const keep=spells[+b.dataset.k];
+    setPanel(`<h2>Fold in which spell?</h2><p>${SP[keep.id].name} keeps its shape and gains the other's levels, upgrades and element.</p><div class="row">${spells.filter(s=>s!==keep).map(s=>`<button class="card" data-a="${spells.indexOf(s)}" style="--c:${SP[s.id].col}">${letterIcon(s.id)}<b>${SP[s.id].name}</b><span>${modSummary(s)||'No upgrades yet'}</span></button>`).join('')}</div><button class="btn ghost" id="fback2">Back</button>`);
+    $('fback2').onclick=()=>fuseFlow(done,back);
+    panel.querySelectorAll('[data-a]').forEach(a=>a.onclick=()=>{const src=spells[+a.dataset.a];fuseSpells(keep,src);spells=spells.filter(s=>s!==src);closePanel();done();});
+  });
+}
 function openReward(kind,done){
   const fin=()=>{closePanel();done();};
   if(kind==='spell'){
     const have=new Set(spells.map(s=>s.id)),offer=shuffle(ALLS.filter(i=>!have.has(i))).slice(0,3);
-    if(have.size&&(!offer.length||Math.random()<.45)){const ups=[...have].filter(i=>(spells.find(s=>s.id===i).tier||0)<3);if(ups.length){const up=pick(ups);if(offer.length>=3)offer[2]=up;else offer.push(up);}}
+    if(have.size&&offer.length&&Math.random()<.35)offer[offer.length-1]=pick([...have]);   // now and then a duplicate, to fuse
     if(!offer.length){openReward('mod',done);return;}
-    setPanel(`<h2>Learn a spell</h2><div class="row">${offer.map(id=>{const o=have.has(id),tr=o?(spells.find(s=>s.id===id).tier||0):0;return `<button class="card" data-sp="${id}">${letterIcon(id)}<i style="--c:${CATC[SP[id].cat]}">${o?'Level up '+tr+' > '+(tr+1):SP[id].cat}</i><b>${SP[id].name}</b><span>${o?'Fuse it: +30% damage and 8% faster.':SP[id].desc}</span></button>`;}).join('')}</div>`);
-    panel.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{addSpell(b.dataset.sp);fin();});
+    setPanel(`<h2>Learn a spell</h2><div class="row">${offer.map(id=>{const o=have.has(id);return `<button class="card" data-sp="${id}">${letterIcon(id)}<i style="--c:${CATC[SP[id].cat]}">${o?'Duplicate: fuse it':SP[id].cat}</i><b>${SP[id].name}</b><span>${SP[id].desc}</span></button>`;}).join('')}</div>`);
+    panel.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>learnFlow(b.dataset.sp,done));
   }else if(kind==='element'){
     const offer=randomEls(3);if(!offer.length){openReward('mod',done);return;}
     setPanel(`<h2>Infuse a spell</h2><div class="row">${offer.map(k=>modCard(k)).join('')}</div>`);
@@ -599,7 +631,8 @@ function openReward(kind,done){
     setPanel(`<h2>Upgrade a spell</h2><div class="row">${offer.map(k=>modCard(k)).join('')}</div>`);
     panel.querySelectorAll('[data-mod]').forEach(b=>b.onclick=()=>chooseTarget(b.dataset.mod,fin));
   }else if(kind==='rest'){
-    setPanel(`<h2>A moment of rest</h2><div class="row"><button class="card" id="r1"><b>Mend</b><span>Heal 6 hearts</span></button><button class="card" id="r2"><b>Fortify</b><span>+2 max hearts and heal 2</span></button></div>`);
+    setPanel(`<h2>A moment of rest</h2><div class="row"><button class="card" id="r1"><b>Mend</b><span>Heal 6 hearts</span></button><button class="card" id="r2"><b>Fortify</b><span>+2 max hearts and heal 2</span></button><button class="card" id="r3" ${spells.length<2?'disabled':''}><b>Fuse</b><span>Merge two spells into one slot</span></button></div>`);
+    $('r3').onclick=()=>fuseFlow(done,()=>openReward('rest',done));
     $('r1').onclick=()=>{P.hp=Math.min(P.max,P.hp+6);fin();};$('r2').onclick=()=>{P.max+=2;P.hp=Math.min(P.max,P.hp+2);fin();};
   }else if(kind==='gamble'){
     setPanel(`<h2>The Wager</h2><p>The stars offer a trade.</p><div class="row"><button class="card" id="g1"><b>Take the coin</b><span>Heal 3 hearts. No risk.</span></button><button class="card" id="g2" ${P.hp<=3?'disabled':''}><b>Pay in blood</b><span>Lose 3 hearts, then gain TWO modifiers.</span></button></div>`);
@@ -618,7 +651,7 @@ function openShop(done){
       const body=o.type==='mod'?`<i style="--c:var(--frost)">Modifier</i><b>${MODS[o.k].name}</b><span>${MODS[o.k].desc}</span>`:o.type==='spell'?`${letterIcon(o.id)}<b>${SP[o.id].name}</b><span>${SP[o.id].desc}</span>`:`<i style="--c:var(--good)">Remedy</i><b>Healing draught</b><span>Heal 4 hearts</span>`;
       return `<button class="card" data-i="${i}" ${dis?'disabled':''}>${body}<span style="color:var(--gold)">${o.sold?'SOLD':o.price+' stardust'}</span></button>`;}).join('')}</div><button class="btn ghost" id="leave">Leave</button>`);
     panel.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const o=offers[+b.dataset.i];if(o.sold||P.dust<o.price)return;P.dust-=o.price;o.sold=true;
-      if(o.type==='heal'){P.hp=Math.min(P.max,P.hp+4);draw();}else if(o.type==='spell'){addSpell(o.id);draw();}else chooseTarget(o.k,draw);});
+      if(o.type==='heal'){P.hp=Math.min(P.max,P.hp+4);draw();}else if(o.type==='spell'){learnFlow(o.id,draw);}else chooseTarget(o.k,draw);});
     $('leave').onclick=()=>{closePanel();done();};
   };
   draw();
@@ -644,7 +677,7 @@ function startHunt(bi,isDaily=false){
   if(wz.perk==='wildfire')gHit.cd*=.9;if(wz.perk==='lucky'){gHit.crit=.1;gHit.gold*=1.3;}
   const ws=spells.find(s=>s.id==='ward');if(wz.perk==='rime'&&ws)ws.m.haste+=1;
   if(!daily)for(const bi2 of hunt_().equipped){const k=powerKey(bi2),lv=hunt_().cards[bi2]||1;
-    if(k.startsWith('spell:')){const id=k.slice(6);if(!spells.some(s=>s.id===id))spells.push(mkSpell(id));}
+    if(k.startsWith('spell:')){const id=k.slice(6);if(!spells.some(s=>s.id===id)&&spells.length<SLOTS)spells.push(mkSpell(id));}
     else if(k.startsWith('el:')){const tgt=spells.find(s=>!s.el&&ELTAGS.includes(s.id));if(tgt)tgt.el=k.slice(3);}
     else if(k==='burn')gHit.burn=true;else if(k==='slow')gHit.frost=true;else if(k==='dmg')gHit.dmg*=1+.15*lv;else if(k==='hearts'){P.max+=1+lv;P.hp=P.max;}
     else if(k==='haste')gHit.cd*=1-.08*lv;else if(k==='speed')gHit.speed*=1+.08*lv;else if(k==='gold')gHit.gold*=1+.25*lv;
@@ -748,7 +781,7 @@ function roomProps(r){
   if(r.props)return r.props;const th=THEMES[r.theme],rn=seeded(r.id*131+r.theme*7+3),out=[],n=r.kind==='boss'?9:5+Math.floor(rn()*3);
   for(let tries=0;out.length<n&&tries<80;tries++){
     const x=AR.x0+26+rn()*(AR.x1-AR.x0-52),y=AR.y0+34+rn()*(AR.y1-AR.y0-56);
-    if((Math.abs(x-240)<48&&(y<84||y>200))||(Math.abs(y-140)<48&&(x<84||x>396))||(Math.abs(x-240)<150&&Math.abs(y-140)<66))continue;
+    if((r.link.N!=null&&y<AR.y0+48)||(r.link.S!=null&&y>AR.y1-42)||(r.link.W!=null&&x<AR.x0+50)||(r.link.E!=null&&x>AR.x1-50)||(Math.abs(x-240)<150&&Math.abs(y-140)<66))continue;
     if(out.some(o=>Math.hypot(o.x-x,o.y-y)<48))continue;
     out.push({name:th.decor[Math.floor(rn()*th.decor.length)],x,y,k:.85+rn()*.3,flip:rn()<.5});
   }
@@ -807,16 +840,44 @@ function drawRoom(){
     if(room.kind==='treasure'&&HUNT_ART.enemies.chest){c.globalAlpha=used?.35:1;c.drawImage(HUNT_ART.enemies.chest.frames[0],ax-15,ay-33,30,30);c.globalAlpha=1;}else text(k.g,ax,ay-4,used?'#4a3a6a':k.col,14,'center',FONT);text(used?'spent':k.n,ax,ay+20,used?'#6a5a8a':'#f1e8d4',8,'center',FONT);
     if(!used&&altarHold>0){c.strokeStyle='#fff6d0';c.lineWidth=2;c.beginPath();c.ellipse(ax,ay,15,6,0,-1.57,-1.57+TAU*Math.min(1,altarHold/.5));c.stroke();}
     if(!used)text('stand here',ax,ay+29,'#a79bc0',8,'center',SMALL,400);}
-  // doors, with a preview of what lies beyond
-  for(const d in room.link){const n=world.cells[room.link[d]],dp=DOORS[d],k=ROOMK[n.kind],open=!locked,v=DIRV[d];
-    const horiz=d==='N'||d==='S',w=horiz?40:10,h=horiz?10:40;
-    c.fillStyle='#050309';c.fillRect(dp.x-w/2,dp.y-h/2,w,h);
-    c.strokeStyle=open?(n.kind==='boss'&&!n.unsealed&&keysHeld<KEYS_NEEDED?'#ff7a6e':'#dcb868'):'#7a2a30';c.lineWidth=2;c.strokeRect(dp.x-w/2+.5,dp.y-h/2+.5,w-1,h-1);
-    if(!open){c.strokeStyle='rgba(255,122,110,.8)';c.lineWidth=1;for(let i=-2;i<=2;i++){c.beginPath();if(horiz){c.moveTo(dp.x+i*7,dp.y-4);c.lineTo(dp.x+i*7,dp.y+4);}else{c.moveTo(dp.x-4,dp.y+i*7);c.lineTo(dp.x+4,dp.y+i*7);}c.stroke();}}
-    else{glow(dp.x-v[0]*4,dp.y-v[1]*4,26,'#ffe9a0',.18+.06*Math.sin(t*3));}
-    const ix=dp.x-v[0]*(horiz?0:24),iy=dp.y-v[1]*(horiz?22:0);
-    c.globalAlpha=n.visited&&n.cleared?.45:1;c.fillStyle='#120c22';c.beginPath();c.arc(ix,iy,7,0,TAU);c.fill();c.strokeStyle=k.col;c.lineWidth=1;c.beginPath();c.arc(ix,iy,7,0,TAU);c.stroke();text(k.g,ix,iy+3.5,k.col,9,'center',FONT);c.globalAlpha=1;
-    if(n.kind==='boss'&&!n.unsealed&&keysHeld<KEYS_NEEDED){c.fillStyle='#ff7a6e';c.fillRect(ix-3,iy+7,6,5);c.strokeStyle='#ff7a6e';c.lineWidth=1;c.beginPath();c.arc(ix,iy+7,2.5,Math.PI,0);c.stroke();}
+  drawExits();
+}
+const rgba=(h,a)=>{const n=parseInt(h.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;};
+/** every linked side of the room is an exit: the whole border glows in the colour of what lies beyond, with chevrons flowing out and a medallion; sealed or locked sides crackle red */
+function drawExits(){
+  const near=d=>clamp(1-({N:P.y-AR.y0,S:AR.y1-P.y,W:P.x-AR.x0,E:AR.x1-P.x}[d])/80,0,1);
+  for(const d of ['N','S','W','E']){
+    const horiz=d==='N'||d==='S',v=DIRV[d],len=horiz?AR.x1-AR.x0:AR.y1-AR.y0,TH=18;
+    // the band occupies [edge, edge+TH inward]; gradient runs from the edge inward
+    const ex=d==='W'?AR.x0:d==='E'?AR.x1:AR.x0,ey=d==='N'?AR.y0:d==='S'?AR.y1:AR.y0;
+    const bx=horiz?AR.x0:(d==='W'?AR.x0:AR.x1-TH),by=horiz?(d==='N'?AR.y0:AR.y1-TH):AR.y0,bw=horiz?len:TH,bh=horiz?TH:len;
+    const g0x=d==='W'?AR.x0:d==='E'?AR.x1:0,g0y=d==='N'?AR.y0:d==='S'?AR.y1:0,g1x=d==='W'?AR.x0+TH:d==='E'?AR.x1-TH:0,g1y=d==='N'?AR.y0+TH:d==='S'?AR.y1-TH:0;
+    if(room.link[d]==null){const gr=c.createLinearGradient(g0x,g0y,g1x,g1y);gr.addColorStop(0,'rgba(4,2,10,.8)');gr.addColorStop(1,'rgba(4,2,10,0)');c.fillStyle=gr;c.fillRect(bx,by,bw,bh);continue;}
+    const n=world.cells[room.link[d]],k=ROOMK[n.kind],open=!locked,sealed=n.kind==='boss'&&!n.unsealed&&keysHeld<KEYS_NEEDED,col=sealed?'#ff5a4a':k.col,pr=open?near(d):0;
+    const a=open?.34+.5*pr:.32+.08*Math.sin(t*6);
+    const gr=c.createLinearGradient(g0x,g0y,g1x,g1y);gr.addColorStop(0,rgba(open?col:'#ff5a4a',a));gr.addColorStop(1,rgba(open?col:'#ff5a4a',0));c.fillStyle=gr;c.fillRect(bx,by,bw,bh);
+    // the bright rim along the whole edge, rippling
+    c.strokeStyle=rgba(open?col:'#ff5a4a',open?.5+.4*pr:.6);c.lineWidth=2;c.beginPath();
+    for(let s=0;s<=len;s+=4){const w=1.2+Math.sin(s*.09+t*(open?5:9))*(open?1.1:.5),X=horiz?AR.x0+s:(d==='W'?AR.x0+w:AR.x1-w),Y=horiz?(d==='N'?AR.y0+w:AR.y1-w):AR.y0+s;s?c.lineTo(X,Y):c.moveTo(X,Y);}c.stroke();
+    if(open){
+      // chevrons stream towards the exit
+      c.strokeStyle=rgba(col,.75);c.lineWidth=1;const step=30,n2=Math.floor(len/step);
+      for(let i=0;i<=n2;i++){const ph=((t*.9+i*.37)%1),off=TH-2-(TH-4)*ph,al=Math.sin(ph*Math.PI)*(.35+.65*pr);if(al<.05)continue;c.globalAlpha=al;
+        const along=(i+.5)*step,cx=horiz?AR.x0+along:(d==='W'?AR.x0+off:AR.x1-off),cy=horiz?(d==='N'?AR.y0+off:AR.y1-off):AR.y0+along,px_=-v[1],py_=v[0];
+        c.beginPath();c.moveTo(cx+px_*3-v[0]*2,cy+py_*3-v[1]*2);c.lineTo(cx+v[0]*1.5,cy+v[1]*1.5);c.lineTo(cx-px_*3-v[0]*2,cy-py_*3-v[1]*2);c.stroke();}
+      c.globalAlpha=1;
+    }else{
+      // locked: spikes along the rim and a flickering crack pattern
+      c.strokeStyle=rgba('#ff7a6a',.55+.2*Math.sin(t*8));c.lineWidth=1;
+      for(let s=6;s<len;s+=12){const L=5+((s*7)%5),sx=horiz?AR.x0+s:(d==='W'?AR.x0:AR.x1),sy=horiz?(d==='N'?AR.y0:AR.y1):AR.y0+s;c.beginPath();c.moveTo(sx,sy);c.lineTo(sx-v[0]*L,sy-v[1]*L);c.stroke();}
+    }
+    // the medallion at the middle of the side
+    const mx=horiz?240:(d==='W'?AR.x0+17:AR.x1-17),my=horiz?(d==='N'?AR.y0+17:AR.y1-17):140;
+    if(open)glow(mx,my,22,col,.28+.3*pr);
+    c.globalAlpha=n.visited&&n.cleared?.5:1;c.fillStyle='#120c22';c.beginPath();c.arc(mx,my,8,0,TAU);c.fill();c.strokeStyle=col;c.lineWidth=1.2;c.beginPath();c.arc(mx,my,8,0,TAU);c.stroke();text(k.g,mx,my+3.8,col,10,'center',FONT);c.globalAlpha=1;
+    const lab=sealed?'SEALED':k.n.toUpperCase(),lx=horiz?240:(d==='W'?AR.x0+34:AR.x1-34),ly=horiz?(d==='N'?AR.y0+36:AR.y1-30):154;
+    c.globalAlpha=.55+.45*pr;text(lab,lx,ly,sealed?'#ff9a8a':'#dcd0f0',7,'center',SMALL,500);c.globalAlpha=1;
+    if(sealed){c.fillStyle='#ff5a4a';c.fillRect(mx-3,my+9,6,5);c.strokeStyle='#ff5a4a';c.lineWidth=1;c.beginPath();c.arc(mx,my+9,2.5,Math.PI,0);c.stroke();}
   }
 }
 function drawZones(){
@@ -871,7 +932,8 @@ function drawHUD(){
   for(let i=0;i<KEYS_NEEDED;i++){const kx=W-18-i*13-8,ky=26;c.fillStyle=i<keysHeld?'#ffd27a':'#2a2145';c.strokeStyle=i<keysHeld?'#fff6d0':'#5a4a82';c.lineWidth=1;c.beginPath();c.arc(kx,ky+3,3,0,TAU);c.fill();c.stroke();c.fillRect(kx-.5,ky+5,1.5,6);c.fillRect(kx,ky+9,3,1.5);}
   {let gx=18;for(const slot of ['hat','robe','charm']){const id=gearOn[slot];c.fillStyle='#0b0818';c.fillRect(gx-1,63,17,17);if(id){const g=gearOf(id);c.fillStyle=RARITY[g.rarity].c;c.fillRect(gx,64,15,15);const im=iconImg('gear_'+id);if(im.complete&&im.naturalWidth)c.drawImage(im,gx+.5,64.5,14,14);}else{c.strokeStyle='#3a2d5c';c.lineWidth=1;c.strokeRect(gx+.5,64.5,14,14);}gx+=19;}}
   // spell bar
-  const n=spells.length,sw=22,gap=3,x0=mid-(n*(sw+gap)-gap)/2,y0=H-5-sw;
+  const n=SLOTS,sw=22,gap=3,x0=mid-(n*(sw+gap)-gap)/2,y0=H-5-sw;
+  for(let i=spells.length;i<SLOTS;i++){const x=x0+i*(sw+gap);c.strokeStyle='#3a2d5c';c.lineWidth=1;c.setLineDash([2,2]);c.strokeRect(x+.5,y0+.5,sw-1,sw-1);c.setLineDash([]);}
   spells.forEach((s,i)=>{const x=x0+i*(sw+gap),def=SP[s.id];c.fillStyle='#0b0818';c.fillRect(x-1,y0-1,sw+2,sw+2);c.fillStyle=def.col;c.fillRect(x,y0,sw,sw);c.fillStyle='rgba(255,255,255,.18)';c.fillRect(x,y0,sw,5);
     const cdMax=sCd(s),k=s.id==='ward'?(P.shield?0:s.cd/cdMax):(['orbit','thorns','familiar'].includes(s.id)?0:clamp(s.cd/cdMax,0,1));
     if(k>0){c.fillStyle='rgba(7,4,15,.65)';c.fillRect(x,y0,sw,sw*k);}
@@ -937,4 +999,4 @@ function roomMusic(){
   if(locked){if(room.kind==='boss')setMusic('elite',bossTheme(hunting.id),3);else if(room.kind==='guard')setMusic('elite',room.id+3,3);else setMusic('battle',room.id+roomsCleared,dark>=3?3:2);}
   else setMusic('camp',room.id);
 }
-if(typeof window!=='undefined')window.__hunt={enter:id=>{const n=world.cells[id];n.unsealed=true;enterRoom(n,null);},step:dt=>{update(dt);},start:(bi,dl)=>startHunt(bi,dl),state:()=>({scene,locked,stage,hp:P&&P.hp,max:P&&P.max,spells:spells&&spells.map(s=>s.id),E:enemies,ES:eshots,P,room,world,keys:keysHeld,dark,stats:stat,hunting:hunting&&hunting.id,dust:P&&P.dust}),bot:(ix,iy)=>{keys.__bx=ix;keys.__by=iy;},go:d=>tryGo(d),give:id=>addSpell(id),mod:(id,k,n=1)=>{const s=spells.find(q=>q.id===id);for(let i=0;i<n;i++)applyMod(s,k);},skip:()=>{if(locked){waveT=0.01;if(boss)boss.hp=1;}},meta:()=>meta.hunt,sanctum:()=>showSanctum(),setKeys:n=>{keysHeld=n;},mimic:()=>{room.used=true;room.cleared=false;spawnMimic();},open:()=>enterHunt({exit(){}})};
+if(typeof window!=='undefined')window.__hunt={enter:id=>{const n=world.cells[id];n.unsealed=true;enterRoom(n,null);},step:dt=>{update(dt);},start:(bi,dl)=>startHunt(bi,dl),state:()=>({scene,locked,stage,hp:P&&P.hp,max:P&&P.max,spells:spells&&spells.map(s=>s.id),E:enemies,ES:eshots,P,room,world,keys:keysHeld,dark,stats:stat,hunting:hunting&&hunting.id,dust:P&&P.dust}),bot:(ix,iy)=>{keys.__bx=ix;keys.__by=iy;},go:d=>tryGo(d),give:id=>addSpell(id),mod:(id,k,n=1)=>{const s=spells.find(q=>q.id===id);for(let i=0;i<n;i++)applyMod(s,k);},skip:()=>{if(locked){waveT=0.01;if(boss)boss.hp=1;}},meta:()=>meta.hunt,sanctum:()=>showSanctum(),setKeys:n=>{keysHeld=n;},mimic:()=>{room.used=true;room.cleared=false;spawnMimic();},openSpell:id=>{scene='panel';learnFlow(id,()=>{scene='wave';});},open:()=>enterHunt({exit(){}})};
