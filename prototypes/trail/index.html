@@ -314,7 +314,15 @@ function injLine(i,x,y,sz=8){text(INJ[i.k].n,x,y,'#e8eee8',sz);pips(x+112,y-6,i.
 function toastLayer(){if(noteT>0){c.globalAlpha=clamp(noteT*2,0,1);c.fillStyle='rgba(0,0,0,.8)';c.fillRect(10,H-40,W-20,22);text(note,W/2,H-25,'#ffd27a',8,'center');c.globalAlpha=1;}}
 
 /* ---------- the trail scene ---------- */
+/* art: a scenic backdrop per map (POC: Pine Ridge) and a pixel-art runner sprite */
+const IMG={};const loadImg=(k,src)=>{const i=new Image();i.onload=()=>{IMG[k]=i;if(k==='runner')bakeRunner();};i.src=src;};
+let RUN_SPR=null;
+function bakeRunner(){const i=IMG.runner,o=document.createElement('canvas');o.width=60;o.height=104;const q=o.getContext('2d');q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.drawImage(i,265,10,690,1150,0,0,60,104);RUN_SPR=o;}
+loadImg('runner','assets/runner.png');loadImg('pine','assets/pine_bg.jpg');
 function drawRunner(x,y,ph,lean){
+  if(RUN_SPR){const cyc=Math.sin(ph*Math.PI*2),run=P.speed>2?Math.min(1,P.speed/18):0,bob=Math.abs(Math.sin(ph*Math.PI))*2.4*run;
+    c.save();c.translate(x,y-bob);c.rotate(lean*.8+(P.speed>12?.04:0));c.scale(1+.025*cyc*run,1-.03*Math.abs(cyc)*run);
+    c.imageSmoothingEnabled=false;c.drawImage(RUN_SPR,-18,-62,36,62);c.restore();return;}
   c.save();c.translate(x,y);c.rotate(lean);
   const bob=Math.abs(Math.sin(ph*Math.PI))*1.6*(P.speed>5?1:0);
   const swing=P.speed>2?Math.sin(ph*Math.PI*2):0,amp=P.speed>14?1:P.speed>6?.7:.35;
@@ -336,9 +344,11 @@ function drawScene(){
   c.save();if(shake>.2)c.translate(rnd(-shake,shake)*.5,rnd(-shake,shake)*.5);
   const sk=c.createLinearGradient(0,0,0,215);sk.addColorStop(0,th.sky[1]);sk.addColorStop(1,th.sky[0]);if(race.theme==='noon'){sk.addColorStop(0,th.sky[0]);}c.fillStyle=sk;c.fillRect(0,0,W,250);
   if(race.theme==='night'){c.fillStyle='#fff';for(let i=0;i<40;i++){c.globalAlpha=.3+.5*((i*37)%10)/10;c.fillRect((i*53+P.x*.01)%W,(i*29)%150,1,1);}c.globalAlpha=1;}
-  const sun=th.sun;glow(sun[0],sun[1],38,sun[2],.7);c.fillStyle=sun[2];c.beginPath();c.arc(sun[0],sun[1],9,0,TAU);c.fill();
+  const bg=race.id==='pine'?IMG.pine:null;
+  if(bg){const zoom=1.3,sw=bg.width/zoom,k=W/sw,sh=250/k,sx=(bg.width-sw)*clamp(P.x/S.L,0,1);c.imageSmoothingEnabled=false;c.fillStyle='#dbe7f3';c.fillRect(0,0,W,40);c.drawImage(bg,sx,0,sw,(250-26)/k,0,26,W,250-26);c.fillStyle='rgba(255,214,170,.07)';c.fillRect(0,0,W,250);}
+  else{const sun=th.sun;glow(sun[0],sun[1],38,sun[2],.7);c.fillStyle=sun[2];c.beginPath();c.arc(sun[0],sun[1],9,0,TAU);c.fill();}
   c.fillStyle='rgba(255,255,255,.18)';for(let i=0;i<4;i++){const cx=((i*97-t*3-P.x*.02)%360+360)%360-40,cy=50+i*22;c.fillRect(cx,cy,34,5);c.fillRect(cx+8,cy-3,20,4);}
-  for(let L=0;L<2;L++){c.fillStyle=th.mt[L];c.beginPath();c.moveTo(0,260);const sp=L?.18:.07;for(let sx=0;sx<=W+6;sx+=6){const wx=sx+P.x*sp;const hh=(L?105:140)-(Math.sin(wx*.021+L*2)*18+Math.sin(wx*.047+L)*10+Math.sin(wx*.009)*22);c.lineTo(sx,hh);}c.lineTo(W,260);c.fill();}
+  if(!bg)for(let L=0;L<2;L++){c.fillStyle=th.mt[L];c.beginPath();c.moveTo(0,260);const sp=L?.18:.07;for(let sx=0;sx<=W+6;sx+=6){const wx=sx+P.x*sp;const hh=(L?105:140)-(Math.sin(wx*.021+L*2)*18+Math.sin(wx*.047+L)*10+Math.sin(wx*.009)*22);c.lineTo(sx,hh);}c.lineTo(W,260);c.fill();}
   const yG=sx=>groundY(P.x+(sx-96)/PXU);
   c.beginPath();c.moveTo(0,H);for(let sx=0;sx<=W+3;sx+=3)c.lineTo(sx,yG(sx));c.lineTo(W,H);c.closePath();c.fillStyle=th.gnd;c.fill();
   for(let sx=0;sx<W;sx+=3){const wx=P.x+(sx-96)/PXU,sg=segAt(S,Math.max(0,wx));c.fillStyle=TERRAIN[sg.t].col;c.fillRect(sx,yG(sx),3.2,6);
@@ -348,7 +358,10 @@ function drawScene(){
     if(sg.t==='mud'&&((sx+Math.floor(wx))%7===0)){c.fillStyle='#2e2218';c.fillRect(sx,yG(sx)+1,3,1.5);}
   }
   c.fillStyle='rgba(255,255,255,.12)';for(let sx=0;sx<W;sx+=3)c.fillRect(sx,yG(sx)-.5,3.2,1);
-  for(const tr of S.trees){const sx=96+(tr.x-P.x)*PXU;if(sx<-20||sx>W+20)continue;const gy=yG(sx)-2,h=tr.h;c.fillStyle=th.tree;c.beginPath();c.moveTo(sx,gy-h);c.lineTo(sx+h*.28,gy);c.lineTo(sx-h*.28,gy);c.closePath();c.fill();c.fillRect(sx-1,gy,2,3);}
+  if(bg){const gg=c.createLinearGradient(0,170,0,H);gg.addColorStop(0,'#3c6a44');gg.addColorStop(1,'#1c3426');c.beginPath();c.moveTo(0,H);for(let sx=0;sx<=W+3;sx+=3)c.lineTo(sx,yG(sx)+4);c.lineTo(W,H);c.closePath();c.fillStyle=gg;c.fill();
+    for(let sx=0;sx<W;sx+=3){const wx=P.x+(sx-96)/PXU,y0=yG(sx);c.fillStyle='#8a6a42';c.fillRect(sx,y0+2,3.2,7);c.fillStyle='#a88a58';c.fillRect(sx,y0+2,3.2,2);if(Math.floor(wx/3)%11===0){c.fillStyle='#5a8a4a';c.fillRect(sx,y0-3,1,4);c.fillRect(sx+1.5,y0-2,1,3);}}}
+  for(const tr of S.trees){if(bg){const sx=96+(tr.x-P.x)*PXU*1.15;if(sx<-24||sx>W+24)continue;const gy=yG(sx)-1,h=tr.h*2.2,w=h*.34;c.fillStyle='#14301f';for(let i=0;i<3;i++){const ty=gy-h*(i*.32),tw=w*(1-i*.22);c.beginPath();c.moveTo(sx,ty-h*.5);c.lineTo(sx+tw,ty);c.lineTo(sx-tw,ty);c.closePath();c.fill();}c.fillStyle='#2a1c10';c.fillRect(sx-1.5,gy-2,3,5);continue;}
+    const sx=96+(tr.x-P.x)*PXU;if(sx<-20||sx>W+20)continue;const gy=yG(sx)-2,h=tr.h;c.fillStyle=th.tree;c.beginPath();c.moveTo(sx,gy-h);c.lineTo(sx+h*.28,gy);c.lineTo(sx-h*.28,gy);c.closePath();c.fill();c.fillRect(sx-1,gy,2,3);}
   for(const ev of S.evs){if(ev.done)continue;const sx=96+(ev.x-P.x)*PXU;if(sx>W+10||sx<-10)continue;const gy=yG(sx);c.fillStyle='#4a3a2a';c.fillRect(sx,gy-22,1.5,22);c.fillStyle='#ffd24a';c.beginPath();c.moveTo(sx+1.5,gy-22);c.lineTo(sx+11,gy-18);c.lineTo(sx+1.5,gy-14);c.fill();}
   const fx=96+(S.L-P.x)*PXU;if(fx<W+20){const gy=yG(fx);c.fillStyle='#e8e0d0';c.fillRect(fx-1,gy-30,2,30);c.fillRect(fx+24,gy-30,2,30);c.fillStyle='#e8503a';c.fillRect(fx-1,gy-31,27,5);text(R_.si+1>=race.stages?'FINISH':'AID',fx+12,gy-27,'#fff',4,'center');}
   const gy=yG(96),slope=Math.atan2(yG(100)-yG(92),8);
