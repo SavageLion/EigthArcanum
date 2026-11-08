@@ -4,16 +4,15 @@
    rooms (each a short wave fight), take three keys from the guardians, break the seal and claim the boss's card.
    Self-contained: it draws on its own 480x270 canvas (#hcv) inside #hunt, and borrows the main game's art, music, wizards, bosses and meta.
    Imports are only used inside functions, because the rest of the game's modules import each other in a loop. */
-import { gains, meta, saveMeta, WIZARDS, noteBoss } from '../data/meta';
-import { BOSSES as MB } from '../data/bosses';
-import { BOSS_EL } from '../systems/spells';
+import { gains, meta, saveMeta, todayKey, WIZARDS, noteBoss, noteDaily } from '../data/meta';
+import { BOSSES as MB, BOSS_EL } from '../data/bossList';
 import { R, SPRITE_OVERRIDES, WIZ_ANIM, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame } from '../render/sprites';
-import { GEAR } from '../systems/gear';
+import { GEAR } from '../data/gear';
 import { applyMuteToMusic, setMusic, sfx, snd, wakeAudio } from '../core/audio';
 import { S } from '../core/state';
 
 const W=480,H=270;
-let root,cv,c,box,panel,hmute,hmenu,exitFn=null,classicFn=null,inited=false,hw=null,prevScene='wave';
+let root,cv,c,box,panel,hmute,hmenu,exitFn=null,inited=false,hw=null,prevScene='wave',daily=false;
 const rnd=(a,b)=>a+Math.random()*(b-a),rint=(a,b)=>Math.floor(rnd(a,b+1)),pick=a=>a[Math.floor(Math.random()*a.length)],clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),TAU=Math.PI*2;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const AR={x0:14,y0:24,x1:466,y1:256};   // playfield
@@ -91,6 +90,7 @@ const PW={
 const EL_POWER={fire:'burn',frost:'slow',storm:'spell:chain',sound:'spell:nova',thorn:'spell:thorns',bone:'spell:familiar',mirror:'spell:ward',blood:'hearts',gold:'gold',poison:'burn',holy:'hearts',void:'spell:blink'};
 const FALL=['dmg','haste','speed','pierce','multi','spell:orbit','spell:meteor','dmg','haste'];
 const powerKey=bi=>EL_POWER[BOSS_EL[bi]]||FALL[bi%FALL.length];
+export const cardInfo=bi=>({text:powerText(powerKey(bi)),level:(meta.hunt&&meta.hunt.cards[bi])||0});
 const powerText=k=>k.startsWith('spell:')?'Begin each hunt with '+SP[k.slice(6)].name+'.':PW[k];
 const hunt_=()=>meta.hunt||(meta.hunt={cards:{},equipped:[],wins:0});
 const owned=()=>Object.keys(hunt_().cards).map(Number);
@@ -421,6 +421,7 @@ function openGate(d,n){
   $('g4').onclick=()=>{closePanel();const v=DIRV[d];P.x-=v[0]*34;P.y-=v[1]*34;scene='wave';};
 }
 function awardCard(){
+  if(daily){noteDaily(stat.rooms,true);const gain=endShards(true);scene='won';banner='HUNT COMPLETE';bannerT=2;sfxT('win',.1);setTimeout(()=>showEnd(true,hunting.id,0,gain),1500);return;}
   const bi=hunting.id,h=hunt_(),lv=(h.cards[bi]||0)+1;h.cards[bi]=lv;if(!h.equipped.includes(bi)&&h.equipped.length<cardSlots())h.equipped.push(bi);h.wins=(h.wins||0)+1;
   noteBoss(true,stat.hurt===0,bi);const gain=endShards(true)+gains.boss;
   scene='won';banner='CARD CLAIMED';bannerT=2;sfxT('win',.1);setTimeout(()=>showEnd(true,bi,lv,gain),1500);
@@ -491,24 +492,26 @@ function pickBoard(){
   const fresh=a=>a.sort((x,y)=>(hunt_().cards[x]?1:0)-(hunt_().cards[y]?1:0))[0];
   board=[fresh(by(1,2)),fresh(by(3,3)),fresh(by(4,5))];
 }
-function startHunt(bi){
-  wakeAudio();closePanel();hunting=bdef(bi);const wz=WIZARDS.find(w=>w.id===meta.lastWizard)||WIZARDS[0];hw=wz;
+const dailyBoss=()=>{let h=0;for(const ch of todayKey())h=(h*31+ch.charCodeAt(0))>>>0;return {bi:h%MB.length,seed:h};};
+function withSeed(seed,fn){const orig=Math.random;let a=seed>>>0;Math.random=()=>{a=(a+0x6D2B79F5)>>>0;let x=Math.imul(a^a>>>15,1|a);x=x+Math.imul(x^x>>>7,61|x)^x;return((x^x>>>14)>>>0)/4294967296;};try{return fn();}finally{Math.random=orig;}}
+function startHunt(bi,isDaily=false){
+  wakeAudio();closePanel();daily=isDaily;hunting=bdef(bi);const wz=WIZARDS.find(w=>w.id===meta.lastWizard)||WIZARDS[0];hw=wz;
   P={x:240,y:150,hp:10+wz.hearts,max:10+wz.hearts,inv:0,face:'south',step:0,moving:false,shield:0,boost:0,dust:wz.gold||0,r:5,aim:0};
   spells=[mkSpell('bolt')];gHit={frost:false,burn:false,dmg:1,cd:1,speed:1,gold:1,crit:0};
   const ST={nova:'nova',ward:'ward',summon:'familiar'};if(wz.spell&&ST[wz.spell.type])spells.push(mkSpell(ST[wz.spell.type]));
   if(wz.perk==='wildfire')gHit.cd*=.9;if(wz.perk==='lucky'){gHit.crit=.1;gHit.gold*=1.3;}
   const ws=spells.find(s=>s.id==='ward');if(wz.perk==='rime'&&ws)ws.m.haste+=1;
-  for(const bi2 of hunt_().equipped){const k=powerKey(bi2),lv=hunt_().cards[bi2]||1;
+  if(!daily)for(const bi2 of hunt_().equipped){const k=powerKey(bi2),lv=hunt_().cards[bi2]||1;
     if(k.startsWith('spell:')){const id=k.slice(6);if(!spells.some(s=>s.id===id))spells.push(mkSpell(id));}
     else if(k==='burn')gHit.burn=true;else if(k==='slow')gHit.frost=true;else if(k==='dmg')gHit.dmg*=1+.15*lv;else if(k==='hearts'){P.max+=1+lv;P.hp=P.max;}
     else if(k==='haste')gHit.cd*=1-.08*lv;else if(k==='speed')gHit.speed*=1+.08*lv;else if(k==='gold')gHit.gold*=1+.25*lv;
     else if(k==='pierce')spells[0].m.pierce++;else if(k==='multi')spells[0].m.multi++;}
-  for(const slot of ['hat','robe','charm']){const id=meta.loadout&&meta.loadout[slot];if(!id||!meta.forge[slot]||!meta.owned.includes(id))continue;const g=GEAR.find(x=>x.id===id),fx=g&&g.fx;if(!fx)continue;
+  if(!daily)for(const slot of ['hat','robe','charm']){const id=meta.loadout&&meta.loadout[slot];if(!id||!meta.forge[slot]||!meta.owned.includes(id))continue;const g=GEAR.find(x=>x.id===id),fx=g&&g.fx;if(!fx)continue;
     if(fx.hearts){P.max+=fx.hearts;P.hp=P.max;}if(fx.dmg)gHit.dmg*=1+fx.dmg;if(fx.rate)gHit.cd*=1-fx.rate;if(fx.gold)gHit.gold*=1+fx.gold;}
-  const bo=meta.boosts||{};P.max+=bo.heart||0;P.hp=P.max;P.dust+=15*(bo.purse||0);gHit.cd*=1-.04*(bo.well||0);
+  const bo=daily?{}:(meta.boosts||{});P.max+=bo.heart||0;P.hp=P.max;P.dust+=15*(bo.purse||0);gHit.cd*=1-.04*(bo.well||0);
   stage=1;twist=null;nextTwist=null;enemies=[];shots=[];eshots=[];gems=[];parts=[];texts=[];marks=[];rings=[];zaps=[];later=[];blasts=[];zones=[];boss=null;guard=null;famil=[];
   stat={kills:0,dmg:0,gems:0,hurt:0,rooms:0};keysHeld=0;dark=0;darkT=0;roamT=8;roomsCleared=0;bossMul=1;locked=false;
-  world=genWorld(bi);enterRoom(world.start,null);
+  world=isDaily?withSeed(dailyBoss().seed,()=>genWorld(bi)):genWorld(bi);enterRoom(world.start,null);
 }
 function wizChips(){
   const open=WIZARDS.filter(w=>meta.wizards.includes(w.id)),locked=WIZARDS.length-open.length;
@@ -521,10 +524,10 @@ function showSanctum(){
   const slots=cardSlots(),eq=hunt_().equipped.length,n=owned().length;
   setPanel(`<h2>The Hunt</h2><p>Choose a boss and a wizard. Clear rooms, take three keys from the guardians, break the seal, claim the card.</p>${wizChips()}
     <div class="row">${board.slice().sort((a,b)=>stars_()[a]-stars_()[b]).map(bi=>{const b=bdef(bi);return `<button class="card" data-hunt="${bi}" style="--c:${b.col}">${bossImg(bi)}<i>${b.num}  ${stars(b.star)}</i><b>${b.name}</b><span>Card: ${powerText(powerKey(bi))}</span><span style="color:var(--gold)">${hunt_().cards[bi]?'Hunt again':'Set out'}</span></button>`;}).join('')}</div>
-    <div class="row" style="gap:calc(var(--s)*6px)"><button class="btn ghost" id="hcoll">Cards ${n}/${MB.length}  -  ${eq}/${slots} equipped</button><button class="btn ghost" id="hclassic">Classic run</button><button class="btn ghost" id="hleave">Back to the village</button></div>`);
+    <div class="row" style="gap:calc(var(--s)*6px)"><button class="btn ghost" id="hcoll">Cards ${n}/${MB.length}  -  ${eq}/${slots} equipped</button><button class="btn ghost" id="hleave">Back to the village</button></div>`);
   panel.querySelectorAll('[data-hunt]').forEach(b=>b.onclick=()=>startHunt(+b.dataset.hunt));
   panel.querySelectorAll('[data-wiz]').forEach(b=>b.onclick=()=>{hw=WIZARDS.find(w=>w.id===b.dataset.wiz);meta.lastWizard=hw.id;saveMeta();showSanctum();});
-  $('hcoll').onclick=showCollection;$('hleave').onclick=leaveHunt;$('hclassic').onclick=()=>{leaveHunt(true);};
+  $('hcoll').onclick=showCollection;$('hleave').onclick=leaveHunt;
 }
 function showCollection(){
   scene='sanctum';const slots=cardSlots(),eq=hunt_().equipped;
@@ -535,19 +538,19 @@ function showCollection(){
 }
 function showEnd(win,cardId,lv,gain){
   scene=win?'won':'dead';board=[];
-  if(win){setMusic('victory',0);setPanel(`<h2>${hunting.name} falls</h2><p>${stat.kills} foes felled  -  ${stat.rooms} rooms cleared  -  ${stat.hurt} hits taken  -  +${gain} shards</p><div class="row" style="justify-content:center">${cardHTML(cardId,'eq')}</div><p>${lv>1?'The card brightens to level '+lv+'.':'A new card joins your collection.'}</p><button class="btn" id="hback">Return to the hunt board</button>`);}
+  if(win){setMusic('victory',0);setPanel(`<h2>${hunting.name} falls</h2><p>${stat.kills} foes felled  -  ${stat.rooms} rooms cleared  -  ${stat.hurt} hits taken  -  +${gain} shards</p>${lv?`<div class="row" style="justify-content:center">${cardHTML(cardId,'eq')}</div><p>${lv>1?'The card brightens to level '+lv+'.':'A new card joins your collection.'}</p>`:'<p>The daily hunt is done. Come back tomorrow.</p>'}<button class="btn" id="hback">Return to the hunt board</button>`);}
   else{setMusic('defeat',0);setPanel(`<h2>You fell</h2><p>${stat.kills} foes felled  -  ${stat.rooms} rooms cleared  -  ${keysHeld} of ${KEYS_NEEDED} keys  -  +${gain} shards. ${hunting.name} still prowls these halls.</p><button class="btn" id="hback">Return to the hunt board</button>`);}
-  $('hback').onclick=()=>showSanctum();
+  $('hback').onclick=()=>daily?leaveHunt():showSanctum();
 }
 function showPause(){
   if(scene!=='wave')return;prevScene=scene;scene='panel';
   setPanel(`<h2>Paused</h2><div class="row" style="justify-content:center"><button class="btn" id="hres">Resume</button><button class="btn ghost" id="hquit">Abandon the hunt</button></div>`);
   $('hres').onclick=()=>{closePanel();scene='wave';};$('hquit').onclick=()=>{closePanel();showEnd(false,null,0,endShards(false));};
 }
-function endShards(win){const g=win?4+hunting.star*2:Math.floor(stat.rooms/3);meta.shards=(meta.shards||0)+g;saveMeta();return g;}
-function leaveHunt(classic){
+function endShards(win){if(daily&&!win)noteDaily(stat.rooms,false);const g=win?4+hunting.star*2:Math.floor(stat.rooms/3);meta.shards=(meta.shards||0)+g;saveMeta();return g;}
+function leaveHunt(){
   closePanel();if(root)root.hidden=true;const wrap=$('wrap');if(wrap)wrap.style.visibility='';S.mode='hub';
-  if(classic&&classicFn)classicFn();else if(exitFn)exitFn();
+  if(exitFn)exitFn();
 }
 
 /* ---------- drawing ---------- */
@@ -706,10 +709,10 @@ function initHunt(){
 }
 /** called by the village: show the hunt board over everything */
 export function enterHunt(opts){
-  exitFn=opts.exit;classicFn=opts.classic;initHunt();
+  exitFn=opts.exit;initHunt();
   S.mode='hunt';S.hub=false;root.hidden=false;const wrap=$('wrap');if(wrap)wrap.style.visibility='hidden';fit();
   const mb=$('mute');if(mb)mb.hidden=true;
-  board=[];showSanctum();
+  board=[];if(opts.daily){const d=dailyBoss();startHunt(d.bi,true);}else showSanctum();
 }
 export function huntStep(dt){if(!root||root.hidden)return;dt=Math.min(.05,dt);update(dt);draw();}
 const bossTheme=bi=>bi;
@@ -718,4 +721,4 @@ function roomMusic(){
   if(locked){if(room.kind==='boss')setMusic('elite',bossTheme(hunting.id),3);else if(room.kind==='guard')setMusic('elite',room.id+3,3);else setMusic('battle',room.id+roomsCleared,dark>=3?3:2);}
   else setMusic('camp',room.id);
 }
-if(typeof window!=='undefined')window.__hunt={enter:id=>{const n=world.cells[id];n.unsealed=true;enterRoom(n,null);},step:dt=>{update(dt);},start:bi=>startHunt(bi),state:()=>({scene,locked,stage,hp:P&&P.hp,max:P&&P.max,spells:spells&&spells.map(s=>s.id),E:enemies,ES:eshots,P,room,world,keys:keysHeld,dark,stats:stat,hunting:hunting&&hunting.id,dust:P&&P.dust}),bot:(ix,iy)=>{keys.__bx=ix;keys.__by=iy;},go:d=>tryGo(d),give:id=>addSpell(id),mod:(id,k,n=1)=>{const s=spells.find(q=>q.id===id);for(let i=0;i<n;i++)applyMod(s,k);},skip:()=>{if(locked){waveT=0.01;if(boss)boss.hp=1;}},meta:()=>meta.hunt,sanctum:()=>showSanctum(),setKeys:n=>{keysHeld=n;},open:()=>enterHunt({exit(){},classic(){}})};
+if(typeof window!=='undefined')window.__hunt={enter:id=>{const n=world.cells[id];n.unsealed=true;enterRoom(n,null);},step:dt=>{update(dt);},start:(bi,dl)=>startHunt(bi,dl),state:()=>({scene,locked,stage,hp:P&&P.hp,max:P&&P.max,spells:spells&&spells.map(s=>s.id),E:enemies,ES:eshots,P,room,world,keys:keysHeld,dark,stats:stat,hunting:hunting&&hunting.id,dust:P&&P.dust}),bot:(ix,iy)=>{keys.__bx=ix;keys.__by=iy;},go:d=>tryGo(d),give:id=>addSpell(id),mod:(id,k,n=1)=>{const s=spells.find(q=>q.id===id);for(let i=0;i<n;i++)applyMod(s,k);},skip:()=>{if(locked){waveT=0.01;if(boss)boss.hp=1;}},meta:()=>meta.hunt,sanctum:()=>showSanctum(),setKeys:n=>{keysHeld=n;},open:()=>enterHunt({exit(){}})};

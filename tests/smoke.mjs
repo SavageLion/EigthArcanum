@@ -1,72 +1,48 @@
-// Smoke test: boots the built game in system Chrome, plays through the title, draw and a fight; fails on any console/page error.
+// Smoke test: boots the built game in system Chrome, walks the Sanctum (every station), opens the hunt board and plays a few seconds of
+// several hunts (different bosses and wizards). Fails on any console or page error.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 
-const NL = String.fromCharCode(10);
 const port = 4300 + Math.floor(Math.random() * 500);
 const srv = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort'], { stdio: 'ignore' });
 await new Promise(r => setTimeout(r, 2500));
-const errors = [];
+const errors = [], notes = [];
 let browser;
 try {
   browser = await chromium.launch({ channel: 'chrome' });
-  const page = await browser.newPage({ viewport: { width: 400, height: 760 }, hasTouch: true });
+  const page = await browser.newPage({ viewport: { width: 844, height: 390 }, hasTouch: true });
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   await page.goto(`http://localhost:${port}/`);
   await page.waitForSelector('#ov .go');
-  await page.click('#ov .go');                 // Begin a run (title) -> the Sanctum
+  await page.click('#ov .go');                 // title -> the Sanctum
   await page.waitForTimeout(600);
-  await page.evaluate(() => { const A = window.__arcana; A.G.P.x = 450; A.G.P.y = 236; });   // walk onto the Door
-  await page.waitForSelector('#hclassic', { state: 'attached', timeout: 8000 }); await page.evaluate(() => document.getElementById('hclassic').click());   // the Door opens the hunt board; take the classic run
-  await page.waitForSelector('#start', { timeout: 8000 }); await page.click('#start');   // setup screen: Begin the run
-  await page.waitForTimeout(600);
-  // every boss x every arena type, run for a couple of simulated seconds
-  const arenas = ['chariot', 'wheel', 'justice', 'strength'];
-  let fights = 0;
-  for (let stage = 0; stage < 16; stage++) {
-    for (const arena of arenas) {
-      await page.evaluate(([st, ar]) => {
-        const a = window.__arcana;
-        a.startRun(); a.S.stage = st; a.S.pos = st;
-        a.quickPull('magician', ar);
-      }, [stage, arena]).catch(e => errors.push(`fight ${stage}/${arena}: ${e.message}`));
-      await page.waitForTimeout(250);
-      fights++;
-    }
+  const mode = () => page.evaluate(() => window.__arcana.S.mode);
+  if (await mode() !== 'hub') errors.push('expected the hub after the title, got ' + await mode());
+  await page.evaluate(() => window.__arcana.meta.unlockEverything());
+  // every station opens an overlay (market, forge, codex, daily board); the door opens the hunt
+  for (const [name, x, y] of [['market', 225, 474], ['forge', 675, 474], ['codex', 205, 834], ['board', 450, 942]]) {
+    await page.evaluate(([x, y]) => { const A = window.__arcana; A.G.P.x = x; A.G.P.y = y; A.G.hub.lock = false; A.G.hub.hold = 0; A.G.hub.near = null; }, [x, y]);
+    await page.waitForFunction(() => !document.getElementById('ov').hidden, null, { timeout: 5000 }).catch(() => errors.push('station did not open: ' + name));
+    await page.evaluate(() => { document.getElementById('hubback') ? document.getElementById('hubback').click() : (document.getElementById('ov').hidden = true); });
+    await page.waitForTimeout(150);
   }
-  // deeper pass: real play-through. Fight with god mode, deal lethal damage, then click through reward, shop and loot like a player.
-  const flows = [];
-  const waitMode = (m, ms) => page.waitForFunction(x => window.__arcana.S.mode === x, m, { timeout: ms });
-  for (const [stage, arena] of [[0,'chariot'],[3,'wheel'],[5,'justice'],[7,'strength'],[11,'justice'],[13,'strength'],[15,'wheel']]) {
-    try {
-      await page.evaluate(([st, ar]) => { const a = window.__arcana; a.startRun(); a.S.stage = st; a.S.pos = st === 7 ? 15 : st; a.quickPull("magician", ar); a.S.god = true; }, [stage, arena]);
-      await waitMode('fight', 5000);
-      await page.waitForTimeout(2500);               // let the boss attack for a while
-      const shots = await page.evaluate(() => { const a = window.__arcana; a.spawnChest(); return a.counts().shots; });
-      await page.waitForTimeout(400);
-      await page.evaluate(() => window.__arcana.damage(1e9));
-      // click through whatever the game shows until the next fight (or victory) begins
-      const trail = [];
-      for (let i = 0; i < 20; i++) {
-        await page.waitForTimeout(350);
-        const mode = await page.evaluate(() => window.__arcana.S.mode);
-        if (mode === 'fight' || mode === 'intro' || mode === 'victory') { trail.push(mode); break; }
-        const sel = ['#ov .optbtn', '#ov .rcard', '#ov #sellnew', '#ov #campnext', '#ov .card', '#ov #sell', '#ov .go', '#ov button'];   // the Camp: pick a reward, a slot, an option, then Next card (twice if something is left behind)
-        let clicked = null;
-        for (const q of sel) { const el = await page.$(q); if (el && await el.isVisible()) { await el.click({ timeout: 1000 }).catch(() => {}); clicked = q; break; } }
-        trail.push(mode + (clicked ? '>' + clicked.replace('#ov ', '') : ''));
-      }
-      flows.push('boss ' + stage + ' (' + arena + '): ' + shots + ' shots | ' + trail.join(' , '));
-    } catch (e) { errors.push('flow ' + stage + '/' + arena + ': ' + e.message.split(NL)[0]); }
+  await page.evaluate(() => { const A = window.__arcana; A.G.P.x = 450; A.G.P.y = 236; A.G.hub.lock = false; A.G.hub.hold = 0; A.G.hub.near = null; });   // walk onto the door
+  await page.waitForSelector('#hpanel [data-hunt]', { timeout: 8000 });
+  notes.push('hunt board open: ' + await page.evaluate(() => document.querySelectorAll('#hpanel [data-hunt]').length) + ' bosses offered');
+  // play a few seconds of several hunts: a spread of bosses and every wizard
+  const wizards = ['raven', 'ember', 'frost', 'bone', 'gambler'];
+  for (const [i, bi] of [0, 9, 18, 27, 36, 45, 54, 63].entries()) {
+    await page.evaluate(([bi, wz]) => { window.__arcana.meta.meta.lastWizard = wz; window.__hunt.start(bi); const S = window.__hunt; for (let k = 0; k < 600; k++) S.step(1 / 60); }, [bi, wizards[i % wizards.length]]);
+    const st = await page.evaluate(() => window.__hunt.state());
+    if (st.scene !== 'wave' && st.scene !== 'panel') errors.push('hunt ' + bi + ' ended oddly: ' + st.scene);
+    // and the boss room
+    await page.evaluate(() => { const S = window.__hunt, st = S.state(); st.P.hp = st.P.max = 99; S.enter(st.world.bossCell.id); for (let k = 0; k < 600; k++) S.step(1 / 60); });
   }
-  console.log(flows.join(NL));
-  const modes = [await page.evaluate(() => window.__arcana.S.mode)];
-  await page.screenshot({ path: process.argv[2] || 'tests/last.png' });
-  console.log('fights started:', fights, '| final mode:', modes.join(','));
-} finally {
-  await browser?.close();
-  srv.kill();
-}
-if (errors.length) { console.error('FAIL\n' + [...new Set(errors)].join('\n')); process.exit(1); }
+  notes.push('hunts played: 8');
+  await page.waitForTimeout(300);
+} catch (e) { errors.push('exception: ' + e.message.split('\n')[0]); }
+finally { if (browser) await browser.close(); srv.kill(); }
+for (const n of notes) console.log(n);
+if (errors.length) { console.log('FAIL'); for (const e of [...new Set(errors)].slice(0, 12)) console.log(e); process.exit(1); }
 console.log('OK: no console or page errors');

@@ -4,55 +4,31 @@ import './style.css';
 import '@fontsource/pixelify-sans/500.css';
 import '@fontsource/pixelify-sans/700.css';
 import '@fontsource/vt323/400.css';
-import { G, S, newPlayer } from './core/state';
-import { KEYS, swapRing } from './core/input';
-import { resize, syncLayout } from './core/size';
-import { BOSSES, ELITE_POS, TOTAL, dealOrder } from './data/bosses';
+import { G, S } from './core/state';
+import { KEYS } from './core/input';
+import { resize } from './core/size';
 import { draw, drawTitle } from './render/draw';
-import { bossFrames, loadSprites } from './render/sprites';
-import { foPlan } from './systems/bossPlans';
-import { castSpell, syncSpells } from './systems/casting';
-import { CY, GOODS, OMENS, RI, RO, WANDS } from './systems/deck';
-import * as _rn from './systems/runner';
-import * as _rs from './systems/runnerSpells';
-import { foDodge, foJump, foSlide, forgeOptions, leaveShop, showTitle } from './systems/faceoff';
-import { enterArena, quickPull, showDraw, startRun, turnCard, updateDraw } from './systems/flow';
-import { GEAR, applyStats, chestLoot, equip, gearFx, gearOf, nearMiss, pickGear, rateNow, spawnChest } from './systems/gear';
-import { RARITY } from './data/rarity';
-import { damage, hurt, step } from './systems/sim';
-import { foSlide as _foSlide } from './systems/faceoff';
-import { fightReward, posHp, relPos } from './systems/deck';
-import * as _lab from './systems/lab';
-import * as _camp from './systems/camp';
-import { hubStep } from './systems/hub';
+import { loadSprites } from './render/sprites';
+import { enterHub, hubStep } from './systems/hub';
 import { huntStep } from './hunt/hunt';
-import { endBeam } from './systems/spellFx';
-import { EL, TYPES, spellCost, spellName } from './systems/spells';
+import { showTitle } from './village/title';
+import * as _score from './core/score';
+import * as _meta from './data/meta';
+import { RARITY } from './data/rarity';
+import { GEAR } from './data/gear';
 
+/* The Eighth Arcanum: a title screen, the Sanctum village (systems/hub.ts) and the Hunt (hunt/hunt.ts). */
 function frame(now){
   const dt=Math.min(.033,(now-G.last)/1000||0); G.last=now;
   if(S.mode==='title'){ S.t+=dt; drawTitle(); }
   else if(S.mode==='hunt'){ huntStep(dt); }
-  else { syncLayout(); syncSpells(); if(S.mode==='hub')hubStep(dt); if(S.mode==='draw'&&!S.paused)updateDraw(dt); if(!S.paused&&S.mode!=='hub'&&S.mode!=='pick'&&S.mode!=='dead'&&S.mode!=='victory'&&S.mode!=='draw'&&S.mode!=='shop') step(dt); draw(); }
+  else { S.t+=dt; if(S.mode==='hub')hubStep(dt); draw(); }
   requestAnimationFrame(frame);
 }
-export function hotSave(){ S.saved=G.P?{wizard:G.P.wizard,order:S.order,pos:S.pos,hp:G.P.hp,seconds:S.runSeconds,used:S.usedOmens,gear:G.P.gear,slots:G.P.slots,gold:G.P.gold,wand:G.P.wand,max:G.P.max,manaMax:G.P.manaMax,thirdEye:G.P.thirdEye,spells:G.P.spells.map(s=>({...s}))}:null; }
-function start(data){
+function start(){
   resize();
-  const d=data&&data.saved;
-  if(d&&Array.isArray(d.spells)&&Array.isArray(d.order)&&[16,32,64].includes(d.order.length)){
-    G.P=newPlayer(d.wizard||'raven'); G.P.spells=d.spells; G.P.gear=d.gear||G.P.gear; G.P.slots=d.slots||2; G.P.gold=d.gold||0; G.P.wand=d.wand||null; G.P.max=d.max||4; G.P.manaMax=d.manaMax||100; G.P.thirdEye=!!d.thirdEye; G.P.scale=Math.pow(1.1,d.pos*15/Math.max(1,d.order.length-1)); G.P.hp=Math.min(G.P.max,d.hp); S.order=d.order; S.pos=d.pos; S.usedOmens=d.used||[]; S.runSeconds=d.seconds||0;
-    showDraw();
-  } else showTitle();
+  showTitle(enterHub);
   requestAnimationFrame(t=>{G.last=t;frame(t)});
 }
-try{ window.claude?.hot?.snapshot?.(()=>({saved:S.saved||null})); }catch(e){}
-Promise.all([loadSprites(),loadAudioManifest()]).finally(()=>{ window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {}); });
-
-import * as _vfx from './render/vfx';
-import './data/elementAssign'
-import './data/newBosses'
-import './data/newBosses64';
-import * as _score from './core/score';
-import * as _meta from './data/meta';
-window.__arcana={pickGear,gearFx,applyStats,RARITY,enterArena,foSlide:_foSlide,KEYS,hurt,nearMiss,rateNow,fightReward,posHp,relPos,lab:_lab,camp:_camp,G,foDebugSpawn:_rn.foDebugSpawn,SPELLS:_rs.SPELLS,meta:_meta,score:_score,vfx:_vfx,damage,endBeam,EL,TYPES,get traps(){return G.traps},foPlan,CY,RO,RI,spawnChest,GEAR,gearOf,equip,chestLoot,get oa(){return G.oa},setStick(x,y){G.stickV={x,y}},quickPull,foDodge,foJump,updateDraw,turnCard,get fo(){return G.fo},get pull(){return G.pull},bossFrames,dealOrder,ELITE_POS,leaveShop,WANDS,GOODS,showDraw,OMENS,swapRing,S,BOSSES,step,startRun,forgeOptions,castSpell,spellName,spellCost,get P(){return G.P},get B(){return G.B},get shots(){return G.shots},counts:()=>({shots:G.shots.length,rings:G.rings.length,cols:G.cols.length})};
+window.__arcana={G,S,KEYS,meta:_meta,score:_score,RARITY,GEAR,enterHub};
+Promise.all([loadSprites(),loadAudioManifest()]).finally(()=>{ start(); });

@@ -2,24 +2,17 @@
 import { W, muteBtn, ov } from '../core/dom';
 import { G, S, newPlayer } from '../core/state';
 import { KEYS } from '../core/input';
-import { BOSSES } from '../data/bosses';
+import { BOSSES } from '../data/bossList';
 import { BOOSTS, FORGE_COST, dailyStreak, dailyToday, meta, saveMeta } from '../data/meta';
-import { enterLab } from './lab';
-import { startRun, bossCardArt } from './flow';
-import { SPELLS } from './runnerSpells';
-import { HUB_ART, K, LW, NPC_ART, R, SPRITE_OVERRIDES, blitSprite, dirOf, makeBg, px } from '../render/sprites';
+import { HUB_ART, K, LW, NPC_ART, R, SPRITE_OVERRIDES, blitSprite, dirOf, px } from '../render/sprites';
 import { drawWizard } from '../render/draw';
 import { resize } from '../core/size';
-import { eventsEnd } from './arenaEvents';
-import { GEAR, SLOT_LABEL, applyStats, gearOf, rarityTag } from './gear';
+import { GEAR, SLOT_LABEL, gearOf, rarityTag } from '../data/gear';
 import { RARITY, rankOf } from '../data/rarity';
-import { icon, pixIcon, show, showSetup } from './faceoff';
-import { oaEnd } from './openArena';
-import { sideEnd } from './sideView';
-import { spellBar } from './casting';
+import { bossCardArt, icon, pixIcon, show } from '../ui/overlay';
 import { $, TAU, clamp, rnd } from '../core/util';
 import { setMusic, tone } from '../core/audio';
-import { enterHunt } from '../hunt/hunt';
+import { cardInfo, enterHunt } from '../hunt/hunt';
 
 /* The Sanctum is a small village: a walled gate at the top (the Door), a main street running down to a plaza with a campfire and a well, and the
    Market, Forge, Codex, Daily Run board and Spell Lab each in their own corner, joined by cobbled lanes, with cottages, lamps and trees around.
@@ -31,8 +24,7 @@ const STATIONS=[
   {id:'market',name:'MARKET',art:'market',k:1.5,fx:225,fy:430,ax:225,ay:474,ar:34,col:'#ffd27a',solid:30},
   {id:'forge',name:'FORGE',art:'forge',k:1.5,fx:675,fy:430,ax:675,ay:474,ar:34,col:'#ff9a5a',solid:30},
   {id:'codex',name:'CODEX',art:'codex',k:1.45,fx:205,fy:790,ax:205,ay:834,ar:34,col:'#e8d28a',solid:28},
-  {id:'board',name:'DAILY RUN',art:'board',k:1.45,fx:450,fy:900,ax:450,ay:942,ar:34,col:'#9ad0ff',solid:28},
-  {id:'lab',name:'SPELL LAB',art:'dummy',k:1.4,fx:695,fy:790,ax:695,ay:834,ar:34,col:'#ff8a8a',solid:26},
+  {id:'board',name:'DAILY HUNT',art:'board',k:1.45,fx:450,fy:900,ax:450,ay:942,ar:34,col:'#9ad0ff',solid:28},
 ];
 const stations=()=>STATIONS;
 /** lanes: x0,y0,x1,y1,width */
@@ -83,18 +75,12 @@ const camOf=()=>{ const vw=HUBW/ZOOM, vh=G.H/ZOOM; return {x:clamp(G.P.x-vw/2,0,
 
 export function enterHub(){
   if(!DECO) buildVillage(); NPCS=null;
-  setMusic('hub',0); S.mode='hub'; S.hub=true; S.mod=null; S.orbit=S.fo=S.open=S.side=false; S.paused=false; S.t=0; sideEnd(); eventsEnd(); oaEnd();
-  G.fo=null; G.pull=null; G.B=undefined; G.bolts=[]; G.shots=[]; G.rings=[]; G.cols=[]; G.parts=[]; G.seeds=[]; G.beams=[]; G.helpers=[]; G.bands=[]; G.traps=[]; G.hits=[]; G.pillars=[]; G.stick=null; G.stickV={x:0,y:0};
+  setMusic('hub',0); S.mode='hub'; S.hub=true; S.paused=false; S.t=0; G.stick=null; G.stickV={x:0,y:0};
   G.P=newPlayer(meta.lastWizard||'raven'); G.P.x=PLAZA.x; G.P.y=PLAZA.y+110; G.P.face='north';
   const c0=camOf();
   G.hub={t:0,near:null,hold:0,lock:false,cx:c0.x,cy:c0.y,motes:Array.from({length:70},(_,i)=>({x:rnd(0,WW),y:rnd(GATE,WH),v:rnd(3,10),p:rnd(0,6)}))};
-  ov.hidden=true; muteBtn.hidden=false; spellBar.hidden=true; for(const id of ['bossname','omen','hint','call','intro']) $(id).hidden=true;
+  ov.hidden=true; muteBtn.hidden=false;
   resize();
-}
-/** applies the permanent boosts and the forged loadout to a fresh run */
-export function applyHubBonuses(){
-  const b=meta.boosts||{}; G.P.max+=b.heart||0; G.P.hp+=b.heart||0; G.P.gold+=15*(b.purse||0); G.P.manaMax+=10*(b.well||0);
-  for(const slot of ['hat','robe','charm']){ const id=meta.loadout&&meta.loadout[slot]; if(id&&meta.forge[slot]&&meta.owned.includes(id)){ G.P.gear[slot]=id; applyStats(gearOf(id),1); } }
 }
 
 export function hubStep(dt){
@@ -114,8 +100,8 @@ export function hubStep(dt){
   for(const m of h.motes){ m.y-=m.v*dt; m.x+=Math.sin(h.t+m.p)*8*dt; if(m.y<GATE){ m.y=WH; m.x=rnd(0,WW); } }
 }
 function openStation(id){
-  if(id==='door'){ enterHunt({exit:enterHub,classic:showSetup}); return; }
-  if(id==='market')showMarket(); else if(id==='forge')showForge(); else if(id==='codex')showCodex(); else if(id==='board')showBoard(); else enterLab();
+  if(id==='door'){ enterHunt({exit:enterHub}); return; }
+  if(id==='market')showMarket(); else if(id==='forge')showForge(); else if(id==='codex')showCodex(); else showBoard();
 }
 const back=()=>{ ov.hidden=true; };
 const shardsTag=()=>`<span style="color:var(--gold)">✦ ${meta.shards||0} shards</span>`;
@@ -146,19 +132,19 @@ function showForge(){
 function showCodex(sel=null){
   const seen=BOSSES.filter((b,i)=>meta.codex[i]>0).length;
   const cell=i=>{ const d=BOSSES[i], n=meta.codex[i]||0; return n>0?`<button class="cdx seen${sel===i?' sel':''}" data-i="${i}" style="--boss:${d.color}"><img alt="" src="${bossCardArt(d,i)}">${d.elite?'<i>★</i>':''}</button>`:`<button class="cdx" data-i="${i}" disabled><span>?</span></button>`; };
-  const info=sel!==null?(()=>{ const d=BOSSES[sel], sp=SPELLS[sel]||SPELLS[0], t=s=>s[0].toUpperCase()+s.slice(1); return `<div class="cdxinfo" style="--boss:${d.color}"><b>${d.name}${d.elite?' · Elite':''}</b><span>Beaten ${meta.codex[sel]} time${meta.codex[sel]>1?'s':''}. Throws ${t(sp[0])} and ${t(sp[1])} spells.</span></div>`; })():'<p class="muted">Tap a card you have discovered.</p>';
-  show(`<div class="eyebrow">Codex · ${seen} of ${BOSSES.length} discovered</div><h2>The Bestiary</h2>${info}<div class="cdxgrid">${BOSSES.map((b,i)=>cell(i)).join('')}</div><button class="go" id="hubback">Back to the Sanctum</button>`);
+  const info=sel!==null?(()=>{ const d=BOSSES[sel], ci=cardInfo(sel); return `<div class="cdxinfo" style="--boss:${d.color}"><b>${d.name}${d.elite?' · Elite':''}</b><span>Beaten ${meta.codex[sel]} time${meta.codex[sel]>1?'s':''}. Card: ${ci.text}${ci.level?' (level '+ci.level+')':''}</span></div>`; })():'<p class="muted">Tap a card you have discovered.</p>';
+  show(`<div class="eyebrow">Codex · ${seen} of ${BOSSES.length} hunted</div><h2>The Bestiary</h2>${info}<div class="cdxgrid">${BOSSES.map((b,i)=>cell(i)).join('')}</div><button class="go" id="hubback">Back to the Sanctum</button>`);
   ov.querySelectorAll('.cdx.seen').forEach(b=>b.onclick=()=>{ const y=ov.scrollTop; showCodex(+b.dataset.i); ov.scrollTop=y; });
   $('hubback').onclick=back;
 }
-/** the Daily Run board: the same eight bosses and arenas for everyone today, no Market boosts or Forge gear */
+/** the Daily Hunt board: the same boss, realm and rooms for everyone today, no Market boosts or Forge gear */
 function showBoard(){
   const d=dailyToday(), st=dailyStreak();
-  show(`<div class="eyebrow">Daily run · ${d.date}</div><h2>Today's challenge</h2>
-    <p class="muted">Eight bosses, the same for everyone today, with no Market boosts or Forge gear. Win it once a day for a shard bonus that grows with your streak.</p>
-    <div class="stats"><div><b>${d.best}/8</b><small>Best today</small></div><div><b>${st}</b><small>Day streak</small></div><div><b>${d.won?'Done':'Open'}</b><small>Today</small></div></div>
-    <button class="go" id="dailygo">${d.best?'Try again':'Start the daily run'}</button><button class="linkbtn" id="hubback">Back to the Sanctum</button>`);
-  $('dailygo').onclick=()=>startRun(meta.lastWizard,8,true); $('hubback').onclick=back;
+  show(`<div class="eyebrow">Daily hunt · ${d.date}</div><h2>Today's quarry</h2>
+    <p class="muted">One boss and one realm, the same for everyone today, with no Market boosts, cards or Forge gear. Win it once a day for a shard bonus that grows with your streak.</p>
+    <div class="stats"><div><b>${d.won?'Slain':d.best?'Hunting':'Unhunted'}</b><small>Today</small></div><div><b>${st}</b><small>Day streak</small></div></div>
+    <button class="go" id="dailygo">${d.best?'Hunt again':'Begin the daily hunt'}</button><button class="linkbtn" id="hubback">Back to the Sanctum</button>`);
+  $('dailygo').onclick=()=>{ ov.hidden=true; enterHunt({exit:enterHub,daily:true}); }; $('hubback').onclick=back;
 }
 /* ---------- drawing ---------- */
 const sprW=(im,k)=>im.width/R*k, sprH=(im,k)=>im.height/R*k;

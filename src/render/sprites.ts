@@ -1,9 +1,7 @@
 // @ts-nocheck
 import { W } from '../core/dom';
-import { G, S } from '../core/state';
-import { BOSSES } from '../data/bosses';
+import { BOSSES } from '../data/bossList';
 import { R, hexRGB, mapSprite, mk, pixelise } from './pixel';
-import { arenaKind, paintArena } from './arenaArt';
 export { R };
 import { BONE, GOLD, TAU, clamp, rnd } from '../core/util';
 
@@ -59,13 +57,6 @@ async function loadClips(set:'arena'|'large',rest:Record<string,Sprite>|null){
 }
 /** Pixel Lab sets for the unlockable wizards (static, 8 directions): arena size plus a scaled-up copy for the face-off back/front views. */
 /** Pixel Lab obstacle and wall-column art for the Runner, per material set (flag, ash, ice, moss): low barrier, hanging blade, monolith, column */
-export const RUNNER_ART:Record<string,Record<string,HTMLImageElement>>={};
-async function loadRunnerArt(){ for(const set of ['flag','ash','ice','moss']){ const o={}; const k=['low','high','block','column']; const im=await Promise.all(k.map(n=>loadImage(`runner/${set}/${n}.png`))); k.forEach((n,i)=>{ if(im[i])o[n]=im[i]; }); RUNNER_ART[set]=o; } }
-/** Pixel Lab spell sprites for the Runner: flying spells by shape name, ground spells as 'g-<shape>' */
-export const SPELL_ART:Record<string,HTMLImageElement>={};
-const SPELL_NAMES=['fireball','crystal','bell','bolt','thorn','skull','eye','bubble','cog','spore','star','coin','blade','card','note','g-flame','g-shard','g-thorns','g-bones','g-wave','g-boulder','g-spikes','g-sand','g-ring','bolt-player','hit-spark','g-cog','p-wisp','p-heart','p-shield','p-magnet','burst'];
-async function loadSpellArt(){ const im=await Promise.all(SPELL_NAMES.map(n=>loadImage(`runner/spells/${n}.png`))); SPELL_NAMES.forEach((n,i)=>{ if(im[i])SPELL_ART[n]=im[i]; }); }
-/** Pixel Lab props for the Sanctum (door, market stall, forge, banner) */
 export const HUB_ART:Record<string,HTMLImageElement>={};
 /** wandering villagers: walk cycles per direction plus the still rotations (public/assets/hub/npc, packed by tools/pack-npc.mjs) */
 export const NPC_ART:Record<string,{frames:number,fps:number,dirs:string[],walk:Record<string,HTMLImageElement[]>,rot:Record<string,HTMLImageElement>}>={};
@@ -73,7 +64,6 @@ async function loadNpcs(){ let man; try{ const r=await fetch(import.meta.env.BAS
   for(const [id,m] of Object.entries<any>(man)){ const A={frames:m.frames,fps:m.fps,dirs:m.dirs,walk:{},rot:{}}; const all=['east','north-east','north','north-west','west','south-west','south','south-east'];
     await Promise.all([...all.map(async d=>{ const im=await loadImage(`hub/npc/${id}/rot/${d}.png`); if(im)A.rot[d]=im; }),...m.dirs.map(async d=>{ const f=await Promise.all(Array.from({length:m.frames},(_,n)=>loadImage(`hub/npc/${id}/${d}/${n}.png`))); if(f.every(Boolean))A.walk[d]=f; })]); NPC_ART[id]=A; } }
 async function loadHubArt(){ const k=['door','market','forge','banner','campfire','codex','dummy','board','tree','pine','well','lamp','cottage','statue','observatory','belltower','townhouse','crates','astrolabe','yew','mushrooms','moontree']; const im=await Promise.all(k.map(n=>loadImage(`hub/${n}.png`))); k.forEach((n,i)=>{ if(im[i])HUB_ART[n]=im[i]; }); }
-export const FIST:{img:HTMLImageElement|null}={img:null};   // Pixel Lab boss fist for the face-off
 /** per-wizard animation clips for the unlockable wizards (idle, walk, cast, hurt, death), by wizard id then clip then direction */
 export const WIZ_ANIM:Record<string,Record<string,Record<string,any>>>={};
 export const WIZ_SETS:Record<string,{dirs:Record<string,Sprite>,back:Sprite,front:Sprite}>={};
@@ -103,13 +93,7 @@ async function loadWizClips(){
 export async function loadSprites(){
   const [arena,large]=await Promise.all([loadSet('arena'),loadSet('large')]);
   SPRITE_OVERRIDES.wizardDirs=arena; SPRITE_OVERRIDES.wizardBack=large?large.north:null; SPRITE_OVERRIDES.wizardFront=large?large.south:null;
-  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadImage('fist.png').then(i=>{FIST.img=i;}),loadHubArt(),loadNpcs(),loadRunnerArt(),loadSpellArt(),loadWizSets().then(loadWizClips),loadArena(),loadBosses(),loadIcons(),loadChest(),loadHands()]);
-}
-async function loadHands(){ const f=await Promise.all(Array.from({length:9},(_,i)=>loadImage(`hands/${i}.png`))); if(f.some(i=>!i)) return; f.forEach(i=>{(i as any).hi=true;}); SPRITE_OVERRIDES.hands=f; }
-async function loadChest(){
-  const [idle,...rest]=await Promise.all([loadImage('chest/idle.png'),...Array.from({length:9},(_,i)=>loadImage(`chest/open/${i}.png`)),...Array.from({length:9},(_,i)=>loadImage(`chest/mimic/${i}.png`))]);
-  if(!idle||rest.some(i=>!i)) return; [idle,...rest].forEach(i=>{(i as any).hi=true;});
-  SPRITE_OVERRIDES.chest={idle,open:rest.slice(0,9),mimic:rest.slice(9)};
+  await Promise.all([loadClips('arena',arena),loadClips('large',large),loadHubArt(),loadNpcs(),loadWizSets().then(loadWizClips),loadArena(),loadBosses(),loadIcons(),loadHuntArt()]);
 }
 /** icons/manifest.json lists which icon ids exist; the UI falls back to the old pixel-map icons for any that don't. */
 async function loadIcons(){ try{ const r=await fetch(import.meta.env.BASE_URL+'assets/icons/manifest.json'); if(r.ok) SPRITE_OVERRIDES.icons=new Set(await r.json()); }catch(e){} }
@@ -148,7 +132,7 @@ const bossCache={};
 export function bossFrames(i){
   if(SPRITE_OVERRIDES.boss[i]) return SPRITE_OVERRIDES.boss[i];
   if(bossCache[i]) return bossCache[i];
-  const f=[]; for(let n=0;n<8;n++){ const t=n*.26+.3; f.push(BOSSES[i].elite?pixelise(c=>BOSSES[i].draw(c,t,BOSSES[i].color),84,.47):pixelise(c=>BOSSES[i].draw(c,t,BOSSES[i].color),66,.4)); }
+  const f=[]; for(let n=0;n<8;n++){ f.push(pixelise(c=>{ c.fillStyle=BOSSES[i].color; c.beginPath(); c.arc(0,0,30,0,TAU); c.fill(); },66,.4)); }
   return bossCache[i]=f;
 }
 export const WIZ_ROWS=["........kk........",".......kbbk.......","......kbbnk...kyk.","......kbbbk...yWy.",".....kbbbnk...kyk.",".....kbbbbk....t..","...kkkggggkkk..t..","..kggggggggggk.t..","...kkksssssskk.t..","....kwsswwswk..t..","....kwwwwwwk..kt..","...kbwwwwwbk.kst..","..kbbbwwwbbbkkst..","..kbbbbwbbbbbkkt..","..kbbnbbbnbbk..t..","..kbbnbbbnbbk..t..","..kbbnbgbnbbk..t..",".kbbbnbgbnbbbk.t..",".kbbnnbgbnnbbk.t..",".kkkkkkkkkkkkk.t.."];
@@ -166,24 +150,13 @@ export function disc(col,r){ r=Math.round(r*2)/2; const key=col+r; if(discs[key]
 export const px=v=>Math.round(v*K*R)/R;
 /** Draw centred at logical (x,y). Hi-res art (img.hi) is drawn at its native physical resolution. */
 export function blit(g,x,y,img){ const k=img.hi?1/R:1, w=img.width*k, h=img.height*k; g.drawImage(img,Math.round((x-w/2)*R)/R,Math.round((y-h/2)*R)/R,w,h); }
-export function makeBg(b){
-  // rendered at physical resolution (LW*R x LH*R): finer dither, rays and stars; the gold frame stays at logical chunk size
-  const WP=LW*R, HP=G.LH*R, o=mk(WP,HP),c=o.getContext('2d'),im=c.createImageData(WP,HP),d=im.data;
-  const A=hexRGB(b.bg[0]),Z=hexRGB(b.bg[1]),bay=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5],cx=WP/2,cy=S.orbit?Math.round(G.H*.45*K*R):60*R,steps=4;
-  for(let y=0;y<HP;y++)for(let x=0;x<WP;x++){
-    const v=clamp(Math.hypot(x-cx,y-cy)/(HP*.82),0,1)*steps, lo=Math.floor(v), f=v-lo, lv=Math.min(steps,lo+(f>(bay[(y%4)*4+x%4]+.5)/16?1:0))/steps, j=(y*WP+x)*4;
-    d[j]=A[0]+(Z[0]-A[0])*lv;d[j+1]=A[1]+(Z[1]-A[1])*lv;d[j+2]=A[2]+(Z[2]-A[2])*lv;d[j+3]=255;
-  }
-  c.putImageData(im,0,0);
-  const flat=arenaKind()==='open';   // the flagstone floor replaces the rays and stars
-  if(!flat){ c.fillStyle=b.rays;
-  for(let i=0;i<24;i++){const a=i/24*TAU,len=i%2?60*R:HP; c.globalAlpha=i%2?.14:.22; for(let r=34*R;r<len;r+=2)c.fillRect(Math.round(cx+Math.cos(a)*r),Math.round(cy+Math.sin(a)*r),1,1);}
-  c.globalAlpha=.32;for(let i=0;i<190*R;i++){const a=i/(190*R)*TAU;c.fillRect(Math.round(cx+Math.cos(a)*30*R),Math.round(cy+Math.sin(a)*30*R),1,1);}
-  c.fillStyle=BONE;for(let i=0;i<60;i++){c.globalAlpha=Math.random()<.3?.8:.35;c.fillRect(Math.floor(rnd(4*R,WP-4*R)),Math.floor(rnd(4*R,HP-4*R)),1,1);}
-  }
-  paintArena(c,b,WP,HP);
-  c.globalAlpha=1;c.fillStyle=GOLD;c.scale(R,R);
-  c.fillRect(2,2,LW-4,1);c.fillRect(2,G.LH-3,LW-4,1);c.fillRect(2,2,1,G.LH-4);c.fillRect(LW-3,2,1,G.LH-4);
-  [[3,3],[LW-4,3],[3,G.LH-4],[LW-4,G.LH-4]].forEach(([x,y])=>{c.fillRect(x-1,y-2,3,5);c.fillRect(x-2,y-1,5,3);});
-  (o as any).hi=true; return o;
+
+/** Pixel Lab art for Hunt mode: animated common enemies, the chest and decor props (public/assets/hunt/manifest.json) */
+export const HUNT_ART:{enemies:Record<string,{fps:number,frames:HTMLImageElement[]}>,decor:Record<string,HTMLImageElement>}={enemies:{},decor:{}};
+async function loadHuntArt(){
+  let man; try{ const r=await fetch(import.meta.env.BASE_URL+'assets/hunt/manifest.json'); if(!r.ok) return; man=await r.json(); }catch(e){ return; }
+  await Promise.all([
+    ...Object.entries<any>(man.enemies||{}).map(async([n,m])=>{ const fr=await Promise.all(Array.from({length:m.frames},(_,i)=>loadImage('hunt/enemies/'+n+'/'+i+'.png'))); if(fr.every(Boolean)) HUNT_ART.enemies[n]={fps:m.fps,frames:fr}; }),
+    ...(man.decor||[]).map(async(n)=>{ const im=await loadImage('hunt/decor/'+n+'.png'); if(im) HUNT_ART.decor[n]=im; }),
+  ]);
 }

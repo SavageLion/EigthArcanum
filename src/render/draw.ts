@@ -1,166 +1,36 @@
 // @ts-nocheck
-import { SPELL_ART } from './sprites';
-import { bulletArt, tintedArt } from '../systems/runnerSpells';
-import { drawHub } from '../systems/hub';
-import { drawSpellExtras } from '../systems/spellFx';
-import { drawCamp } from '../systems/camp';
-import { drawDummy } from '../systems/lab';
-import { SIDE_FEET, SIDE_K, sideDrawFloor } from '../systems/sideView';
-import { pickupDraw } from '../systems/arenaEvents';
-import { W, ctx, reduced } from '../core/dom';
+import { ctx, W } from '../core/dom';
 import { G, S } from '../core/state';
-import { HEART, HEART0, K, LW, R, SKULL, SPRITE_OVERRIDES, WIZ_ANIM, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, dirOf, disc, px } from './sprites';
-import { CY, RI, RO, WANDS, isMod } from '../systems/deck';
-import { foBoss, foFloor, foPlayer } from '../systems/faceoff';
-import { drawPull } from '../systems/flow';
-import { drawChest, foWiz, wizSprite } from '../systems/gear';
-import { oaDrawFloor, oaDrawStick } from '../systems/openArena';
-import { burst } from '../systems/sim';
-import { EL, spellCost } from '../systems/spells';
-import { BONE, GOLD, TAU, clamp, rnd } from '../core/util';
-import { circle, fl, ln, poly } from './bossArt';
-import { drawArenaLayers } from './arenaArt';
-import { codedWizardLarge, codedWizardSet } from './wizardArt';
-import { vfxDraw, vfxStep } from './vfx';
-import { pixelise } from './pixel';
+import { LW, R, SPRITE_OVERRIDES, WIZ_ANIM, WIZ_SETS, blit, blitSprite, bossFrames, clipFrame, disc, px } from './sprites';
+import { drawHub } from '../systems/hub';
+import { GOLD, TAU } from '../core/util';
 
-/* ---------- drawing ---------- */
-const gx=()=>ctx;
-const pr=v=>Math.round(v*R)/R; // snap a logical coordinate to the physical pixel grid
-function arcDots(x,y,rad,fromA,toA,w,col){
-  const c=ctx,rr=rad*K; if(rr<1)return; const st=.8/(rr*R); c.fillStyle=col;
-  for(let a=fromA;a<toA;a+=st) c.fillRect(pr(x*K+Math.cos(a)*rr-w/2),pr(y*K+Math.sin(a)*rr-w/2),w,w);
-}
-export function lineDots(x0,y0,x1,y1,col,w=1){ const c=ctx,n=Math.max(1,Math.round(Math.hypot(x1-x0,y1-y0)*K*R));c.fillStyle=col;for(let i=0;i<=n;i++)c.fillRect(pr((x0+(x1-x0)*i/n)*K),pr((y0+(y1-y0)*i/n)*K),w,w); }
+/* Village drawing: the Sanctum itself lives in systems/hub.ts; this file holds the walking wizard and the title backdrop. */
 const nowS=()=>performance.now()/1000;
-/** the sprite set for a wizard: the Raven uses the animated Pixel Lab art, the others their coded art (static, with a little bob) */
-const codedCache={};
 /** how big each unlockable wizard is drawn relative to the Raven (their sprites come in different canvas sizes) */
 const WIZ_DRAW_K={ember:.9,frost:.9};
-function wizardSprites(id){ if(!id||id==='raven') return {dirs:SPRITE_OVERRIDES.wizardDirs,back:SPRITE_OVERRIDES.wizardBack,anim:true}; const W=WIZ_SETS[id]; if(W) return {dirs:W.dirs,back:W.back,anim:!!WIZ_ANIM[id],clips:WIZ_ANIM[id]}; return codedCache[id]||(codedCache[id]={dirs:codedWizardSet(id),back:codedWizardLarge(id),anim:false}); }
-/** What the wizard is doing: one-shots (hurt, cast) win over walk, which wins over idle. Returns [clip name, seconds into it]. */
-function wizardAction(P){ const t=nowS();
-  if(S.mode==='dying'||S.mode==='dead') return ['death',t-(P.deathAt??t)];
-  if(P.hurtAt!==undefined&&t-P.hurtAt<.55) return ['hurt',t-P.hurtAt];
-  if(P.castAt!==undefined&&t-P.castAt<.5) return ['cast',t-P.castAt];
-  return t-(P.moveAt??-9)<.15?['walk',t]:['idle',t]; }
-/** The frame to draw for a direction: the current clip if that clip exists, else idle, else the still pose. */
-function wizardFrame(set,rest,dir,clips){ const [name,age]=G.P?wizardAction(G.P):['idle',nowS()], A=clips||SPRITE_OVERRIDES.anim[set]; const clip=A[name]?.[dir]||A.idle?.[dir]; return clip?clipFrame(clip,age):rest; }
-/** facing: one of the 8 directions (south = towards the camera). Falls back to the procedural wizard if the art is missing. */
+function wizardSprites(id){
+  if(!id||id==='raven') return {dirs:SPRITE_OVERRIDES.wizardDirs,clips:SPRITE_OVERRIDES.anim.arena};
+  const W_=WIZ_SETS[id]; return W_?{dirs:W_.dirs,clips:WIZ_ANIM[id]}:{dirs:null,clips:null};
+}
+/** the frame to draw for a direction: walk while moving, otherwise idle, otherwise the still pose */
+function wizardFrame(rest,dir,clips){ const P=G.P, name=P&&nowS()-(P.moveAt??-9)<.15?'walk':'idle', clip=clips&&(clips[name]?.[dir]||clips.idle?.[dir]); return clip?clipFrame(clip,nowS()):rest; }
+/** facing: one of the 8 directions (south = towards the camera) */
 export function drawWizard(x,y,fade,facing='south'){
   const c=ctx; if(fade)c.globalAlpha=.4;
-  const WS=wizardSprites(G.P&&G.P.wizard), set=WS.dirs; let tip;
-  if(set&&WS.anim){ const side=S.side&&G.plats&&G.plats.length, air=side&&G.P.air, af=air?(WS.clips||SPRITE_OVERRIDES.anim.arena).walk?.[facing]?.frames[2]:null; tip=blitSprite(c,af||wizardFrame('arena',set[facing],facing,WS.clips),px(x),px(y)+(side?SIDE_FEET*K:8),(side?SIDE_K:1)*(WIZ_DRAW_K[G.P&&G.P.wizard]||1)); }
-  else if(set){ const k=S.side&&G.plats&&G.plats.length?SIDE_K:1, dead=S.mode==='dying'||S.mode==='dead', age=dead?nowS()-(G.P.deathAt??nowS()):0, bob=dead?0:Math.round(Math.sin(nowS()*3.2)*R)/R*.8;
-    if(dead){ c.save(); c.translate(px(x),px(y)+8); c.rotate(Math.min(age*3.2,1.45)); tip=blitSprite(c,set[facing],0,0); c.restore(); } else tip=blitSprite(c,set[facing],px(x),px(y)+8+bob,k*(WIZ_DRAW_K[G.P&&G.P.wizard]||1)); }          // feet 8 logical px below the hitbox centre
-  else { blit(c,px(x),px(y)-2,wizSprite()); tip={x:px(x)+6,y:px(y)-11}; }
-  if(G.P&&G.P.wand){const w=WANDS.find(q=>q.id===G.P.wand);blit(c,tip.x,tip.y,disc(w.c,1.5));}
+  const WS=wizardSprites(G.P&&G.P.wizard), set=WS.dirs; let tip={x:px(x)+6,y:px(y)-11};
+  if(set){ const fr=wizardFrame(set[facing],facing,WS.clips); if(fr) tip=blitSprite(c,fr,px(x),px(y)+8,WIZ_DRAW_K[G.P&&G.P.wizard]||1); }
   if(Math.floor(S.t*6)%2){c.fillStyle='#ffffff';c.fillRect(tip.x-.25,tip.y-.25,.5,.5);}
   c.globalAlpha=1;
-}
-function drawPlayer(){
-  const c=ctx, blink=G.P.inv>0&&Math.floor(S.t*14)%2===0;
-  if(Math.hypot(G.P.x-(G.P.lx??G.P.x),G.P.y-(G.P.ly??G.P.y))>.4) G.P.moveAt=nowS(); G.P.lx=G.P.x; G.P.ly=G.P.y;
-  if(S.fo&&G.fo){ foPlayer(c,blink); for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); } if(G.P.shield>0) arcDots(G.P.x,G.P.y,48,0,TAU,1,'#bfeaf2'); return; }
-  G.P.face=S.side?(G.P.sdir||'north'):G.B?dirOf(Math.atan2(G.B.y-G.P.y,G.B.x-G.P.x)):'north';
-  if(!(blink&&reduced)) drawWizard(G.P.x,G.P.y,blink,G.P.face);
-  if(G.P.shield>0&&!(G.P.shield<1&&Math.floor(S.t*10)%2)) arcDots(G.P.x,G.P.y,28,0,TAU,1,'#bfeaf2');
-  for(const f of G.helpers){ if(f.x!==undefined) blit(c,px(f.x),px(f.y),SKULL); }
-  const hx=px(G.P.x),hy=px(G.P.y),r=G.P.hit<4?1:1;
-  blit(c,hx,hy,disc('#ffd76a',1.5));
-}
-function drawBoss(){
-  if(S.lab){ drawDummy(ctx); return; }
-  const c=ctx,f=bossFrames(S.stage),atk=SPRITE_OVERRIDES.bossAtk[S.stage],age=performance.now()/1000-(G.B.atkAt??-9);
-  const fr=(atk&&age<.45)?atk[Math.min(atk.length-1,Math.floor(age*14))]:f[Math.floor(S.t*6)%f.length];
-  const j=G.B.enraged&&!reduced?(Math.floor(S.t*14)%2):0;
-  const x=px(G.B.x)+j,y=px(G.B.y);
-  const sk=S.side&&G.plats&&G.plats.length?SIDE_K:1, bl=img=>{ if(sk===1)return blit(c,x,y,img); c.save(); c.translate(x,y); c.scale(sk,sk); blit(c,0,0,img); c.restore(); };
-  bl(fr.img);
-  if(G.B.chill>0){c.fillStyle='#bfeaf2';for(let i=0;i<4;i++)c.fillRect(x+Math.round(Math.cos(S.t*2+i*1.6)*24),y+Math.round(Math.sin(S.t*2+i*1.6)*22),2,2);}
-  if(G.B.flash>0) bl(fr.white);
-  if(G.B.burning>0&&Math.random()<.5) burst(G.B.x+rnd(-30,30),G.B.y+rnd(-30,30),'#f0813f',1);
-}
-/* ---- HUD, drawn at physical resolution (u = one physical pixel in logical units) ---- */
-const U=1/R;
-const box=(x,y,w,h,col,al=1)=>{ const c=ctx; c.globalAlpha=al; c.fillStyle=col; c.fillRect(pr(x),pr(y),Math.max(U,pr(w)),Math.max(U,pr(h))); c.globalAlpha=1; };
-/** gilded bar: dark trough, bevelled gold rim, optional trailing chip, shaded fill, notches and end gems */
-function gildedBar(x,y,w,h,frac,trail,col,notches,gem){
-  box(x-3*U,y-3*U,w+6*U,h+6*U,'#0b0814');
-  box(x-2*U,y-2*U,w+4*U,h+4*U,'#8f7440');                 // rim
-  box(x-2*U,y-2*U,w+4*U,U,'#f0d9a5'); box(x-2*U,y-2*U,U,h+4*U,'#dcb868');   // lit top/left edges
-  box(x-2*U,y+h+U,w+4*U,U,'#57401f'); box(x+w+U,y-2*U,U,h+4*U,'#57401f');   // shaded bottom/right
-  box(x,y,w,h,'#1a1024');                                  // trough
-  if(trail>frac) box(x+w*frac,y,w*(trail-frac),h,'#f1e8d4',.55);   // damage chip
-  if(frac>0){ box(x,y,w*frac,h,col); box(x,y,w*frac,Math.max(U,h*.3),'#ffffff',.28); box(x,y+h*.7,w*frac,h*.3,'#000000',.22); }
-  for(const n of notches) box(x+w*n-U/2,y,U,h,'#0b0814',.55);
-  if(gem){ for(const sx of [x-4*U,x+w+4*U]){ box(sx-U,y+h/2-3*U,2*U,6*U,'#dcb868'); box(sx-3*U,y+h/2-U,6*U,2*U,'#dcb868'); box(sx-U,y+h/2-U,2*U,2*U,'#ffffff'); } }
-}
-let heartImg=null, starImg=null;
-function hudArt(){
-  if(heartImg) return;
-  const heart=(fill,rim,hi)=>pixelise(c=>{ c.beginPath();c.moveTo(0,7);c.bezierCurveTo(-11,-1,-7,-9,0,-4);c.bezierCurveTo(7,-9,11,-1,0,7);c.closePath(); fl(c,fill); ln(c,rim,1.2); if(hi){c.beginPath();c.ellipse(-4,-3,2,1.3,-.6,0,TAU);fl(c,hi);} },12,.62).img;
-  heartImg={full:heart('#d9505f','#f0d9a5','#f3b8ae'),empty:heart('#2a1a33','#57401f',null)};
-  starImg=pixelise(c=>{ poly(c,[[0,-9],[2.2,-2.2],[9,0],[2.2,2.2],[0,9],[-2.2,2.2],[-9,0],[-2.2,-2.2]]); fl(c,'#79c6dd'); ln(c,'#bfeaf2',1); circle(c,0,0,1.6); fl(c,'#ffffff'); },10,.6).img;
-}
-function drawHUD(){
-  hudArt(); const sv=S.side&&G.plats&&G.plats.length, c=ctx,bx=sv?30:20,by=sv?9:18,bw=sv?100:120,bh=sv?4:5;
-  const hp=G.B.hp/G.B.max; G.B.trail=Math.max(hp,(G.B.trail??hp)-.004);
-  gildedBar(bx,by,bw,bh,hp,G.B.trail,G.B.color,[.25,.5,.75],true);
-  box(bx+bw/2-U/2,by-4*U,U,2*U,GOLD); box(bx+bw/2-U/2,by+bh+2*U,U,2*U,GOLD);   // phase tick
-  for(let i=0;i<G.P.max;i++){ const low=G.P.hp===1&&i===0&&Math.floor(performance.now()/350)%2; blit(c,8+i*10+5,G.LH-14+(low?-.5:0)+4,i<G.P.hp?heartImg.full:heartImg.empty); }
-  if(G.P.spells.length){
-    const mx=17,my=G.LH-21,mw=57,mh=4, full=G.P.mana>=G.P.manaMax;
-    gildedBar(mx,my,mw,mh,G.P.mana/G.P.manaMax,0,G.P.grazeGlow>0?'#c7e6ff':'#5aa8f0',G.P.spells.map(s=>spellCost(s)/G.P.manaMax),false);
-    blit(c,9,my+mh/2,starImg); if(full&&Math.floor(performance.now()/300)%2) box(8.5,my+mh/2-.5,1,1,'#ffffff');
-  }
 }
 export function draw(){
   const c=ctx; c.setTransform(R,0,0,R,0,0); c.imageSmoothingEnabled=false;
   c.fillStyle='#0b0814';c.fillRect(0,0,LW,G.LH);
-  if(S.mode==='hub'){ drawHub(c); return; }
-  if(S.camp&&G.camp){ drawCamp(c); return; }
-  if(S.shake>0) c.translate(Math.round(rnd(-S.shake,S.shake)*.2),Math.round(rnd(-S.shake,S.shake)*.2));
-  if(isMod('hanged')&&S.mode!=='draw'){c.translate(0,G.LH);c.scale(1,-1);}
-  c.drawImage(G.bg,0,0,LW,G.LH); drawArenaLayers(c,LW); vfxStep();
-  if(S.mode==='draw'){drawPull();return;}
-  if(!G.B||S.mode==='shop') return;
-  if(S.fo&&G.fo)foFloor(c); if(S.open&&G.oa)oaDrawFloor(c); if(S.side&&G.plats)sideDrawFloor(c); if(!S.fo&&!S.orbit&&S.mode==='fight')pickupDraw(c);
-  if(S.orbit&&G.P){ for(const r of [RI,RO]){ const live=G.P.tr===r,rr=r*K,st=(live?5:7)/(rr*R); c.globalAlpha=live?.75:.3; c.fillStyle=live?BONE:G.B.color; for(let a=S.t*.1;a<TAU+S.t*.1;a+=st)c.fillRect(pr(LW/2+Math.cos(a)*rr),pr(CY()*K+Math.sin(a)*rr),1,1); c.globalAlpha=1; }
-    for(const k of G.bands){ const w=px(k.w); if(k.t<k.warn){ if(Math.floor(S.t*12)%2){ arcDots(W/2,CY(),k.r-k.w/2,0,TAU,1,BONE); arcDots(W/2,CY(),k.r+k.w/2,0,TAU,1,BONE); } } else { arcDots(W/2,CY(),k.r,0,TAU,w,G.B.color); arcDots(W/2,CY(),k.r,0,TAU,Math.max(2,w-6),'#fffbee'); } } }
-  for(const k of G.cols){
-    const x0=px(k.x-k.w/2),w=px(k.w);
-    if(k.t<k.warn){ const on=(Math.floor(S.t*12)%2)+1; c.fillStyle=k.c; for(let y=0;y<G.LH;y+=2)for(let x=x0+(y%4?0:1);x<x0+w;x+=on+1)c.fillRect(x,y,1,1); const m=Math.round(w/2*(1-k.t/k.warn)); c.fillRect(x0+w/2-m,0,1,G.LH);c.fillRect(x0+w/2+m,0,1,G.LH); }
-    else { c.fillStyle=k.c;c.fillRect(x0-2,0,w+4,G.LH);c.fillStyle='#fffbe0';c.fillRect(x0,0,w,G.LH); }
-  }
-  for(const r of G.rings){ const w=Math.max(1,Math.round(r.w*K)); if(r.gap>=TAU-.01) arcDots(r.x,r.y,r.rad,0,TAU,w,r.c); else { arcDots(r.x,r.y,r.rad,r.a+r.gap,r.a-r.gap+TAU,w+2,'#0b0814'); arcDots(r.x,r.y,r.rad,r.a+r.gap,r.a-r.gap+TAU,w,r.c);} }
-  if(!['won','pick','victory'].includes(S.mode)){ if(S.fo&&G.fo)foBoss(c); else drawBoss(); }
-  for(const b of G.beams){ if(b.sy!==undefined) lineDots(b.sx,b.sy,G.B.x,G.B.y,GOLD); else { lineDots(b.x,0,b.x+rnd(-10,10),G.B.y*.5,'#fff2a0',2); lineDots(b.x,G.B.y*.5,b.x,G.B.y,'#fff2a0',2);} }
-  for(const b of G.bolts){ const BS=SPELL_ART['bolt-player']; if(BS){ const col=b.c, im=col?tintedArt('bolt-player',col,.55):BS, w=Math.max(6,b.r*1.9*K*2), h=w*2; c.save(); c.translate(px(b.x),px(b.y)); c.rotate(Math.atan2(b.vy||-1,b.vx||0)+Math.PI/2); c.drawImage(im,-w/2,-h*.6,w,h); c.restore(); continue; }
-    if(b.c) blit(c,px(b.x),px(b.y),disc(b.c,Math.max(1,b.r*K))); else { c.fillStyle='#7d5a22';c.fillRect(px(b.x)-1,px(b.y),3,6);c.fillStyle='#ffe9a8';c.fillRect(px(b.x),px(b.y)-1,1,6); } }
-  for(const s of G.seeds){ if(s.homing) blit(c,px(s.x),px(s.y),disc('#9dbb6a',1)); }
-  for(const s of G.shots){
-    if(isMod('moon')&&G.P&&Math.hypot(s.x-G.P.x,s.y-G.P.y)>135)continue;
-    const SS=SPRITE_OVERRIDES.shot[S.stage];
-    if(SS&&!s.seed){ c.save(); c.translate(px(s.x),px(s.y)); c.rotate(Math.atan2(s.vy,s.vx)); const z=s.r*K>3.5?16:8; c.drawImage(SS,-z/2,-z/2,z,z); c.restore(); continue; }   // boss's own projectile art
-    if(!SS&&!s.seed){ const BA=bulletArt(S.stage,G.B.color); if(BA){ c.save(); c.translate(px(s.x),px(s.y)); if(BA.spin)c.rotate(S.t*BA.spin*2+s.x*.05); const z=s.r*K>3.5?18:11; c.globalAlpha=.2; c.fillStyle=G.B.color; c.beginPath(); c.arc(0,0,z*.62,0,TAU); c.fill(); c.globalAlpha=1; c.drawImage(BA.img,-z/2,-z/2,z,z); c.restore(); continue; } }
-    if(S.stage===0||S.stage===13){ for(let k=3;k>=1;k--){ c.globalAlpha=.55-k*.1; blit(c,px(s.x-s.vx*.011*k),px(s.y-s.vy*.011*k),disc(k>1?'#c0301a':s.c,Math.max(1.5,s.r*K*(1-.2*k)))); } c.globalAlpha=1; }
-    blit(c,px(s.x),px(s.y),disc(s.c,Math.max(2,s.r*K)));
-    if(s.seed) arcDots(s.x,s.y,s.r+15*clamp(s.fuse/1.15,0,1),0,TAU,1,s.c);
-  }
-  { const HS=SPELL_ART['hit-spark']; if(HS&&G.hits) for(const h of G.hits){ const f=h.t/h.life, z=(10+f*12)*(h.big?1.6:1); c.globalAlpha=1-f; c.drawImage(HS,px(h.x)-z/2,px(h.y)-z/2,z,z); } c.globalAlpha=1; }
-  for(const p of G.parts){ c.fillStyle=p.c; const z=p.r>2&&p.t<p.life*.5?2:1; c.fillRect(px(p.x),px(p.y),z,z); }
-  drawChest(c); drawSpellExtras(c);
-  for(const k of G.traps){ const on=k.arm<=0&&Math.floor(S.t*5)%2===0; blit(c,px(k.x),px(k.y),disc(k.c,on?3:2)); c.fillStyle=k.c; for(let i=0;i<4;i++){const a=i*1.57+S.t;c.fillRect(px(k.x)+Math.round(Math.cos(a)*7),px(k.y)+Math.round(Math.sin(a)*7),1,1);} }
-  if(G.P&&G.P.beam&&G.B){ const col=EL[G.P.beam.s.els[0]].c; lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#0b0814',5); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,col,3); lineDots(G.P.x,G.P.y,G.B.x,G.B.y,'#fffbee',1); }
-  vfxDraw(c,'back');
-  if(G.P){ if(S.mode==='dying'||S.mode==='dead'){ if(S.fo) foPlayer(c,false); else drawWizard(G.P.x,G.P.y,false,G.P.face||'north'); } else drawPlayer(); }
-  vfxDraw(c,'front');
-  c.setTransform(R,0,0,R,0,0); if(G.P&&S.mode!=='title'){ const hs=LW/160; if(hs===1) drawHUD(); else { c.save(); c.scale(hs,hs); const lh=G.LH; G.LH=lh/hs; try{ drawHUD(); } finally { G.LH=lh; c.restore(); } } } if(S.open&&(S.mode==='fight'||S.mode==='intro')) oaDrawStick(c);
-  if(S.flash>0){ c.fillStyle=`rgba(255,240,210,${Math.min(.5,S.flash)})`; c.fillRect(-4,-4,LW+8,G.LH+8); }
+  if(S.mode==='hub') drawHub(c);
 }
 export function drawTitle(){
-  const c=ctx; c.setTransform(R,0,0,R,0,0); c.imageSmoothingEnabled=false; c.drawImage(G.bg,0,0,LW,G.LH);
-  const f=bossFrames(7); blit(c,LW/2,60+Math.round(Math.sin(S.t)*2),f[Math.floor(S.t*6)%f.length].img);
+  const c=ctx; c.setTransform(R,0,0,R,0,0); c.imageSmoothingEnabled=false;
+  c.fillStyle='#0b0814'; c.fillRect(0,0,LW,G.LH);
+  const f=bossFrames(7); if(f&&f.length) blit(c,LW/2,60+Math.round(Math.sin(S.t)*2),f[Math.floor(S.t*6)%f.length].img);
   for(let i=0;i<14;i++){ const a=S.t*.45+i/14*TAU,r=100+((S.t*38+i*18)%90); blit(c,px(W/2+Math.cos(a)*r),px(150+Math.sin(a)*r*.82),disc(i%2?'#b78cff':GOLD,2)); }
 }
