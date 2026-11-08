@@ -18,6 +18,9 @@ node tests/hunt-bot.mjs 12   # build first; a dodging bot plays whole hunts and 
 - **Gear** (hat, robe, charm, five rarities) drops from chests and is worn for the rest of the hunt; gear you have worn is recorded for the Forge. Wizards bring their perks (raven, sun eater, ice hermit, bone priestess, gambler).
 - Controls: drag anywhere (or WASD / arrows) to move, Esc pauses. Spells cast themselves.
 
+## Deck mode (prototype, branch deck-mode)
+The Sanctum's Hunt gate opens a fast tarot-deck boss rush (`src/deck/deck.ts`, add `?deck` to the URL to jump straight in). A run is seven short boss fights. Your spells are cards: hold four, tap one to cast it (mana), played cards go to the discard pile and the hand refills from the shuffled draw pile. Same-suit streaks build a combo. After each boss you pick one of three cards for your deck, any of which may be drawn reversed (+60% power, costs a heart). `node tests/deck-bot.mjs 6` plays whole runs headlessly.
+
 ## Layout
 - `src/main.ts`: title, village and hunt loop. `src/village/title.ts`, `src/systems/hub.ts`, `src/ui/overlay.ts` (overlays, icons, boss card art).
 - `src/hunt/hunt.ts`: the whole hunt (world generation, rooms, spells, elements, bosses, rewards, cards, UI). `src/hunt/vfx.ts` runs the pixel VFX library on the hunt canvas.

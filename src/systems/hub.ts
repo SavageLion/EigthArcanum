@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { enterDeck } from '../deck/deck';
 import { W, muteBtn, ov } from '../core/dom';
 import { G, S, newPlayer } from '../core/state';
 import { KEYS } from '../core/input';
@@ -100,7 +101,7 @@ export function hubStep(dt){
   for(const m of h.motes){ m.y-=m.v*dt; m.x+=Math.sin(h.t+m.p)*8*dt; if(m.y<GATE){ m.y=WH; m.x=rnd(0,WW); } }
 }
 function openStation(id){
-  if(id==='door'){ enterHunt({exit:enterHub}); return; }
+  if(id==='door'){ enterDeck({exit:enterHub}); return; }
   if(id==='market')showMarket(); else if(id==='forge')showForge(); else if(id==='codex')showCodex(); else showBoard();
 }
 const back=()=>{ ov.hidden=true; };
