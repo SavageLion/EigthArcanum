@@ -14,7 +14,7 @@ import { applyMuteToMusic, setMusic, sfx, snd, wakeAudio } from '../core/audio';
 import { S } from '../core/state';
 
 const W=480,H=270;
-let root,cv,c,box,panel,hmute,hmenu,exitFn=null,inited=false,hw=null,prevScene='wave',daily=false;
+let root,cv,c,box,panel,hmute,hmenu,hfull,exitFn=null,inited=false,hw=null,prevScene='wave',daily=false;
 const rnd=(a,b)=>a+Math.random()*(b-a),rint=(a,b)=>Math.floor(rnd(a,b+1)),pick=a=>a[Math.floor(Math.random()*a.length)],clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),TAU=Math.PI*2;
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const AR={x0:14,y0:24,x1:466,y1:256};   // playfield
@@ -904,7 +904,7 @@ function onKey(e){if(S.mode!=='hunt')return;const k=e.key.length===1?e.key.toLow
 function fit(){if(!box)return;const pw=innerWidth-32,ph=innerHeight;box.style.setProperty('--s',Math.max(.5,Math.min(pw/480,ph/270)).toFixed(4));}
 function initHunt(){
   if(inited)return;inited=true;
-  root=$('hunt');cv=$('hcv');box=$('hbox');panel=$('hpanel');hmute=$('hmute');hmenu=$('hmenu');
+  root=$('hunt');cv=$('hcv');box=$('hbox');panel=$('hpanel');hmute=$('hmute');hfull=$('hfull');hmenu=$('hmenu');
   setShake(v=>{shake=Math.max(shake,v);});
   cv.width=W*R;cv.height=H*R;c=cv.getContext('2d');c.setTransform(R,0,0,R,0,0);c.imageSmoothingEnabled=false;
   addEventListener('keydown',onKey);addEventListener('keyup',onKey);addEventListener('resize',fit);
@@ -913,6 +913,12 @@ function initHunt(){
   const endStick=e=>{if(e.pointerId!==stick.id)return;stick.id=null;stick.on=false;stick.x=stick.y=0;};
   cv.addEventListener('pointerup',endStick);cv.addEventListener('pointercancel',endStick);cv.addEventListener('contextmenu',e=>e.preventDefault());
   hmenu.onclick=()=>showPause();
+  /* full screen: a button where the browser allows it (Android, desktop); on iPhone the page can be added to the Home Screen instead */
+  const fsEl=document.documentElement,canFs=!!(fsEl.requestFullscreen||fsEl.webkitRequestFullscreen),isFs=()=>!!(document.fullscreenElement||document.webkitFullscreenElement),standalone=matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches||navigator.standalone;
+  hfull.hidden=!canFs||standalone;
+  const paintFs=()=>{hfull.textContent=isFs()?'exit full':'full';fit();};
+  hfull.onclick=async()=>{try{if(isFs()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}else{await (fsEl.requestFullscreen||fsEl.webkitRequestFullscreen).call(fsEl);try{await screen.orientation.lock('landscape');}catch(e){}}}catch(e){}paintFs();};
+  document.addEventListener('fullscreenchange',paintFs);document.addEventListener('webkitfullscreenchange',paintFs);
   const paintMute=()=>{hmute.textContent=snd.muted?'♪ off':'♪ on';};paintMute();
   hmute.onclick=()=>{snd.muted=!snd.muted;try{localStorage.setItem('ea-mute',snd.muted?'1':'0');}catch(e){}wakeAudio();applyMuteToMusic();paintMute();};
   fit();

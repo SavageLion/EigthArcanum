@@ -440,7 +440,7 @@ p{font-size:1.32rem;line-height:1.1}
 #hunt .chip.on{color:#0b0818;background:#dcb868;border-color:#dcb868}
 #hunt .chip[disabled]{opacity:.35;cursor:default}
 #hmenu,#hmute{position:absolute;top:calc(var(--s)*2px);font:inherit;font-size:calc(var(--s)*8px);color:#a79bc0;background:rgba(7,4,15,.7);border:1px solid #3a2d5c;padding:calc(var(--s)*1px) calc(var(--s)*5px);cursor:pointer;z-index:2}
-#hmenu{right:calc(var(--s)*2px);top:calc(var(--s)*40px)}#hmute{right:calc(var(--s)*28px);top:calc(var(--s)*40px)}
+#hmenu{right:calc(var(--s)*2px);top:calc(var(--s)*40px)}#hmute{right:calc(var(--s)*28px);top:calc(var(--s)*40px)}#hfull{position:absolute;right:calc(var(--s)*62px);top:calc(var(--s)*40px);font:inherit;font-size:calc(var(--s)*8px);color:#a79bc0;background:rgba(7,4,15,.7);border:1px solid #3a2d5c;padding:calc(var(--s)*1px) calc(var(--s)*5px);cursor:pointer;z-index:2}#hfull[hidden]{display:none}
 #hrotate{position:fixed;inset:0;background:#07040f;display:none;place-items:center;text-align:center;z-index:5;color:#dcb868;font-size:22px;padding:24px}
 #hrotate small{display:block;margin-top:10px;font-family:'VT323','Courier New',monospace;font-size:18px;color:#a79bc0}
 @media (orientation:portrait){#hunt:not([hidden]) #hrotate{display:grid}}
