@@ -1,0 +1,33 @@
+{
+ "enemies": {
+  "wisp": {
+   "frames": 9,
+   "fps": 8
+  },
+  "bat": {
+   "frames": 9,
+   "fps": 14
+  },
+  "seer": {
+   "frames": 9,
+   "fps": 7
+  },
+  "husk": {
+   "frames": 9,
+   "fps": 8
+  },
+  "ram": {
+   "frames": 9,
+   "fps": 9
+  },
+  "guardian": {
+   "frames": 9,
+   "fps": 7
+  },
+  "chest": {
+   "frames": 1,
+   "fps": 1
+  }
+ },
+ "decor": []
+}

@@ -1,0 +1,51 @@
+{
+  "group_id": "8660fe5e-f0ef-40d0-aec9-85f393286539",
+  "states": [
+    {
+      "character": {
+        "id": "f05c71b8-06c2-4549-929c-8665e8427bc2",
+        "name": "Idle",
+        "prompt": "sleek black cat standing on all four legs with glowing pale gold eyes and a tiny silver crescent moon collar charm",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "cat",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-11-07T17:03:07.173401+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "walking": {
+            "east": [
+              "Idle/animations/walking/east/frame_000.png",
+              "Idle/animations/walking/east/frame_001.png",
+              "Idle/animations/walking/east/frame_002.png",
+              "Idle/animations/walking/east/frame_003.png"
+            ],
+            "west": [
+              "Idle/animations/walking/west/frame_000.png",
+              "Idle/animations/walking/west/frame_001.png",
+              "Idle/animations/walking/west/frame_002.png",
+              "Idle/animations/walking/west/frame_003.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-07T17:08:13.631199"
+}
