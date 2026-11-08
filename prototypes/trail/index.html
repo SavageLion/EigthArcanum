@@ -13,11 +13,12 @@ html,body{margin:0;height:100%;background:#0d1210;overflow:hidden;touch-action:n
 <body>
 <canvas id="g" aria-label="Ridgeline"></canvas>
 <script>
-/* RIDGELINE: a trail-running roguelike for phones (prototype).
-   You control only your EFFORT, one thumb on a fader. The trail does the rest. Effort drives speed, but also heart rate and legs: hills and heat push your
-   heart rate up, redlining burns your legs, and an empty tank means a bonk. Eat and drink on the move, make quick calls at trail events (creek, scree, fork...),
-   and draft gear at aid stations. Finish every stage of a race inside the cutoff for a bronze medal; beat the par time for silver; beat the gold time without
-   bonking for gold. Races unlock in order on the map. Everything here is one self-contained file. */
+/* RIDGELINE: a trail-running management roguelike for phones (prototype).
+   You run a trail runner's season. At HOME BASE you buy gear, rest, and visit the physio tent. On the MAP you pick training trails (they build four stats)
+   and races (they pay coins and medals). In a run you control only your EFFORT with one thumb: effort sets speed, but also heart rate and legs. Hills and
+   heat push your heart rate up, redlining burns your legs, an empty tank means a bonk. Hard running leaves INJURIES that follow you into the next run
+   until you treat them in the physio mini-game (at base, or in the medical tent at a race aid station, at the cost of race time). Fatigue builds as you
+   run and only rest clears it. Everything here is one self-contained file. */
 (()=>{
 'use strict';
 const W=270,H=480,SC=2,TAU=Math.PI*2;
@@ -31,122 +32,158 @@ let audioCtx=null;
 function beep(f,d=.08,type='square',v=.04,sl=0){try{if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=f;if(sl)o.frequency.linearRampToValueAtTime(f+sl,audioCtx.currentTime+d);g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d);}catch(e){}}
 
 /* ---------- save ---------- */
-const KEY='ridgeline-v1';let save={medals:{}};
-try{const j=JSON.parse(localStorage.getItem(KEY)||'null');if(j&&j.medals)save=j;}catch(e){}
+const KEY='ridgeline-v2';
+const DEF=()=>({medals:{},coins:80,day:1,fatigue:0,stats:{end:{l:0,x:0},clm:{l:0,x:0},heat:{l:0,x:0},rec:{l:0,x:0}},inj:[],owned:['hat'],cap:2,load:['hat'],loose:false});
+let save=DEF();
+try{const j=JSON.parse(localStorage.getItem(KEY)||'null');if(j&&j.medals){save=Object.assign(DEF(),j);save.stats=Object.assign(DEF().stats,j.stats||{});}
+  else{const o=JSON.parse(localStorage.getItem('ridgeline-v1')||'null');if(o&&o.medals)save.medals=o.medals;}}catch(e){}
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(save));}catch(e){}};
 const MEDAL_COL={bronze:'#c98a4a',silver:'#cfd6e0',gold:'#ffd24a'};
 
-/* ---------- races ---------- */
+/* ---------- races and training trails ---------- */
 const RACES=[
   {id:'pine',name:'Pine Ridge 5K',km:5,stages:2,theme:'dawn',tier:0,blurb:'Cool morning, gentle hills. Learn to pace.'},
   {id:'canyon',name:'Canyon Loop 15K',km:15,stages:3,theme:'noon',tier:1,blurb:'Hot rock and steep sections. Heat bites.'},
   {id:'sky',name:'Skyline 30K',km:30,stages:4,theme:'dusk',tier:2,blurb:'A long climb to the ridge. Ration everything.'},
+  {id:'summit',name:'Summit Ultra 50K',km:50,stages:5,theme:'night',tier:3,blurb:'Five stages through the night. Bring a medic.'},
 ];
+const TRAIN=[
+  {id:'t_hill',name:'Hill Repeats',short:'Hills',stat:'clm',km:3,stages:1,theme:'dawn',tier:0,train:{amp:1.7,bias:.62,fat:16},blurb:'Steep climbs and steep descents. Builds CLIMBING.'},
+  {id:'t_long',name:'Long Run',short:'Long run',stat:'end',km:3,stages:1,theme:'dawn',tier:0,train:{len:1.5,fat:24},blurb:'A long steady grind. Builds ENDURANCE.'},
+  {id:'t_heat',name:'Heat Lab',short:'Heat',stat:'heat',km:3,stages:1,theme:'noon',tier:0,train:{heat:.95,fat:18},blurb:'Run through the hottest hour. Builds HEAT TOLERANCE.'},
+  {id:'t_rec',name:'Recovery Jog',short:'Recovery',stat:'rec',km:3,stages:1,theme:'dawn',tier:0,train:{amp:.4,fat:-8},blurb:'Stay easy, heart rate low. Builds RECOVERY and shakes out fatigue.'},
+];
+const STATN={end:'Endurance',clm:'Climbing',heat:'Heat tolerance',rec:'Recovery'};
+const STATT={end:'Legs drain 5% slower per level',clm:'Hills slow you 7% less per level',heat:'Heat hurts 8% less per level',rec:'Legs recover 12% faster, wider physio zones'};
 const THEMES={dawn:{sky:['#f2a78c','#6a5a9a'],sun:[200,70,'#ffe0b0'],heat:.1,mt:['#4a4470','#3a3560'],tree:'#1f3a34',gnd:'#3a5a3c'},
               noon:{sky:['#69bff2','#dff2ff'],sun:[70,40,'#fff6c0'],heat:.65,mt:['#7a88a8','#667392'],tree:'#2a5a3a',gnd:'#8a7048'},
-              dusk:{sky:['#e06a58','#2a1a4a'],sun:[220,110,'#ff9a5a'],heat:.3,mt:['#5a3a6a','#3a2858'],tree:'#1a2a30',gnd:'#4a4030'}};
+              dusk:{sky:['#e06a58','#2a1a4a'],sun:[220,110,'#ff9a5a'],heat:.3,mt:['#5a3a6a','#3a2858'],tree:'#1a2a30',gnd:'#4a4030'},
+              night:{sky:['#2a3a6a','#070a1c'],sun:[210,60,'#dfe8ff'],heat:0,mt:['#1e2650','#161c40'],tree:'#0c1a1c',gnd:'#1a2a24'}};
 const TERRAIN={smooth:{n:'Smooth trail',f:1,col:'#6a5a3a'},rocky:{n:'Rocky',f:.84,col:'#6a6a70'},loose:{n:'Loose scree',f:.74,col:'#8a7a5a'},mud:{n:'Mud',f:.8,col:'#4a3a2c'},creek:{n:'Creek bed',f:.7,col:'#3a6a8a'}};
 const ZONES=[{n:'Easy',max:.3,col:'#6a8ab0'},{n:'Steady',max:.55,col:'#6ac07a'},{n:'Tempo',max:.75,col:'#e8d24a'},{n:'Hard',max:.9,col:'#f0903a'},{n:'Redline',max:1.01,col:'#e84a3a'}];
-const HRZ=[.55,.7,.8,.9];
 
-/* ---------- gear ---------- */
+/* ---------- gear (bought at base, carried in your loadout) ---------- */
 const GEAR={
-  poles:{n:'Trekking poles',t:'Climbs cost 15% less speed and 10% less legs.'},
-  shoes:{n:'Trail shoes',t:'Rocky, loose and muddy ground slows you half as much. Fewer falls.'},
-  flask:{n:'Soft flasks',t:'+2 drinks in your pack.'},gels:{n:'Gel pack',t:'+2 gels in your pack.'},
-  hat:{n:'Sun hat',t:'Heat hurts 60% less.'},sleeves:{n:'Compression sleeves',t:'Legs recover 40% faster.'},
-  tape:{n:'Blister tape',t:'You cannot get blisters this race.'},watch:{n:'Pacing watch',t:'Shows the sweet-spot effort on your fader.'},
-  buff:{n:'Cooling buff',t:'Heart rate runs 4 beats-per-effort cooler in the heat.'},
+  poles:{n:'Trekking poles',p:80,t:'Climbs cost 15% less speed and 10% less legs.'},
+  shoes:{n:'Trail shoes',p:60,t:'Rocky, loose and muddy ground slows you half as much. Fewer falls.'},
+  flask:{n:'Soft flasks',p:30,t:'+2 drinks in your pack.'},gels:{n:'Gel pack',p:30,t:'+2 gels in your pack.'},
+  hat:{n:'Sun hat',p:30,t:'Heat hurts 60% less.'},sleeves:{n:'Compression sleeves',p:60,t:'Legs recover 40% faster.'},
+  tape:{n:'Blister tape',p:25,t:'You cannot get blisters this race.'},watch:{n:'Pacing watch',p:70,t:'Shows the sweet-spot effort on your fader.'},
+  buff:{n:'Cooling buff',p:45,t:'Heart rate runs cooler in the heat.'},
+  roller:{n:'Massage gun',p:55,t:'Physio zones 35% wider. Tent treatments cost 20 s less.'},
 };
+const SHOPIDS=['hat','flask','gels','tape','shoes','sleeves','poles','buff','watch','roller'];
+const CAPCOST=[60,110,180];
+
+/* ---------- injuries ---------- */
+const INJ={
+  blister:{n:'Blister',loc:'foot',t:'Every step is slower'},
+  shin:{n:'Shin splints',loc:'shin',t:'Legs drain faster on flat and downhill'},
+  calf:{n:'Tight calf',loc:'calf',t:'Climbs hurt more, cramps come sooner'},
+  knee:{n:'Sore knee',loc:'knee',t:'Descents drain your legs'},
+  ach:{n:'Achilles pain',loc:'ankle',t:'Hard efforts drain your legs'},
+};
+const SEVCOL=['#e8d24a','#f0903a','#e84a3a'];
+const sev=k=>{const q=save.inj.find(i=>i.k===k);return q?q.s:0;};
+const lv=k=>save.stats[k].l;
+const need=l=>70+45*l;
+function addInj(k){const q=save.inj.find(i=>i.k===k);if(q){q.s=Math.min(3,q.s+1);return INJ[k].n+' worse';}save.inj.push({k,s:1});return INJ[k].n;}
+function addXp(k,n,lines){const s=save.stats[k];if(s.l>=5)return;s.x+=n;lines.push({s:`${STATN[k]} +${Math.round(n)} xp`,c:'#9fd8a0'});while(s.l<5&&s.x>=need(s.l)){s.x-=need(s.l);s.l++;lines.push({s:`${STATN[k]} is now level ${s.l}!`,c:'#ffd24a'});}if(s.l>=5)s.x=0;}
+function advanceDay(rest,lines){save.day++;save.fatigue=Math.max(0,save.fatigue-(rest?45:12));
+  const ch=(rest?.5:.12)*(save.fatigue<50?1:.5);save.inj.forEach(i=>{if(Math.random()<ch){i.s--;lines.push({s:INJ[i.k].n+(i.s>0?' eases':' has healed'),c:'#9fd8a0'});}});save.inj=save.inj.filter(i=>i.s>0);}
 
 /* ---------- state ---------- */
-let scene='map',race=null,R_=null,S=null,P=null,t=0,sceneT=0,paused=false,shake=0,flash=0,msg='',msgT=0;
+let scene='map',race=null,R_=null,S=null,P=null,PH=null,t=0,sceneT=0,paused=false,shake=0,flash=0,msg='',msgT=0,note='',noteT=0;
 const HIT=[],popups=[],parts=[];
 const pop=(s,x,y,col='#fff')=>popups.push({s,x,y,t:1.2,col});
 const banner=(s,n=1.6)=>{msg=s;msgT=n;};
+const toast=s=>{note=s;noteT=2;};
 
 /* ---------- stage generation ---------- */
 function genStage(r,si){
-  const L=1000+120*r.tier+60*si,segs=[];let x=0,e=0;const tier=r.tier,amp=.05+.035*tier+.01*si;
+  const tr=r.train||{},L=(1000+120*r.tier+60*si)*(tr.len||1),segs=[];let x=0,e=0;const tier=r.tier,amp=(.05+.035*Math.min(tier,2)+.01*si)*(tr.amp||1);
   const th=THEMES[r.theme];
   const tw=tier===0?{smooth:5,rocky:2,loose:1,mud:1,creek:1}:tier===1?{smooth:3,rocky:4,loose:3,mud:1,creek:2}:{smooth:2,rocky:4,loose:4,mud:2,creek:2};
   const pickTer=()=>{const k=Object.keys(tw);let q=Math.random()*k.reduce((a,b)=>a+tw[b],0);for(const n of k){q-=tw[n];if(q<=0)return n;}return 'smooth';};
-  while(x<L){const len=Math.min(L-x,rint(80,190)),roll=Math.random();let g=roll<.4?rnd(.03,amp*2.1):roll<.72?rnd(-amp*1.7,-.02):rnd(-.01,.02);if(si===0&&x<150)g=rnd(0,.02);
+  const b1=tr.bias||.4;
+  while(x<L){const len=Math.min(L-x,rint(80,190)),roll=Math.random();let g=roll<b1?rnd(.03,amp*2.1):roll<b1+.32?rnd(-amp*1.7,-.02):rnd(-.01,.02);if(si===0&&x<150)g=rnd(0,.02);
     const ter=pickTer();segs.push({x0:x,len,g,t:ter,e0:e});e+=len*g;x+=len;}
   const evs=[],pool=['creek','climb','scree','fork','oranges','heat','blister'];
-  const n=3+(tier>0?1:0),slots=[];for(let i=0;i<n;i++)slots.push(L*(.16+.7*(i+rnd(.2,.8))/n));
+  const n=tr.fat!=null?2:3+(tier>0?1:0),slots=[];for(let i=0;i<n;i++)slots.push(L*(.16+.7*(i+rnd(.2,.8))/n));
   let ps=shuffle(pool);slots.forEach((px,i)=>evs.push({x:px,k:ps[i%ps.length],done:false}));
-  const obs=[];{let ox=70;while(ox<L-50){const sg=segs.find(q=>ox<q.x0+q.len)||segs[segs.length-1];let k;const r=Math.random();
-    if(sg.t==='mud'||sg.t==='creek')k=r<.55?'puddle':r<.8?'branch':'gel';else if(sg.t==='rocky'||sg.t==='loose')k=r<.55?'rock':r<.78?'branch':'gel';else k=r<.4?'log':r<.65?'branch':r<.85?'gel':'rock';
-    if(!evs.some(e=>Math.abs(e.x-ox)<35))obs.push({x:ox,k,done:false});ox+=rint(50,96)-5*tier;}}
-  return {L,segs,evs,obs,heat:th.heat+rnd(-.1,.15),cut:L/[9.2,8.4,7.0][tier],trees:Array.from({length:60},()=>({x:rnd(0,L+80),h:rnd(14,30)})),elevEnd:e};
+  const heat=tr.heat!=null?tr.heat:th.heat+rnd(-.1,.15);
+  return {L,segs,evs,heat,cut:L/(tr.fat!=null?7.5:[9.2,8.4,7.0,7.7][tier]),trees:Array.from({length:60},()=>({x:rnd(0,L+80),h:rnd(14,30)})),elevEnd:e};
 }
 const segAt=(st,x)=>{const s=st.segs;for(let i=0;i<s.length;i++)if(x<s[i].x0+s[i].len)return s[i];return s[s.length-1];};
 const elevAt=(st,x)=>{const s=segAt(st,x);return s.e0+(Math.min(x,s.x0+s.len)-s.x0)*s.g;};
 
-/* ---------- run ---------- */
-function startRace(r){
-  race=r;R_={si:0,times:[],bonks:0,gear:[],sips:3,gels:2,blister:false,total:0,stageStart:0};
-  scene='draft';sceneT=0;R_.draft=shuffle(Object.keys(GEAR)).slice(0,3);R_.draftFor='start';
+/* ---------- running ---------- */
+function beginRace(r){
+  race=r;R_={si:0,times:[],bonks:0,gear:save.load.filter(g=>save.owned.includes(g)),sips:3,gels:2,blister:false,fell:false,total:0,newInj:[],stageInj:[],tentUsed:false,report:[],climbXp:0,heatXp:0,easyXp:0,res:null,settled:false};
+  R_.sips=3+(has('flask')?2:0);R_.gels=2+(has('gels')?2:0);
+  R_.legs=clamp(100-save.fatigue*.25+(save.loose?10:0),40,100);R_.water=100;R_.fuel=100;if(save.loose){R_.report.push({s:'Loosened up by physio: +10 legs',c:'#9fd8a0'});}save.loose=false;
+  startStage();
 }
 function startStage(){
-  S=genStage(race,R_.si);const th=THEMES[race.theme];
-  P={x:0,effort:.3,hr:.45,legs:R_.legs!=null?R_.legs:100,water:R_.water!=null?R_.water:100,fuel:R_.fuel!=null?R_.fuel:100,bonk:0,stop:0,slow:null,hike:0,cramp:0,redT:0,ankle:0,cool:0,stumbleT:0,phase:0,t:0,speed:0,face:1,cut:S.cut,elevCam:0,ev:null,drinkT:0,bonked:false,hrAvg:0,jy:0,jvy:0,duck:0,flow:0,jumpAt:-9,duckAt:-9,hits:0,clears:0,perfects:0,gels:0};
-  P.elevCam=0;popups.length=0;parts.length=0;scene='run';sceneT=0;banner(`Stage ${R_.si+1} of ${race.stages}`,1.8);beep(520,.12);
+  S=genStage(race,R_.si);
+  P={x:0,effort:.3,hr:.45,legs:R_.legs,water:R_.water,fuel:R_.fuel,bonk:0,stop:0,slow:null,hike:0,cramp:0,redT:0,ankle:0,cool:0,phase:0,t:0,speed:0,cut:S.cut,elevCam:0,ev:null,drinkT:0,bonked:false,sDown:0,sRed:0,sHard:0,sClimb:0,tEasy:0};
+  popups.length=0;parts.length=0;scene='run';sceneT=0;R_.stageInj=[];banner(`Stage ${R_.si+1} of ${race.stages}`,1.8);beep(520,.12);
 }
 const has=g=>R_&&R_.gear.includes(g);
-const PS=[19,17,15.5],PG=[23,20,18],avgL=()=>1000+120*race.tier+60*(race.stages-1)/2;
+const PS=[19,17,15.5,15],PG=[23,20,18,17.4],avgL=()=>1000+120*race.tier+60*(race.stages-1)/2;
 const par=()=>({silver:race.stages*avgL()/PS[race.tier],gold:race.stages*avgL()/PG[race.tier]});
 const simTS=()=>(race.km/race.stages)*5.54;
 const fmtT=sec=>{sec=Math.round(sec);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0');};
 
-/* ---------- physics ---------- */
 function sweetEffort(g,heat){return clamp((.74-.28-1.1*Math.max(0,g)-heat*.06)/.62,.1,.9);}
 function update(dt){
-  t+=dt;sceneT+=dt;shake*=Math.pow(.02,dt);flash=Math.max(0,flash-dt*2);if(msgT>0)msgT-=dt;
+  t+=dt;sceneT+=dt;shake*=Math.pow(.02,dt);flash=Math.max(0,flash-dt*2);if(msgT>0)msgT-=dt;if(noteT>0)noteT-=dt;
   for(const p of popups)p.t-=dt;for(let i=popups.length-1;i>=0;i--)if(popups[i].t<=0)popups.splice(i,1);
   for(const q of parts){q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=q.g*dt;q.t-=dt;}for(let i=parts.length-1;i>=0;i--)if(parts[i].t<=0)parts.splice(i,1);
   if(paused)return;
+  if(scene==='physio'){if(PH&&PH.mode==='play'){PH.t+=dt;if(PH.fbT>0)PH.fbT-=dt;}return;}
   if(scene==='event'){P.ev.t-=dt;if(P.ev.t<=0)chooseEvent(0);return;}
   if(scene!=='run')return;
   const seg=segAt(S,P.x),g=seg.g,ter=TERRAIN[seg.t];P.t+=dt;
-  const heat=S.heat*(has('hat')?.4:1)*(P.cool>0?.3:1);
+  const heat=S.heat*(has('hat')?.4:1)*(P.cool>0?.3:1)*(1-.08*lv('heat'));
   let e=P.effort;
   if(P.bonk>0){P.bonk-=dt;e=Math.min(e,.15);if(P.bonk<=0){P.legs=Math.max(P.legs,14);banner('You find your legs again',1.6);}}
   if(P.hike>0){P.hike-=dt;e=Math.min(e,.2);}
   if(P.cramp>0){P.cramp-=dt;e=Math.min(e,.35);}
   // speed
   let v=9+26*Math.pow(e,.9);
-  if(g>0)v*=clamp(1-3.0*g*(has('poles')?.85:1),.4,1);else v*=1+Math.min(.35,-g*2.2);
+  if(g>0)v*=clamp(1-3.0*(1-.07*lv('clm'))*g*(has('poles')?.85:1)*(1+.1*sev('calf')),.4,1);else v*=1+Math.min(.35,-g*2.2);
   const terPen=1-ter.f;v*=1-terPen*((has('shoes')&&seg.t!=='smooth')?.5:1);
   if(P.legs<25)v*=.6+.4*P.legs/25;
-  if(R_.blister)v*=.92;if(P.ankle>0){P.ankle-=dt;v*=.85;}
+  if(R_.blister)v*=.92;v*=1-.045*sev('blister');if(P.ankle>0){P.ankle-=dt;v*=.85;}
   if(P.slow){P.slow.t-=dt;v*=P.slow.v;if(P.slow.t<=0)P.slow=null;}
-  if(P.hike>0)v=Math.min(v,11*(has('poles')?1.2:1))*(g>0?1:1);
+  if(P.hike>0)v=Math.min(v,11*(has('poles')?1.2:1));
   if(P.bonk>0)v=Math.min(v,7);
-  if(P.flow>=3)v*=1.06;
   if(P.drinkT>0){P.drinkT-=dt;v*=.55;}
   if(P.stop>0){P.stop-=dt;v=0;}
   P.speed+=(v-P.speed)*(1-Math.exp(-dt*3));P.x+=P.speed*dt;P.phase+=P.speed*dt*.085;
-  if(P.jy>0||P.jvy>0){P.jvy-=520*dt;P.jy=Math.max(0,P.jy+P.jvy*dt);if(P.jy===0)P.jvy=0;}if(P.duck>0)P.duck-=dt;
-  for(const ob of S.obs){if(ob.done||P.x<ob.x)continue;ob.done=true;passObstacle(ob);}
   // heart rate
   let tgt=.28+.62*e+1.1*Math.max(0,g)+heat*.07+(P.water<20?.08:0)+(has('buff')&&heat>.3?-.03:0);tgt=clamp(tgt,.3,1);
   P.hr+=(tgt-P.hr)*(1-Math.exp(-dt/(tgt>P.hr?5:9)));
   // legs
   let drain=.35+13*Math.pow(Math.max(0,P.hr-.62),1.6);
-  if(g<-.06&&e>.55)drain+=Math.max(0,-g-.06)*30*e;
+  if(g<-.06&&e>.55)drain+=Math.max(0,-g-.06)*30*e*(1+.6*sev('knee'));
   if(g>0&&has('poles'))drain*=.9;
+  if(g<.02)drain*=1+.08*sev('shin');if(e>.75)drain*=1+.2*sev('ach');
+  drain*=1-.05*lv('end');
   if(P.fuel<20)drain*=1.5;if(P.water<20)drain*=1.3;
-  if(P.hr<.6){const rec=.8*(.6-P.hr)/.3*(has('sleeves')?1.4:1)*(P.fuel<15?.6:1);P.legs=Math.min(100,P.legs+rec*dt);}
+  if(P.hr<.6){const rec=.8*(.6-P.hr)/.3*(has('sleeves')?1.4:1)*(1+.12*lv('rec'))*(P.fuel<15?.6:1);P.legs=Math.min(100,P.legs+rec*dt);}
   if(P.hr>.62)P.legs-=drain*dt;else P.legs-=.2*dt;
   if(P.legs<=0&&P.bonk<=0){P.legs=0;P.bonk=12;R_.bonks++;P.bonked=true;banner('BONK! Your legs give out',2);shake=6;beep(160,.4,'sawtooth',.06,-60);flash=.6;}
+  // stress tracking for injuries and training
+  if(g<-.05&&e>.55)P.sDown+=dt;if(P.hr>.9)P.sRed+=dt;if(e>.7)P.sHard+=dt;if(g>.04&&P.hr>.8)P.sClimb+=dt;if(P.hr<.62)P.tEasy+=dt;
+  if(g>.03)R_.climbXp+=dt;
   // hydration and fuel
   P.water=Math.max(0,P.water-.45*(.5+e+heat*.6)*dt);P.fuel=Math.max(0,P.fuel-.32*(.4+e)*dt);
   // cramp from redlining while dry
-  if(P.hr>.92){P.redT+=dt;if(P.redT>6&&P.water<35&&P.cramp<=0){P.cramp=9;P.redT=0;banner('Cramp! Ease off',1.8);beep(200,.2,'sawtooth',.05);}}else P.redT=Math.max(0,P.redT-dt);
+  if(P.hr>.92){P.redT+=dt;if(P.redT>6-sev('calf')&&P.water<35&&P.cramp<=0){P.cramp=9;P.redT=0;banner('Cramp! Ease off',1.8);beep(200,.2,'sawtooth',.05);}}else P.redT=Math.max(0,P.redT-dt);
   // stumbles on technical ground
-  if((seg.t==='rocky'||seg.t==='loose')&&e>.8&&Math.random()<(has('shoes')?.008:.016)*dt*60/60*1){P.stop=Math.max(P.stop,.7);P.legs-=6;pop('stumble',96,P.sy||200,'#ffb08a');shake=3;}
+  if((seg.t==='rocky'||seg.t==='loose')&&e>.8&&Math.random()<(has('shoes')?.008:.016)*dt){P.stop=Math.max(P.stop,.7);P.legs-=6;pop('stumble',96,P.sy||200,'#ffb08a');shake=3;}
   // particles
   if(P.speed>6&&Math.random()<dt*14){parts.push({x:96-4,y:groundY(P.x)-1,vx:rnd(-16,-5),vy:rnd(-12,-3),g:30,t:.5,col:seg.t==='mud'?'#5a4a3a':'#a89a78',s:1.5});}
   if(P.hr>.85&&Math.random()<dt*8)parts.push({x:96+2,y:groundY(P.x)-26,vx:rnd(-6,6),vy:rnd(-20,-8),g:40,t:.6,col:'#9ad8ff',s:1.5});
@@ -156,31 +193,20 @@ function update(dt){
   if(P.t>S.cut){fail('Missed the cutoff');return;}
   if(P.x>=S.L)finishStage();
 }
-function groundY(wx){return 192-(elevAt(S,wx)-P.elevCam)*EV;}
 const PXU=1.75,EV=PXU*2.2;
+function groundY(wx){return 192-(elevAt(S,wx)-P.elevCam)*EV;}
 
-/* ---------- obstacles: tap to jump, swipe down to duck ---------- */
-function jump(){if(scene!=='run'||paused||P.jy>0||P.stop>0||P.bonk>0||P.hike>0)return;P.jvy=130;P.jy=.01;P.jumpAt=P.t;P.legs=Math.max(0,P.legs-.25);beep(560,.07,'triangle',.03,160);}
-function duck(){if(scene!=='run'||paused||P.jy>0||P.bonk>0)return;P.duck=.55;P.duckAt=P.t;beep(300,.06,'triangle',.03,-60);}
-function passObstacle(ob){
-  const k=ob.k,jumped=P.t-P.jumpAt,ducked=P.t-P.duckAt;let ok=true;
-  if(k==='rock')ok=P.jy>=10;else if(k==='log')ok=P.jy>=14;else if(k==='branch')ok=P.duck>0;else if(k==='puddle')ok=P.jy>3;
-  if(k==='gel'){if(P.jy>7){ob.got=true;R_.gels=Math.min(R_.gels+1,6);P.fuel=Math.min(100,P.fuel+14);P.gels++;pop('+gel',96,150,'#ffe08a');beep(900,.08,'sine');}return;}
-  if(ok){P.clears++;const perfect=(k==='branch')?ducked<.35:(jumped<.38&&jumped>=0);P.flow+=perfect?2:1;if(perfect){P.perfects++;pop(P.flow>=3?'FLOW x'+P.flow:'perfect',96,150,'#9aff9a');}else pop('clear',96,150,'#cfe8cf');beep(700+Math.min(6,P.flow)*60,.05,'triangle',.03);}
-  else{P.hits++;P.flow=0;shake=3;if(k==='puddle'){P.slow={t:3,v:.65};pop('splash',96,150,'#9ad8ff');}else{P.stop=Math.max(P.stop,.6);P.legs=Math.max(0,P.legs-6);P.speed*=.4;pop(k==='branch'?'bonk!':'stumble',96,150,'#ff8a7a');beep(180,.15,'sawtooth',.05,-40);}}
-}
-
-/* ---------- events ---------- */
+/* ---------- trail events ---------- */
 const EVENTS={
   creek:{t:'Creek crossing',d:'Cold water runs over the trail. Wade it or hop the stones?',
     a:{t:'Wade across',h:'Safe and cooling, but slow',fn(){P.slow={t:6,v:.6};P.hr=Math.max(.3,P.hr-.08);P.legs=Math.min(100,P.legs+6);pop('cooled off',96,150,'#9ad8ff');if(!has('tape')&&Math.random()<.2&&!R_.blister){R_.blister=true;pop('blister!',96,140,'#ffb08a');}}},
-    b:{t:'Leap the stones',h:'65% you gain ground, 35% you fall',fn(){if(Math.random()<.65){P.x+=28;pop('+ground',96,150,'#9aff9a');}else{P.legs-=16;P.ankle=20;P.stop=.8;shake=5;pop('fell!',96,150,'#ff8a7a');}}}},
+    b:{t:'Leap the stones',h:'65% you gain ground, 35% you fall',fn(){if(Math.random()<.65){P.x+=28;pop('+ground',96,150,'#9aff9a');}else{P.legs-=16;P.ankle=20;P.stop=.8;shake=5;R_.fell=true;pop('fell!',96,150,'#ff8a7a');}}}},
   climb:{t:'Steep climb',d:'The trail kicks up. Power-hike it, or run it?',
     a:{t:'Power-hike',h:'Walk for 10 s: heart rate drops, legs recover',fn(){P.hike=10;pop('hiking',96,150,'#9ad8ff');}},
     b:{t:'Run it',h:'Gain ground now, but heart rate spikes',fn(){P.x+=34;P.hr=Math.min(1,P.hr+.15);P.legs-=8;pop('+ground',96,150,'#9aff9a');}}},
   scree:{t:'Loose scree',d:'A slope of shifting stones.',
     a:{t:'Pick your way',h:'Slower, safe',fn(){P.slow={t:7,v:.7};}},
-    b:{t:'Send it',h:'55% big gain, 45% you stumble',fn(){if(Math.random()<.55){P.x+=38;pop('+ground',96,150,'#9aff9a');}else{P.stop=1.6;P.legs-=10;shake=5;pop('stumble',96,150,'#ff8a7a');}}}},
+    b:{t:'Send it',h:'55% big gain, 45% you stumble',fn(){if(Math.random()<.55){P.x+=38;pop('+ground',96,150,'#9aff9a');}else{P.stop=1.6;P.legs-=10;shake=5;R_.fell=true;pop('stumble',96,150,'#ff8a7a');}}}},
   fork:{t:'A fork',d:'A steep shortcut up the ridge, or the long switchbacks.',
     a:{t:'Shortcut',h:'Skip 160 m, but a hard push',fn(){P.x+=160;P.hr=Math.min(1,P.hr+.14);P.legs-=14;pop('shortcut',96,150,'#9aff9a');}},
     b:{t:'Switchbacks',h:'Easy, recover a little',fn(){P.legs=Math.min(100,P.legs+4);P.hr=Math.max(.3,P.hr-.03);}}},
@@ -200,23 +226,81 @@ function chooseEvent(i){if(scene!=='event')return;const d=EVENTS[P.ev.k];(i?d.b:
 /* ---------- actions ---------- */
 function drink(){if(scene!=='run'||R_.sips<=0||P.drinkT>0)return;R_.sips--;P.water=Math.min(100,P.water+38);P.drinkT=1.3;beep(700,.1,'sine');pop('+water',96,150,'#9ad8ff');}
 function gel(){if(scene!=='run'||R_.gels<=0||P.drinkT>0)return;R_.gels--;P.fuel=Math.min(100,P.fuel+42);P.legs=Math.min(100,P.legs+8);P.drinkT=1.1;beep(800,.1,'sine');pop('+fuel',96,150,'#ffe08a');}
+
+// injuries are rolled at the end of every stage from how hard you ran it
+function rollInjuries(){
+  const fr=n=>P.t>0?n/P.t:0,f=save.fatigue*.0012,tr=race.train?.6:1,out=[];
+  const tryInj=(k,p)=>{if(Math.random()<clamp(p,0,.55)*tr)out.push(addInj(k));};
+  tryInj('knee',.025+fr(P.sDown)*.9+f+(R_.fell?.25:0));
+  tryInj('shin',.025+fr(P.sHard)*.3+f);
+  tryInj('calf',.025+fr(P.sClimb)*.9+f+(P.water<20?.08:0));
+  tryInj('ach',.02+fr(P.sRed)*1.0+f+(P.bonked?.1:0));
+  if(R_.blister){out.push(addInj('blister'));R_.blister=false;}
+  R_.fell=false;P.bonked=false;R_.stageInj=out;R_.newInj.push(...out);
+  R_.heatXp+=S.heat>.3?14:5;R_.easyXp+=fr(P.tEasy);R_.climbFrac=(R_.climbFrac||0)+fr(R_.climbXp);R_.climbXp=0;
+}
 function finishStage(){
-  R_.times.push(P.t);R_.total+=P.t;R_.legs=P.legs;R_.water=P.water;R_.fuel=P.fuel;beep(988,.2,'triangle');
+  R_.times.push(P.t);R_.total+=P.t;R_.legs=P.legs;R_.water=P.water;R_.fuel=P.fuel;beep(988,.2,'triangle');rollInjuries();
   if(R_.si+1>=race.stages)return endRace(true);
-  scene='aid';sceneT=0;R_.draftFor='aid';R_.draft=shuffle(Object.keys(GEAR).filter(g=>!R_.gear.includes(g))).slice(0,3);
-  // aid station restores
+  scene='aid';sceneT=0;R_.tentUsed=false;R_.draft=shuffle(Object.keys(GEAR).filter(g=>!R_.gear.includes(g))).slice(0,3);
   R_.legs=Math.min(100,P.legs+50);R_.water=100;R_.fuel=Math.min(100,P.fuel+30);R_.sips=Math.max(R_.sips,3+(has('flask')?2:0));R_.gels=Math.max(R_.gels,2+(has('gels')?2:0));
 }
-function fail(why){scene='dnf';sceneT=0;R_.why=why;beep(150,.5,'sawtooth',.06,-80);}
+function aidNext(){R_.si++;startStage();}
+function draftPick(g){R_.gear.push(g);if(g==='flask')R_.sips+=2;if(g==='gels')R_.gels+=2;beep(740,.1,'triangle');aidNext();}
+const COIN={bronze:50,silver:80,gold:120};
+function settle(done,medal){
+  if(R_.settled)return;R_.settled=true;const tr=!!race.train,L=R_.report,st=race.stages;let coins=0,fat;
+  if(!done)coins=8;else if(tr)coins=18;else coins=Math.round(COIN[medal]*(1+.6*race.tier));
+  if(tr)fat=race.train.fat;else fat=11*st;
+  if(done){
+    if(tr){const k=race.stat;let xp=45+(R_.bonks?0:15);if(k==='rec')xp=20+55*clamp(R_.easyXp,0,1);if(k==='clm')xp+=10*R_.climbFrac*3;addXp(k,xp,L);if(k!=='end')addXp('end',8,L);}
+    else{addXp('end',10*st,L);addXp('clm',clamp(R_.climbFrac/st,0,1)*22*st,L);addXp('heat',R_.heatXp,L);addXp('rec',6*st,L);}
+  }
+  save.coins+=coins;R_.coins=coins;if(coins)L.unshift({s:`+${coins} coins`,c:'#ffd24a'});
+  save.fatigue=clamp(save.fatigue+fat,0,100);
+  R_.newInj.forEach(s=>L.push({s:'Injury: '+s,c:'#ff8a7a'}));
+  advanceDay(false,L);if(save.fatigue>=70)L.push({s:'You are overreached: rest soon!',c:'#ffb08a'});
+  persist();
+}
+function fail(why){scene='dnf';sceneT=0;R_.why=why;rollInjuries();beep(150,.5,'sawtooth',.06,-80);settle(false);}
 function endRace(done){
-  scene='result';sceneT=0;const pr=par();R_.res={total:R_.total,medal:'bronze'};
-  if(R_.total<=pr.silver)R_.res.medal='silver';if(R_.total<=pr.gold&&R_.bonks===0)R_.res.medal='gold';
-  const prev=save.medals[race.id],order={bronze:1,silver:2,gold:3};if(!prev||order[R_.res.medal]>order[prev])save.medals[race.id]=R_.res.medal;persist();beep(1046,.4,'triangle');
+  scene='result';sceneT=0;R_.res={total:R_.total,medal:null};
+  if(!race.train){const pr=par();R_.res.medal='bronze';if(R_.total<=pr.silver)R_.res.medal='silver';if(R_.total<=pr.gold&&R_.bonks===0)R_.res.medal='gold';
+    const prev=save.medals[race.id],order={bronze:1,silver:2,gold:3};if(!prev||order[R_.res.medal]>order[prev])save.medals[race.id]=R_.res.medal;}
+  settle(done,R_.res.medal);beep(1046,.4,'triangle');
 }
-function draftPick(g){
-  R_.gear.push(g);if(g==='flask')R_.sips+=2;if(g==='gels')R_.gels+=2;beep(740,.1,'triangle');
-  if(R_.draftFor==='start'){R_.legs=100;R_.water=100;R_.fuel=100;R_.si=0;startStage();}else{R_.si++;startStage();}
+
+/* ---------- base: shop, rest, loadout ---------- */
+function buy(id){const it=GEAR[id];if(save.owned.includes(id)||save.coins<it.p)return;save.coins-=it.p;save.owned.push(id);if(save.load.length<save.cap)save.load.push(id);persist();beep(880,.1,'triangle');}
+function toggleLoad(id){const i=save.load.indexOf(id);if(i>=0)save.load.splice(i,1);else if(save.load.length<save.cap)save.load.push(id);else toast('Loadout full: untap an item first');persist();beep(500,.05,'triangle');}
+function buyCap(){const p=CAPCOST[save.cap-2];if(p==null||save.coins<p)return;save.coins-=p;save.cap++;persist();beep(880,.1,'triangle');}
+function restDay(){const L=[];advanceDay(true,L);persist();toast(L.length?L.map(q=>q.s).join(', '):'Rested. Fatigue cleared a lot.');beep(400,.2,'sine');}
+
+/* ---------- physio mini-game ---------- */
+const tri=x=>{x=((x%2)+2)%2;return x<1?x:2-x;};
+function openTreat(from,k){
+  const fee=from==='base'?15:0;if(save.coins<fee){toast('Not enough coins');return;}
+  const s=sev(k);if(!s)return;save.coins-=fee;
+  const kit=g=>from==='tent'?has(g):save.load.includes(g);
+  PH={from,mode:'play',k,s,pulses:4+s,n:0,hits:0,perf:0,miss:0,t:0,zc:rnd(.25,.75),w:clamp(.26+.025*lv('rec')+(kit('roller')?.09:0)-.03*(s-1),.14,.5),speed:.7+.12*s,fb:'',fbT:0,res:null,log:[]};
+  scene='physio';sceneT=0;
 }
+function press(){
+  if(!PH||PH.mode!=='play')return;
+  const pos=tri(PH.t*PH.speed),d=Math.abs(pos-PH.zc);
+  if(d<=PH.w/2){PH.hits++;const pf=d<=PH.w*.18;if(pf)PH.perf++;PH.fb=pf?'PERFECT':'good';PH.log.push(pf?2:1);beep(pf?980:760,.08,'triangle');}
+  else{PH.miss++;PH.fb='ouch';PH.log.push(0);beep(200,.12,'sawtooth',.04);}
+  PH.fbT=.7;PH.n++;PH.zc=rnd(.18,.82);
+  const need_=Math.ceil(PH.pulses*.6);
+  if(PH.miss>=3||PH.n>=PH.pulses||PH.hits>=PH.pulses){
+    const ok=PH.hits>=need_;PH.mode='done';PH.res={ok};
+    if(ok){const q=save.inj.find(i=>i.k===PH.k);if(q){q.s--;if(q.s<=0)save.inj=save.inj.filter(i=>i!==q);}const L=[];addXp('rec',8,L);
+      if(PH.perf>=3){if(PH.from==='tent'){R_.legs=Math.min(100,R_.legs+10);}else save.loose=true;PH.res.loose=true;}}
+    if(PH.from==='tent'){R_.tentUsed=true;R_.total+=(40-(has('roller')?20:0))/simTS();}
+    persist();beep(ok?1046:180,.3,ok?'triangle':'sawtooth');
+  }
+}
+function leaveTreat(){scene=PH&&PH.from==='tent'?'aid':'base';PH=null;}
 
 /* ---------- drawing helpers ---------- */
 function text(s,x,y,col='#f1e8d4',size=8,align='left',weight=700){c.font=`${weight} ${size}px ${MONO}`;c.textAlign=align;c.fillStyle='rgba(0,0,0,.55)';c.fillText(s,x+.6,y+.6);c.fillStyle=col;c.fillText(s,x,y);}
@@ -224,43 +308,39 @@ function wrap(s,n){const w=s.split(' '),L=[];let l='';for(const x of w){if((l+' 
 function btn(x,y,w,h,s,main,fn,dis){HIT.push({x,y,w,h,fn:dis?()=>{}:fn});c.fillStyle=dis?'#2c3430':main?'#e8a23a':'#1b2420';c.fillRect(x,y,w,h);c.strokeStyle=dis?'#3a443e':main?'#ffd27a':'#4a5a50';c.lineWidth=1;c.strokeRect(x+.5,y+.5,w-1,h-1);text(s,x+w/2,y+h/2+3,dis?'#6a746e':main?'#1a1208':'#e8eee8',main?10:8,'center');}
 function glow(x,y,r,col,a){const g=c.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');c.globalAlpha=a;c.fillStyle=g;c.beginPath();c.arc(x,y,r,0,TAU);c.fill();c.globalAlpha=1;}
 function bar(x,y,w,h,v,col,label,val){c.fillStyle='#10160f';c.fillRect(x,y,w,h);c.fillStyle=col;c.fillRect(x,y,w*clamp(v,0,1),h);c.strokeStyle='#3a4a3e';c.strokeRect(x+.5,y+.5,w-1,h-1);text(label,x-4,y+h-1.5,'#9fb0a4',7,'right');if(val!=null)text(val,x+w+3,y+h-1.5,'#cfdad2',7,'left');}
+function pips(x,y,n,max,col){for(let i=0;i<max;i++){c.fillStyle=i<n?col:'#26322b';c.fillRect(x+i*7,y,5,5);}}
+function panelBg(a=.82){c.fillStyle=`rgba(6,10,8,${a})`;c.fillRect(0,0,W,H);}
+function injLine(i,x,y,sz=8){text(INJ[i.k].n,x,y,'#e8eee8',sz);pips(x+112,y-6,i.s,3,SEVCOL[i.s-1]);}
+function toastLayer(){if(noteT>0){c.globalAlpha=clamp(noteT*2,0,1);c.fillStyle='rgba(0,0,0,.8)';c.fillRect(10,H-40,W-20,22);text(note,W/2,H-25,'#ffd27a',8,'center');c.globalAlpha=1;}}
 
 /* ---------- the trail scene ---------- */
-function drawRunner(x,y,ph,lean,state){
+function drawRunner(x,y,ph,lean){
   c.save();c.translate(x,y);c.rotate(lean);
   const bob=Math.abs(Math.sin(ph*Math.PI))*1.6*(P.speed>5?1:0);
   const swing=P.speed>2?Math.sin(ph*Math.PI*2):0,amp=P.speed>14?1:P.speed>6?.7:.35;
   const limb=(x0,y0,a1,l1,a2,l2,col,w)=>{const x1=x0+Math.sin(a1)*l1,y1=y0+Math.cos(a1)*l1,x2=x1+Math.sin(a2)*l2,y2=y1+Math.cos(a2)*l2;c.strokeStyle=col;c.lineWidth=w;c.lineCap='square';c.beginPath();c.moveTo(x0,y0);c.lineTo(x1,y1);c.lineTo(x2,y2);c.stroke();return [x2,y2];};
   const hipY=-9-bob*.5,a=swing*amp;
-  // back leg
   limb(0,hipY,-a*.9-.25,5,-a*.9-.25-.9*Math.max(0,swing*amp),5,'#1e2a66',2.2);
-  // body
-  c.fillStyle='#d9432e';c.fillRect(-2.5,hipY-9-bob,5,9);          // top
-  c.fillStyle='#2f6a3c';c.fillRect(-5,hipY-9.5-bob,3,6.5);         // pack
-  c.fillStyle='#f0c8a0';c.fillRect(-1.5,hipY-14-bob,4,4);          // head
-  c.fillStyle='#f1e8d4';c.fillRect(-2,hipY-15.2-bob,5,1.6);c.fillRect(1.5,hipY-14.4-bob,3,.9);   // cap
-  // arms
+  c.fillStyle='#d9432e';c.fillRect(-2.5,hipY-9-bob,5,9);
+  c.fillStyle='#2f6a3c';c.fillRect(-5,hipY-9.5-bob,3,6.5);
+  c.fillStyle='#f0c8a0';c.fillRect(-1.5,hipY-14-bob,4,4);
+  c.fillStyle='#f1e8d4';c.fillRect(-2,hipY-15.2-bob,5,1.6);c.fillRect(1.5,hipY-14.4-bob,3,.9);
   limb(0,hipY-7.5-bob,a*.9+.2,4,a*.9-.9,4,'#f0c8a0',1.6);
-  // front leg
   limb(0,hipY,a*.9-.1,5,a*.9-.1-.9*Math.max(0,-swing*amp),5,'#2a3a8a',2.4);
   c.fillStyle='#f4f4f4';c.fillRect(a*5-1,-1.5,4,1.6);
   c.restore();
 }
 function drawScene(){
-  const th=THEMES[race.theme],seg=segAt(S,P.x);
+  const th=THEMES[race.theme];
   P.elevCam+=(elevAt(S,P.x)-P.elevCam)*.12;
   c.save();if(shake>.2)c.translate(rnd(-shake,shake)*.5,rnd(-shake,shake)*.5);
   const sk=c.createLinearGradient(0,0,0,215);sk.addColorStop(0,th.sky[1]);sk.addColorStop(1,th.sky[0]);if(race.theme==='noon'){sk.addColorStop(0,th.sky[0]);}c.fillStyle=sk;c.fillRect(0,0,W,250);
-  // sun
+  if(race.theme==='night'){c.fillStyle='#fff';for(let i=0;i<40;i++){c.globalAlpha=.3+.5*((i*37)%10)/10;c.fillRect((i*53+P.x*.01)%W,(i*29)%150,1,1);}c.globalAlpha=1;}
   const sun=th.sun;glow(sun[0],sun[1],38,sun[2],.7);c.fillStyle=sun[2];c.beginPath();c.arc(sun[0],sun[1],9,0,TAU);c.fill();
-  // clouds
   c.fillStyle='rgba(255,255,255,.18)';for(let i=0;i<4;i++){const cx=((i*97-t*3-P.x*.02)%360+360)%360-40,cy=50+i*22;c.fillRect(cx,cy,34,5);c.fillRect(cx+8,cy-3,20,4);}
-  // distant mountains (parallax)
   for(let L=0;L<2;L++){c.fillStyle=th.mt[L];c.beginPath();c.moveTo(0,260);const sp=L?.18:.07;for(let sx=0;sx<=W+6;sx+=6){const wx=sx+P.x*sp;const hh=(L?105:140)-(Math.sin(wx*.021+L*2)*18+Math.sin(wx*.047+L)*10+Math.sin(wx*.009)*22);c.lineTo(sx,hh);}c.lineTo(W,260);c.fill();}
-  // ground
   const yG=sx=>groundY(P.x+(sx-96)/PXU);
   c.beginPath();c.moveTo(0,H);for(let sx=0;sx<=W+3;sx+=3)c.lineTo(sx,yG(sx));c.lineTo(W,H);c.closePath();c.fillStyle=th.gnd;c.fill();
-  // trail surface bands by terrain
   for(let sx=0;sx<W;sx+=3){const wx=P.x+(sx-96)/PXU,sg=segAt(S,Math.max(0,wx));c.fillStyle=TERRAIN[sg.t].col;c.fillRect(sx,yG(sx),3.2,6);
     if(sg.t==='rocky'&&((sx*7+Math.floor(wx))%5===0)){c.fillStyle='#8a8a92';c.fillRect(sx,yG(sx)-1.5,2,2);}
     if(sg.t==='loose'&&((sx*3+Math.floor(wx))%4===0)){c.fillStyle='#b8a888';c.fillRect(sx,yG(sx)-1,1.5,1.5);}
@@ -268,74 +348,51 @@ function drawScene(){
     if(sg.t==='mud'&&((sx+Math.floor(wx))%7===0)){c.fillStyle='#2e2218';c.fillRect(sx,yG(sx)+1,3,1.5);}
   }
   c.fillStyle='rgba(255,255,255,.12)';for(let sx=0;sx<W;sx+=3)c.fillRect(sx,yG(sx)-.5,3.2,1);
-  // trees anchored in the world
   for(const tr of S.trees){const sx=96+(tr.x-P.x)*PXU;if(sx<-20||sx>W+20)continue;const gy=yG(sx)-2,h=tr.h;c.fillStyle=th.tree;c.beginPath();c.moveTo(sx,gy-h);c.lineTo(sx+h*.28,gy);c.lineTo(sx-h*.28,gy);c.closePath();c.fill();c.fillRect(sx-1,gy,2,3);}
-  // event flags
   for(const ev of S.evs){if(ev.done)continue;const sx=96+(ev.x-P.x)*PXU;if(sx>W+10||sx<-10)continue;const gy=yG(sx);c.fillStyle='#4a3a2a';c.fillRect(sx,gy-22,1.5,22);c.fillStyle='#ffd24a';c.beginPath();c.moveTo(sx+1.5,gy-22);c.lineTo(sx+11,gy-18);c.lineTo(sx+1.5,gy-14);c.fill();}
-  // finish gate
-  const fx=96+(S.L-P.x)*PXU;if(fx<W+20){const gy=yG(fx);c.fillStyle='#e8e0d0';c.fillRect(fx-1,gy-30,2,30);c.fillRect(fx+24,gy-30,2,30);c.fillStyle='#e8503a';c.fillRect(fx-1,gy-31,27,5);text('FINISH',fx+12,gy-27,'#fff',4,'center');}
-  // obstacles
-  for(const ob of S.obs){const sx=96+(ob.x-P.x)*PXU;if(sx<-14||sx>W+14||ob.got)continue;const gy2=yG(sx);
-    if(ob.k==='rock'){c.fillStyle='#6e6e78';c.beginPath();c.moveTo(sx-6,gy2);c.lineTo(sx-4,gy2-8);c.lineTo(sx+1,gy2-11);c.lineTo(sx+6,gy2-5);c.lineTo(sx+7,gy2);c.fill();c.fillStyle='#9a9aa4';c.fillRect(sx-2,gy2-10,3,2);}
-    else if(ob.k==='log'){c.fillStyle='#6a4a2a';c.fillRect(sx-8,gy2-14,16,14);c.fillStyle='#8a6a3a';c.fillRect(sx-8,gy2-14,16,2);c.fillStyle='#3a2410';c.fillRect(sx+6,gy2-13,2,12);c.fillRect(sx-6,gy2-8,5,1);}
-    else if(ob.k==='branch'){c.fillStyle='#2a1c10';c.fillRect(sx-16,gy2-26,32,4);c.fillRect(sx-1,gy2-60,2,36);c.fillStyle='#2f6a3c';c.fillRect(sx-14,gy2-31,8,6);c.fillRect(sx-4,gy2-33,10,8);c.fillRect(sx+7,gy2-30,7,5);c.fillStyle='#3f8a50';c.fillRect(sx-3,gy2-33,4,3);}
-    else if(ob.k==='puddle'){c.fillStyle='rgba(90,150,200,.85)';c.beginPath();c.ellipse(sx,gy2+1.5,9,2.6,0,0,TAU);c.fill();c.fillStyle='rgba(255,255,255,.4)';c.fillRect(sx-3,gy2+.5,4,1);}
-    else if(ob.k==='gel'){const by=gy2-24+Math.sin(t*4+ob.x)*2;glow(sx,by,12,'#ffe08a',.55);c.fillStyle='#ffd24a';c.fillRect(sx-3,by-5,6,10);c.fillStyle='#e8503a';c.fillRect(sx-3,by-1,6,2);}}
-  // runner
+  const fx=96+(S.L-P.x)*PXU;if(fx<W+20){const gy=yG(fx);c.fillStyle='#e8e0d0';c.fillRect(fx-1,gy-30,2,30);c.fillRect(fx+24,gy-30,2,30);c.fillStyle='#e8503a';c.fillRect(fx-1,gy-31,27,5);text(R_.si+1>=race.stages?'FINISH':'AID',fx+12,gy-27,'#fff',4,'center');}
   const gy=yG(96),slope=Math.atan2(yG(100)-yG(92),8);
-  c.fillStyle='rgba(0,0,0,.28)';c.beginPath();c.ellipse(96,gy+1,Math.max(3,8-P.jy*.18),2.4,0,0,TAU);c.fill();
-  if(P.duck>0){c.save();c.translate(96,gy);c.scale(1.12,.66);c.translate(-96,-gy);}
-  drawRunner(96,gy-P.jy,P.jy>0?.18:P.phase,slope*.6+(P.speed>12?.12:0),null);
-  if(P.duck>0)c.restore();
-  if(P.flow>=3){glow(96,gy-12-P.jy,22,'#9aff9a',.25+.1*Math.sin(t*10));}
+  c.fillStyle='rgba(0,0,0,.28)';c.beginPath();c.ellipse(96,gy+1,8,2.4,0,0,TAU);c.fill();
+  drawRunner(96,gy,P.phase,slope*.6+(P.speed>12?.12:0));
   if(P.hike>0){c.strokeStyle='#cfd6e0';c.lineWidth=1;c.beginPath();c.moveTo(100,gy-12);c.lineTo(108,gy);c.stroke();}
   if(R_.gear.includes('poles')){c.strokeStyle='#9aa4ae';c.lineWidth=1;c.beginPath();c.moveTo(99,gy-10);c.lineTo(107+Math.sin(P.phase*TAU)*3,gy);c.stroke();}
   for(const q of parts){c.globalAlpha=clamp(q.t*2,0,1);c.fillStyle=q.col;c.fillRect(q.x,q.y,q.s,q.s);}c.globalAlpha=1;
   for(const p of popups){c.globalAlpha=clamp(p.t*2,0,1);text(p.s,p.x,p.y-(1.2-p.t)*22,p.col,8,'center');}c.globalAlpha=1;
-  // heat shimmer tint and exhaustion vignette
   const heat=S.heat*(R_.gear.includes('hat')?.4:1);if(heat>.35){c.fillStyle=`rgba(255,200,100,${(heat-.3)*.12})`;c.fillRect(0,0,W,250);}
   if(P.hr>.85||P.legs<20||P.bonk>0){const a=clamp((P.hr-.85)*3+(20-P.legs)/40,0,.55)*(P.bonk>0?1.4:1);const vg=c.createRadialGradient(W/2,120,60,W/2,120,200);vg.addColorStop(0,'rgba(200,30,20,0)');vg.addColorStop(1,`rgba(200,30,20,${a*(.7+.3*Math.sin(t*(4+P.hr*6)))})`);c.fillStyle=vg;c.fillRect(0,0,W,250);}
   if(flash>0){c.fillStyle=`rgba(255,255,255,${flash*.5})`;c.fillRect(0,0,W,250);}
   c.restore();
 }
 function drawHud(){
-  // top strip
   c.fillStyle='rgba(8,12,10,.65)';c.fillRect(0,0,W,30);
-  text(`${race.name}`,6,10,'#e8eee8',8);text(`Stage ${R_.si+1}/${race.stages}`,6,22,'#9fb0a4',8);
+  text(`${race.name}`,6,10,'#e8eee8',8);text(race.stages>1?`Stage ${R_.si+1}/${race.stages}`:'Training',6,22,'#9fb0a4',8);
   const sim=(R_.total+P.t)*simTS();text(fmtT(sim),W-24,12,'#fff',11,'right');text(`cutoff ${fmtT(S.cut*simTS())}`,W-24,23,P.t>S.cut*.85?'#ff8a7a':'#9fb0a4',7,'right');
   HIT.push({x:W-20,y:0,w:20,h:30,fn:()=>{paused=true;}});text('II',W-10,16,'#cfdad2',9,'center');
-  // elevation profile strip
   const px=6,pw=W-12,py=36,ph=18,els=[];let mn=1e9,mx=-1e9;for(let i=0;i<=40;i++){const e=elevAt(S,S.L*i/40);els.push(e);mn=Math.min(mn,e);mx=Math.max(mx,e);}
   c.fillStyle='rgba(8,12,10,.55)';c.fillRect(px-2,py-4,pw+4,ph+8);c.beginPath();c.moveTo(px,py+ph);els.forEach((e,i)=>c.lineTo(px+pw*i/40,py+ph-(e-mn)/(mx-mn||1)*ph));c.lineTo(px+pw,py+ph);c.fillStyle='rgba(120,160,120,.5)';c.fill();
   for(const ev of S.evs){c.fillStyle=ev.done?'#4a5a50':'#ffd24a';c.fillRect(px+pw*ev.x/S.L-.5,py,1.5,ph);}
   const rx=px+pw*clamp(P.x/S.L,0,1),ry=py+ph-(elevAt(S,P.x)-mn)/(mx-mn||1)*ph;c.fillStyle='#fff';c.beginPath();c.arc(rx,ry,2.6,0,TAU);c.fill();
-  // terrain label and status
   const sg=segAt(S,P.x);text(TERRAIN[sg.t].n+(sg.g>.02?`  ${Math.round(sg.g*100)}% climb`:sg.g<-.02?`  ${Math.round(-sg.g*100)}% descent`:''),W/2,70,'#e8eee8',8,'center');
   let st=[];if(R_.blister)st.push('blister');if(P.ankle>0)st.push('ankle');if(P.cramp>0)st.push('CRAMP');if(P.bonk>0)st.push('BONK');if(P.hike>0)st.push('hiking');if(P.cool>0)st.push('cooled');if(P.stop>0&&P.drinkT<=0)st.push('stopped');
   text(st.join('  '),W/2,80,'#ffb08a',8,'center');
-  if(P.flow>=2)text('FLOW x'+P.flow,W/2,92,'#9aff9a',9,'center');
-  if(msgT>0){c.globalAlpha=clamp(msgT*2,0,1);text(msg,W/2,110,'#fff',13,'center');c.globalAlpha=1;}
-  // control panel
+  if(save.inj.length)text('Carrying: '+save.inj.map(i=>INJ[i.k].n).join(', '),W/2,92,'#e8a07a',6.5,'center',500);
+  if(msgT>0){c.globalAlpha=clamp(msgT*2,0,1);text(msg,W/2,112,'#fff',13,'center');c.globalAlpha=1;}
   c.fillStyle='#0c120f';c.fillRect(0,252,W,H-252);c.strokeStyle='#2a3a30';c.beginPath();c.moveTo(0,252.5);c.lineTo(W,252.5);c.stroke();
   const bx=34,bw=140;
-  // heart rate gauge with zones
   text('HEART',6,270,'#9fb0a4',7);const hz=[0,.55,.7,.8,.9,1],hc=['#4a6a8a','#4a9a5a','#c8b83a','#d8802a','#d83a2a'];
-  for(let i=0;i<5;i++){c.fillStyle=hc[i];c.globalAlpha=.55;c.fillRect(bx+bw*(hz[i]-.3)/.7,262,bw*(hz[i+1]-hz[i])/.7+(i<4?0:0),12);}c.globalAlpha=1;
+  for(let i=0;i<5;i++){c.fillStyle=hc[i];c.globalAlpha=.55;c.fillRect(bx+bw*(hz[i]-.3)/.7,262,bw*(hz[i+1]-hz[i])/.7,12);}c.globalAlpha=1;
   const hx=bx+bw*clamp((P.hr-.3)/.7,0,1);c.fillStyle='#fff';c.beginPath();c.moveTo(hx,276);c.lineTo(hx-4,283);c.lineTo(hx+4,283);c.fill();c.fillRect(hx-.5,262,1.5,12);
   text(`${Math.round(P.hr*190)} bpm`,bx+bw+4,272,P.hr>.9?'#ff8a7a':'#e8eee8',8);
-  const lv=P.legs/100;bar(bx,290,bw,9,lv,P.legs<25?'#e84a3a':'#6ac07a','LEGS',Math.round(P.legs)+'%');
+  bar(bx,290,bw,9,P.legs/100,P.legs<25?'#e84a3a':'#6ac07a','LEGS',Math.round(P.legs)+'%');
   bar(bx,306,bw,9,P.water/100,P.water<25?'#e8a23a':'#5aaaf0','WATER',Math.round(P.water)+'%');
   bar(bx,322,bw,9,P.fuel/100,P.fuel<25?'#e8a23a':'#e8d24a','FUEL',Math.round(P.fuel)+'%');
-  // buttons
   btn(8,342,82,34,`DRINK  x${R_.sips}`,false,drink,R_.sips<=0||P.drinkT>0);btn(96,342,82,34,`GEL  x${R_.gels}`,false,gel,R_.gels<=0||P.drinkT>0);
-  // pack and hints
-  text('Gear: '+(R_.gear.length?R_.gear.map(g=>GEAR[g].n).join(', '):'none yet'),6,392,'#7f9086',6.5);
+  text('Gear: '+(R_.gear.length?R_.gear.map(g=>GEAR[g].n).join(', '):'none'),6,392,'#7f9086',6.5);
   const z=ZONES.find(zz=>P.effort<=zz.max);text(`Effort: ${z.n}`,6,408,z.col,9);
-  const need=sweetEffort(sg.g,S.heat);text(need>P.effort+.12?'You can push a little':need<P.effort-.12?'Ease off to save your legs':'Good rhythm',6,422,'#9fb0a4',8);
+  const need_=sweetEffort(sg.g,S.heat);text(need_>P.effort+.12?'You can push a little':need_<P.effort-.12?'Ease off to save your legs':'Good rhythm',6,422,'#9fb0a4',8);
   if(P.legs<30)text('Legs low: ease off, eat, or hike',6,436,'#ff8a7a',8);
   else if(P.water<30)text('Thirsty: drink',6,436,'#ffb08a',8);
   else if(P.fuel<30)text('Hungry: take a gel',6,436,'#ffd27a',8);
-  // fader
   fader();
 }
 const FX=214,FW=48,FY0=262,FY1=468;
@@ -349,54 +406,174 @@ function fader(){
 }
 function setEffortFromY(py){P.effort=clamp(1-(py-FY0-8)/(FY1-FY0-16),0,1);}
 
-/* ---------- other screens ---------- */
-function panelBg(a=.82){c.fillStyle=`rgba(6,10,8,${a})`;c.fillRect(0,0,W,H);}
-function mapScene(){
+/* ---------- map ---------- */
+const MAPN={base:{x:50,y:428},t_hill:{x:40,y:368},t_long:{x:92,y:316},t_heat:{x:44,y:262},t_rec:{x:92,y:208},pine:{x:196,y:402},canyon:{x:178,y:326},sky:{x:208,y:248},summit:{x:170,y:166}};
+const MORD={bronze:1,silver:2,gold:3};
+const isUnlocked=i=>i===0||(MORD[save.medals[RACES[i-1].id]]||0)>=(i>=2?2:1);
+function topBar(){
+  c.fillStyle='rgba(6,10,8,.85)';c.fillRect(0,0,W,48);
+  text('RIDGELINE',8,16,'#e8a23a',12);text(`Day ${save.day}`,W-8,14,'#e8eee8',9,'right');text(`${save.coins} coins`,W-8,28,'#ffd24a',9,'right');
+  bar(54,24,96,8,save.fatigue/100,save.fatigue>70?'#e84a3a':save.fatigue>40?'#e8a23a':'#6ac07a','TIRED',null);
+  text(save.inj.length?`${save.inj.length} injur${save.inj.length>1?'ies':'y'}`:'healthy',8,42,save.inj.length?'#ff8a7a':'#9fd8a0',7.5);
+}
+function mapBack(){
   const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1e3a3a');g.addColorStop(1,'#0d1210');c.fillStyle=g;c.fillRect(0,0,W,H);
   c.fillStyle='#16241e';c.beginPath();c.moveTo(0,320);for(let x=0;x<=W;x+=6)c.lineTo(x,300-Math.sin(x*.03)*22-Math.sin(x*.07)*10);c.lineTo(W,H);c.lineTo(0,H);c.fill();
   c.fillStyle='#10201a';c.beginPath();c.moveTo(0,380);for(let x=0;x<=W;x+=6)c.lineTo(x,360-Math.sin(x*.04+2)*26-Math.sin(x*.09)*8);c.lineTo(W,H);c.lineTo(0,H);c.fill();
-  text('RIDGELINE',W/2,52,'#e8a23a',24,'center');text('a trail running roguelike',W/2,70,'#9fb0a4',9,'center',500);
-  const nodes=[[70,430],[170,330],[110,220]].map((n,i)=>({x:n[0],y:n[1]-60,r:RACES[i]}));
-  c.strokeStyle='#e8d9a8';c.setLineDash([4,4]);c.lineWidth=2;c.beginPath();c.moveTo(nodes[0].x,nodes[0].y);nodes.slice(1).forEach(n=>c.lineTo(n.x,n.y));c.stroke();c.setLineDash([]);
-  nodes.forEach((n,i)=>{const r=n.r,unlocked=i===0||save.medals[RACES[i-1].id],m=save.medals[r.id];
-    glow(n.x,n.y,30,m?MEDAL_COL[m]:unlocked?'#e8a23a':'#444',.4);c.fillStyle=unlocked?'#1b2a22':'#161c18';c.beginPath();c.arc(n.x,n.y,18,0,TAU);c.fill();c.strokeStyle=m?MEDAL_COL[m]:unlocked?'#e8a23a':'#444';c.lineWidth=2;c.stroke();
-    text(unlocked?String(r.km)+'k':'lock',n.x,n.y+4,unlocked?'#fff':'#666',11,'center');text(r.name,n.x+(i===1?-26:26),n.y-2,unlocked?'#e8eee8':'#667',8,i===1?'right':'left');text(`${r.stages} stages`+(m?'  '+m:''),n.x+(i===1?-26:26),n.y+9,m?MEDAL_COL[m]:'#9fb0a4',7,i===1?'right':'left',500);
-    if(unlocked)HIT.push({x:n.x-34,y:n.y-24,w:68,h:48,fn:()=>{race=r;scene='brief';sceneT=0;}});});
-  text('Tap a race to begin',W/2,460,'#6a7a70',8,'center',500);
+}
+function mapScene(){
+  mapBack();topBar();
+  const N=MAPN;c.lineWidth=2;c.setLineDash([4,4]);
+  c.strokeStyle='#7fb0c8';c.beginPath();['base','t_hill','t_long','t_heat','t_rec'].forEach((k,i)=>i?c.lineTo(N[k].x,N[k].y):c.moveTo(N[k].x,N[k].y));c.stroke();
+  c.strokeStyle='#e8d9a8';c.beginPath();['base','pine','canyon','sky','summit'].forEach((k,i)=>i?c.lineTo(N[k].x,N[k].y):c.moveTo(N[k].x,N[k].y));c.stroke();c.setLineDash([]);
+  // training nodes
+  TRAIN.forEach(r=>{const n=N[r.id];glow(n.x,n.y,22,'#7fb0c8',.35);c.fillStyle='#14262c';c.beginPath();c.arc(n.x,n.y,11,0,TAU);c.fill();c.strokeStyle='#7fb0c8';c.lineWidth=1.5;c.stroke();
+    text(r.stat==='clm'?'^':r.stat==='end'?'~':r.stat==='heat'?'*':'+',n.x,n.y+4,'#bfe0f0',11,'center');text(r.short,n.x+16,n.y+3,'#bfe0f0',8,'left');
+    HIT.push({x:n.x-18,y:n.y-16,w:90,h:32,fn:()=>{race=r;scene='brief';sceneT=0;}});});
+  // races
+  RACES.forEach((r,i)=>{const n=N[r.id],un=isUnlocked(i),m=save.medals[r.id];
+    glow(n.x,n.y,30,m?MEDAL_COL[m]:un?'#e8a23a':'#444',.4);c.fillStyle=un?'#1b2a22':'#161c18';c.beginPath();c.arc(n.x,n.y,16,0,TAU);c.fill();c.strokeStyle=m?MEDAL_COL[m]:un?'#e8a23a':'#444';c.lineWidth=2;c.stroke();
+    text(un?r.km+'k':'lock',n.x,n.y+4,un?'#fff':'#666',10,'center');text(r.name,n.x,n.y-22,un?'#e8eee8':'#667',7.5,'center');text(`${r.stages} stages`+(m?'  '+m:''),n.x,n.y+28,m?MEDAL_COL[m]:'#9fb0a4',7,'center',500);
+    if(un)HIT.push({x:n.x-36,y:n.y-32,w:72,h:64,fn:()=>{race=r;scene='brief';sceneT=0;}});});
+  // home base
+  const b=N.base;glow(b.x,b.y,28,'#ffd27a',.4);c.fillStyle='#3a2a1c';c.fillRect(b.x-12,b.y-8,24,16);c.fillStyle='#6a3a2a';c.beginPath();c.moveTo(b.x-16,b.y-8);c.lineTo(b.x,b.y-22);c.lineTo(b.x+16,b.y-8);c.fill();c.fillStyle='#ffd27a';c.fillRect(b.x-3,b.y-3,6,6);
+  text('HOME BASE',b.x+22,b.y-2,'#ffd27a',8,'left');text('shop, physio, rest',b.x+22,b.y+9,'#9fb0a4',6.5,'left',500);
+  HIT.push({x:b.x-20,y:b.y-26,w:130,h:50,fn:()=>{scene='base';sceneT=0;}});
+  text('Blue trails train your stats. Gold trails are races (silver unlocks the harder ones).',W/2,466,'#6a7a70',7,'center',500);
+  if(save.fatigue>=70)text('You are overreached: rest at base',W/2,456,'#ffb08a',7.5,'center');
 }
 function briefScene(){
-  mapScene();panelBg(.86);const r=race,pr=(()=>{const sv=race;return {s:race.stages*(1000+120*race.tier+90)/16.6,g:race.stages*(1000+120*race.tier+90)/19.8};})();
-  text(r.name,W/2,70,'#e8a23a',16,'center');text(`${r.km} km  -  ${r.stages} stages  -  ${r.theme}`,W/2,88,'#9fb0a4',9,'center',500);
-  wrap(r.blurb,34).forEach((q,i)=>text(q,W/2,112+i*12,'#e8eee8',9,'center',500));
-  const L=['You steer only your EFFORT with the fader on the right.','Easy and steady let your legs recover. Hard and redline burn them.','Hills and heat push your heart rate up. Hike the steep parts.','TAP the trail to jump rocks and logs. SWIPE DOWN to duck branches. Grab gels in the air.','Clean clears build FLOW: a speed boost. Run faster and you get less time to react.','Drink and eat on the move, make quick calls at events, and draft gear at aid stations.'];
-  L.forEach((q,i)=>wrap(q,36).forEach((w,j)=>text(w,18,148+i*23+j*10,'#b8c4bc',8,'left',500)));
-  text('MEDALS',W/2,300,'#9fb0a4',8,'center');
-  [['bronze','Finish every stage inside the cutoff'],['silver','Beat the par time'],['gold','Beat the gold time without bonking']].forEach((m,i)=>{c.fillStyle=MEDAL_COL[m[0]];c.beginPath();c.arc(26,322+i*22,6,0,TAU);c.fill();text(m[1],40,325+i*22,save.medals[r.id]&&{bronze:1,silver:2,gold:3}[save.medals[r.id]]>=i+1?'#fff':'#9fb0a4',8,'left',500);});
-  btn(60,400,150,32,'START RACE',true,()=>startRace(r));btn(90,440,90,22,'Back',false,()=>{scene='map';});
+  mapScene();panelBg(.9);const r=race,tr=!!r.train;
+  text(r.name,W/2,66,'#e8a23a',16,'center');text(tr?'Training trail':`${r.km} km  -  ${r.stages} stages  -  ${r.theme}`,W/2,82,'#9fb0a4',9,'center',500);
+  wrap(r.blurb,36).forEach((q,i)=>text(q,W/2,100+i*11,'#e8eee8',8.5,'center',500));
+  // body
+  bar(60,128,110,8,save.fatigue/100,save.fatigue>70?'#e84a3a':save.fatigue>40?'#e8a23a':'#6ac07a','TIRED',Math.round(save.fatigue)+'%');
+  if(save.inj.length)save.inj.slice(0,5).forEach((i,j)=>injLine(i,28,152+j*12,7.5));else text('No injuries. Fresh legs.',28,152,'#9fd8a0',8);
+  const startLegs=Math.round(clamp(100-save.fatigue*.25+(save.loose?10:0),40,100));text(`Start with ${startLegs}% legs`+(save.loose?'  (loosened)':''),W/2,218,startLegs<85?'#ffb08a':'#9fb0a4',7.5,'center',500);
+  // loadout
+  text(`LOADOUT  ${save.load.length}/${save.cap}   (tap to swap)`,W/2,238,'#e8a23a',8,'center');
+  save.owned.forEach((g,i)=>{const x=i%2?140:18,y=246+Math.floor(i/2)*26,on=save.load.includes(g);
+    HIT.push({x,y,w:112,h:22,fn:()=>toggleLoad(g)});c.fillStyle=on?'#2a3a1e':'#141c18';c.fillRect(x,y,112,22);c.strokeStyle=on?'#9aff9a':'#3a4a40';c.lineWidth=1;c.strokeRect(x+.5,y+.5,111,21);text(GEAR[g].n,x+56,y+14,on?'#e8ffe0':'#8a9a90',7.5,'center');});
+  const gy=246+Math.ceil(save.owned.length/2)*26+8;
+  const last=save.load.length?save.load.map(g=>GEAR[g].t).join('  '):'';
+  if(save.owned.length<GEAR_N())text('More gear for sale at Home Base',W/2,gy+4,'#7f9086',7,'center',500);
+  if(!tr){text('Bronze: finish. Silver: par time. Gold: par, no bonks.',W/2,398,'#9fb0a4',7,'center',500);}else text(`Pays 18 coins and ${STATN[r.stat]} experience`,W/2,398,'#9fb0a4',7.5,'center',500);
+  text('Fader = effort. Heart rate up = legs burn. Eat, drink, hike climbs.',W/2,412,'#6a7a70',6.5,'center',500);
+  btn(60,422,150,30,tr?'START TRAINING':'START RACE',true,()=>beginRace(r));btn(90,456,90,20,'Back',false,()=>{scene='map';});
+  toastLayer();
 }
-function draftScene(){
-  panelBg(.9);const first=R_.draftFor==='start';
-  if(!first){text(`Aid station ${R_.si+1}`,W/2,40,'#e8a23a',16,'center');text(`Stage time ${fmtT(R_.times[R_.times.length-1]*simTS())}`,W/2,58,'#e8eee8',10,'center');
-    ['Legs +50','Water refilled','Fuel +30','Pack restocked'].forEach((q,i)=>text(q,W/2,82+i*12,'#9fd8a0',9,'center',500));text('Choose one item for the rest of the race',W/2,150,'#9fb0a4',8,'center',500);}
-  else{text(race.name,W/2,40,'#e8a23a',16,'center');text('Pick your starting item',W/2,58,'#e8eee8',10,'center');}
-  R_.draft.forEach((g,i)=>{const y=(first?90:166)+i*(first?96:88),h=first?84:78;HIT.push({x:20,y,w:230,h,fn:()=>draftPick(g)});c.fillStyle='#16241e';c.fillRect(20,y,230,h);c.strokeStyle='#e8a23a';c.lineWidth=1.5;c.strokeRect(20.5,y+.5,229,h-1);
-    text(GEAR[g].n,34,y+24,'#ffd27a',12);wrap(GEAR[g].t,30).forEach((q,j)=>text(q,34,y+42+j*12,'#c8d4cc',9,'left',500));});
+const GEAR_N=()=>SHOPIDS.length;
+function baseScene(){
+  const g=c.createLinearGradient(0,0,0,200);g.addColorStop(0,'#2a2a4a');g.addColorStop(1,'#e0905a');c.fillStyle=g;c.fillRect(0,0,W,H);
+  c.fillStyle='#142018';c.fillRect(0,120,W,H);c.fillStyle='#1d2f22';c.beginPath();c.moveTo(0,130);for(let x=0;x<=W;x+=6)c.lineTo(x,112-Math.sin(x*.05)*8);c.lineTo(W,H);c.lineTo(0,H);c.fill();
+  topBar();
+  // cabin and tent
+  glow(70,110,40,'#ffd27a',.4);c.fillStyle='#4a3020';c.fillRect(40,86,60,34);c.fillStyle='#7a3a28';c.beginPath();c.moveTo(34,86);c.lineTo(70,62);c.lineTo(106,86);c.fill();c.fillStyle='#ffd27a';c.fillRect(54,98,12,12);c.fillStyle='#2a1810';c.fillRect(78,98,12,22);
+  c.fillStyle='#e8e0d0';c.beginPath();c.moveTo(150,122);c.lineTo(188,84);c.lineTo(226,122);c.fill();c.fillStyle='#c8403a';c.fillRect(184,66,16,10);c.fillRect(187,62,2,24);c.fillStyle='#2a2a30';c.beginPath();c.moveTo(178,122);c.lineTo(188,98);c.lineTo(198,122);c.fill();
+  text('HOME BASE',W/2,150,'#e8a23a',14,'center');
+  // stats
+  text('RUNNER',14,174,'#9fb0a4',8);
+  ['end','clm','heat','rec'].forEach((k,i)=>{const y=186+i*18,s=save.stats[k];text(STATN[k],14,y+7,'#e8eee8',7.5);pips(116,y,s.l,5,'#6ac07a');
+    c.fillStyle='#10160f';c.fillRect(158,y+1,60,5);c.fillStyle='#e8a23a';c.fillRect(158,y+1,60*(s.l>=5?1:s.x/need(s.l)),5);text(s.l>=5?'MAX':`Lv ${s.l}`,224,y+7,'#9fb0a4',7);});
+  text('CONDITION',14,268,'#9fb0a4',8);
+  if(save.inj.length)save.inj.slice(0,5).forEach((i,j)=>{injLine(i,14,282+j*13,7.5);text(INJ[i.k].t,148,282+j*13,'#8a9a90',5.5,'left',500);});else text('No injuries. You feel good.',14,282,'#9fd8a0',8);
+  bar(66,352,110,8,save.fatigue/100,save.fatigue>70?'#e84a3a':save.fatigue>40?'#e8a23a':'#6ac07a','TIRED',Math.round(save.fatigue)+'%');
+  btn(14,372,118,34,'SHOP',true,()=>{scene='shop';sceneT=0;});btn(138,372,118,34,'PHYSIO TENT 15c',false,()=>{PH={from:'base',mode:'pick'};scene='physio';sceneT=0;});
+  btn(14,412,118,30,'REST A DAY',false,restDay);btn(138,412,118,30,'BACK TO MAP',false,()=>{scene='map';});
+  text('Rest clears fatigue and may heal injuries',W/2,458,'#6a7a70',7,'center',500);
+  toastLayer();
+}
+function shopScene(){
+  panelBg(1);c.fillStyle='#10180f';c.fillRect(0,0,W,H);
+  text('GEAR SHOP',W/2,22,'#e8a23a',14,'center');text(`${save.coins} coins`,W-10,14,'#ffd24a',9,'right');text(`Loadout slots ${save.cap}`,10,14,'#9fb0a4',8);
+  SHOPIDS.forEach((id,i)=>{const y=34+i*35,it=GEAR[id],own=save.owned.includes(id),can=save.coins>=it.p;
+    c.fillStyle='#16241e';c.fillRect(10,y,250,32);c.strokeStyle=own?'#4a7a4a':can?'#e8a23a':'#3a4a40';c.lineWidth=1;c.strokeRect(10.5,y+.5,249,31);
+    text(it.n,16,y+12,own?'#9fd8a0':'#ffd27a',9);wrap(it.t,52).slice(0,2).forEach((q,j)=>text(q,16,y+22+j*8,'#b8c4bc',6.5,'left',500));
+    if(own)text('OWNED',252,y+14,'#9fd8a0',8,'right');else btn(204,y+4,50,24,`${it.p}c`,can,()=>buy(id),!can);});
+  const cc=CAPCOST[save.cap-2];
+  if(cc!=null)btn(10,34+SHOPIDS.length*35+2,250,26,`Bigger pack: +1 loadout slot (${cc}c)`,save.coins>=cc,buyCap,save.coins<cc);else text('Pack is full size',W/2,34+SHOPIDS.length*35+18,'#9fb0a4',8,'center');
+  btn(80,446,110,24,'Back',false,()=>{scene='base';});
+  text('Choose what to carry on the race screen',W/2,438,'#6a7a70',6.5,'center',500);
+  toastLayer();
+}
+
+/* ---------- physio scene ---------- */
+function drawLeg(loc,pressure){
+  c.fillStyle='#d9a47c';c.fillRect(118,50,30,70);c.beginPath();c.arc(133,128,16,0,TAU);c.fill();c.fillRect(121,128,24,86);c.fillRect(116,212,48,12);c.fillStyle='#c48e68';c.fillRect(121,150,5,50);
+  const K={knee:[133,128],shin:[133,168],calf:[140,170],ankle:[133,208],foot:[142,220]}[loc];
+  glow(K[0],K[1],18,'#ff5a4a',.5+.3*Math.sin(t*6));c.fillStyle='#c8362a';c.beginPath();c.arc(K[0],K[1],5-(pressure||0)*3,0,TAU);c.fill();
+  // hand pressing
+  const py=pressure!=null?pressure:0;c.fillStyle='#f0c8a0';c.fillRect(K[0]+8,K[1]-6-(1-py)*0,34,12);c.fillStyle='#e8eee8';c.fillRect(K[0]+38,K[1]-8,26,16);
+}
+function physioScene(){
+  c.fillStyle='#16201e';c.fillRect(0,0,W,H);c.fillStyle='#223a38';c.fillRect(0,44,W,200);
+  const inTent=PH&&PH.from==='tent';
+  text(inTent?'MEDICAL TENT':'PHYSIO TENT',W/2,22,'#e8a23a',14,'center');
+  if(!PH||PH.mode==='pick'){
+    text('Who needs help? (15 coins each)',W/2,50,'#9fb0a4',8,'center',500);
+    if(!save.inj.length)text('Nothing to treat. You feel good!',W/2,120,'#9fd8a0',10,'center');
+    save.inj.forEach((i,j)=>{const y=64+j*54;c.fillStyle='#16241e';c.fillRect(14,y,242,48);c.strokeStyle='#e8a23a';c.strokeRect(14.5,y+.5,241,47);injLine(i,24,y+18,9);text(INJ[i.k].t,24,y+34,'#b8c4bc',7,'left',500);HIT.push({x:14,y,w:242,h:48,fn:()=>openTreat('base',i.k)});});
+    text(`${save.coins} coins`,W-10,40,'#ffd24a',8,'right');
+    btn(80,430,110,26,'Back',false,()=>{scene='base';});toastLayer();return;
+  }
+  const inj=INJ[PH.k];
+  text(`${inj.n}  (level ${PH.s})`,W/2,40,'#ffb08a',10,'center');
+  const pr=PH.mode==='play'?(PH.fbT>0?PH.fbT/.7:0):0;drawLeg(inj.loc,pr);
+  // bar
+  const bx=20,bw=230,by=282,bh=22;c.fillStyle='#10160f';c.fillRect(bx,by,bw,bh);c.strokeStyle='#3a4a3e';c.strokeRect(bx+.5,by+.5,bw-1,bh-1);
+  if(PH.mode==='play'){c.fillStyle='rgba(106,192,122,.45)';c.fillRect(bx+bw*(PH.zc-PH.w/2),by,bw*PH.w,bh);c.fillStyle='rgba(255,255,255,.5)';c.fillRect(bx+bw*(PH.zc-PH.w*.09),by,bw*PH.w*.18,bh);
+    const pos=tri(PH.t*PH.speed);c.fillStyle='#fff';c.fillRect(bx+bw*pos-1.5,by-5,3,bh+10);}
+  // pulse pips
+  for(let i=0;i<PH.pulses;i++){const v=PH.log[i];c.fillStyle=v==null?'#26322b':v===2?'#ffd24a':v===1?'#6ac07a':'#e84a3a';c.fillRect(135-PH.pulses*7+i*14,260,10,10);}
+  text(`needs ${Math.ceil(PH.pulses*.6)} good hits  -  ouch x${PH.miss}/3`,W/2,252,'#9fb0a4',7.5,'center',500);
+  if(PH.fbT>0){c.globalAlpha=clamp(PH.fbT*2,0,1);text(PH.fb,W/2,328,PH.fb==='ouch'?'#ff8a7a':PH.fb==='PERFECT'?'#ffd24a':'#9aff9a',14,'center');c.globalAlpha=1;}
+  if(PH.mode==='play'){
+    text('Tap PRESS when the marker is in the green zone',W/2,344,'#e8eee8',8,'center',500);
+    btn(40,356,190,70,'PRESS',true,press);HIT.push({x:0,y:240,w:W,h:200,fn:press});HIT.unshift(HIT.pop());
+  }else{
+    const ok=PH.res.ok;text(ok?(PH.s>1?'Better! Injury eased':'Healed!'):'Too sore. Try again later.',W/2,350,ok?'#9fd8a0':'#ff8a7a',12,'center');
+    if(PH.res.loose)text('Perfect work: legs loosened (+10 legs next run)',W/2,368,'#ffd27a',7.5,'center');
+    if(inTent)text(`The treatment cost ${(40-(has('roller')?20:0))} s`,W/2,382,'#9fb0a4',7.5,'center',500);
+    btn(70,396,130,32,'DONE',true,leaveTreat);
+  }
+  toastLayer();
+}
+
+/* ---------- other screens ---------- */
+function aidScene(){
+  panelBg(1);c.fillStyle='#10180f';c.fillRect(0,0,W,H);
+  text(`Aid station ${R_.si+1}`,W/2,24,'#e8a23a',15,'center');text(`Stage time ${fmtT(R_.times[R_.times.length-1]*simTS())}   Total ${fmtT(R_.total*simTS())}`,W/2,40,'#e8eee8',8.5,'center');
+  text('Legs +50   Water refilled   Fuel +30   Pack restocked',W/2,56,'#9fd8a0',7.5,'center',500);
+  text('MEDICAL TENT',14,76,'#e8a23a',8.5);text(R_.tentUsed?'(used)':`one treatment, costs ${40-(has('roller')?20:0)} s`,W-12,76,'#9fb0a4',7,'right',500);
+  const stage=R_.stageInj;
+  if(!save.inj.length)text('You are in good shape.',14,98,'#9fd8a0',8.5);
+  save.inj.slice(0,4).forEach((i,j)=>{const y=84+j*26;c.fillStyle='#16241e';c.fillRect(10,y,250,22);c.strokeStyle=R_.tentUsed?'#2a3a30':'#e8a23a';c.strokeRect(10.5,y+.5,249,21);
+    text(INJ[i.k].n,18,y+14,R_.tentUsed?'#6a7a70':'#e8eee8',8);pips(124,y+8,i.s,3,SEVCOL[i.s-1]);
+    if(stage.some(s=>s.startsWith(INJ[i.k].n)))text('NEW',160,y+14,'#ff8a7a',7.5);
+    if(!R_.tentUsed){HIT.push({x:10,y,w:250,h:22,fn:()=>openTreat('tent',i.k)});text('TREAT',252,y+14,'#ffd27a',8,'right');}});
+  text('Pick one item for the rest of the race',W/2,206,'#9fb0a4',8,'center',500);
+  R_.draft.forEach((g,i)=>{const y=216+i*58;HIT.push({x:10,y,w:250,h:52,fn:()=>draftPick(g)});c.fillStyle='#16241e';c.fillRect(10,y,250,52);c.strokeStyle='#e8a23a';c.lineWidth=1.5;c.strokeRect(10.5,y+.5,249,51);
+    text(GEAR[g].n,20,y+18,'#ffd27a',10);wrap(GEAR[g].t,40).slice(0,2).forEach((q,j)=>text(q,20,y+32+j*10,'#c8d4cc',7.5,'left',500));});
+  if(!R_.draft.length)btn(60,230,150,32,'CONTINUE',true,aidNext);
+  toastLayer();
 }
 function resultScene(){
-  panelBg(.9);const m=R_.res.medal,pr=par();
-  text('FINISH!',W/2,60,'#e8a23a',24,'center');text(race.name,W/2,80,'#e8eee8',10,'center');
-  glow(W/2,150,60,MEDAL_COL[m],.5);c.fillStyle=MEDAL_COL[m];c.beginPath();c.arc(W/2,150,32,0,TAU);c.fill();c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.arc(W/2,150,24,0,TAU);c.fill();text(m.toUpperCase(),W/2,155,'#1a1208',11,'center');
-  c.fillStyle='#d8432e';c.fillRect(W/2-14,110,10,-26);c.fillRect(W/2+4,110,10,-26);
-  text(`Time ${fmtT(R_.total*simTS())}`,W/2,214,'#fff',14,'center');
-  text(`Silver par ${fmtT(pr.silver*simTS())}   Gold ${fmtT(pr.gold*simTS())}`,W/2,232,'#9fb0a4',8,'center',500);
-  text(R_.bonks?`${R_.bonks} bonk${R_.bonks>1?'s':''}: no gold`:'No bonks',W/2,246,R_.bonks?'#ff8a7a':'#9fd8a0',9,'center');
-  R_.times.forEach((q,i)=>text(`Stage ${i+1}   ${fmtT(q*simTS())}`,W/2,272+i*14,'#cfdad2',9,'center',500));
-  btn(60,400,150,32,'BACK TO MAP',true,()=>{scene='map';});
+  panelBg(.95);const m=R_.res.medal,pr=race.train?null:par();
+  if(race.train){text('TRAINING DONE',W/2,52,'#7fb0c8',20,'center');text(race.name,W/2,72,'#e8eee8',10,'center');}
+  else{text('FINISH!',W/2,44,'#e8a23a',22,'center');text(race.name,W/2,60,'#e8eee8',10,'center');
+    glow(W/2,112,50,MEDAL_COL[m],.5);c.fillStyle=MEDAL_COL[m];c.beginPath();c.arc(W/2,112,28,0,TAU);c.fill();c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.arc(W/2,112,21,0,TAU);c.fill();text(m.toUpperCase(),W/2,116,'#1a1208',10,'center');}
+  const y0=race.train?96:162;
+  text(`Time ${fmtT(R_.total*simTS())}`,W/2,y0,'#fff',14,'center');
+  if(pr)text(`Silver par ${fmtT(pr.silver*simTS())}   Gold ${fmtT(pr.gold*simTS())}`,W/2,y0+16,'#9fb0a4',8,'center',500);
+  text(R_.bonks?`${R_.bonks} bonk${R_.bonks>1?'s':''}${pr?': no gold':''}`:'No bonks',W/2,y0+30,R_.bonks?'#ff8a7a':'#9fd8a0',9,'center');
+  R_.report.slice(0,14).forEach((q,i)=>text(q.s,W/2,y0+52+i*13,q.c,8.5,'center',500));
+  btn(60,436,150,30,'BACK TO MAP',true,()=>{scene='map';});
 }
 function dnfScene(){
-  panelBg(.9);text('DNF',W/2,120,'#e84a3a',32,'center');text(R_.why,W/2,150,'#e8eee8',12,'center');text(`Stage ${R_.si+1} of ${race.stages}`,W/2,170,'#9fb0a4',9,'center',500);
-  wrap('Pace yourself: stay in Steady or Tempo, hike the steep climbs, and keep eating and drinking.',32).forEach((q,i)=>text(q,W/2,206+i*13,'#b8c4bc',9,'center',500));
-  btn(60,360,150,32,'TRY AGAIN',true,()=>startRace(race));btn(60,402,150,26,'Back to map',false,()=>{scene='map';});
+  panelBg(.95);text('DNF',W/2,100,'#e84a3a',32,'center');text(R_.why,W/2,128,'#e8eee8',12,'center');text(`Stage ${R_.si+1} of ${race.stages}`,W/2,146,'#9fb0a4',9,'center',500);
+  R_.report.slice(0,8).forEach((q,i)=>text(q.s,W/2,176+i*13,q.c,8.5,'center',500));
+  wrap('Pace yourself: stay in Steady or Tempo, hike the steep climbs, keep eating and drinking, and train your weak stat.',34).forEach((q,i)=>text(q,W/2,300+i*12,'#b8c4bc',8.5,'center',500));
+  btn(60,372,150,32,'TRY AGAIN',true,()=>beginRace(race));btn(60,412,150,26,'Back to map',false,()=>{scene='map';});
 }
 function eventScene(){
   drawScene();drawHud();c.fillStyle='rgba(6,10,8,.78)';c.fillRect(0,0,W,H);const ev=EVENTS[P.ev.k];
@@ -404,12 +581,15 @@ function eventScene(){
   [ev.a,ev.b].forEach((o,i)=>{const y=190+i*86;HIT.push({x:20,y,w:230,h:76,fn:()=>chooseEvent(i)});c.fillStyle=i?'#2a1e16':'#16241e';c.fillRect(20,y,230,76);c.strokeStyle=i?'#e8803a':'#6ac07a';c.lineWidth=1.5;c.strokeRect(20.5,y+.5,229,75);text(o.t,34,y+26,'#fff',12);wrap(o.h,32).forEach((q,j)=>text(q,34,y+44+j*11,'#b8c4bc',9,'left',500));});
   c.fillStyle='#10160f';c.fillRect(20,366,230,6);c.fillStyle='#e8a23a';c.fillRect(20,366,230*P.ev.t/P.ev.max,6);text('Decide (the first option is picked if time runs out)',W/2,388,'#6a7a70',7,'center',500);
 }
-function pauseLayer(){panelBg(.85);HIT.length=0;text('Paused',W/2,190,'#e8a23a',16,'center');btn(60,210,150,30,'Resume',true,()=>{paused=false;});btn(60,250,150,26,'Quit race',false,()=>{paused=false;scene='map';});}
+function pauseLayer(){panelBg(.85);HIT.length=0;text('Paused',W/2,190,'#e8a23a',16,'center');btn(60,210,150,30,'Resume',true,()=>{paused=false;});btn(60,250,150,26,'Quit run',false,()=>{paused=false;scene='map';});}
 function render(){
   HIT.length=0;c.setTransform(SC,0,0,SC,0,0);c.imageSmoothingEnabled=false;
   if(scene==='map')mapScene();
   else if(scene==='brief')briefScene();
-  else if(scene==='draft'||scene==='aid')draftScene();
+  else if(scene==='base')baseScene();
+  else if(scene==='shop')shopScene();
+  else if(scene==='physio')physioScene();
+  else if(scene==='aid')aidScene();
   else if(scene==='result')resultScene();
   else if(scene==='dnf')dnfScene();
   else if(scene==='event')eventScene();
@@ -418,21 +598,25 @@ function render(){
 }
 
 /* ---------- input ---------- */
-let dragging=false,tap=null;
+let dragging=false;
 const pt=e=>{const r=cvs.getBoundingClientRect();return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};};
 cvs.addEventListener('pointerdown',e=>{try{cvs.setPointerCapture(e.pointerId);}catch(_){}const p=pt(e);
   for(let i=HIT.length-1;i>=0;i--){const b=HIT[i];if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h){b.fn();return;}}
-  if(scene==='run'&&!paused&&p.x>=FX-10&&p.y>=FY0-10){dragging=true;setEffortFromY(p.y);}
-  else if(scene==='run'&&!paused&&p.y<250){tap={x:p.x,y:p.y,id:e.pointerId};}});
+  if(scene==='run'&&!paused&&p.x>=FX-10&&p.y>=FY0-10){dragging=true;setEffortFromY(p.y);}});
 cvs.addEventListener('pointermove',e=>{if(!dragging)return;setEffortFromY(pt(e).y);});
-const up=e=>{dragging=false;if(tap&&e&&e.pointerId===tap.id&&scene==='run'&&!paused){const p=pt(e);if(p.y-tap.y>22)duck();else jump();}tap=null;};cvs.addEventListener('pointerup',up);cvs.addEventListener('pointercancel',up);cvs.addEventListener('contextmenu',e=>e.preventDefault());
-addEventListener('keydown',e=>{if(scene==='run'){if(e.key===' '||e.key==='w')jump();if(e.key==='s')duck();if(e.key==='ArrowUp')P.effort=clamp(P.effort+.06,0,1);if(e.key==='ArrowDown')P.effort=clamp(P.effort-.06,0,1);if(e.key==='d')drink();if(e.key==='g')gel();if(e.key==='Escape')paused=!paused;}
-  if(scene==='event'){if(e.key==='1')chooseEvent(0);if(e.key==='2')chooseEvent(1);}});
+const up=()=>{dragging=false;};cvs.addEventListener('pointerup',up);cvs.addEventListener('pointercancel',up);cvs.addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('keydown',e=>{if(scene==='run'){if(e.key==='ArrowUp')P.effort=clamp(P.effort+.06,0,1);if(e.key==='ArrowDown')P.effort=clamp(P.effort-.06,0,1);if(e.key==='d')drink();if(e.key==='g')gel();if(e.key==='Escape')paused=!paused;}
+  if(scene==='event'){if(e.key==='1')chooseEvent(0);if(e.key==='2')chooseEvent(1);}
+  if(scene==='physio'&&(e.key===' '))press();});
 
 /* ---------- loop and test hooks ---------- */
 let last=0;function frame(now){const dt=Math.min(.05,(now-last)/1000||0);last=now;update(dt);render();requestAnimationFrame(frame);}requestAnimationFrame(n=>{last=n;frame(n);});
-window.__trail={jump,duck,state:()=>({scene,race,R_,P,S,save}),startRace:i=>startRace(RACES[i]),setEffort:e=>{if(P)P.effort=clamp(e,0,1);},drink,gel,choose:chooseEvent,draft:i=>draftPick(R_.draft[i]),step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,seg:()=>segAt(S,P.x),open:i=>{race=RACES[i];scene='brief';},reset:()=>{save={medals:{}};persist();}};
+const ALL=[...RACES,...TRAIN];
+window.__trail={state:()=>({scene,race,R_,P,S,save,PH}),start:i=>beginRace(ALL[i]),startRace:i=>beginRace(ALL[i]),setEffort:e=>{if(P)P.effort=clamp(e,0,1);},drink,gel,choose:chooseEvent,draft:i=>draftPick(R_.draft[i]),cont:aidNext,
+  step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,train:TRAIN,seg:()=>segAt(S,P.x),open:i=>{race=ALL[i];scene='brief';},reset:()=>{save=DEF();persist();},
+  buy,toggle:toggleLoad,buyCap,rest:restDay,treat:(from,k)=>openTreat(from,k),press,leave:leaveTreat,goto:s=>{scene=s;},give:n=>{save.coins+=n;},setSave:o=>{Object.assign(save,o);}};
 })();
+
 </script>
 </body>
 </html>
