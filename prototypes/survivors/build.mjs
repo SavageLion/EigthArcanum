@@ -7,6 +7,8 @@ for (const d of ['east', 'west', 'north', 'south']) {
   spr.idle[d] = b64(`${A}/arena/${d}.png`);
   spr.walk[d] = Array.from({ length: 6 }, (_, i) => b64(`${A}/anim/arena/walk/${d}/${i}.png`));
 }
+spr.boss = {};
+for (const id of ['bell','storm','frost','emperor','devil']) spr.boss[id] = [0,1,2,3].map(i => b64('public/assets/boss/' + id + '/idle/' + i + '.png'));
 const t = fs.readFileSync('prototypes/survivors/' + (process.argv[2]||'template.html') + '', 'utf8').replace('/*SPR*/{}', JSON.stringify(spr));
 fs.writeFileSync('prototypes/survivors/' + (process.argv[3]||'survivors.html') + '', t);
 console.log('built', (t.length / 1024).toFixed(0) + ' KB');
