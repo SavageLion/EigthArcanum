@@ -9,7 +9,9 @@ import { BONE, GOLD, TAU, clamp, rnd } from '../core/util';
 
 /* ---------- pixel renderer: all art is drawn on a 160px-wide canvas and scaled up with hard edges.
    SPRITE_OVERRIDES is the slot for final art: boss sheets and wizard frames replace these placeholders. ---------- */
-export const LW=160, K=LW/W;
+export let LW=160;
+export const K=160/400;   // canvas units per world unit stays fixed; the Chariot arena widens both the world and the canvas so everything is drawn smaller
+export const setLW=(v:number)=>{ LW=v; };
 /** The 8 facing directions, clockwise from east, in screen space (y down). South = facing the camera, north = back to camera. */
 export const DIRS=['east','south-east','south','south-west','west','north-west','north','north-east'];
 export const dirOf=(ang:number)=>DIRS[((Math.round(ang/(Math.PI/4))%8)+8)%8];

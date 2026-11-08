@@ -156,7 +156,7 @@ export function draw(){
   vfxDraw(c,'back');
   if(G.P){ if(S.mode==='dying'||S.mode==='dead'){ if(S.fo) foPlayer(c,false); else drawWizard(G.P.x,G.P.y,false,G.P.face||'north'); } else drawPlayer(); }
   vfxDraw(c,'front');
-  c.setTransform(R,0,0,R,0,0); if(G.P&&S.mode!=='title') drawHUD(); if(S.open&&(S.mode==='fight'||S.mode==='intro')) oaDrawStick(c);
+  c.setTransform(R,0,0,R,0,0); if(G.P&&S.mode!=='title'){ const hs=LW/160; if(hs===1) drawHUD(); else { c.save(); c.scale(hs,hs); const lh=G.LH; G.LH=lh/hs; try{ drawHUD(); } finally { G.LH=lh; c.restore(); } } } if(S.open&&(S.mode==='fight'||S.mode==='intro')) oaDrawStick(c);
   if(S.flash>0){ c.fillStyle=`rgba(255,240,210,${Math.min(.5,S.flash)})`; c.fillRect(-4,-4,LW+8,G.LH+8); }
 }
 export function drawTitle(){
