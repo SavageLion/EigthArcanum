@@ -25,12 +25,14 @@ import { fightReward, posHp, relPos } from './systems/deck';
 import * as _lab from './systems/lab';
 import * as _camp from './systems/camp';
 import { hubStep } from './systems/hub';
+import { huntStep } from './hunt/hunt';
 import { endBeam } from './systems/spellFx';
 import { EL, TYPES, spellCost, spellName } from './systems/spells';
 
 function frame(now){
   const dt=Math.min(.033,(now-G.last)/1000||0); G.last=now;
   if(S.mode==='title'){ S.t+=dt; drawTitle(); }
+  else if(S.mode==='hunt'){ huntStep(dt); }
   else { syncLayout(); syncSpells(); if(S.mode==='hub')hubStep(dt); if(S.mode==='draw'&&!S.paused)updateDraw(dt); if(!S.paused&&S.mode!=='hub'&&S.mode!=='pick'&&S.mode!=='dead'&&S.mode!=='victory'&&S.mode!=='draw'&&S.mode!=='shop') step(dt); draw(); }
   requestAnimationFrame(frame);
 }

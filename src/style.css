@@ -408,3 +408,39 @@ p{font-size:1.32rem;line-height:1.1}
 /* item rarity */
 .rar{font-family:var(--body);font-weight:400;font-size:.85rem;margin-left:4px;letter-spacing:.03em}
 .camp .lootrow span{-webkit-line-clamp:2}
+
+/* ---------- Hunt mode (landscape wave survival), see src/hunt/hunt.ts ---------- */
+#hunt{position:fixed;inset:0;z-index:30;background:#07040f;color:var(--bone,#f1e8d4);display:grid;place-items:center;padding:0 max(16px,env(safe-area-inset-left,0px));touch-action:none;user-select:none;-webkit-user-select:none;font-family:var(--display,'Pixelify Sans',monospace)}
+#hunt[hidden]{display:none}
+#hbox{position:relative;--s:1;width:calc(480px*var(--s));height:calc(270px*var(--s))}
+#hcv{width:100%;height:100%;display:block;image-rendering:pixelated;background:#0b0818}
+#hpanel{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:calc(var(--s)*6px);background:rgba(7,4,15,.84);text-align:center;padding:calc(var(--s)*6px)}
+#hpanel.on{display:flex}
+#hpanel h2{margin:0;font-size:calc(var(--s)*14px);color:#dcb868;letter-spacing:.06em;font-weight:700}
+#hpanel p{margin:0;font-family:'VT323','Courier New',monospace;font-size:calc(var(--s)*10px);color:#a79bc0;line-height:1.05}
+#hunt .row{display:flex;gap:calc(var(--s)*6px);justify-content:center;width:100%}
+#hunt .grid{display:flex;flex-wrap:wrap;gap:calc(var(--s)*5px);justify-content:center;max-height:calc(var(--s)*150px);overflow-y:auto;width:100%;touch-action:pan-y}
+#hunt .card{flex:1 1 0;min-width:0;max-width:calc(var(--s)*140px);background:#171027;border:2px solid #5a4a82;color:inherit;font:inherit;padding:calc(var(--s)*5px);display:flex;flex-direction:column;gap:calc(var(--s)*2px);align-items:center;cursor:pointer;min-height:calc(var(--s)*70px)}
+#hunt .card[data-hunt]{border-color:var(--c,#5a4a82)}
+#hunt .card:active{background:#241838;border-color:#dcb868}
+#hunt .card[disabled]{opacity:.4;cursor:default}
+#hunt .card b{font-size:calc(var(--s)*10px);line-height:1.1;font-weight:700}
+#hunt .card span{font-family:'VT323','Courier New',monospace;font-size:calc(var(--s)*9px);line-height:1.02;color:#a79bc0}
+#hunt .card i{font-style:normal;font-family:'VT323','Courier New',monospace;font-size:calc(var(--s)*8px);letter-spacing:.08em;text-transform:uppercase;color:var(--c,#dcb868)}
+#hunt .card img{width:calc(var(--s)*34px);height:calc(var(--s)*34px);object-fit:contain;image-rendering:pixelated}
+#hunt .card.eq{border-color:#dcb868;background:#241838}
+#hunt .card.small{flex:0 0 calc(var(--s)*92px);min-height:calc(var(--s)*56px);opacity:.8}
+#hunt .card.small.eq{opacity:1}
+#hunt .card.small img{width:calc(var(--s)*22px);height:calc(var(--s)*22px)}
+#hunt .sico{width:calc(var(--s)*20px);height:calc(var(--s)*20px);image-rendering:pixelated}
+#hunt .ico{width:calc(var(--s)*16px);height:calc(var(--s)*16px);display:grid;place-items:center;background:var(--c,#555);color:#0b0818;font-weight:700;font-size:calc(var(--s)*10px)}
+#hunt .btn{font:inherit;font-weight:700;font-size:calc(var(--s)*10px);color:#0b0818;background:#dcb868;border:0;padding:calc(var(--s)*4px) calc(var(--s)*12px);cursor:pointer}
+#hunt .btn.ghost{background:transparent;color:#f1e8d4;border:2px solid #5a4a82}
+#hunt .chip{white-space:nowrap;font:inherit;font-size:calc(var(--s)*9px);color:#a79bc0;background:#171027;border:2px solid #3a2d5c;padding:calc(var(--s)*2px) calc(var(--s)*7px);cursor:pointer}
+#hunt .chip.on{color:#0b0818;background:#dcb868;border-color:#dcb868}
+#hunt .chip[disabled]{opacity:.35;cursor:default}
+#hmenu,#hmute{position:absolute;top:calc(var(--s)*2px);font:inherit;font-size:calc(var(--s)*8px);color:#a79bc0;background:rgba(7,4,15,.7);border:1px solid #3a2d5c;padding:calc(var(--s)*1px) calc(var(--s)*5px);cursor:pointer;z-index:2}
+#hmenu{right:calc(var(--s)*2px);top:calc(var(--s)*40px)}#hmute{right:calc(var(--s)*28px);top:calc(var(--s)*40px)}
+#hrotate{position:fixed;inset:0;background:#07040f;display:none;place-items:center;text-align:center;z-index:5;color:#dcb868;font-size:22px;padding:24px}
+#hrotate small{display:block;margin-top:10px;font-family:'VT323','Courier New',monospace;font-size:18px;color:#a79bc0}
+@media (orientation:portrait){#hunt:not([hidden]) #hrotate{display:grid}}

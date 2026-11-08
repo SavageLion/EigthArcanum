@@ -13,7 +13,8 @@ export interface Meta{
   forge:Record<string,boolean>;          // unlocked loadout slots
   loadout:Record<string,string|null>;    // gear carried into each run
   codex:Record<number,number>;           // times each boss (by index) has been beaten
-  daily:{date:string;best:number;won:boolean;streak:number;last:string};   // today's seeded 8-boss run
+  daily:{date:string;best:number;won:boolean;streak:number;last:string};
+  hunt?:{cards:Record<number,number>;equipped:number[];wins:number};   // Hunt mode: tarot cards claimed from bosses (by boss index) and which are equipped   // today's seeded 8-boss run
 }
 const KEY='ea-meta-v1';
 const fresh=():Meta=>({wizards:['raven'],runs:[8],counters:{bosses:0,elites:0,clean:0,mimics:0,chests:0,won:{8:0,16:0,32:0,64:0}},best:{8:0,16:0,32:0,64:0},lastWizard:'raven',lastRun:8,shards:0,boosts:{heart:0,purse:0,well:0},owned:[],forge:{hat:false,robe:false,charm:false},loadout:{hat:null,robe:null,charm:null},codex:{},daily:{date:'',best:0,won:false,streak:0,last:''}});

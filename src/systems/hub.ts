@@ -19,6 +19,7 @@ import { sideEnd } from './sideView';
 import { spellBar } from './casting';
 import { $, TAU, clamp, rnd } from '../core/util';
 import { setMusic, tone } from '../core/audio';
+import { enterHunt } from '../hunt/hunt';
 
 /* The Sanctum is a small village: a walled gate at the top (the Door), a main street running down to a plaza with a campfire and a well, and the
    Market, Forge, Codex, Daily Run board and Spell Lab each in their own corner, joined by cobbled lanes, with cottages, lamps and trees around.
@@ -26,7 +27,7 @@ import { setMusic, tone } from '../core/audio';
    runs (data/meta.ts). */
 const ZOOM=.74, HUBW=400, WW=900, WH=1000, GATE=175, PLAZA={x:450,y:600,r:80};
 const STATIONS=[
-  {id:'door',name:'THE DOOR',art:'door',k:1.7,fx:450,fy:166,ax:450,ay:236,ar:34,col:'#b07aff',solid:34},
+  {id:'door',name:'THE HUNT',art:'door',k:1.7,fx:450,fy:166,ax:450,ay:236,ar:34,col:'#b07aff',solid:34},
   {id:'market',name:'MARKET',art:'market',k:1.5,fx:225,fy:430,ax:225,ay:474,ar:34,col:'#ffd27a',solid:30},
   {id:'forge',name:'FORGE',art:'forge',k:1.5,fx:675,fy:430,ax:675,ay:474,ar:34,col:'#ff9a5a',solid:30},
   {id:'codex',name:'CODEX',art:'codex',k:1.45,fx:205,fy:790,ax:205,ay:834,ar:34,col:'#e8d28a',solid:28},
@@ -113,7 +114,7 @@ export function hubStep(dt){
   for(const m of h.motes){ m.y-=m.v*dt; m.x+=Math.sin(h.t+m.p)*8*dt; if(m.y<GATE){ m.y=WH; m.x=rnd(0,WW); } }
 }
 function openStation(id){
-  if(id==='door'){ showSetup(); return; }
+  if(id==='door'){ enterHunt({exit:enterHub,classic:showSetup}); return; }
   if(id==='market')showMarket(); else if(id==='forge')showForge(); else if(id==='codex')showCodex(); else if(id==='board')showBoard(); else enterLab();
 }
 const back=()=>{ ov.hidden=true; };
