@@ -36,9 +36,9 @@ export const WIZARDS:Wizard[]=[
   {id:'gambler',name:'The Gambler',blurb:'Fortune favours the reckless.',hearts:3,mana:100,rate:.2,slots:2,gold:40,perk:'lucky',perkText:'Lucky streak: 10% of bolts crit for x5, and chests hold 50% more gold.',unlock:'Slay 2 mimics in total',unlocked:m=>m.counters.mimics>=2},
 ];
 export const BOOSTS=[
-  {id:'heart',name:'Vital Draught',glyph:'♥',desc:'Start every run with one more heart.',cost:30,max:2},
-  {id:'purse',name:'Coin Purse',glyph:'◎',desc:'Start every run with 15 more gold.',cost:15,max:4},
-  {id:'well',name:'Mana Well',glyph:'✦',desc:'Start every run with 10 more mana.',cost:20,max:3},
+  {id:'heart',name:'Vital Draught',glyph:'♥',desc:'Start every hunt with one more heart.',cost:30,max:2},
+  {id:'purse',name:'Coin Purse',glyph:'◎',desc:'Start every hunt with 15 more stardust.',cost:15,max:4},
+  {id:'well',name:'Spell Well',glyph:'✦',desc:'Your spells recharge 4% faster in every hunt.',cost:20,max:3},
 ];
 export const FORGE_COST:Record<string,number>={hat:20,robe:20,charm:25};
 export function recordGear(id:string){ if(!meta.owned.includes(id)){ meta.owned.push(id); saveMeta(); } }

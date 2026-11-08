@@ -27,7 +27,19 @@
   "chest": {
    "frames": 1,
    "fps": 1
+  },
+  "mimic": {
+   "frames": 9,
+   "fps": 9
   }
  },
- "decor": []
+ "decor": [
+  "ice",
+  "obsidian",
+  "mushroom",
+  "thorn",
+  "obelisk",
+  "voideye",
+  "arch"
+ ]
 }

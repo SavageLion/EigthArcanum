@@ -15,7 +15,7 @@ import { setMusic, tone } from '../core/audio';
 import { cardInfo, enterHunt } from '../hunt/hunt';
 
 /* The Sanctum is a small village: a walled gate at the top (the Door), a main street running down to a plaza with a campfire and a well, and the
-   Market, Forge, Codex, Daily Run board and Spell Lab each in their own corner, joined by cobbled lanes, with cottages, lamps and trees around.
+   Market, Forge, Codex and Daily Hunt board each in their own corner, joined by cobbled lanes, with cottages, lamps and trees around.
    The view follows you through a world bigger than the screen. Step onto a glowing circle to use a building. Shards are earned from bosses and
    runs (data/meta.ts). */
 const ZOOM=.74, HUBW=400, WW=900, WH=1000, GATE=175, PLAZA={x:450,y:600,r:80};
@@ -109,7 +109,7 @@ const shardsTag=()=>`<span style="color:var(--gold)">✦ ${meta.shards||0} shard
 function showMarket(){
   const rows=BOOSTS.map(b=>{ const n=meta.boosts[b.id]||0, maxed=n>=b.max, can=!maxed&&(meta.shards||0)>=b.cost;
     return `<button class="shoprow" data-id="${b.id}" style="--boss:#ffd27a" ${can?'':'disabled'}><div class="wport" style="width:34px;height:34px;font-size:1.3rem;display:grid;place-items:center;color:#ffd27a">${b.glyph}</div><div class="txt"><b>${b.name} <small>${n}/${b.max}</small></b><span>${b.desc}</span></div><em>${maxed?'Owned':b.cost+' ✦'}</em></button>`; }).join('');
-  show(`<div class="eyebrow">Market · ${shardsTag()}</div><h2>The Merchant</h2><p class="muted">Pay in Arcana Shards, earned from bosses and finished runs. What you buy is yours at the start of every run.</p><div class="shop">${rows}</div><button class="go" id="hubback">Back to the Sanctum</button>`);
+  show(`<div class="eyebrow">Market · ${shardsTag()}</div><h2>The Merchant</h2><p class="muted">Pay in Arcana Shards, earned from bosses and hunts. What you buy is yours at the start of every hunt.</p><div class="shop">${rows}</div><button class="go" id="hubback">Back to the Sanctum</button>`);
   ov.querySelectorAll('.shoprow').forEach(b=>b.onclick=()=>{ const it=BOOSTS.find(x=>x.id===b.dataset.id); if((meta.shards||0)<it.cost||(meta.boosts[it.id]||0)>=it.max)return; meta.shards-=it.cost; meta.boosts[it.id]=(meta.boosts[it.id]||0)+1; saveMeta(); tone(880,.1,'triangle',.05); showMarket(); });
   $('hubback').onclick=back;
 }
@@ -122,7 +122,7 @@ function showForge(){
     const rows=owned.map(g=>`<button class="shoprow" data-slot="${slot}" data-gear="${g.id}" style="--boss:${RARITY[g.rarity].c}">${icon('gear_'+g.id,pixIcon(slot))}<div class="txt"><b>${g.name} ${rarityTag(g)}</b><span>${g.desc}</span></div><em>${cur===g.id?'Chosen':''}</em></button>`).join('');
     return `<div class="eyebrow">${SLOT_LABEL[slot]}</div>${none}${rows||'<p class="muted">Gear you find in chests shows up here.</p>'}`;
   };
-  show(`<div class="eyebrow">Forge · ${shardsTag()}</div><h2>The Arcane Forge</h2><p class="muted">Unlock a slot, then choose the gear you carry into every run. Gear you have worn before is kept here.</p><div class="shop">${slots.map(sec).join('')}</div><button class="go" id="hubback">Back to the Sanctum</button>`);
+  show(`<div class="eyebrow">Forge · ${shardsTag()}</div><h2>The Arcane Forge</h2><p class="muted">Unlock a slot, then choose the gear you carry into every hunt. Gear you have worn in a hunt is kept here.</p><div class="shop">${slots.map(sec).join('')}</div><button class="go" id="hubback">Back to the Sanctum</button>`);
   ov.querySelectorAll('[data-unlock]').forEach(b=>b.onclick=()=>{ const s=b.dataset.unlock, c=FORGE_COST[s]; if((meta.shards||0)<c)return; meta.shards-=c; meta.forge[s]=true; saveMeta(); tone(880,.1,'triangle',.05); showForge(); });
   ov.querySelectorAll('[data-slot]').forEach(b=>b.onclick=()=>{ meta.loadout[b.dataset.slot]=b.dataset.gear||null; saveMeta(); tone(520,.06,'square',.03); showForge(); });
   $('hubback').onclick=back;
