@@ -1,4 +1,4 @@
-// Plays whole deck-mode runs in headless Chrome with a dodging, card-playing bot and reports how far it gets.
+// Plays whole turn-based deck runs in headless Chrome with a greedy bot and reports how far it gets.
 // usage: node tests/deck-bot.mjs [runs] [--shots dir]
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
@@ -16,39 +16,54 @@ try {
   if (shotDir) await page.screenshot({ path: shotDir + '/deck_title.png' });
   for (let r = 0; r < RUNS; r++) {
     await page.evaluate(() => window.__deck.start());
-    const o = await page.evaluate(async (shotDir) => {
-      const D = window.__deck; let guard = 0, fights = 0, secs = 0;
-      const PRI = ['sun', 'tower', 'death', 'meteor', 'moon', 'blizzard', 'volley', 'chain', 'pyre', 'nova', 'magician', 'wheel', 'bulwark', 'thorns', 'ward', 'shard', 'ember', 'bolt', 'star', 'mend', 'fool'];
-      while (guard++ < 400000) {
-        const st = D.state();
+    const o = await page.evaluate(async () => {
+      const D = window.__deck; let guard = 0, turns = 0, tarotUsed = 0, reacts = 0;
+      const wait = () => { let g = 0; while (g++ < 600) { const s = D.state(); if (s.scene !== 'fight' || (s.phase === 'player' && s.busy <= 0)) return; D.step(1 / 30); } };
+      while (guard++ < 20000) {
+        let st = D.state();
         if (st.scene === 'end') break;
+        if (st.scene === 'shuffle' || st.scene === 'won') { D.step(0.5); continue; }
         if (st.scene === 'reward') {
-          const off = D.offer(); let bi = 0, bs = -1;
-          off.forEach((c, i) => { const sc = (PRI.length - PRI.indexOf(c.d)) + (c.rev ? -6 : 0); if (sc > bs) { bs = sc; bi = i; } });
-          D.step(1.3); D.pick(bi); fights++; continue;
+          const off = st.offer; let bi = 0, bs = -1;
+          off.forEach((o, i) => { const sc = o.spell ? D.cards[o.spell.d].pw / D.cards[o.spell.d].cost + (D.cards[o.spell.d].kind === 'def' ? 1 : 2) : 3; if (sc > bs) { bs = sc; bi = i; } });
+          D.step(1.3); D.pick(bi); continue;
         }
-        if (st.scene === 'fight') {
-          const P = st.P; let bb = [0, 0], bsc = -1e9;
-          for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a), nx = P.x + dx * 30, ny = P.y + dy * 30; let sc = 0;
-            for (const q of D.sh()) { const d = Math.hypot(q.x + q.vx * .25 - nx, q.y + q.vy * .25 - ny); sc -= d < 26 ? (26 - d) * (26 - d) : 0; }
-            for (const z of D.zn()) { const d = Math.hypot(z.x - nx, z.y - ny); sc -= d < z.r + 12 ? (z.r + 12 - d) * 8 : 0; }
-            sc -= Math.max(0, 30 - nx, nx - 450, 90 - ny, ny - 168) * 3; sc -= Math.abs(nx - st.boss.x) * .01; if (sc > bsc) { bsc = sc; bb = [dx, dy]; } }
-          D.bot(bb[0], bb[1]);
-          if (guard % 3 === 0) { // play the best affordable card
-            const h = st.hand; let bi = -1, bs = -1;
-            h.forEach((c, i) => { if (!c) return; const d = D.cards[c.d]; if (st.mana < d.cost) return; let sc = PRI.length - PRI.indexOf(c.d); if (c.d === 'mend' && st.P.hp >= st.run.max) sc = -5; if ((c.d === 'ward' || c.d === 'thorns' || c.d === 'bulwark') && st.P.ward > 1) sc = -5; if (c.d === 'star' && st.mana > 6) sc = -5; if (sc > bs) { bs = sc; bi = i; } });
-            if (bi >= 0 && bs > -3) D.play(bi);
+        // player turn
+        turns++;
+        for (let k = 0; k < 12; k++) {
+          wait(); st = D.state(); if (st.scene !== 'fight') break;
+          const P = st.P, B = st.boss, it = B.intents[0], inc = it && !it.cancel ? (['guard', 'enrage'].includes(it.k) ? 0 : (it.v + B.str) * (it.n || 1)) : 0;
+          // tarot
+          if (st.run.tarot.length) {
+            const id = st.run.tarot[0];
+            if ((id === 'empress' || id === 'sun') && P.hp < 24) { D.tarot(0, false); tarotUsed++; continue; }
+            if (['death', 'tower', 'justice', 'strength', 'devil'].includes(id) && B.hp < B.max * .6) { D.tarot(0, false); tarotUsed++; continue; }
+            if (['priestess', 'emperor'].includes(id) && inc >= 14 && P.ward < inc) { D.tarot(0, false); tarotUsed++; continue; }
           }
+          let bi = -1, bs = 1.5;
+          st.hand.forEach((cd, i) => {
+            const d = D.cards[cd.d], cost = st.cost(i); if (st.mana < cost) return;
+            let v = d.pw + (st.react(i) ? 9 : 0);
+            if (d.kind === 'def') v += P.ward < inc ? 8 : -6;
+            if (cd.d === 'mend' || cd.d === 'verdant') v += P.hp < P.max - 10 ? 6 : -10;
+            if (cd.d === 'meditate') v += st.hand.length < 5 ? 3 : -3;
+            if (cd.d === 'moonwell') v += st.mana < 3 ? 3 : -4;
+            const sc = v / Math.max(1, cost) + (cost >= 3 ? 1 : 0);
+            if (sc > bs) { bs = sc; bi = i; }
+          });
+          if (bi < 0) break;
+          if (st.react(bi)) reacts++;
+          D.cast(bi); D.step(0.6);
         }
-        D.step(1 / 30); secs += 1 / 30;
+        wait(); st = D.state(); if (st.scene === 'fight') { D.end(); let g = 0; while (g++ < 900) { D.step(1 / 30); const s = D.state(); if (s.scene !== 'fight' || (s.phase === 'player' && s.busy <= 0)) break; } }
       }
-      const f = D.state(); return { kills: f.run.kills, win: f.run.kills >= 7, secs: Math.round(secs), deck: f.run.deck.length, hp: f.P && f.P.hp };
-    }, shotDir);
+      const f = D.state(); return { kills: f.run.kills, win: f.run.kills >= 7, turns, tarotUsed, reacts, deck: f.run.deck.length, hp: f.P && f.P.hp };
+    });
     res.push(o); console.log('run', r + 1, JSON.stringify(o));
     if (shotDir && r === 0) await page.screenshot({ path: shotDir + '/deck_end.png' });
   }
 } finally { await browser.close(); srv.kill(); }
 const w = res.filter(r => r.win).length;
-console.log(`\nwon ${w}/${res.length}; avg bosses ${(res.reduce((a, r) => a + r.kills, 0) / res.length).toFixed(1)}; avg run ${Math.round(res.reduce((a, r) => a + r.secs, 0) / res.length)}s`);
+console.log(`\nwon ${w}/${res.length}; avg bosses ${(res.reduce((a, r) => a + r.kills, 0) / res.length).toFixed(1)}; avg turns ${Math.round(res.reduce((a, r) => a + r.turns, 0) / res.length)}`);
 console.log(errs.size ? 'ERRORS:\n' + [...errs].join('\n') : 'no page errors');
 process.exit(errs.size ? 1 : 0);

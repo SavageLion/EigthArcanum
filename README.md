@@ -19,7 +19,7 @@ node tests/hunt-bot.mjs 12   # build first; a dodging bot plays whole hunts and 
 - Controls: drag anywhere (or WASD / arrows) to move, Esc pauses. Spells cast themselves.
 
 ## Deck mode (prototype, branch deck-mode)
-The Sanctum's Hunt gate opens a fast tarot-deck boss rush (`src/deck/deck.ts`, add `?deck` to the URL to jump straight in). A run is seven short boss fights. Your spells are cards: hold four, tap one to cast it (mana), played cards go to the discard pile and the hand refills from the shuffled draw pile. Same-suit streaks build a combo. After each boss you pick one of three cards for your deck, any of which may be drawn reversed (+60% power, costs a heart). `node tests/deck-bot.mjs 6` plays whole runs headlessly.
+The Sanctum's Hunt gate opens a turn-based tarot duel (`src/deck/deck.ts`, add `?deck` to the URL to jump straight in). Wizard on the left, boss on the right, seven fights per run. Spells are cards that cost mana; tarot cards are one-use run items with an Upright and a Reversed effect. What makes it its own game: mana follows moon phases (3, 5, 3, 2) and carries over; your hand persists (draw 2, discard nothing, hand of 7); casting a different element than the one marked on the boss triggers a reaction (Fire+Frost = Steam, and so on, defensive spells included); wards decay by half each turn; the boss's next three moves show as a fate row that tarot can bend. `node tests/deck-bot.mjs 12` plays whole runs headlessly.
 
 ## Layout
 - `src/main.ts`: title, village and hunt loop. `src/village/title.ts`, `src/systems/hub.ts`, `src/ui/overlay.ts` (overlays, icons, boss card art).
