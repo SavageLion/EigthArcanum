@@ -7,3 +7,6 @@ A standalone trail-running roguelike for phones. One self-contained file: `index
 - Drink and eat on the move, make quick calls at trail events, draft gear at aid stations.
 - Races unlock in order on the map. Bronze: finish every stage inside the cutoff. Silver: beat the par time. Gold: beat the gold time without bonking.
 - `node tests/trail-bot.mjs 8` plays every race with a pacing bot (add `--effort 0.9` to see what always-sprinting does).
+
+## Obstacles
+Tap the trail to jump (rocks, logs, puddles) and swipe down to duck (low branches). Grab gel packets while airborne. Clean clears build FLOW (a speed boost) and a perfect timing counts double. Hits stumble you. Faster running leaves less time to react. Keyboard: space/W jump, S duck.
