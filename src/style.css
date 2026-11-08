@@ -468,3 +468,8 @@ p{font-size:1.32rem;line-height:1.1}
 #deck[hidden]{display:none}
 #dbox{--s:1;width:calc(480px*var(--s));height:calc(270px*var(--s))}
 #dcv{width:100%;height:100%;display:block;image-rendering:pixelated;background:#0b0818;touch-action:none}
+
+#reading{position:fixed;inset:0;z-index:30;background:#07040f;display:grid;place-items:center;padding:0 max(16px,env(safe-area-inset-left,0px));touch-action:none;user-select:none;-webkit-user-select:none}
+#reading[hidden]{display:none}
+#rbox{--s:1;width:calc(480px*var(--s));height:calc(270px*var(--s))}
+#rcv{width:100%;height:100%;display:block;image-rendering:pixelated;background:#0b0818;touch-action:none}

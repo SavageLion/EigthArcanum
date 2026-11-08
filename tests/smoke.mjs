@@ -20,7 +20,7 @@ try {
   const mode = () => page.evaluate(() => window.__arcana.S.mode);
   if (await mode() !== 'hub') errors.push('expected the hub after the title, got ' + await mode());
   await page.evaluate(() => window.__arcana.meta.unlockEverything());
-  // every station opens an overlay (market, forge, codex, daily board); the door opens deck mode (the older hunt stays reachable through __hunt)
+  // every station opens an overlay (market, forge, codex, daily board); the door opens reading mode (the older hunt stays reachable through __hunt)
   for (const [name, x, y] of [['market', 225, 474], ['forge', 675, 474], ['codex', 205, 834], ['board', 450, 942]]) {
     await page.evaluate(([x, y]) => { const A = window.__arcana; A.G.P.x = x; A.G.P.y = y; A.G.hub.lock = false; A.G.hub.hold = 0; A.G.hub.near = null; }, [x, y]);
     await page.waitForFunction(() => !document.getElementById('ov').hidden, null, { timeout: 5000 }).catch(() => errors.push('station did not open: ' + name));
@@ -28,9 +28,9 @@ try {
     await page.waitForTimeout(150);
   }
   await page.evaluate(() => { const A = window.__arcana; A.G.P.x = 450; A.G.P.y = 236; A.G.hub.lock = false; A.G.hub.hold = 0; A.G.hub.near = null; });   // walk onto the door
-  await page.waitForSelector('#deck:not([hidden])', { timeout: 8000 });
-  await page.evaluate(() => { const D = window.__deck; D.start(); D.step(1.5); for (let k = 0; k < 8; k++) { const st = D.state(); if (st.scene !== 'fight') break; for (let i = 0; i < 3; i++) { D.step(.5); const h = D.state().hand; const j = h.findIndex((c, q) => D.state().mana >= D.state().cost(q)); if (j >= 0) D.cast(j); } D.step(.5); D.end(); for (let q = 0; q < 120; q++) D.step(1 / 30); } });
-  notes.push('deck mode played: ' + await page.evaluate(() => window.__deck.sceneNow()));
+  await page.waitForSelector('#reading:not([hidden])', { timeout: 8000 });
+  await page.evaluate(() => { const D = window.__reading; D.start(); for (let g = 0; g < 400; g++) { const st = D.state(); if (st.scene === 'end') break; if (st.scene === 'shop') { D.next(); continue; } if (st.scene !== 'round') { D.step(.5); continue; } if (st.rd.anim) { D.step(.3); continue; } const b = D.best(); if (!b) { D.step(.2); continue; } D.select(b.idx); D.play(); } });
+  notes.push('reading mode played: ' + await page.evaluate(() => window.__reading.sceneNow()));
   await page.evaluate(() => window.__hunt.open());
   await page.waitForSelector('#hpanel [data-hunt]', { timeout: 8000 });
   notes.push('hunt board open: ' + await page.evaluate(() => document.querySelectorAll('#hpanel [data-hunt]').length) + ' bosses offered');
