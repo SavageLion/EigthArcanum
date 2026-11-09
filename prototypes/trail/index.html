@@ -45,7 +45,7 @@ const MEDAL_COL={bronze:'#c98a4a',silver:'#cfd6e0',gold:'#ffd24a'};
 
 /* ---------- races and training trails ---------- */
 const RACES=[
-  {id:'pine',name:'Pine Ridge 5K',km:5,stages:2,theme:'dawn',tier:0,seed:11,climate:['clear','clear','fog','rain'],world:{peak:55,noise:28,decor:1700,trailW:0,lake:true,lakeR:7,river:true,biome:{rock:75,loose:58,mud:.64,brush:.6}},bear:[],blurb:'Cool morning, gentle hills and a quiet lake. A friendly first race to learn pacing.'},
+  {id:'pine',name:'Pine Ridge 5K',km:5,stages:2,theme:'dawn',tier:0,seed:11,climate:['clear','clear','fog','rain'],world:{peak:55,noise:28,decor:1200,tufts:5000,tuftsNear:90,trailW:0,lake:true,lakeR:7,river:true,biome:{rock:75,loose:58,mud:.64,brush:.6}},bear:[],blurb:'Cool morning, gentle hills and a quiet lake. A friendly first race to learn pacing.'},
   {id:'lake',name:'Lakeside 10K',km:10,stages:3,theme:'noon',tier:0,seed:23,climate:['clear','wind','clear','rain'],world:{peak:34,noise:22,lake:true,lakeR:15,river:false,biome:{rock:80,loose:62,mud:.55,brush:.62}},bear:[],blurb:'A huge flat lake, fast meadows and open ground. The wind decides your day.'},
   {id:'canyon',name:'Canyon Loop 15K',km:15,stages:3,theme:'noon',tier:1,seed:37,climate:['hot','hot','clear','wind'],world:{peak:80,noise:60,lake:false,river:true,trees:.25,biome:{rock:34,loose:26,mud:.72,brush:.7}},bear:[1],blurb:'Red rock and scree, almost no shade. Heat bites and there may be a bear in the rocks.'},
   {id:'fog',name:'Fogbank 21K',km:21,stages:4,theme:'dawn',tier:1,seed:41,climate:['fog','fog','rain','cold'],world:{peak:50,noise:46,lake:true,lakeR:9,river:true,trees:1.5,biome:{rock:72,loose:58,mud:.44,brush:.44}},bear:[2],blurb:'Mud, thick forest and mist. Hard to see the way, so trust your map.'},
@@ -58,14 +58,14 @@ const MORD={bronze:1,silver:2,gold:3};
 const medalOf=id=>MORD[save.medals[id]]||0;
 const statTotal=()=>Object.values(save.stats).reduce((a,s)=>a+s.l,0);
 const ENTRY={
-  lake:{t:'Finish Pine Ridge 5K with any medal.',ok:()=>medalOf('pine')>=1},
-  canyon:{t:'Earn silver or better at Pine Ridge 5K.',ok:()=>medalOf('pine')>=2},
-  fog:{t:'Earn silver or better at Lakeside 10K.',ok:()=>medalOf('lake')>=2},
-  sky:{t:'Earn silver or better at Canyon Loop 15K.',ok:()=>medalOf('canyon')>=2},
-  glacier:{t:'Silver or better at Fogbank 21K, and 6 total stat levels.',ok:()=>medalOf('fog')>=2&&statTotal()>=6},
-  summit:{t:'Silver or better at Skyline 30K and at Glacier Gap 42K.',ok:()=>medalOf('sky')>=2&&medalOf('glacier')>=2},
+  lake:{t:'Finish Pine Ridge 5K with any medal.',s:'Any medal at Pine Ridge',ok:()=>medalOf('pine')>=1},
+  canyon:{t:'Earn silver or better at Pine Ridge 5K.',s:'Silver at Pine Ridge',ok:()=>medalOf('pine')>=2},
+  fog:{t:'Earn silver or better at Lakeside 10K.',s:'Silver at Lakeside',ok:()=>medalOf('lake')>=2},
+  sky:{t:'Earn silver or better at Canyon Loop 15K.',s:'Silver at Canyon Loop',ok:()=>medalOf('canyon')>=2},
+  glacier:{t:'Silver or better at Fogbank 21K, and 6 total stat levels.',s:'Silver at Fogbank + 6 stat levels',ok:()=>medalOf('fog')>=2&&statTotal()>=6},
+  summit:{t:'Silver or better at Skyline 30K and at Glacier Gap 42K.',s:'Silver at Skyline + Glacier Gap',ok:()=>medalOf('sky')>=2&&medalOf('glacier')>=2},
 };
-const entry=r=>{const e=ENTRY[r.id];return !e||e.ok()?{ok:true}:{ok:false,why:e.t};};
+const entry=r=>{const e=ENTRY[r.id];return !e||e.ok()?{ok:true}:{ok:false,why:e.t,short:e.s};};
 // weather: forecast per race and day (re-rolls every day you spend), the same weather for the whole race
 const WX={
   clear:{n:'Clear',d:'Perfect running weather.',vis:1},
@@ -177,6 +177,7 @@ function update(dt){
   if(scene==='event'){P.ev.t-=dt;if(P.ev.t<=0)chooseEvent(0);return;}
   if(scene!=='run'&&scene!=='nav')return;
   if(scene==='nav'&&NAV.brief)return;
+  if(scene==='nav'&&NAV.tb)tuftStep(dt);
   const seg=scene==='nav'?navSeg(dt):segAt(S,P.x),g=seg.g,ter=TERRAIN[seg.t];P.t+=dt;
   const heat=S.heat*(has('hat')?.4:1)*(P.cool>0?.3:1)*(1-.08*lv('heat'));
   let e=P.effort;
@@ -400,19 +401,25 @@ function drawBear(cx,base){
 }
 const IMG={};const loadImg=(k,src)=>{const i=new Image();i.onload=()=>{IMG[k]=i;};i.src=src;};loadImg('pine','assets/pine_bg.jpg');
 // scenic backdrop behind the terrain view (Pine Ridge): mirrored tiles that scroll as you turn
-const PL={};const plLoad=(k,src)=>{const i=new Image();i.onload=()=>{PL[k]=i;};i.src='assets/pl/'+src+'.png';};
+const PL={};const plLoad=(k,src)=>{const i=new Image();i.onload=()=>{PL[k]=i;const cv=document.createElement('canvas');cv.width=i.width;cv.height=i.height;const q=cv.getContext('2d');q.drawImage(i,0,0);const d=q.getImageData(0,0,i.width,i.height).data;let x0=i.width,y0=i.height,x1=0,y1=0;for(let y=0;y<i.height;y++)for(let x=0;x<i.width;x++)if(d[(y*i.width+x)*4+3]>40){if(x<x0)x0=x;if(x+1>x1)x1=x+1;if(y<y0)y0=y;if(y+1>y1)y1=y+1;}PLB[k]=x1>x0?{x0,y0,x1,y1}:{x0:0,y0:0,x1:i.width,y1:i.height};};i.src='assets/pl/'+src+'.png';};
 ['pine_a','spruce_b','aspen_c','bush','flowers','rocks','grass','cloud','runner_north'].forEach(n=>plLoad(n,n));for(let i=0;i<8;i++)plLoad('run'+i,'run_'+i);for(let i=0;i<7;i++){plLoad('bird'+i,'bird_'+i);plLoad('bfly'+i,'bfly_'+i);}
+function tuftStep(dt){const N=NAV,tb=N.tb,ts=N.ts,T_=N.W.tufts,dec=dt*.55;for(let i=0;i<tb.length;i++)if(tb[i]>0)tb[i]=Math.max(0,tb[i]-dec);
+  const fx=Math.cos(N.hd),fy=Math.sin(N.hd),rx=-fy,ry=fx,cx=Math.floor(N.px/16),cy=Math.floor(N.py/16);
+  for(let gx=cx-1;gx<=cx+1;gx++)for(let gy=cy-1;gy<=cy+1;gy++){const L=N.tg.get(gx*1000+gy);if(!L)continue;for(let j=0;j<L.length;j++){const i=L[j],q=T_[i],dx=q.x-N.px,dy=q.y-N.py,d=Math.hypot(dx,dy);if(d<16){const b=1-d/16;if(b>tb[i]){tb[i]=b;ts[i]=(dx*rx+dy*ry)>=0?1:-1;}}}}}
+const PLB={},NEAR=[];
 function plSprite(s,sx,yb,hp,clip,f){
-  let im=null,k=1,sway=.03;
-  if(s.kind===0){const h=((Math.floor(s.wx*7.3+s.wy*13.1))%100+100)%100;im=PL[h<45?'pine_a':h<80?'spruce_b':'aspen_c'];k=1.7;}
-  else if(s.kind===4){im=PL.bush;sway=.012;}else if(s.kind===5){im=PL.flowers;sway=.05;}else if(s.kind===6){im=PL.rocks;sway=0;}else if(s.kind===7){im=PL.grass;sway=.07;}
-  else if(s.kind===8){im=PL['bfly'+(Math.floor(t*12+s.wx)%7)];sway=0;}else return false;
-  if(!im)return false;
-  const hpx=hp*k*3,wpx=hpx*(im.width/im.height);let x=sx*3,y=yb*3;
-  if(s.kind===8){y-=(5+2*Math.sin(t*2+s.wx))*SCL/s.zc*3;x+=Math.sin(t*1.1+s.wy*.3)*9*SCL/s.zc;}
-  c.save();c.beginPath();c.rect(0,0,W,clip*3);c.clip();c.globalAlpha=clamp(1-f*.92,.04,1);c.translate(x,y);
-  if(sway)c.transform(1,0,Math.sin(t*1.1+s.wx*.05+s.wy*.03)*sway*(1+(WXC().wind?1.6:0)),1,0,0);
-  c.imageSmoothingEnabled=false;c.drawImage(im,-wpx/2,-hpx,wpx,hpx);c.restore();return true;}
+  let im=null,key='',k=1,sway=.03,bend=0,sd=1,sq=1;
+  if(s.kind===0){const h=((Math.floor(s.wx*7.3+s.wy*13.1))%100+100)%100;key=h<45?'pine_a':h<80?'spruce_b':'aspen_c';k=1.7;}
+  else if(s.kind===4){key='bush';sway=.012;}else if(s.kind===5){key='flowers';sway=.05;}else if(s.kind===6){key='rocks';sway=0;}else if(s.kind===7){key='grass';sway=.07;}
+  else if(s.kind===9){key='grass';sway=.05;const b=NAV.tb[s.ti];if(b>0){bend=b;sd=NAV.ts[s.ti];sq=1-.45*b;}}
+  else if(s.kind===8){key='bfly'+(Math.floor(t*12+s.wx)%7);sway=0;}else return false;
+  im=PL[key];if(!im)return false;const bb=PLB[key]||{x0:0,y0:0,x1:im.width,y1:im.height},bw=bb.x1-bb.x0,bh=bb.y1-bb.y0;
+  const hpx=hp*k*PXS*sq,wpx=hpx*bw/(bh*sq);let x=sx*PXS,y=yb*PXS+1;
+  if(s.kind===8){y-=(5+2*Math.sin(t*2+s.wx))*SCL/s.zc*PXS;x+=Math.sin(t*1.1+s.wy*.3)*9*SCL/s.zc;}
+  c.save();if(s.kind!==9||s.zc>35){c.beginPath();c.rect(0,0,W,clip*PXS);c.clip();}c.globalAlpha=clamp(1-f*.92,.04,1);c.translate(x,y);
+  const wind=1+(WXC().wind?1.6:0),shear=(sway?Math.sin(t*1.1+s.wx*.05+s.wy*.03)*sway*wind:0)+(bend?sd*bend*1.15:0);
+  if(shear)c.transform(1,0,shear,1,0,0);
+  c.imageSmoothingEnabled=false;c.drawImage(im,bb.x0,bb.y0,bw,bh,-wpx/2,-hpx,wpx,hpx);c.restore();return true;}
 function drawSkyLife(){
   const cl=PL.cloud,hd=NAV.hd,tt=t;
   if(cl){c.globalAlpha=.92;for(let i=0;i<4;i++){const wrap=W+220,x=(((i*173-tt*(5+i*2)-hd*(180+i*40))%wrap)+wrap)%wrap-110,y=22+i*21+Math.sin(tt*.2+i)*3,sc=1.1+i*.25;c.drawImage(cl,x,y,cl.width*sc,cl.height*sc);}c.globalAlpha=1;}
@@ -420,8 +427,8 @@ function drawSkyLife(){
 }
 function drawAmbient(){const tt=t,wr=W+20;c.fillStyle='rgba(255,250,210,.7)';
   for(let i=0;i<34;i++){const x=(((i*57+tt*(8+i%5*3)+Math.sin(tt*.7+i)*12-NAV.hd*60)%wr)+wr)%wr-10,y=120+((i*83+Math.sin(tt*.5+i*2)*20+tt*4*(i%3))%260);c.fillRect(x,y,1.6,1.6);}
-  for(let i=0;i<7;i++){const x=(((i*131+tt*14+Math.sin(tt+i)*20)%wr)+wr)%wr-10,y=(i*97+tt*(22+i*3))%(VH*3-60);c.fillStyle=['#e8a838','#d86a30','#a8c040'][i%3];c.fillRect(x,y,2.4,1.6);}}
-function drawBackdrop(){const im=IMG.pine,sh=HOR*3+40,sc=sh/1150,tw=im.width*sc,off=((NAV.hd*260)%(tw*2)+tw*2)%(tw*2),base=Math.floor(off/tw);
+  for(let i=0;i<7;i++){const x=(((i*131+tt*14+Math.sin(tt+i)*20)%wr)+wr)%wr-10,y=(i*97+tt*(22+i*3))%(VH*PXS-60);c.fillStyle=['#e8a838','#d86a30','#a8c040'][i%3];c.fillRect(x,y,2.4,1.6);}}
+function drawBackdrop(){const im=IMG.pine,sh=HOR*PXS+40,sc=sh/1150,tw=im.width*sc,off=((NAV.hd*260)%(tw*2)+tw*2)%(tw*2),base=Math.floor(off/tw);
   for(let k=0;k<4;k++){const n=base+k,x=n*tw-off;if(x>W||x+tw<0)continue;c.save();if(n&1){c.translate(x+tw,0);c.scale(-1,1);c.drawImage(im,0,0,im.width,1150,0,0,tw,sh);}else c.drawImage(im,0,0,im.width,1150,x,0,tw,sh);c.restore();}
   if(NAV.gray){const g=NAV.gray[0];c.fillStyle=`rgba(${g[0]},${g[1]},${g[2]},${NAV.gray[1]})`;c.fillRect(0,0,W,sh);}}
 function bearScene(){
@@ -484,14 +491,14 @@ function fader(){
 function setEffortFromY(py){P.effort=clamp(1-(py-FY0-16)/(FY1-FY0-24),0,1);}
 
 /* ---------- TRAIL VIEW: run from behind, choose your terrain, navigate to the finish ---------- */
-const NN=128,CS=8,WL=7,SCL=34,ZMAX=300,KMAX=220;const PORT=true;let VW=90,VH=116,HOR=50,TANH=.9*90/160;
+const NN=128,CS=8,WL=7,SCL=51,ZMAX=300,KMAX=240,PXS=2;const PORT=true;let VW=135,VH=174,HOR=75,TANH=.9*90/160;
 const TCODE=['grass','brush','rocky','loose','mud','creek','lake','smooth'];
 const TPAL=[[106,154,74],[46,90,48],[122,122,130],[168,154,120],[90,70,48],[74,138,192],[58,106,176],[200,164,104]];
 const TNAME=['Meadow','Thick brush','Rocky','Loose scree','Mud','Creek','Lake','Trail'];
 let NAV=null,KEYS={l:0,r:0};
 let STP={x:8,y:440,w:254,h:34};
 const steerFromX=x=>clamp((x-(STP.x+STP.w/2))/(STP.w/2),-1,1);
-const runY=()=>(HOR+7*SCL/9)*3+14;
+const runY=()=>(HOR+7*SCL/9)*PXS+14;
 
 const curG=()=>scene==='nav'?NAV.seg.g:segAt(S,P.x).g;
 const mulberry=a=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
@@ -543,11 +550,13 @@ function genWorld(op){op=op||{};
   // scenery and course furniture
   const trees=[];for(let i=0,tn=Math.round(1100*(op.trees??1));i<tn;i++){const x=rng()*N,y=rng()*N,k=(y|0)*N+(x|0),t=T[k];const p=t===1?.9:t===0?.12:t===4?.2:t===3?.05:t===2?.03:0;if(rng()<p&&!trail[k])trees.push({x:x*CS,y:y*CS,h:8+rng()*11});}
   const ribbons=[];for(let i=4;i<pts.length-2;i+=5)ribbons.push(pts[i]);
+  const tufts=[];if(op.tufts||op.tuftsNear){for(let i=0;i<op.tufts;i++){const x=rng()*N,y=rng()*N,k=(y|0)*N+(x|0),tt=T[k];if(trail[k]||(tt!==0&&tt!==1))continue;tufts.push({x:x*CS,y:y*CS,h:3.5+rng()*2.5});}}
+    if(op.tuftsNear){for(let i=0;i<pts.length;i++)for(let j=0;j<op.tuftsNear;j++){const a=rng()*TAU,d=3+rng()*38,x=pts[i].x+Math.cos(a)*d,y=pts[i].y+Math.sin(a)*d;if(x<4||y<4||x>1020||y>1020)continue;const k=Math.floor(y/CS)*N+Math.floor(x/CS),tt=T[k];if(trail[k]||(tt!==0&&tt!==1))continue;tufts.push({x,y,h:3.5+rng()*2.5});}}
   const decor=[];if(op.decor){for(let i=0;i<op.decor;i++){const x=rng()*N,y=rng()*N,k=(y|0)*N+(x|0),tt=T[k];if(trail[k]||tt===5||tt===6)continue;const r=rng();let kind;
       if(tt===1)kind=r<.6?4:r<.85?7:5;else if(tt===0)kind=r<.5?5:r<.8?7:4;else if(tt===2||tt===3)kind=r<.7?6:7;else kind=7;
       decor.push({x:x*CS,y:y*CS,kind,h:kind===4?9:kind===5?6:kind===6?8:6});if(kind===5&&rng()<.4)decor.push({x:x*CS+rng()*10,y:y*CS+rng()*10,kind:8,h:3});}}
   const rcx=fin.x+(rng()-.5)*16,rcy=fin.y+(rng()-.5)*16;
-  Object.assign(W_,{pts,trees,ribbons,decor,decoys,lands:[{n:'Start',x:start.x,y:start.y},{n:'Mt Ridge',x:peak.x,y:peak.y},...(hasLake?[{n:'Lake',x:lake.x,y:lake.y}]:[]),...lands],ring:{x:rcx,y:rcy,r:19},riverLabel:op.river===false?null:{x:rflip?127-(20+.3*107):20+.3*107,y:30+7*Math.sin(2.4+ph)}});
+  Object.assign(W_,{pts,trees,ribbons,decor,tufts,decoys,lands:[{n:'Start',x:start.x,y:start.y},{n:'Mt Ridge',x:peak.x,y:peak.y},...(hasLake?[{n:'Lake',x:lake.x,y:lake.y}]:[]),...lands],ring:{x:rcx,y:rcy,r:19},riverLabel:op.river===false?null:{x:rflip?127-(20+.3*107):20+.3*107,y:30+7*Math.sin(2.4+ph)}});
   return W_;
 }
 const hAt=(W_,x,y)=>{x=clamp(x/CS-.5,0,NN-1.001);y=clamp(y/CS-.5,0,NN-1.001);const xi=x|0,yi=y|0,xf=x-xi,yf=y-yi,H=W_.H,i=yi*NN+xi;return H[i]*(1-xf)*(1-yf)+H[i+1]*xf*(1-yf)+H[i+NN]*(1-xf)*yf+H[i+NN+1]*xf*yf;};
@@ -573,8 +582,10 @@ function startNav(){
   R_.parS+=len/VS[r.tier];R_.parG+=len/VG[r.tier];
   P={x:0,effort:.3,hr:.45,legs:R_.legs,water:R_.water,fuel:R_.fuel,bonk:0,stop:0,slow:null,hike:0,cramp:0,redT:0,ankle:0,cool:0,phase:0,t:0,speed:0,cut:S.cut,elevCam:0,ev:null,drinkT:0,bonked:false,sDown:0,sRed:0,sHard:0,sClimb:0,tEasy:0};
   const px=(Wd.start.x+.5)*CS,py=(Wd.start.y+.5)*CS;
-  NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,seenFin:true,pl:r.id==='pine',
+  NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,seenFin:true,pl:r.id==='pine',tb:null,ts:null,tg:null,
     vis:wx.vis||1,windAng:Math.random()*TAU,gray:(ws&&BGIMG)?ws:null,stars:th.stars?Array.from({length:45},()=>[rint(0,VW-1),rint(0,HOR-3)]):null};
+  setTiles(r);
+  if(NAV.pl&&Wd.tufts&&Wd.tufts.length){NAV.tb=new Float32Array(Wd.tufts.length);NAV.ts=new Int8Array(Wd.tufts.length);NAV.tg=new Map();Wd.tufts.forEach((q,i)=>{const kk=Math.floor(q.x/16)*1000+Math.floor(q.y/16);let L=NAV.tg.get(kk);if(!L){L=[];NAV.tg.set(kk,L);}L.push(i);});}
   bakeNavMap();navReveal(Wd.start.x,Wd.start.y,9);
   popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;NAV.brief=true;NAV.map=true;
 }
@@ -609,6 +620,14 @@ const ytops=new Int16Array(VW*KMAX),ybuf=new Int16Array(VW),zs=new Float32Array(
 let vcv=null,vctx=null,vimg=null,v32=null;
 const pack=(r,g,b)=>(255<<24)|((b&255)<<16)|((g&255)<<8)|(r&255);
 let SKYT=[88,148,222],SKYB=[214,232,244],TINT=[1,1,1],BGIMG=false;
+const TEXD=[],TEXAVG=[],TS=8;let TEXMAP={0:[0,0,0,14,2],1:[12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};
+for(let i=0;i<16;i++){const im=new Image();im.onload=()=>{const cv=document.createElement('canvas');cv.width=cv.height=32;const q=cv.getContext('2d');q.drawImage(im,0,0);const d=q.getImageData(0,0,32,32).data;TEXD[i]=d;let r=0,g=0,b=0;for(let j=0;j<1024;j++){r+=d[j*4];g+=d[j*4+1];b+=d[j*4+2];}TEXAVG[i]=[r/1024,g/1024,b/1024];};im.src='assets/pl/tile_'+i+'.png';}
+function setTiles(r){const th=r.theme;
+  if(r.id==='canyon')TEXMAP={0:[9],1:[9,12],2:[10],3:[10,5],4:[6],5:[7],6:[7],7:[3]};
+  else if(th==='frost')TEXMAP={0:[11],1:[11,12],2:[4,11],3:[11,5],4:[6],5:[7],6:[7],7:[3]};
+  else if(r.id==='fog')TEXMAP={0:[0,0,14],1:[12,12,1],2:[4],3:[5],4:[6,6,8],5:[7],6:[7],7:[3]};
+  else if(r.id==='pine')TEXMAP={0:[0,0,2,1,0,14],1:[1,12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};
+  else TEXMAP={0:[0,0,0,14,2],1:[12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};}
 function navView(){
   if(!vcv){vcv=document.createElement('canvas');vcv.width=VW;vcv.height=VH;vctx=vcv.getContext('2d');vimg=vctx.createImageData(VW,VH);v32=new Uint32Array(vimg.data.buffer);}
   const N=NAV,vis=N.vis||1,Wd=N.W,fx=Math.cos(N.hd),fy=Math.sin(N.hd),rx=-fy,ry=fx,camx=N.px-fx*9,camy=N.py-fy*9,camh=N.camh;
@@ -622,14 +641,16 @@ function navView(){
     for(let col=0;col<VW;col++){
       const u=(col+.5)/VW*2-1,wx=cx0+lx*u,wy=cy0+ly*u,ix=clamp(Math.floor(wx/CS),0,NN-1),iy=clamp(Math.floor(wy/CS),0,NN-1),i=iy*NN+ix,code=Wd.T[i];
       const h=code===6?WL:hAt(Wd,wx,wy),ys=HOR+(camh-h)*SCL/z;
-      if(ys<ybuf[col]){const p=TPAL[code],tx=((ix*73856093)^(iy*19349663))&7,s=(code===6?1+Math.sin(wx*.25+wy*.2+sceneT*2)*.05:Wd.shade[i])*(1+(tx-3.5)*(N.pl?.032:.012));
-        const r=p[0]*s*TINT[0]*(1-f)+SKYB[0]*f,g=p[1]*s*TINT[1]*(1-f)+SKYB[1]*f,b=p[2]*s*TINT[2]*(1-f)+SKYB[2]*f,cc=pack(r,g,b);
+      if(ys<ybuf[col]){const p=TPAL[code],tx=((ix*73856093)^(iy*19349663))&7,s=(code===6?1+Math.sin(wx*.25+wy*.2+sceneT*2)*.06:Wd.shade[i])*(1+(tx-3.5)*.012);
+        let cr=p[0],cg=p[1],cb=p[2];const vl=TEXMAP[code],tl=TEXD[vl[((ix*7+iy*13)>>1)%vl.length]];
+        if(tl){const u=Math.abs(((wx/TS)%2+2)%2-1),v=Math.abs(((wy/TS)%2+2)%2-1),o=(((v*31.99)|0)*32+((u*31.99)|0))*4;cr=tl[o];cg=tl[o+1];cb=tl[o+2];const mz=z<12?(12-z)/12*.7:z>40?clamp((z-40)/70,0,.85):0;if(mz>0){const av=TEXAVG[vl[((ix*7+iy*13)>>1)%vl.length]];cr+=(av[0]-cr)*mz;cg+=(av[1]-cg)*mz;cb+=(av[2]-cb)*mz;}}
+        const r=cr*s*TINT[0]*(1-f)+SKYB[0]*f,g=cg*s*TINT[1]*(1-f)+SKYB[1]*f,b=cb*s*TINT[2]*(1-f)+SKYB[2]*f,cc=pack(r,g,b);
         let y0=Math.max(0,ys|0);for(let y=y0;y<ybuf[col];y++)v32[y*VW+col]=cc;ybuf[col]=y0;}
       ytops[col*KMAX+k]=ybuf[col];}
-    zs[k++]=z;z+=Math.max(.9,z*.03);
+    zs[k++]=z;z+=Math.max(.6,z*.022);
   }
   // sprites (trees, ribbons, signs, the finish), far to near, clipped by the terrain in front of them
-  vctx.putImageData(vimg,0,0);c.imageSmoothingEnabled=false;if(BGIMG&&IMG.pine)drawBackdrop();if(N.pl)drawSkyLife();c.drawImage(vcv,0,0,VW*3,VH*3);
+  vctx.putImageData(vimg,0,0);c.imageSmoothingEnabled=false;if(BGIMG&&IMG.pine)drawBackdrop();if(N.pl)drawSkyLife();c.drawImage(vcv,0,0,VW*PXS,VH*PXS);
   const list=[];
   const add=(wx,wy,kind,hgt)=>{const rx0=wx-camx,ry0=wy-camy,zc=rx0*fx+ry0*fy;if(zc<3||zc>ZMAX-8)return;const lat=rx0*rx+ry0*ry,u=lat/(zc*TANH);if(Math.abs(u)>1.15)return;list.push({zc,u,wx,wy,kind,hgt});};
   for(const t of Wd.trees)add(t.x,t.y,0,t.h);
@@ -637,12 +658,14 @@ function navView(){
   for(const r of Wd.ribbons)add(r.x,r.y,1,16);
   for(const d of Wd.decoys)add(d.x,d.y,2,10);
   add((Wd.fin.x+.5)*CS,(Wd.fin.y+.5)*CS,3,24);
-  list.sort((a,b)=>b.zc-a.zc);
-  const rect=(x0,y0,x1,y1,col,clip)=>{y1=Math.min(clip,y1);if(y1<=y0||x1<=x0)return;c.fillStyle=col;c.fillRect(Math.round(x0*3),Math.round(y0*3),Math.max(1,Math.round((x1-x0)*3)),Math.max(1,Math.round((y1-y0)*3)));};
+  if(N.pl&&N.tb){const T_=Wd.tufts;for(let i=0;i<T_.length;i++){const q=T_[i],dx=q.x-camx,dy=q.y-camy;if(dx*dx+dy*dy>5200)continue;const zc=dx*fx+dy*fy;if(zc<3||zc>70)continue;const u=(dx*rx+dy*ry)/(zc*TANH);if(Math.abs(u)>1.12)continue;list.push({zc,u,wx:q.x,wy:q.y,kind:9,hgt:q.h,ti:i});}}
+  list.sort((a,b)=>b.zc-a.zc);NEAR.length=0;
+  const rect=(x0,y0,x1,y1,col,clip)=>{y1=Math.min(clip,y1);if(y1<=y0||x1<=x0)return;c.fillStyle=col;c.fillRect(Math.round(x0*PXS),Math.round(y0*PXS),Math.max(1,Math.round((x1-x0)*PXS)),Math.max(1,Math.round((y1-y0)*PXS)));};
   const fog=(c0,f)=>`rgb(${(c0[0]*(1-f)+SKYB[0]*f)|0},${(c0[1]*(1-f)+SKYB[1]*f)|0},${(c0[2]*(1-f)+SKYB[2]*f)|0})`;
   for(const s of list){
     const sx=(s.u+1)/2*VW,col=clamp(Math.floor(sx),0,VW-1);let lo=0,hi=k-1;while(lo<hi){const m=(lo+hi)>>1;if(zs[m]<s.zc)lo=m+1;else hi=m;}
     const clip=ytops[col*KMAX+Math.max(0,lo-1)],yb=HOR+(camh-(tAt(Wd,s.wx,s.wy)===6?WL:hAt(Wd,s.wx,s.wy)))*SCL/s.zc,hp=s.hgt*SCL/s.zc,f=clamp((s.zc-45*vis)/(240*vis),0,1)*(s.kind===3?(vis<1?.45:.1):1);
+    if(N.pl&&s.zc<9.2&&(s.kind===9||s.kind===5||s.kind===7||s.kind===4||s.kind===6)){NEAR.push([s,sx,yb,hp,clip,f]);continue;}
     if(N.pl&&plSprite(s,sx,yb,hp,clip,f))continue;
     if(s.kind===0){const w=Math.max(1,hp*.42);rect(sx-.5,yb-hp*.22,sx+.5,yb,fog([60,40,24],f),clip);rect(sx-w/2,yb-hp*.6,sx+w/2,yb-hp*.2,fog([22,70,40],f),clip);rect(sx-w*.3,yb-hp,sx+w*.3,yb-hp*.55,fog([30,86,48],f),clip);}
     else if(s.kind===1){rect(sx-.5,yb-hp,sx+.5,yb,fog([90,66,40],f),clip);rect(sx-.5,yb-hp,sx+2.5,yb-hp*.72,fog([255,90,170],f),clip);}
@@ -656,7 +679,7 @@ function navView(){
 }
 function drawRunnerBack(x,y,ph){
   if(PL.run0&&PL.runner_north){const moving=P.speed>1.5,im=moving?(PL['run'+(Math.floor(ph*8)%8)]||PL.run0):PL.runner_north;
-    c.save();c.translate(x,y);c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(0,2,13,3.2,0,0,TAU);c.fill();c.imageSmoothingEnabled=false;c.drawImage(im,-32,-62,64,64);c.restore();return;}
+    c.save();c.translate(x,y);c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(0,2,13,3.2,0,0,TAU);c.fill();const rb=PLB.run0||{y1:62};c.imageSmoothingEnabled=false;c.drawImage(im,-32,-rb.y1+2,64,64);c.restore();return;}
   const run=P.speed>2?Math.min(1,P.speed/18):0,sw=Math.sin(ph*TAU)*run,bob=Math.abs(sw)*1.6;
   c.save();c.translate(x,y-bob);c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(0,bob+1,11,3,0,0,TAU);c.fill();
   const lg=(dx,lift,k)=>{c.fillStyle='#d9a070';c.fillRect(dx,-14+lift*.4,5,13-lift);c.fillStyle='#e8603a';c.fillRect(dx-.5,-2-lift,6,3);};
@@ -711,7 +734,7 @@ function navHud(){
     text(`Effort: ${z.n}`,176,264,z.col,8);
     btn(318,208,56,26,`DRINK x${R_.sips}`,false,drink,R_.sips<=0||P.drinkT>0);btn(378,208,52,26,`GEL x${R_.gels}`,false,gel,R_.gels<=0||P.drinkT>0);btn(318,238,112,26,'OPEN MAP',true,()=>{N.map=true;});
   }else{
-    const py0=VH*3;c.fillStyle='rgba(8,12,10,.92)';c.fillRect(0,py0,W,H-py0);c.strokeStyle='#2a3a30';c.beginPath();c.moveTo(0,py0+.5);c.lineTo(W,py0+.5);c.stroke();
+    const py0=VH*PXS;c.fillStyle='rgba(8,12,10,.92)';c.fillRect(0,py0,W,H-py0);c.strokeStyle='#2a3a30';c.beginPath();c.moveTo(0,py0+.5);c.lineTo(W,py0+.5);c.stroke();
     text('HEART',6,364,'#9fb0a4',6.5);navHeart(44,356,110,10,354,14);text(`${Math.round(P.hr*190)}`,158,365,P.hr>.9?'#ff8a7a':'#e8eee8',7.5);
     bar(44,376,110,8,P.legs/100,P.legs<25?'#e84a3a':'#6ac07a','LEGS',null);bar(44,388,110,8,P.water/100,P.water<25?'#e8a23a':'#5aaaf0','WATER',null);bar(44,400,110,8,P.fuel/100,P.fuel<25?'#e8a23a':'#e8d24a','FUEL',null);
     text(`Effort: ${z.n}`,6,422,z.col,8.5);
@@ -753,7 +776,7 @@ function navMapOverlay(){
   }
 }
 function drawWeatherFx(){
-  const wx=R_.wx,tt=t,vh=VH*3;
+  const wx=R_.wx,tt=t,vh=VH*PXS;
   if(wx==='rain'||wx==='storm'){const st=wx==='storm',n=st?170:110;c.strokeStyle='rgba(190,210,235,.45)';c.lineWidth=1;c.beginPath();for(let i=0;i<n;i++){const x=((i*53.7+tt*(st?90:45)+i*i*.37)%(W+40))-20,y=((i*91.3+tt*(st?640:520))%(vh+30))-15;c.moveTo(x,y);c.lineTo(x-(st?7:3),y+(st?13:11));}c.stroke();
     if(st&&Math.sin(tt*.9+Math.sin(tt*.37)*4)>.985){c.fillStyle='rgba(255,255,255,.35)';c.fillRect(0,0,W,vh);}}
   else if(wx==='fog'){const g=c.createLinearGradient(0,60,0,vh);g.addColorStop(0,'rgba(210,216,220,0)');g.addColorStop(.5,'rgba(210,216,220,.28)');g.addColorStop(1,'rgba(210,216,220,.1)');c.fillStyle=g;c.fillRect(0,0,W,vh);for(let i=0;i<5;i++){c.fillStyle='rgba(235,240,242,.10)';c.fillRect(((i*83+tt*8)%(W+120))-60,150+i*28,120,10);}}
@@ -763,7 +786,7 @@ function drawWeatherFx(){
 }
 function navScene(){
   navView();
-  const N=NAV;drawRunnerBack(W/2,runY(),P.phase);drawWeatherFx();if(NAV.pl)drawAmbient();
+  const N=NAV;drawRunnerBack(W/2,runY(),P.phase);for(const a of NEAR)plSprite(a[0],a[1],a[2],a[3],a[4],a[5]);drawWeatherFx();if(NAV.pl)drawAmbient();
   for(const q of parts){c.globalAlpha=clamp(q.t*2,0,1);c.fillStyle=q.col;c.fillRect(q.x,q.y,q.s,q.s);}c.globalAlpha=1;
   for(const p of popups){c.globalAlpha=clamp(p.t*2,0,1);text(p.s,p.x,p.y-(1.2-p.t)*22,p.col,8,'center');}c.globalAlpha=1;
   if(P.hr>.85||P.legs<20||P.bonk>0){const a=clamp((P.hr-.85)*3+(20-P.legs)/40,0,.55)*(P.bonk>0?1.4:1);const vg=c.createRadialGradient(W/2,120,90,W/2,120,300);vg.addColorStop(0,'rgba(200,30,20,0)');vg.addColorStop(1,`rgba(200,30,20,${a*(.7+.3*Math.sin(t*(4+P.hr*6)))})`);c.fillStyle=vg;c.fillRect(0,0,W,H);}
@@ -772,8 +795,9 @@ function navScene(){
 }
 
 /* ---------- map ---------- */
-const MAPH=780;let mapOff=null;
-const MAPN={base:{x:48,y:736},t_hill:{x:34,y:668},t_long:{x:86,y:614},t_heat:{x:40,y:560},t_rec:{x:92,y:506},pine:{x:200,y:708},lake:{x:212,y:632},canyon:{x:162,y:556},fog:{x:212,y:480},sky:{x:158,y:404},glacier:{x:212,y:328},summit:{x:148,y:240},bear:{x:46,y:420}};
+const MAPH=800;let mapOff=null,prevSc='';
+const STOPY=i=>MAPH-130-i*98,STOPX=i=>i%2?196:74;
+const nextGoal=()=>{const i=RACES.findIndex(r=>entry(r).ok&&medalOf(r.id)<2);return i<0?RACES.length-1:i;};
 function topBar(){
   c.fillStyle='rgba(6,10,8,.88)';c.fillRect(0,0,W,48);
   text('RIDGELINE',8,16,'#e8a23a',12);text(`Day ${save.day}`,W-32,14,'#e8eee8',9,'right');text(`${save.coins} coins`,W-32,28,'#ffd24a',9,'right');
@@ -790,33 +814,53 @@ function wxIcon(k,x,y,s){c.save();c.translate(x,y);const u=s/12;c.scale(u,u);c.l
   else{cloud('#6a7488');c.fillStyle='#ffe44a';c.beginPath();c.moveTo(1,3);c.lineTo(-3,9);c.lineTo(0,8);c.lineTo(-1,13);c.lineTo(4,5);c.lineTo(1,6);c.closePath();c.fill();}
   c.restore();}
 function mapScene(){
-  if(mapOff==null)mapOff=MAPH-H;
+  if(mapOff==null)mapOff=clamp(STOPY(nextGoal())-200,0,MAPH-H);
+  const goal=nextGoal(),pulse=.5+.5*Math.sin(t*3);
   c.save();c.translate(0,-mapOff);
   const g=c.createLinearGradient(0,0,0,MAPH);g.addColorStop(0,'#2a4e60');g.addColorStop(.45,'#1a3a36');g.addColorStop(1,'#0d1210');c.fillStyle=g;c.fillRect(0,0,W,MAPH);
-  for(let k=0;k<5;k++){c.fillStyle=k%2?'#10201a':'#16241e';c.beginPath();c.moveTo(0,MAPH);for(let x=0;x<=W;x+=6)c.lineTo(x,120+k*150-Math.sin(x*.03+k)*24-Math.sin(x*.07+k*2)*10);c.lineTo(W,MAPH);c.fill();}
-  const N=MAPN,Y=n=>n.y-mapOff;c.lineWidth=2;c.setLineDash([4,4]);
-  c.strokeStyle='#7fb0c8';c.beginPath();['base','t_hill','t_long','t_heat','t_rec'].forEach((k,i)=>i?c.lineTo(N[k].x,N[k].y):c.moveTo(N[k].x,N[k].y));c.stroke();
-  c.strokeStyle='#e8d9a8';c.beginPath();['base','pine','lake','canyon','fog','sky','glacier','summit'].forEach((k,i)=>i?c.lineTo(N[k].x,N[k].y):c.moveTo(N[k].x,N[k].y));c.stroke();c.setLineDash([]);
-  TRAIN.forEach(r=>{const n=N[r.id];glow(n.x,n.y,22,'#7fb0c8',.35);c.fillStyle='#14262c';c.beginPath();c.arc(n.x,n.y,11,0,TAU);c.fill();c.strokeStyle='#7fb0c8';c.lineWidth=1.5;c.stroke();
-    text(r.stat==='clm'?'^':r.stat==='end'?'~':r.stat==='heat'?'*':'+',n.x,n.y+4,'#bfe0f0',11,'center');text(r.short,n.x+16,n.y+3,'#bfe0f0',8,'left');
-    HIT.push({x:n.x-18,y:Y(n)-16,w:90,h:32,tap:1,fn:()=>{race=r;scene='brief';sceneT=0;}});});
-  RACES.forEach(r=>{const n=N[r.id],en=entry(r),un=en.ok,m=save.medals[r.id],wk=forecast(r);
-    glow(n.x,n.y,30,m?MEDAL_COL[m]:un?'#e8a23a':'#444',.4);c.fillStyle=un?'#1b2a22':'#161c18';c.beginPath();c.arc(n.x,n.y,16,0,TAU);c.fill();c.strokeStyle=m?MEDAL_COL[m]:un?'#e8a23a':'#555';c.lineWidth=2;c.stroke();
-    text(un?r.km+'k':'lock',n.x,n.y+4,un?'#fff':'#777',10,'center');text(r.name,n.x,n.y-22,un?'#e8eee8':'#8a96a0',7.5,'center');text(`${r.stages} stages`+(m?'  '+m:un?'':'  (entry needed)'),n.x,n.y+28,m?MEDAL_COL[m]:'#9fb0a4',7,'center',500);
-    wxIcon(wk,n.x-24,n.y+40,11);text(WX[wk].n,n.x-14,n.y+43,un?'#bfd6e8':'#7a8a96',6.5,'left',500);
-    HIT.push({x:n.x-40,y:Y(n)-32,w:80,h:84,tap:1,fn:()=>{race=r;scene='brief';sceneT=0;}});});
-  const bn=N.bear;glow(bn.x,bn.y,26,'#e8503a',.35);c.fillStyle='#2a1a14';c.beginPath();c.arc(bn.x,bn.y,14,0,TAU);c.fill();c.strokeStyle='#e8503a';c.lineWidth=1.5;c.stroke();
-  c.fillStyle='#6a4228';c.fillRect(bn.x-6,bn.y-5,12,10);c.fillRect(bn.x-8,bn.y-8,5,5);c.fillRect(bn.x+3,bn.y-8,5,5);c.fillStyle='#a87850';c.fillRect(bn.x-3,bn.y,6,4);
-  text('Bear Den',bn.x,bn.y-20,'#ffb09a',7.5,'center');text(`W${save.bear.w} L${save.bear.l}`,bn.x,bn.y+26,'#9fb0a4',6.5,'center',500);
-  HIT.push({x:bn.x-30,y:Y(bn)-28,w:60,h:56,tap:1,fn:()=>startBear('test')});
-  const b=N.base;glow(b.x,b.y,28,'#ffd27a',.4);c.fillStyle='#3a2a1c';c.fillRect(b.x-12,b.y-8,24,16);c.fillStyle='#6a3a2a';c.beginPath();c.moveTo(b.x-16,b.y-8);c.lineTo(b.x,b.y-22);c.lineTo(b.x+16,b.y-8);c.fill();c.fillStyle='#ffd27a';c.fillRect(b.x-3,b.y-3,6,6);
-  text('HOME BASE',b.x+22,b.y-2,'#ffd27a',8,'left');text('shop, physio, rest',b.x+22,b.y+9,'#9fb0a4',6.5,'left',500);
-  HIT.push({x:b.x-20,y:Y(b)-26,w:130,h:50,tap:1,fn:()=>{scene='base';sceneT=0;}});
+  for(let k=0;k<5;k++){c.fillStyle=k%2?'#10201a':'#16241e';c.beginPath();c.moveTo(0,MAPH);for(let x=0;x<=W;x+=6)c.lineTo(x,130+k*150-Math.sin(x*.03+k)*24-Math.sin(x*.07+k*2)*10);c.lineTo(W,MAPH);c.fill();}
+  // the race road, bottom to top
+  c.strokeStyle='#e8d9a8';c.lineWidth=3;c.setLineDash([6,5]);c.beginPath();c.moveTo(135,MAPH-24);RACES.forEach((r,i)=>c.lineTo(STOPX(i),STOPY(i)));c.stroke();c.setLineDash([]);
+  text('START',135,MAPH-10,'#e8d9a8',8,'center');
+  RACES.forEach((r,i)=>{
+    const x=STOPX(i),y=STOPY(i),en=entry(r),un=en.ok,m=save.medals[r.id],wk=forecast(r),isGoal=i===goal;
+    const cx0=i%2?8:98,cw=166,cy0=y-34;
+    // card
+    c.fillStyle=un?'rgba(12,26,22,.92)':'rgba(14,16,18,.9)';c.fillRect(cx0,cy0,cw,68);
+    c.strokeStyle=m?MEDAL_COL[m]:isGoal?`rgba(255,210,100,${.55+.45*pulse})`:un?'#4a6a5a':'#3a3f44';c.lineWidth=isGoal?2:1.2;c.strokeRect(cx0+.5,cy0+.5,cw-1,67);
+    text(r.name,cx0+8,cy0+14,un?'#f1e8d4':'#8a96a0',8.5);
+    text(`${r.km} km  -  ${r.stages} stage${r.stages>1?'s':''}`,cx0+8,cy0+26,un?'#9fb0a4':'#6a747c',7,'left',500);
+    if(m)text(m.toUpperCase()+' MEDAL',cx0+8,cy0+38,MEDAL_COL[m],7.5);
+    else if(!un){text('LOCKED',cx0+8,cy0+38,'#c8806a',7.5);text('Needs: '+en.short,cx0+8,cy0+47,'#d8a090',6.6,'left',500);}
+    else text(isGoal?'NEXT GOAL':'OPEN',cx0+8,cy0+38,isGoal?'#ffd27a':'#9fd8a0',7.5);
+    wxIcon(wk,cx0+14,cy0+57,11);text(WX[wk].n,cx0+26,cy0+60,un?'#bfd6e8':'#7a8a96',7,'left',500);
+    // stop on the road
+    glow(x,y,26,m?MEDAL_COL[m]:isGoal?'#ffd27a':un?'#e8a23a':'#333',isGoal?.35+.25*pulse:.3);c.fillStyle=un?'#1b2a22':'#161c18';c.beginPath();c.arc(x,y,15,0,TAU);c.fill();c.strokeStyle=m?MEDAL_COL[m]:isGoal?'#ffd27a':un?'#e8a23a':'#555';c.lineWidth=2;c.stroke();
+    text(un?String(i+1):'x',x,y+4,un?'#fff':'#777',11,'center');
+    HIT.push({x:cx0,y:cy0-mapOff,w:cw,h:68,tap:1,fn:()=>{race=r;scene='brief';sceneT=0;}});
+    HIT.push({x:x-20,y:y-20-mapOff,w:40,h:40,tap:1,fn:()=>{race=r;scene='brief';sceneT=0;}});
+  });
   c.restore();
   topBar();
-  c.fillStyle='rgba(6,10,8,.7)';c.fillRect(0,H-18,W,18);text('Drag to scroll. Blue = training, gold = races. Weather changes every day.',W/2,H-6,'#8a9a90',6.2,'center',500);
-  if(save.fatigue>=70)text('You are overreached: rest at base',W/2,H-26,'#ffb08a',7.5,'center');
-  const sh=(H-70)*(H/MAPH),sy=50+(H-70-sh)*(mapOff/(MAPH-H));c.fillStyle='rgba(255,255,255,.25)';c.fillRect(W-3,sy,2,sh);
+  // dock
+  c.fillStyle='rgba(6,10,8,.94)';c.fillRect(0,H-52,W,52);c.strokeStyle='#2a3a30';c.beginPath();c.moveTo(0,H-52.5);c.lineTo(W,H-52.5);c.stroke();
+  btn(8,H-44,124,36,'HOME BASE',true,()=>{scene='base';sceneT=0;});btn(138,H-44,124,36,'TRAINING',false,()=>{scene='train';sceneT=0;});
+  if(save.fatigue>=70)text('You are overreached: rest at base',W/2,H-58,'#ffb08a',7.5,'center');
+  const sh=(H-110)*((H-100)/MAPH),sy=52+(H-110-sh)*(mapOff/(MAPH-H));c.fillStyle='rgba(255,255,255,.22)';c.fillRect(W-3,sy,2,sh);
+}
+function trainScene(){
+  c.fillStyle='#10180f';c.fillRect(0,0,W,H);topBar();
+  text('TRAINING',W/2,70,'#7fb0c8',15,'center');text('Short trails that build your stats. No medals, small coin reward.',W/2,84,'#9fb0a4',7,'center',500);
+  TRAIN.forEach((r,i)=>{const y=96+i*66,lvl=save.stats[r.stat].l;
+    c.fillStyle='#14262c';c.fillRect(10,y,250,60);c.strokeStyle='#7fb0c8';c.lineWidth=1.2;c.strokeRect(10.5,y+.5,249,59);
+    text(r.name,20,y+17,'#e8f4fa',10);text(`${STATN[r.stat]}  Lv ${lvl}${lvl>=5?' (max)':''}`,250,y+17,'#9fd8a0',7.5,'right');
+    wrap(r.blurb,52).slice(0,2).forEach((q,j)=>text(q,20,y+31+j*10,'#b8d0dc',7,'left',500));
+    wxIcon(r.wx||'clear',24,y+50,10);text(WX[r.wx||'clear'].n,36,y+53,'#bfd6e8',6.8,'left',500);
+    HIT.push({x:10,y,w:250,h:60,fn:()=>{race=r;scene='brief';sceneT=0;}});});
+  const y=96+4*66;c.fillStyle='#2a1a14';c.fillRect(10,y,250,50);c.strokeStyle='#e8503a';c.lineWidth=1.2;c.strokeRect(10.5,y+.5,249,49);
+  text('Bear Den',20,y+17,'#ffb09a',10);text(`wins ${save.bear.w}  losses ${save.bear.l}`,250,y+17,'#9fb0a4',7.5,'right');text('Boxing mini-game: dodge the swipe, punch when it is open.',20,y+33,'#d8b8a8',7,'left',500);
+  HIT.push({x:10,y,w:250,h:50,fn:()=>startBear('test')});
+  btn(70,H-44,130,32,'BACK TO MAP',false,()=>{scene='map';});
 }
 function briefScene(){
   mapScene();HIT.length=0;panelBg(.985);const r=race,tr=!!r.train,en=tr?{ok:true}:entry(r),wxk=tr?(r.wx||'clear'):forecast(r),wx=WX[wxk];
@@ -832,7 +876,7 @@ function briefScene(){
     HIT.push({x,y,w:112,h:21,fn:()=>toggleLoad(g)});c.fillStyle=on?'#2a3a1e':'#141c18';c.fillRect(x,y,112,21);c.strokeStyle=on?'#9aff9a':'#3a4a40';c.lineWidth=1;c.strokeRect(x+.5,y+.5,111,20);text(GEAR[g].n,x+56,y+14,on?'#e8ffe0':'#8a9a90',7.5,'center');});
   if(save.owned.length<SHOPIDS.length)text('More gear for sale at Home Base',W/2,392,'#7f9086',7,'center',500);
   text(tr?`Pays 18 coins and ${STATN[r.stat]} experience`:'Bronze: finish. Silver: par time. Gold: par, no bonks.',W/2,406,'#9fb0a4',7,'center',500);
-  btn(60,414,150,30,tr?'START TRAINING':en.ok?'START RACE':'LOCKED',true,()=>beginRace(r),!en.ok);btn(90,450,90,20,'Back',false,()=>{scene='map';});
+  btn(60,414,150,30,tr?'START TRAINING':en.ok?'START RACE':'LOCKED',true,()=>beginRace(r),!en.ok);btn(90,450,90,20,'Back',false,()=>{scene=race.train?'train':'map';});
 }
 const GEAR_N=()=>SHOPIDS.length;
 function baseScene(){
@@ -956,7 +1000,9 @@ function eventScene(){
 function pauseLayer(){panelBg(.85);HIT.length=0;text('Paused',W/2,190,'#e8a23a',16,'center');btn(60,210,150,30,'Resume',true,()=>{paused=false;});btn(60,250,150,26,'Quit run',false,()=>{paused=false;scene='map';});}
 function render(){
   HIT.length=0;c.setTransform(SC,0,0,SC,0,0);c.imageSmoothingEnabled=false;
+  if(scene==='map'&&prevSc!=='map'&&prevSc!=='brief')mapOff=null;prevSc=scene;
   if(scene==='map')mapScene();
+  else if(scene==='train')trainScene();
   else if(scene==='brief')briefScene();
   else if(scene==='base')baseScene();
   else if(scene==='shop')shopScene();
