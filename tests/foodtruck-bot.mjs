@@ -21,14 +21,17 @@ try {
       const F = window.__ft; F.auto(true); let g = 0, maxShift = 0, lv = 0;
       while (g++ < 400000) { F.step(1 / 30); const st = F.state(); if (st.RUN) { maxShift = Math.max(maxShift, st.RUN.shift); lv = st.RUN.lv; } if (st.scene === 'over' || st.scene === 'win') break; }
       const st = F.state(); F.auto(false);
-      return { scene: st.scene, shifts: st.RUN.shift, fed: st.RUN.fed, lv: st.RUN.lv, cash: Math.round(st.RUN.cash), dishes: st.RUN.dishes.map(d => d.k + d.lv + (d.fl.length ? '+' + d.fl.join('+') : '') + (d.recipe ? '[' + d.recipe + ']' : '')).join(' '), relics: st.RUN.relics.join(','), steps: g };
+      return { scene: st.scene, shifts: st.RUN.shift, leg: st.RUN.leg, stops: st.RUN.stops, fuel: Math.round(st.RUN.fuel), insp: Math.round(st.RUN.insp), why: st.S.loseWhy, fed: st.RUN.fed, lv: st.RUN.lv, cash: Math.round(st.RUN.cash), dishes: st.RUN.dishes.map(d => d.k + d.lv + (d.fl.length ? '+' + d.fl.join('+') : '') + (d.recipe ? '[' + d.recipe + ']' : '')).join(' '), relics: st.RUN.relics.join(','), steps: g };
     });
-    console.log(`run ${i + 1}: ${r.scene} after ${r.shifts} shifts, fed ${r.fed}, level ${r.lv}, cash ${r.cash}   menu: ${r.dishes}   relics: ${r.relics}   (${r.steps} steps)`);
+    console.log(`run ${i + 1}: ${r.scene} leg ${r.leg + 1}, ${r.stops} stops, ${r.shifts} shifts, fed ${r.fed}, level ${r.lv}, cash ${r.cash}   menu: ${r.dishes}   relics: ${r.relics}   fuel ${r.fuel} insp ${r.insp} ${r.why || ''}`);
   }
   if (shotDir) {
     const shot = async (name, fn, wait = 400) => { await page.evaluate(fn); await page.waitForTimeout(wait); await page.screenshot({ path: shotDir + '/ft_' + name + '.png' }); };
     await shot('title', () => { const F = window.__ft; F.goto('title'); });
-    await shot('drive', () => { const F = window.__ft; F.newRun(0); F.startDrive(); for (let i = 0; i < 60; i++) { F.setKey('r', 1); F.step(1 / 30); } F.setKey('r', 0); });
+    await shot('trip', () => { const F = window.__ft; F.newRun(0); F.startTrip(); F.auto(true); for (let i = 0; i < 130; i++) F.step(1 / 30); F.auto(false); });
+    await shot('kitchen', () => { const F = window.__ft; const S = F.state(); S.RUN.cash = 80; F.startShift('stadium'); S.RUN.dishes.push({ k: 'pizza', lv: 2, fl: ['spicy'], recipe: '', cd: 0 }); F.stop('kitchen'); });
+    await shot('mechanic', () => { const F = window.__ft; F.state().RUN.cash = 120; F.stop('mechanic'); });
+    await shot('gas', () => { const F = window.__ft; F.stop('gas'); });
     await shot('shift', () => { const F = window.__ft; F.startShift('stadium'); F.auto(true); for (let i = 0; i < 420; i++) F.step(1 / 30); F.auto(false); });
     await shot('levelup', () => { const F = window.__ft; const S = F.state(); S.RUN.xp = 999; F.step(1 / 30); });
     await shot('results', () => { const F = window.__ft; F.pick(0); F.state().S.fedThis = 31; F.state().S.tipsThis = 44; F.goto('shift'); F.state().S.shiftT = 999; F.step(1 / 30); });
