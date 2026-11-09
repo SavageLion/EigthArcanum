@@ -145,6 +145,7 @@ function update(dt){
   if(scene==='bear'){bearStep(dt);return;}
   if(scene==='event'){P.ev.t-=dt;if(P.ev.t<=0)chooseEvent(0);return;}
   if(scene!=='run'&&scene!=='nav')return;
+  if(scene==='nav'&&NAV.brief)return;
   const seg=scene==='nav'?navSeg(dt):segAt(S,P.x),g=seg.g,ter=TERRAIN[seg.t];P.t+=dt;
   const heat=S.heat*(has('hat')?.4:1)*(P.cool>0?.3:1)*(1-.08*lv('heat'));
   let e=P.effort;
@@ -513,8 +514,10 @@ function startNav(){
   NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,seenFin:true,
     stars:th.stars?Array.from({length:45},()=>[rint(0,VW-1),rint(0,HOR-3)]):null};
   bakeNavMap();navReveal(Wd.start.x,Wd.start.y,9);
-  popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;banner(R_.si+1>=race.stages?'Find the FINISH (red gate)':'Find the AID STATION (blue gate)',2.6);beep(520,.12);
+  popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;NAV.brief=true;NAV.map=true;
 }
+// the route briefing is over: the clock starts
+function beginNav(){if(!NAV||!NAV.brief)return;NAV.brief=false;NAV.map=false;banner(R_.si+1>=race.stages?'Find the FINISH (red gate)':'Find the AID STATION (blue gate)',2.6);beep(520,.12);}
 function navReveal(cx,cy,r){const N=NAV,tc=N.tcv.getContext('2d');tc.fillStyle='#c8a468';for(let y=Math.max(0,Math.floor(cy-r));y<Math.min(NN,cy+r);y++)for(let x=Math.max(0,Math.floor(cx-r));x<Math.min(NN,cx+r);x++){const i=y*NN+x;if(N.W.trail[i]&&!N.rev[i]&&Math.hypot(x-cx,y-cy)<r){N.rev[i]=1;tc.fillRect(x,y,1,1);}}}
 function bakeNavMap(){
   const Wd=NAV.W,cv=document.createElement('canvas');cv.width=cv.height=NN;const q=cv.getContext('2d'),im=q.createImageData(NN,NN);
@@ -649,7 +652,7 @@ function navHeart(bx,y,bw,h,ny,nh){const hz=[0,.55,.7,.8,.9,1],hc=['#4a6a8a','#4
   const hx=bx+bw*clamp((P.hr-.3)/.7,0,1);c.fillStyle='#fff';c.fillRect(hx-.5,ny,1.5,nh);}
 function navMapOverlay(){
   const N=NAV,Wd=N.W,mx=PORT?15:10,my=PORT?36:18,sc=240/NN;
-  panelBg(1);text('MAP',mx,PORT?14:13,'#e8a23a',10);text('the clock keeps running while you read it',PORT?mx:mx+40,PORT?28:13,'#ff9a7a',6.5,'left',500);
+  panelBg(1);text('MAP',mx,PORT?14:13,'#e8a23a',10);text(N.brief?`${race.name}  -  stage ${R_.si+1}/${race.stages}: plan your route, then press START`:'the clock keeps running while you read it',PORT?mx:mx+40,PORT?28:13,N.brief?'#9ae8a8':'#ff9a7a',6.5,'left',500);
   c.imageSmoothingEnabled=false;c.drawImage(N.bake,mx,my,NN*sc,NN*sc);c.drawImage(N.tcv,mx,my,NN*sc,NN*sc);
   c.strokeStyle='#3a4a3e';c.lineWidth=1;c.strokeRect(mx+.5,my+.5,NN*sc-1,NN*sc-1);
   const M=(x,y)=>[mx+x*sc,my+y*sc];
@@ -665,7 +668,7 @@ function navMapOverlay(){
   if(PORT){
     legend.forEach((q,i)=>{const col=TPAL[q[0]],X=mx+(i%2)*126,Y=288+Math.floor(i/2)*13;c.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;c.fillRect(X,Y,9,9);text(q[1],X+13,Y+8,'#cfdad2',6.5,'left',500);});
     notes.forEach((q,i)=>text(q,mx,350+i*11,'#9fb0a4',6.5,'left',500));
-    btn(mx,420,240,34,'BACK TO RUNNING',true,()=>{N.map=false;});
+    if(N.brief)btn(mx,420,240,34,R_.si+1>=race.stages?'START RACE':'START STAGE '+(R_.si+1),true,beginNav);else btn(mx,420,240,34,'BACK TO RUNNING',true,()=>{N.map=false;});
   }else{
     const X=264;text('HOW TO READ IT',X,34,'#e8a23a',8.5);
     legend.forEach((q,i)=>{const col=TPAL[q[0]];c.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;c.fillRect(X,42+i*13,9,9);text(q[1],X+14,50+i*13,'#cfdad2',7,'left',500);});
@@ -893,7 +896,7 @@ cvs.addEventListener('pointerdown',e=>{try{cvs.setPointerCapture(e.pointerId);}c
 cvs.addEventListener('pointermove',e=>{const k=drags.get(e.pointerId);if(!k)return;const p=pt(e);if(k==='f')setEffortFromY(p.y);else if(NAV)NAV.steer=steerFromX(p.x);});
 const up=e=>{const k=drags.get(e.pointerId);if(k==='s'&&NAV)NAV.steer=0;drags.delete(e.pointerId);if(fsReq){fsReq=false;toggleFS();}};cvs.addEventListener('pointerup',up);cvs.addEventListener('pointercancel',up);cvs.addEventListener('contextmenu',e=>e.preventDefault());
 addEventListener('keydown',e=>{if(scene==='run'||scene==='nav'){if(e.key==='ArrowUp')P.effort=clamp(P.effort+.06,0,1);if(e.key==='ArrowDown')P.effort=clamp(P.effort-.06,0,1);if(e.key==='d'&&scene==='run')drink();if(e.key==='g')gel();if(e.key==='Escape')paused=!paused;}
-  if(scene==='nav'){if(e.key==='ArrowLeft'||e.key==='a')KEYS.l=1;if(e.key==='ArrowRight'||e.key==='d')KEYS.r=1;if(e.key==='m'||e.key==='Tab'){NAV.map=!NAV.map;e.preventDefault();}if(e.key==='q')drink();}
+  if(scene==='nav'){if(e.key==='ArrowLeft'||e.key==='a')KEYS.l=1;if(e.key==='ArrowRight'||e.key==='d')KEYS.r=1;if((e.key==='m'||e.key==='Tab')&&!NAV.brief){NAV.map=!NAV.map;e.preventDefault();}if((e.key==='Enter'||e.key===' ')&&NAV.brief)beginNav();if(e.key==='q')drink();}
   if(scene==='event'){if(e.key==='1')chooseEvent(0);if(e.key==='2')chooseEvent(1);}
   if(scene==='physio'&&(e.key===' '))press();
   if(scene==='bear'){if(e.key==='ArrowLeft'||e.key==='a')bearDodge(-1);if(e.key==='ArrowRight'||e.key==='d')bearDodge(1);if(e.key===' '||e.key==='j'||e.key==='ArrowUp')bearPunch();}
@@ -906,7 +909,7 @@ const ALL=[...RACES,...TRAIN];
 window.__trail={state:()=>({scene,race,R_,P,S,save,PH,BR,NAV}),start:i=>beginRace(ALL[i]),startRace:i=>beginRace(ALL[i]),setEffort:e=>{if(P)P.effort=clamp(e,0,1);},drink,gel,choose:chooseEvent,draft:i=>draftPick(R_.draft[i]),cont:aidNext,
   step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,train:TRAIN,seg:()=>segAt(S,P.x),open:i=>{race=ALL[i];scene='brief';},reset:()=>{save=DEF();persist();},
   buy,toggle:toggleLoad,buyCap,rest:restDay,treat:(from,k)=>openTreat(from,k),press,leave:leaveTreat,goto:s=>{scene=s;},give:n=>{save.coins+=n;},setSave:o=>{Object.assign(save,o);},
-  navStart:()=>beginRace(NAVRACE),steer:v=>{if(NAV)NAV.bot=v;},nav:()=>NAV,bearStart:from=>startBear(from||'test'),dodge:bearDodge,punch:bearPunch,bearEnd:endBear,bearForce:win=>{if(BR)BR.over=win?'win':'lose';}};
+  navStart:()=>beginRace(NAVRACE),beginNav,steer:v=>{if(NAV)NAV.bot=v;},nav:()=>NAV,bearStart:from=>startBear(from||'test'),dodge:bearDodge,punch:bearPunch,bearEnd:endBear,bearForce:win=>{if(BR)BR.over=win?'win':'lose';}};
 })();
 </script>
 </body>

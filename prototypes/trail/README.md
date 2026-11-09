@@ -26,3 +26,6 @@ A trail-running **management** game for phones, played in portrait. One page, no
 - A tall light beam stands over the gate so it can be seen from far away over hills.
 - You can follow the marked course (ribbons on the cheapest way round the mountain), or cut your own route for a shortcut: terrain and slopes slow you, the lake blocks you, and unmarked trails may lead nowhere.
 - A line under the terrain name says whether you are on the marked course; off course it shows how far the ribbons are and a pink dot on the compass points to them.
+
+## Route briefing
+Every stage opens on the map with the clock stopped. Study the gate (green dot), the pink marked course, the terrain legend and your start, then press START (or Enter / space). During the run the map is still available but the clock keeps running while it is open.

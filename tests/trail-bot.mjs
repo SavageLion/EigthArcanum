@@ -49,7 +49,7 @@ try {
     window.__navBot = mode => {
       T.reset(); T.navStart(); let g = 0, idx = 0, slow = 0, rnd = 0; const nrm = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
       while (['nav', 'event', 'bear', 'aid'].includes(T.state().scene) && g++ < 120000) { const sc0 = T.state().scene; if (sc0 === 'event') { T.choose(1); continue; } if (sc0 === 'bear') { window.__bear(.3, .9); T.bearEnd(); continue; } if (sc0 === 'aid') { T.cont(); continue; }
-        const n = T.nav(), st = T.state(), P = st.P, W_ = n.W; let tx, ty;
+        const n = T.nav(), st = T.state(), P = st.P, W_ = n.W; if (n.brief) T.beginNav(); let tx, ty;
         if (mode === 'trail') { while (idx < W_.pts.length - 1 && Math.hypot(W_.pts[idx].x - n.px, W_.pts[idx].y - n.py) < 18) idx++; const q = W_.pts[Math.min(idx + 2, W_.pts.length - 1)]; tx = q.x; ty = q.y; }
         else { tx = (W_.fin.x + .5) * 8; ty = (W_.fin.y + .5) * 8; }
         let steer = Math.max(-1, Math.min(1, nrm(Math.atan2(ty - n.py, tx - n.px) - n.hd) * 3));
@@ -63,7 +63,7 @@ try {
     };
     const nrm = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
     window.__ctl = fixed => {
-      const n = T.nav(), st = T.state(), P = st.P, W_ = n.W; n.__idx = n.__idx || 0;
+      const n = T.nav(), st = T.state(), P = st.P, W_ = n.W; if (n.brief) T.beginNav(); n.__idx = n.__idx || 0;
       while (n.__idx < W_.pts.length - 1 && Math.hypot(W_.pts[n.__idx].x - n.px, W_.pts[n.__idx].y - n.py) < 18) n.__idx++;
       const q = W_.pts[Math.min(n.__idx + 2, W_.pts.length - 1)];
       T.steer(Math.max(-1, Math.min(1, nrm(Math.atan2(q.y - n.py, q.x - n.px) - n.hd) * 3)));
