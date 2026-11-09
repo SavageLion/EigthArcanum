@@ -68,12 +68,14 @@ try {
     console.log('points', JSON.stringify(f.pts), 'money', f.money);
   }
   if (shotDir) {
-    const shot = async (name, fn) => { await page.evaluate(fn); await page.waitForTimeout(500); await page.screenshot({ path: shotDir + '/tm_' + name + '.png' }); };
+    const shot = async (name, fn, wait = 500) => { await page.evaluate(fn); await page.waitForTimeout(wait); await page.screenshot({ path: shotDir + '/tm_' + name + '.png' }); };
     await shot('home', () => { const T = window.__trail; T.reset(); T.goto('home'); });
     await shot('team', () => { const T = window.__trail; T.reset(); T.tm.new(); T.tm.week(); T.goto('team'); });
     await shot('plan', () => { const T = window.__trail; T.goto('tplan'); });
-    await shot('race', () => { const T = window.__trail; T.tm.start(); T.tm.speed(4); for (let i = 0; i < 160; i++) T.step(1 / 30); });
-    await shot('race2', () => { const T = window.__trail; T.tm.sel(1); T.tm.surge(T.tm.tr().mine[1]); for (let i = 0; i < 260; i++) T.step(1 / 30); });
+    await shot('race', () => { const T = window.__trail; T.tm.start(); T.tm.speed(4); }, 6000);
+    await shot('race3', () => { const T = window.__trail; T.tm.g3().mode = 'all'; }, 1500);
+    await shot('trail', () => { const T = window.__trail; T.tm.view('trail'); for (let i = 0; i < 30; i++) T.step(1 / 30); });
+    await shot('race2', () => { const T = window.__trail; T.tm.g3().mode = 'sel'; T.tm.sel(1); T.tm.surge(T.tm.tr().mine[1]); }, 5000);
     await shot('res', () => { const T = window.__trail; T.tm.finish(); });
     await shot('shop', () => { const T = window.__trail; T.goto('tshop'); });
     await shot('recruit', () => { const T = window.__trail; T.tm.get().money = 800; T.goto('team'); T.step(.1); });
