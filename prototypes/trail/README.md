@@ -108,3 +108,12 @@ In a run, a leg is no longer a slider-and-steering race. Each leg is split into 
 - **Perks** still change the physics underneath, and some pair with cards (Metronome with Steady, Mountain goat with climbs).
 - A hand of cards plus a time bank turns pacing into decisions: spend legs now for time, or save them for the climb you can see coming. Each card shows its effect on speed, heart rate and legs.
 - `tests/trail-run-bot.mjs --pol steady|smart`: a bot that only plays Steady fails every run; a simple rule-based bot (hills, descents, recovery, kick) summits about 3 in 4.
+
+## Trail Team Manager
+Home screen: **TEAM MANAGER** (or **NEW TEAM CAREER**). You run a team of three runners through a 7-race season against four rival teams (12 rivals on the roster), with the season's money, training and injuries carrying across races. The Roguelike Run and Classic Season are still on the home screen.
+
+- **Between races (weekly):** set each runner's training focus (Power, Endurance, Climbing, Heat, Recovery, or Rest) and press NEXT WEEK. Training adds xp but also fatigue; resting clears fatigue and speeds up injury recovery. Staff and gear in STAFF & GEAR (Coach: more xp; Physio: faster healing and fewer injuries; Nutritionist: more drinks and gels). RECRUIT replaces a runner with a scouted one.
+- **Race plan:** the forecast and the course profile are shown. Each runner has four phase stances (Easy / Steady / Tempo / Attack) for the four quarters of the race, two gear slots, and an entry tick (rest them if they are tired or injured). A solo prediction shows estimated time, legs at the finish and a bonk warning, so the plan is a real optimisation: leave legs unused and you lose time, overspend and you bonk.
+- **Live race:** every runner (yours and the rivals) is simulated with the same physics as the single-runner game, at 1x to 8x. The Trail View camera follows whichever of your runners you select; the profile strip shows all runners; you can change a runner's stance, SURGE (8 s, 30 s cooldown), DRINK or GEL at any moment. There are two aid stations (legs, water and fuel top-up).
+- **Scoring:** each runner earns prize money by place; the team score is the sum of the best two places per team (lowest wins, like cross-country). Team points build the season standings, with a championship bonus.
+- `tests/trail-team-bot.mjs [seasons] --pol naive|opt`: a bot that only uses the default plan finishes 3rd to 5th among teams; one that searches the plan with the predictor, trains and buys staff wins the season.
