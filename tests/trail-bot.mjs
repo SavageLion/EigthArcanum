@@ -16,7 +16,7 @@ const port = srv.address().port;
 const browser = await chromium.launch({ channel: 'chrome' }), errs = new Set();
 const NAMES = ['Pine', 'Canyon', 'Sky', 'Summit', 'Hills', 'Long', 'Heat', 'Recovery'];
 try {
-  const page = await browser.newPage({ viewport: { width: 844, height: 390 } });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.setDefaultTimeout(0);
   page.on('pageerror', e => errs.add('pageerror: ' + e.message)); page.on('console', m => { if (m.type() === 'error') errs.add('console: ' + m.text().slice(0, 160)); });
   await page.goto(`http://localhost:${port}/`); await page.waitForTimeout(800);
@@ -61,6 +61,15 @@ try {
       }
       const st = T.state(); return { sc: st.scene, medal: st.R_.res && st.R_.res.medal, total: Math.round(st.R_.total), why: st.R_.why, dist: Math.round(st.NAV ? st.NAV.dist : 0) };
     };
+    const nrm = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+    window.__ctl = fixed => {
+      const n = T.nav(), st = T.state(), P = st.P, W_ = n.W; n.__idx = n.__idx || 0;
+      while (n.__idx < W_.pts.length - 1 && Math.hypot(W_.pts[n.__idx].x - n.px, W_.pts[n.__idx].y - n.py) < 18) n.__idx++;
+      const q = W_.pts[Math.min(n.__idx + 2, W_.pts.length - 1)];
+      T.steer(Math.max(-1, Math.min(1, nrm(Math.atan2(q.y - n.py, q.x - n.px) - n.hd) * 3)));
+      if (fixed != null) T.setEffort(fixed); else T.setEffort(T.sweet(n.seg.g, st.S.heat) + (.74 - P.hr) * 1.3);
+      if (P.water < 45) T.drink(); if (P.fuel < 45) T.gel();
+    };
     window.__run = (idx, fixed, acc) => {
       T.start(idx); let guard = 0, treated = 0;
       while (guard++ < 400000) {
@@ -72,11 +81,7 @@ try {
         }
         if (sc === 'bear') { window.__bear(.3, .9); T.bearEnd(); continue; }
         if (sc === 'event') { T.choose(st.P.ev.k === 'bear' ? (Math.random() < .5 ? 0 : 1) : Math.random() < .35 ? 1 : 0); continue; }
-        if (sc === 'run') {
-          const P = st.P, g = T.seg().g;
-          if (fixed != null) T.setEffort(fixed); else T.setEffort(T.sweet(g, st.S.heat) + (.74 - P.hr) * 1.3);
-          if (P.water < 45) T.drink(); if (P.fuel < 45) T.gel();
-        }
+        if (sc === 'nav') window.__ctl(fixed);
         T.step(1 / 30);
       }
       const st = T.state();
@@ -139,9 +144,9 @@ try {
     await shot('shop', () => window.__trail.goto('shop'));
     await shot('pick', () => { const T = window.__trail; T.goto('base'); T.state(); T.goto('physio'); });
     await shot('brief', () => { window.__trail.open(1); });
-    await shot('run', () => { const T = window.__trail; T.start(1); for (let i = 0; i < 400; i++) { T.setEffort(.5); T.step(1 / 30); } });
+    await shot('run', () => { const T = window.__trail; T.start(0); for (let i = 0; i < 300; i++) { window.__ctl(.5); if (T.state().scene === 'event') T.choose(0); T.step(1 / 30); } });
     await shot('physio', () => { const T = window.__trail; T.goto('base'); T.treat('base', 'knee'); T.step(.4); });
-    await shot('aid', () => { const T = window.__trail; T.start(1); T.setEffort(.8); let g = 0; while (T.state().scene !== 'aid' && g++ < 90000) { const st = T.state(); if (st.scene === 'event') T.choose(0); else { if (st.P.water < 40) T.drink(); T.step(1 / 30); } } });
+    await shot('aid', () => { const T = window.__trail; T.start(1); let g = 0; while (T.state().scene !== 'aid' && g++ < 90000) { const st = T.state(); if (st.scene === 'event') T.choose(0); else if (st.scene === 'bear') { window.__bear(.3, .9); T.bearEnd(); } else { window.__ctl(); T.step(1 / 30); } } });
     await shot('bear', () => { const T = window.__trail; T.reset(); T.bearStart('test'); for (let i = 0; i < 110; i++) T.step(1 / 60); });
     await shot('nav', () => { const T = window.__trail; T.reset(); T.navStart(); for (let i = 0; i < 240; i++) { const n = T.nav(), P = T.state().P; T.setEffort(.5); T.steer(Math.sin(i / 40) * .3); T.step(1 / 30); } });
     await shot('navmap', () => { window.__trail.nav().map = true; window.__trail.step(.1); });
