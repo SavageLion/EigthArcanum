@@ -1,31 +1,21 @@
-# Hot & Hangry: a food truck roguelike (prototype)
+# Hot & Hangry
 
-Forced landscape phone game (a portrait phone rotates the screen automatically). One self-contained file, `index.html`, plus a few sprites.
+Forced-landscape phone food-truck roguelike. Single file (`index.html`), canvas, Pixel Lab art.
 
-Run it: `node prototypes/foodtruck/serve.mjs` then open http://localhost:8081 (add a port number to change it). On a phone on the same Wi-Fi use your PC's address instead of localhost. Desktop: WASD or arrows to drive, Enter to start, 1-3 to pick upgrades, P to pause.
+## The run
+Three legs (Town, Downtown, Golden Spatula). Each leg is a **free-roam city**:
 
-## The run: a road trip to the Golden Spatula Cook-off
-Three legs (Town, Highway, Coast). Each leg is a long scrolling road with traffic; the leg ends in a **cook-off** shift against a boss (the Local Blogger, the Celebrity Chef, the Food Critic). Win the last one to win the run.
+- **Drive** (left thumb = virtual joystick; WASD/arrows on desktop). Petrol is limited.
+- **Park** inside a coloured lot for ~0.7 s to enter it:
+  - **Lunch Rush** (x4 venues) - the shift. Serve 3 per leg to unlock the cook-off.
+  - **Kitchen** - fuse two dishes into a new one ($20).
+  - **Mechanic** - car upgrades (engine, tyres, armour, window, vent, tank).
+  - **Gas** - refuel (price drops with a good rating).
+  - **Cook-off** - boss shift that wins the leg.
+- **Food Police**: heat (WANTED stars) rises from shifts, kitchen fires, bad reviews and crashes. Cops chase, ram you and try to box you in (bust meter fills -> run over). Your truck auto-fires food at nearby cops; lose them by getting >500 px away for 6 s. Parking in a lot clears them.
 
-- **Driving:** drag up and down to change lane through the traffic, left and right to slow down or speed up. Crashes cost health and slow you; crates on the road give a free flavour for the next shift.
-- **Petrol** is limited. Driving burns it (faster burns more), every stop costs a little, and running out strands you (a tow costs $40, or the run ends). Gas stations sell more, cheaper if your reviews are good.
-- **Exits:** every so often the road offers a fork with an exit up and an exit down, with signs saying what is there. Steer onto a ramp to take it. Skip both and nothing happens, but you miss the stop.
-- **Stops:**
-  - **Lunch rush:** the shift (below), at a venue with its own rules.
-  - **Kitchen:** fuse two of your dishes into one new fusion dish (it frees a menu slot), or pay for a master class to level a dish.
-  - **Mechanic:** car upgrades: engine, fuel-saver tyres, armour, a second window (+1 projectile), a bigger vent (less kitchen heat and inspection), a bigger tank, plus repairs.
-  - **Gas station:** buy petrol.
-- **Reviews:** after every shift you get a star review from how many customers you fed, your damage and kitchen fires, with a written quip. The average rating changes your tips, petrol price and inspection.
-- **The health inspector:** an inspection meter rises from kitchen fires, every shift, and bad reviews (it falls with good reviews and a bigger vent). At 100% the inspector's van appears behind you and gains on you; your dishes fire backwards to slow it (frozen and greasy food slow it more), and taking any exit loses it. If it catches you the truck is shut down and the run is over.
+## The shift (window view)
+Inside the truck, looking out of the serving window. Customers march up the street; if they reach the counter they chew on the truck. **Touch the street to aim** the food cannon (auto-aims at the closest customer when you let go). Dishes auto-fire; level-ups give new dishes, flavours, recipes (dish lv3 + flavour). Spicy overheats the kitchen. Karens throw complaints that you can shoot down.
 
-## The shift
-Your truck drives around the lot (drag the left side) and fires food out of its window at the nearest customers. Feed customers to earn tips and experience; angry customers pound on the truck and Karens throw complaints. Level up for a choice of three: a new dish, a dish level, a flavour or a perk. After each shift: a shop, a repair and one of three relics.
-
-## Build
-- **Dishes** (up to 4): Burger, Hot Dog (pierces), Taco (shotgun), Pizza (boomerang), Ice Cream (lobbed splash), and fusions made in the kitchen.
-- **Flavours** (up to 2 per dish): Spicy (burns and spreads, but heats your own kitchen: too much and the truck catches fire), Frozen, Sour, Sweet, Greasy.
-- **Recipes:** a dish at level 3 with a flavour becomes a named recipe (Inferno Burger leaves fire puddles, Fire Taco ignites neighbours, Frosty Taco freezes, Pickle Dog pierces further, Dessert Pizza drops tips, Double Smash bounces).
-- **Trucks:** Rusty Red (tougher, starts with burgers) and Teal Taco (faster, starts with tacos).
-
-## Testing
-`node tests/foodtruck-bot.mjs [runs] [--shots dir]` plays whole runs with an autoplay bot in a landscape viewport (it drives the road, picks exits and uses the stops), checks that a portrait phone rotates the game, and reports page errors.
+## Test
+`node tests/foodtruck-bot.mjs [runs] --shots dir` (Playwright bot, landscape + portrait rotation check). Serve with `node prototypes/foodtruck/serve.mjs` (port 8081).
