@@ -29,3 +29,6 @@ A trail-running **management** game for phones, played in portrait. One page, no
 
 ## Route briefing
 Every stage opens on the map with the clock stopped. Study the gate (green dot), the pink marked course, the terrain legend and your start, then press START (or Enter / space). During the run the map is still available but the clock keeps running while it is open.
+
+## Elevation graph
+A profile of the marked course sits under the compass: ticks are trail events still ahead, the coloured bar at the right is the gate (blue aid station, red finish), the white dot is your position along the course (dimmer when you are off it), and the caption gives the course's total climb. Drink and gel buttons work during runs.

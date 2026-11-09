@@ -229,8 +229,8 @@ function openEvent(ev){P.ev={k:ev.k,t:6,max:6};scene='event';sceneT=0;beep(660,.
 function chooseEvent(i){if(scene!=='event')return;const d=EVENTS[P.ev.k];scene='nav';P.ev=null;(i?d.b:d.a).fn();beep(i?520:440,.08,'triangle');}
 
 /* ---------- actions ---------- */
-function drink(){if(scene!=='run'||R_.sips<=0||P.drinkT>0)return;R_.sips--;P.water=Math.min(100,P.water+38);P.drinkT=1.3;beep(700,.1,'sine');pop('+water',RX,110,'#9ad8ff');}
-function gel(){if(scene!=='run'||R_.gels<=0||P.drinkT>0)return;R_.gels--;P.fuel=Math.min(100,P.fuel+42);P.legs=Math.min(100,P.legs+8);P.drinkT=1.1;beep(800,.1,'sine');pop('+fuel',RX,110,'#ffe08a');}
+function drink(){if((scene!=='run'&&scene!=='nav')||R_.sips<=0||P.drinkT>0)return;R_.sips--;P.water=Math.min(100,P.water+38);P.drinkT=1.3;beep(700,.1,'sine');pop('+water',RX,110,'#9ad8ff');}
+function gel(){if((scene!=='run'&&scene!=='nav')||R_.gels<=0||P.drinkT>0)return;R_.gels--;P.fuel=Math.min(100,P.fuel+42);P.legs=Math.min(100,P.legs+8);P.drinkT=1.1;beep(800,.1,'sine');pop('+fuel',RX,110,'#ffe08a');}
 
 // injuries are rolled at the end of every stage from how hard you ran it
 function rollInjuries(){
@@ -603,7 +603,7 @@ function drawRunnerBack(x,y,ph){
 const navFinishName=()=>R_.si+1>=race.stages?'FINISH':'AID STATION';
 // the search circle shrinks and drifts onto the real gate as you close in
 function navRing(){const N=NAV,Wd=N.W,d=Math.hypot(N.px/CS-Wd.fin.x,N.py/CS-Wd.fin.y),k=clamp((d-10)/55,0,1);return {x:Wd.fin.x+(Wd.ring.x-Wd.fin.x)*k,y:Wd.fin.y+(Wd.ring.y-Wd.fin.y)*k,r:6+13*k};}
-function navCourse(){const N=NAV,pts=N.W.pts;let best=1e9,bi=0;for(let i=0;i<pts.length;i+=2){const d=Math.hypot(pts[i].x-N.px,pts[i].y-N.py);if(d<best){best=d;bi=i;}}return {d:best,p:pts[bi]};}
+function navCourse(){const N=NAV,pts=N.W.pts;let best=1e9,bi=0;for(let i=0;i<pts.length;i+=2){const d=Math.hypot(pts[i].x-N.px,pts[i].y-N.py);if(d<best){best=d;bi=i;}}return {d:best,p:pts[bi],i:bi};}
 function navHud(){
   const N=NAV,pr=PORT;
   c.fillStyle='rgba(8,12,10,.6)';c.fillRect(0,0,W,pr?48:26);
@@ -619,13 +619,22 @@ function navHud(){
   if(co.d>=22){const rel=relB(brg(co.p.x,co.p.y));if(Math.abs(rel)<=lim)text('.',cx+rel*pxs,cy+16,'#ff7ac0',14,'center');}
   const tx=pr?W-56:W-76,sim=(R_.total+P.t)*simTS();text(fmtT(sim),tx,12,'#fff',10,'right');text(`cutoff ${fmtT(S.cut*simTS())}`,tx,22,P.t>S.cut*.85?'#ff8a7a':'#9fb0a4',6.5,'right');
   HIT.push({x:tx+4,y:2,w:20,h:20,fn:()=>{paused=true;}});c.fillStyle='rgba(8,12,10,.7)';c.fillRect(tx+6,3,18,18);text('II',tx+15,16,'#cfdad2',9,'center');
-  const sg=N.seg,fT=(TERRAIN[sg.t]||{f:1}).f,ty=pr?66:40;
+  if(pr){
+    if(!N.prof){const pts=N.W.pts,el=[];let asc=0,prev=null;for(let k=0;k<=64;k++){const q=pts[Math.min(pts.length-1,Math.round(k/64*(pts.length-1)))],h=hAt(N.W,q.x,q.y);el.push(h);if(prev!=null&&h>prev)asc+=h-prev;prev=h;}N.prof={el,asc,mn:Math.min(...el),mx:Math.max(...el)};}
+    const pf=N.prof,px0=8,pw=W-16,py0=56,ph=22;c.fillStyle='rgba(8,12,10,.6)';c.fillRect(px0-2,py0-3,pw+4,ph+17);
+    c.beginPath();c.moveTo(px0,py0+ph);pf.el.forEach((h,k)=>c.lineTo(px0+pw*k/64,py0+ph-(h-pf.mn)/(pf.mx-pf.mn||1)*ph));c.lineTo(px0+pw,py0+ph);c.fillStyle='rgba(120,160,120,.55)';c.fill();
+    for(const ev of S.evs){if(ev.done)continue;c.fillStyle='#ffd24a';c.fillRect(px0+pw*clamp(ev.x/N.len,0,1)-.5,py0,1.5,ph);}
+    c.fillStyle=R_.si+1>=race.stages?'#ff6a5a':'#5aaaf0';c.fillRect(px0+pw-2,py0-2,2.5,ph+2);
+    const fr=co.i/(N.W.pts.length-1),yy=py0+ph-(pf.el[Math.round(fr*64)]-pf.mn)/(pf.mx-pf.mn||1)*ph;c.fillStyle=co.d<22?'#fff':'rgba(255,255,255,.5)';c.beginPath();c.arc(px0+pw*fr,yy,2.8,0,TAU);c.fill();
+    text('Marked course: +'+Math.round(pf.asc*sm)+' m climb'+(co.d<22?'':'  (you are off course)'),W/2,py0+ph+11,'#9fb0a4',6.5,'center',500);
+  }
+  const sg=N.seg,fT=(TERRAIN[sg.t]||{f:1}).f,ty=pr?100:40;
   text(`${TNAME[N.ter]}  ${Math.round((N.ter===7?1:fT)*100)}%`+(sg.g>.03?`   ${Math.round(sg.g*100)}% climb`:sg.g<-.03?`   ${Math.round(-sg.g*100)}% descent`:''),W/2,ty,'#fff',8,'center');
   let st=[];if(P.cramp>0)st.push('CRAMP');if(P.bonk>0)st.push('BONK');if(P.hike>0)st.push('hiking');if(P.stop>0&&P.drinkT<=0&&!N.map)st.push('stopped');text(st.join('  '),W/2,ty+11,'#ffb08a',8,'center');
   if(save.inj.length)text('Carrying: '+save.inj.map(i=>INJ[i.k].n).join(', '),W/2,ty+21,'#e8a07a',6.5,'center',500);
   if(seen)text(`${navFinishName()}  ${Math.round(Math.hypot(fgx-N.px,fgy-N.py)*sm)} m`,W/2,ty+34,'#7aff9a',9,'center');
   text(co.d<22?'On the marked course':`Off course  -  ribbons ${Math.round(co.d*sm)} m away (pink dot)`,W/2,ty+(seen?46:34),co.d<22?'#9fd8a0':'#ffb08a',6.8,'center',500);
-  if(msgT>0){c.globalAlpha=clamp(msgT*2,0,1);text(msg,W/2,pr?120:92,'#fff',14,'center');c.globalAlpha=1;}
+  if(msgT>0){c.globalAlpha=clamp(msgT*2,0,1);text(msg,W/2,pr?170:92,'#fff',14,'center');c.globalAlpha=1;}
   const z=ZONES.find(zz=>P.effort<=zz.max);
   if(!pr){
     c.fillStyle='rgba(8,12,10,.82)';c.fillRect(0,202,FX-6,H-202);c.strokeStyle='#2a3a30';c.beginPath();c.moveTo(0,202.5);c.lineTo(FX-6,202.5);c.stroke();
