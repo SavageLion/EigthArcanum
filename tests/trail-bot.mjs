@@ -14,7 +14,7 @@ const MIME = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg' }
 const srv = http.createServer((q, s) => { const p = q.url.split('?')[0], f = path.join(root, p === '/' ? 'index.html' : p.split('..').join('')); try { s.setHeader('Content-Type', MIME[path.extname(f)] || 'text/plain'); s.end(fs.readFileSync(f)); } catch (e) { s.statusCode = 404; s.end(); } }).listen(0);
 const port = srv.address().port;
 const browser = await chromium.launch({ channel: 'chrome' }), errs = new Set();
-const NAMES = ['Pine', 'Canyon', 'Sky', 'Summit', 'Hills', 'Long', 'Heat', 'Recovery'];
+const NAMES = ['Pine', 'Lakeside', 'Canyon', 'Fogbank', 'Skyline', 'Glacier', 'Summit', 'Hills', 'Long', 'Heat', 'Recovery'];
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.setDefaultTimeout(0);
@@ -89,7 +89,7 @@ try {
     };
   });
   if (!SEASON) {
-    for (let ri = 0; ri < 8; ri++) {
+    for (let ri = 0; ri < 11; ri++) {
       const res = [];
       for (let k = 0; k < RUNS; k++) res.push(await page.evaluate(([ri, fixed]) => { window.__trail.reset(); return window.__run(ri, fixed, .8); }, [ri, fixed]));
       console.log(NAMES[ri].padEnd(9), res.map(r => r.sc === 'result' ? `${r.medal || 'ok'}(${r.total}s,${r.bonks}b,${r.inj}inj,${r.treated}tx)` : `DNF:${r.why}`).join('  '));
@@ -101,7 +101,7 @@ try {
         const PRICE = { shoes: 60, flask: 30, sleeves: 60, watch: 70, roller: 55, poles: 80, gels: 30, buff: 45, tape: 25, hat: 30 };
         const WANT = ['shoes', 'flask', 'sleeves', 'watch', 'roller', 'poles', 'gels', 'buff', 'tape'];
         for (let step = 0; step < 120; step++) {
-          let sv = St(); if (sv.medals.summit === 'silver' || sv.medals.summit === 'gold') { out.push(`day ${sv.day}: SUMMIT cleared (${sv.medals.summit})`); break; }
+          let sv = St(); if (['silver', 'gold'].includes(sv.medals.summit)) { out.push(`day ${sv.day}: SUMMIT cleared (${sv.medals.summit})`); break; }
           for (const id of WANT) { sv = St(); if (!sv.owned.includes(id) && sv.coins >= PRICE[id] + 20) { if (sv.load.length >= sv.cap && sv.cap < 5 && sv.coins >= [60, 110, 180][sv.cap - 2] + PRICE[id] + 20) T.buyCap(); T.buy(id); } }
           sv = St();
           const pref = ['shoes', 'watch', 'sleeves', 'poles', 'flask', 'roller', 'hat', 'buff', 'gels', 'tape'];
@@ -113,12 +113,13 @@ try {
             T.rest(); if (St().day > 300) break; continue;
           }
           const lvs = sv.stats, tot = lvs.end.l + lvs.clm.l + lvs.heat.l + lvs.rec.l;
-          const nextRace = ['pine', 'canyon', 'sky', 'summit'].findIndex(id => !['silver', 'gold'].includes(sv.medals[id]));
-          const need = [0, 3, 6, 9][nextRace];
-          let idx; if (nextRace >= 0 && tot >= need) idx = nextRace; else { const ks = ['clm', 'end', 'heat', 'rec']; const k = ks.reduce((a, b) => lvs[a].l <= lvs[b].l ? a : b); idx = 4 + ks.indexOf(k); }
+          const RIDS = ['pine', 'lake', 'canyon', 'fog', 'sky', 'glacier', 'summit'];
+          const nextRace = RIDS.findIndex((id, i) => T.entry(i) && !['silver', 'gold'].includes(sv.medals[id]));
+          const need = [0, 1, 3, 4, 6, 8, 10][nextRace];
+          let idx; if (nextRace >= 0 && tot >= need) idx = nextRace; else { const ks = ['clm', 'end', 'heat', 'rec']; const k = ks.reduce((a, b) => lvs[a].l <= lvs[b].l ? a : b); idx = 7 + ks.indexOf(k); }
           const r = window.__run(idx, null, .8);
           sv = St();
-          out.push(`day ${sv.day} ${['Pine', 'Canyon', 'Sky', 'Summit', 'Hills', 'Long', 'Heat', 'Recov'][idx]}: ${r.sc === 'result' ? (r.medal || 'ok') : 'DNF ' + r.why} coins=${sv.coins} fat=${Math.round(sv.fatigue)} stats=${lvs.end.l}${lvs.clm.l}${lvs.heat.l}${lvs.rec.l} inj=${sv.inj.map(i => i.k + i.s).join(',')}`);
+          out.push(`day ${sv.day} ${['Pine', 'Lakeside', 'Canyon', 'Fogbank', 'Skyline', 'Glacier', 'Summit', 'Hills', 'Long', 'Heat', 'Recov'][idx]}: ${r.sc === 'result' ? (r.medal || 'ok') : 'DNF ' + r.why} coins=${sv.coins} fat=${Math.round(sv.fatigue)} stats=${lvs.end.l}${lvs.clm.l}${lvs.heat.l}${lvs.rec.l} inj=${sv.inj.map(i => i.k + i.s).join(',')}`);
         }
         return out;
       });
