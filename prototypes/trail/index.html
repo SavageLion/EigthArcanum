@@ -46,7 +46,7 @@ const MEDAL_COL={bronze:'#c98a4a',silver:'#cfd6e0',gold:'#ffd24a'};
 
 /* ---------- races and training trails ---------- */
 const RACES=[
-  {id:'pine',name:'Pine Ridge 5K',km:5,stages:2,theme:'dawn',tier:0,seed:11,climate:['clear','clear','fog','rain'],world:{peak:75,noise:42,edge:true,decor:1200,tufts:5000,tuftsNear:90,trailW:0,lake:true,lakeR:7,river:true,biome:{rock:75,loose:58,mud:.64,brush:.6}},bear:[],blurb:'Cool morning, gentle hills and a quiet lake. A friendly first race to learn pacing.'},
+  {id:'pine',name:'Pine Ridge 5K',km:5,stages:2,theme:'dawn',tier:0,seed:11,climate:['clear','clear','fog','rain'],world:{peak:75,noise:42,edge:true,shadows:true,decor:1200,tufts:5000,tuftsNear:90,trailW:0,lake:true,lakeR:7,river:true,biome:{rock:75,loose:58,mud:.64,brush:.6}},bear:[],blurb:'Cool morning, gentle hills and a quiet lake. A friendly first race to learn pacing.'},
   {id:'lake',name:'Lakeside 10K',km:10,stages:3,theme:'noon',tier:0,seed:23,climate:['clear','wind','clear','rain'],world:{peak:34,noise:22,lake:true,lakeR:15,river:false,biome:{rock:80,loose:62,mud:.55,brush:.62}},bear:[],blurb:'A huge flat lake, fast meadows and open ground. The wind decides your day.'},
   {id:'canyon',name:'Canyon Loop 15K',km:15,stages:3,theme:'noon',tier:1,seed:37,climate:['hot','hot','clear','wind'],world:{peak:80,noise:60,lake:false,river:true,trees:.25,biome:{rock:34,loose:26,mud:.72,brush:.7}},bear:[1],blurb:'Red rock and scree, almost no shade. Heat bites and there may be a bear in the rocks.'},
   {id:'fog',name:'Fogbank 21K',km:21,stages:4,theme:'dawn',tier:1,seed:41,climate:['fog','fog','rain','cold'],world:{peak:50,noise:46,lake:true,lakeR:9,river:true,trees:1.5,biome:{rock:72,loose:58,mud:.44,brush:.44}},bear:[2],blurb:'Mud, thick forest and mist. Hard to see the way, so trust your map.'},
@@ -409,7 +409,12 @@ function tuftStep(dt){const N=NAV,tb=N.tb,ts=N.ts,T_=N.W.tufts,dec=dt*.55;for(le
   const fx=Math.cos(N.hd),fy=Math.sin(N.hd),rx=-fy,ry=fx,cx=Math.floor(N.px/16),cy=Math.floor(N.py/16);
   for(let gx=cx-1;gx<=cx+1;gx++)for(let gy=cy-1;gy<=cy+1;gy++){const L=N.tg.get(gx*1000+gy);if(!L)continue;for(let j=0;j<L.length;j++){const i=L[j],q=T_[i],dx=q.x-N.px,dy=q.y-N.py,d=Math.hypot(dx,dy);if(d<16){const b=1-d/16;if(b>tb[i]){tb[i]=b;ts[i]=(dx*rx+dy*ry)>=0?1:-1;}}}}}
 const PLB={},NEAR=[];
+function tuftDraw(s,sx,yb,hp,clip,f){const im=PL.grass,bb=PLB.grass;if(!im||!bb)return false;
+  const b=NAV.tb[s.ti],sd=NAV.ts[s.ti],sq=1-.45*b,bw=bb.x1-bb.x0,bh=bb.y1-bb.y0,hpx=hp*PXS*sq,wpx=hpx*bw/(bh*sq);
+  const shear=Math.sin(t*1.1+s.wx*.05+s.wy*.03)*.05*(WXC().wind?2.6:1)+(b>0?sd*b*1.15:0);
+  c.globalAlpha=clamp(1-f*.92,.04,1);c.setTransform(SC,0,shear*SC,SC,sx*PXS*SC,(yb*PXS+1)*SC);c.drawImage(im,bb.x0,bb.y0,bw,bh,-wpx/2,-hpx,wpx,hpx);c.setTransform(SC,0,0,SC,0,0);c.globalAlpha=1;return true;}
 function plSprite(s,sx,yb,hp,clip,f){
+  if(s.kind===9)return tuftDraw(s,sx,yb,hp,clip,f);
   let im=null,key='',k=1,sway=.03,bend=0,sd=1,sq=1;
   if(s.kind===0){const h=((Math.floor(s.wx*7.3+s.wy*13.1))%100+100)%100;key=h<45?'pine_a':h<80?'spruce_b':'aspen_c';k=1.7;}
   else if(s.kind===4){key='bush';sway=.012;}else if(s.kind===5){key='flowers';sway=.05;}else if(s.kind===6){key='rocks';sway=0;}else if(s.kind===7){key='grass';sway=.07;}
@@ -422,7 +427,7 @@ function plSprite(s,sx,yb,hp,clip,f){
   if(s.kind===8){y-=(5+2*Math.sin(t*2+s.wx))*SCL/s.zc*PXS;x+=Math.sin(t*1.1+s.wy*.3)*9*SCL/s.zc;}
   c.save();if(s.kind!==9||s.zc>35){c.beginPath();c.rect(0,0,W,clip*PXS);c.clip();}c.globalAlpha=clamp(1-f*.92,.04,1);c.translate(x,y);
   const wind=1+(WXC().wind?1.6:0),shear=(sway?Math.sin(t*1.1+s.wx*.05+s.wy*.03)*sway*wind:0)+(bend?sd*bend*1.15:0);
-  if(s.kind!==8&&s.kind!==9&&s.kind!==5&&s.kind!==7){c.fillStyle='rgba(24,10,44,.3)';c.beginPath();c.ellipse(0,0,wpx*.44,Math.max(2,hpx*.05),0,0,TAU);c.fill();}
+  if(s.kind!==8&&s.kind!==9&&s.kind!==5&&s.kind!==7&&s.zc<90){c.fillStyle='rgba(24,10,44,.3)';c.beginPath();c.ellipse(0,0,wpx*.44,Math.max(2,hpx*.05),0,0,TAU);c.fill();}
   if(shear)c.transform(1,0,shear,1,0,0);
   c.imageSmoothingEnabled=false;c.drawImage(im,bb.x0,bb.y0,bw,bh,-wpx/2,-hpx,wpx,hpx);
   if(s.kind===3&&key==='gate_aid'){c.globalCompositeOperation='lighter';const fl=.8+.2*Math.sin(t*8),r=hpx*.3;for(const gx of [-wpx*.38,wpx*.38]){const gy=-hpx*.6,g=c.createRadialGradient(gx,gy,0,gx,gy,r);g.addColorStop(0,`rgba(255,180,80,${.5*fl})`);g.addColorStop(1,'rgba(255,120,40,0)');c.fillStyle=g;c.fillRect(gx-r,gy-r,r*2,r*2);}}
@@ -529,7 +534,7 @@ function fader(){
 function setEffortFromY(py){P.effort=clamp(1-(py-FY0-16)/(FY1-FY0-24),0,1);}
 
 /* ---------- TRAIL VIEW: run from behind, choose your terrain, navigate to the finish ---------- */
-const NN=128,CS=8,WL=7,ZMAX=300,KMAX=240,PXS=2;let SCL=51,CAMB=9,CAMH=7;const PORT=true;let VW=135,VH=174,HOR=75,TANH=.9*90/160;
+const NN=128,CS=8,WL=7,ZMAX=300,KMAX=240;let PXS=2,SCL=51,CAMB=9,CAMH=7;const PORT=true;let VW=135,VH=174,HOR=75,TANH=.9*90/160;
 const TCODE=['grass','brush','rocky','loose','mud','creek','lake','smooth'];
 const TPAL=[[106,154,74],[46,90,48],[122,122,130],[168,154,120],[90,70,48],[74,138,192],[58,106,176],[200,164,104]];
 const TNAME=['Meadow','Thick brush','Rocky','Loose scree','Mud','Creek','Lake','Trail'];
@@ -593,13 +598,17 @@ function genWorld(op){op=op||{};
   const decor=[];
   if(op.edge){const nrm=i=>{const a=pts[Math.max(0,i-2)],b=pts[Math.min(pts.length-1,i+2)],tx=b.x-a.x,ty=b.y-a.y,l=Math.hypot(tx,ty)||1;return {nx:-ty/l,ny:tx/l};};
     const put=(i,side,lat,kind,h)=>{const n=nrm(i),x=pts[i].x+n.nx*side*lat,y=pts[i].y+n.ny*side*lat;if(x<6||y<6||x>1018||y>1018)return;const k=Math.floor(y/CS)*N+Math.floor(x/CS);if(T[k]===6||T[k]===5)return;decor.push({x,y,kind,h});};
-    for(let i=3;i<pts.length-2;i++){const r=rng();if(i%8===3)put(i,(i>>3)%2?1:-1,20+rng()*12,10,26+rng()*14);if(i%4===1&&r<.8)put(i,rng()<.5?1:-1,10+rng()*14,14,6+rng()*3);if(i%3===0&&r<.7)put(i,rng()<.5?1:-1,5+rng()*9,13,4+rng()*2);if((i%40)<22)put(i,1,9.5,11,4.4);}
+    for(let i=3;i<pts.length-2;i++){const r=rng();if(i%8===3)put(i,(i>>3)%2?1:-1,20+rng()*12,10,26+rng()*14);if(i%4===1&&r<.8)put(i,rng()<.5?1:-1,10+rng()*14,14,6+rng()*3);if(i%3===0&&r<.7)put(i,rng()<.5?1:-1,5+rng()*9,13,4+rng()*2);if((i%40)<22)put(i,1,9.5,11,4.4);if(rng()<.55)put(i,rng()<.5?1:-1,3.2+rng()*1.8,6,1.6+rng()*.9);if(rng()<.5)put(i,rng()<.5?1:-1,3+rng()*2.4,7,2.6+rng()*1.2);}
     for(const d of decoys)put(Math.min(pts.length-1,d.j),1,8,12,13);put(2,1,8,12,13);}
   if(op.decor){for(let i=0;i<op.decor;i++){const x=rng()*N,y=rng()*N,k=(y|0)*N+(x|0),tt=T[k];if(trail[k]||tt===5||tt===6)continue;const r=rng();let kind;
       if(tt===1)kind=r<.6?4:r<.85?7:5;else if(tt===0)kind=r<.5?5:r<.8?7:4;else if(tt===2||tt===3)kind=r<.7?6:7;else kind=7;
       decor.push({x:x*CS,y:y*CS,kind,h:kind===4?7:kind===5?4.6:kind===6?6:4.6});if(kind===5&&rng()<.4)decor.push({x:x*CS+rng()*10,y:y*CS+rng()*10,kind:8,h:3});}}
   const rcx=fin.x+(rng()-.5)*16,rcy=fin.y+(rng()-.5)*16;
-  Object.assign(W_,{pts,trees,ribbons,decor,tufts,decoys,lands:[{n:'Start',x:start.x,y:start.y},{n:'Mt Ridge',x:peak.x,y:peak.y},...(hasLake?[{n:'Lake',x:lake.x,y:lake.y}]:[]),...lands],ring:{x:rcx,y:rcy,r:19},riverLabel:op.river===false?null:{x:rflip?127-(20+.3*107):20+.3*107,y:30+7*Math.sin(2.4+ph)}});
+  const sunAng=Math.atan2(fin.y-start.y,fin.x-start.x)+.55,lights=decor.filter(d=>d.kind===12).map(d=>({x:d.x,y:d.y,r2:18*18}));lights.push({x:(fin.x+.5)*CS,y:(fin.y+.5)*CS,r2:26*26});
+  let shadow=null;if(op.shadows){shadow=new Float32Array(256*256);const dx=-Math.cos(sunAng),dy=-Math.sin(sunAng);
+    const stamp=(x,y,h)=>{const Ls=h*1.15,r0=Math.max(2,h*.2);for(let s2=0;s2<=Ls;s2+=2.5){const cx=x+dx*s2,cy=y+dy*s2,rr=r0*(1-.45*s2/Ls),a=.95*(1-s2/Ls*.6),gx=cx/4,gy=cy/4,gr=Math.ceil(rr/4);for(let yy=-gr;yy<=gr;yy++)for(let xx=-gr;xx<=gr;xx++){const X=Math.floor(gx)+xx,Y=Math.floor(gy)+yy;if(X<0||Y<0||X>255||Y>255)continue;const dd=Math.hypot(X+.5-gx,Y+.5-gy)/(rr/4+.5);if(dd<1){const vv=a*(1-dd*dd);if(vv>shadow[Y*256+X])shadow[Y*256+X]=vv;}}}};
+    for(const t of trees)stamp(t.x,t.y,t.h*1.7);for(const d of decor){if(d.kind===10)stamp(d.x,d.y,d.h);else if(d.kind===4||d.kind===14||d.kind===12||d.kind===11)stamp(d.x,d.y,d.h*.8);}}
+  Object.assign(W_,{shadow,lights,sunAng,pts,trees,ribbons,decor,tufts,decoys,lands:[{n:'Start',x:start.x,y:start.y},{n:'Mt Ridge',x:peak.x,y:peak.y},...(hasLake?[{n:'Lake',x:lake.x,y:lake.y}]:[]),...lands],ring:{x:rcx,y:rcy,r:19},riverLabel:op.river===false?null:{x:rflip?127-(20+.3*107):20+.3*107,y:30+7*Math.sin(2.4+ph)}});
   return W_;
 }
 const hAt=(W_,x,y)=>{x=clamp(x/CS-.5,0,NN-1.001);y=clamp(y/CS-.5,0,NN-1.001);const xi=x|0,yi=y|0,xf=x-xi,yf=y-yi,H=W_.H,i=yi*NN+xi;return H[i]*(1-xf)*(1-yf)+H[i+1]*xf*(1-yf)+H[i+NN]*(1-xf)*yf+H[i+NN+1]*xf*yf;};
@@ -614,9 +623,9 @@ function makeEvents(r,L,seed){const rg=mulberry(seed*13+5),tr=r.train,n=tr?2:3+(
 function gain(d){if(!NAV)return;const fx=Math.cos(NAV.hd),fy=Math.sin(NAV.hd);let m=0;for(;m<d;m+=2){const nx=NAV.px+fx*2,ny=NAV.py+fy*2;if(nx<4||ny<4||nx>NN*CS-4||ny>NN*CS-4||tAt(NAV.W,nx,ny)===6)break;NAV.px=nx;NAV.py=ny;}
   P.x+=m;NAV.dist+=m;navReveal(NAV.px/CS,NAV.py/CS,9);if(Math.hypot(NAV.px/CS-NAV.W.fin.x,NAV.py/CS-NAV.W.fin.y)<2.2)finishNav();}
 function startNav(){
-  const r=race;if(r.id==='pine'){CAMB=14;CAMH=8.6;SCL=78;HOR=92;}else{CAMB=9;CAMH=7;SCL=51;HOR=75;}
+  const r=race;if(r.id==='pine'){CAMB=14;CAMH=8.6;SCL=104;HOR=123;PXS=1.5;VW=180;VH=232;}else{CAMB=9;CAMH=7;SCL=51;HOR=75;PXS=2;VW=135;VH=174;}vcv=null;
   const tr=r.train||{},th=NAVTH[r.theme]||NAVTH.dawn,w0=r.world||tr.world||{},seed=(r.seed||1)*37+R_.si*101+7,wx=WX[R_.wx]||WX.clear;
-  const Wd=genWorld(Object.assign({seed,span:r.tier===0?.85:1},w0));
+  const Wd=genWorld(Object.assign({seed,span:r.tier===0?.85:1},w0));buildGroundGrids(Wd);
   const mix=(a,b,k)=>a.map((v,i)=>v*(1-k)+b[i]*k),ws=WXSKY[R_.wx];
   SKYT=th.top;SKYB=r.id==='pine'?[222,150,160]:th.bot;TINT=(r.id==='pine'?[1.1,.97,.93]:th.tint).map(v=>v*(wx.tintMul||1));BGIMG=r.id==='pine';
   if(ws){SKYT=mix(SKYT,ws[0],ws[1]);SKYB=mix(SKYB,ws[0],ws[1]);}
@@ -660,18 +669,64 @@ function navMove(d){
 function finishNav(){finishStage();}
 
 // ----- the voxel-style view from behind
-const ytops=new Int16Array(VW*KMAX),ybuf=new Int16Array(VW),zs=new Float32Array(KMAX);
+const ytops=new Int16Array(270*KMAX),ybuf=new Int16Array(270),zs=new Float32Array(KMAX);
 let vcv=null,vctx=null,vimg=null,v32=null;
 const pack=(r,g,b)=>(255<<24)|((b&255)<<16)|((g&255)<<8)|(r&255);
 let SKYT=[88,148,222],SKYB=[214,232,244],TINT=[1,1,1],BGIMG=false;
-const TEXD=[],TEXAVG=[],TS=8;let TEXMAP={0:[0,0,0,14,2],1:[12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};
-for(let i=0;i<16;i++){const im=new Image();im.onload=()=>{const cv=document.createElement('canvas');cv.width=cv.height=32;const q=cv.getContext('2d');q.drawImage(im,0,0);const d=q.getImageData(0,0,32,32).data;TEXD[i]=d;let r=0,g=0,b=0;for(let j=0;j<1024;j++){r+=d[j*4];g+=d[j*4+1];b+=d[j*4+2];}TEXAVG[i]=[r/1024,g/1024,b/1024];};im.src='assets/pl/tile_'+i+'.png';}
-function setTiles(r){const th=r.theme;
+/* ---------- ground tiles (Pixel Lab): dithered terrain blending with transition tiles, noise-picked variants, flat decals, bump light from the tile relief, tree shadows, lantern pools ---------- */
+const TILES=[],NLIGHT=[];
+const hash3=(a,b)=>{let h=(Math.imul(a|0,73856093)^Math.imul(b|0,19349663))>>>0;h^=h>>>13;h=Math.imul(h,0x5bd1e995)>>>0;return ((h^(h>>>15))&1023)/1023;};
+const mac=(x,y)=>Math.sin(x*.031+Math.sin(y*.019)*2.2)*.5+Math.sin(y*.026+Math.sin(x*.015)*2.6)*.5;
+let TEXMAP={0:[0,0,0,14,2],1:[12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]},MIXM={};
+function loadTile(idx,src,size,ts){const im=new Image();im.onload=()=>{const cv=document.createElement('canvas');cv.width=cv.height=size;const q=cv.getContext('2d');q.drawImage(im,0,0,size,size);const d=q.getImageData(0,0,size,size).data,n=size*size,lum=new Float32Array(n);let r=0,g=0,b=0;
+  for(let j=0;j<n;j++){r+=d[j*4];g+=d[j*4+1];b+=d[j*4+2];lum[j]=d[j*4]*.3+d[j*4+1]*.59+d[j*4+2]*.11;}
+  const bx=new Int8Array(n),by=new Int8Array(n);for(let y=0;y<size;y++)for(let x=0;x<size;x++){const xl=lum[y*size+(x?x-1:x)],xr=lum[y*size+(x<size-1?x+1:x)],yu=lum[(y?y-1:y)*size+x],yd=lum[(y<size-1?y+1:y)*size+x];bx[y*size+x]=clamp((xr-xl)/3,-127,127);by[y*size+x]=clamp((yd-yu)/3,-127,127);}
+  TILES[idx]={d,size,ts,avg:[r/n,g/n,b/n],bx,by};};im.src=src;}
+for(let i=0;i<16;i++){loadTile(i,'assets/pl/tile_'+i+'.png',32,8);loadTile(16+i,'assets/pl/gt_'+i+'.png',64,16);}
+function setTiles(r){const th=r.theme;MIXM={};
   if(r.id==='canyon')TEXMAP={0:[9],1:[9,12],2:[10],3:[10,5],4:[6],5:[7],6:[7],7:[3]};
   else if(th==='frost')TEXMAP={0:[11],1:[11,12],2:[4,11],3:[11,5],4:[6],5:[7],6:[7],7:[3]};
   else if(r.id==='fog')TEXMAP={0:[0,0,14],1:[12,12,1],2:[4],3:[5],4:[6,6,8],5:[7],6:[7],7:[3]};
-  else if(r.id==='pine')TEXMAP={0:[0,0,2,1,0,0],1:[1,12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};
-  else TEXMAP={0:[0,0,0,14,2],1:[12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};}
+  else if(r.id==='pine'){TEXMAP={0:[16,16,16,16,18,28,16,16],1:[30,17,30],2:[22],3:[24],4:[25],5:[7],6:[7],7:[19]};
+    MIXM={'0-7':20,'1-7':20,'7-0':20,'7-1':20,'7-3':21,'3-7':21,'0-2':23,'2-0':23,'1-2':23,'4-0':26,'0-4':26,'4-1':26,'1-4':26};}
+  else TEXMAP={0:[0,0,0,14,2],1:[12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};
+  rebuildMix();}
+let GR0=0,GR1=0,GR2=0,SUNC=1,SUNS=0;
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16),MIXN=new Int8Array(64).fill(-1);
+const FLOWERS=[[255,255,240],[255,226,90],[196,124,232],[252,154,192]];
+function rebuildMix(){MIXN.fill(-1);for(const k in MIXM){const p=k.split('-');MIXN[(+p[0])*8+(+p[1])]=MIXM[k];}}
+// large-scale variation is computed once per world cell
+function buildGroundGrids(Wd){const N=NN,mv=new Float32Array(N*N),mt=new Float32Array(N*N),mf=new Uint8Array(N*N);
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){const wx=(x+.5)*CS,wy=(y+.5)*CS;mv[y*N+x]=mac(wx,wy)*.5+.5;mt[y*N+x]=mac(wx*.5+40,wy*.5-20);mf[y*N+x]=(mac(wx*1.3+9,wy*.9)>0?1:0)|(mac(wx*.8,wy*1.1+5)>0?2:0);}
+  Wd.mv=mv;Wd.mt=mt;Wd.mf=mf;}
+function groundRGB(wx,wy,z,ix,iy,code,Wd){
+  const i=iy*NN+ix,fx=wx/CS-ix,fy=wy/CS-iy;let c2=code,tid=-1;
+  if(z<=95){const ex=fx<.5?fx:1-fx,ey=fy<.5?fy:1-fy;
+    if(ex<.3||ey<.3){ // near a terrain border: dither into the neighbour, with a transition tile in the band between
+      const cX=ex<.3?Wd.T[iy*NN+clamp(fx<.5?ix-1:ix+1,0,NN-1)]:code,cY=ey<.3?Wd.T[clamp(fy<.5?iy-1:iy+1,0,NN-1)*NN+ix]:code,wX=cX!==code?(1-ex/.3)*.5:0,wY=cY!==code?(1-ey/.3)*.5:0;
+      if(wX>0||wY>0){const useX=wX>=wY,cc=useX?cX:cY,w=useX?wX:wY,n=z<16?.5:BAY[(Math.floor(wy*4)&3)*4+(Math.floor(wx*4)&3)];
+        if(n<w*.6)c2=cc;else if(n<w*1.5){const mx=MIXN[code*8+cc];if(mx>=0)tid=mx;else if(n<w)c2=cc;}}}}
+  const L=TEXMAP[c2];
+  if(tid<0)tid=L[clamp(Math.floor((Wd.mv[i]+(BAY[(Math.floor(wy*.7)&3)*4+(Math.floor(wx*.7)&3)]-.5)*.1)*L.length),0,L.length-1)];
+  const tl=TILES[tid];
+  if(!tl){const p=TPAL[c2];GR0=p[0];GR1=p[1];GR2=p[2];return;}
+  const mm=Wd.mt[i];
+  if(z>95){const av=tl.avg;GR0=av[0]*(1+.1*mm);GR1=av[1]*(1+.05*mm);GR2=av[2]*(1-.08*mm);return;}
+  const S=tl.size-1,ts=tl.ts,TW=tl.size,fl=Wd.mf[i];let u=((wx/ts)%2+2)%2,v=((wy/ts)%2+2)%2,sgx=u<1?1:-1,sgy=v<1?1:-1;u=u<1?u:2-u;v=v<1?v:2-v;
+  if(fl&1){u=1-u;sgx=-sgx;}if(fl&2){v=1-v;sgy=-sgy;}
+  let cr,cg,cb;const d=tl.d,ux=u*S,vy=v*S,x0=ux|0,y0=vy|0;
+  if(z<20){const fx2=ux-x0,fy2=vy-y0,x1=x0<S?x0+1:S,y1=y0<S?y0+1:S,o00=(y0*TW+x0)*4,o10=(y0*TW+x1)*4,o01=(y1*TW+x0)*4,o11=(y1*TW+x1)*4,w00=(1-fx2)*(1-fy2),w10=fx2*(1-fy2),w01=(1-fx2)*fy2,w11=fx2*fy2;
+    cr=d[o00]*w00+d[o10]*w10+d[o01]*w01+d[o11]*w11;cg=d[o00+1]*w00+d[o10+1]*w10+d[o01+1]*w01+d[o11+1]*w11;cb=d[o00+2]*w00+d[o10+2]*w10+d[o01+2]*w01+d[o11+2]*w11;}
+  else{const o=(y0*TW+x0)*4;cr=d[o];cg=d[o+1];cb=d[o+2];}
+  const mz=z<12?(12-z)/12*.5:z>40?(z-40)/55*.8:0;if(mz>0){const av=tl.avg;cr+=(av[0]-cr)*mz;cg+=(av[1]-cg)*mz;cb+=(av[2]-cb)*mz;}
+  // a few flat decals on lush ground (not too close, where they would be huge squares)
+  if(z>10&&z<34&&(c2===0||c2===1)&&tid!==19){const hh=hash3(Math.floor(wx*5.3),Math.floor(wy*5.3)+9);if(hh<.006){const fc=FLOWERS[Math.floor(hh*6000)%4];cr=fc[0];cg=fc[1];cb=fc[2];}else if(hh>.9975){cr=146;cg=136;cb=146;}}
+  if(z<70){const o2=y0*TW+x0,bs=1+(tl.bx[o2]*sgx*SUNC+tl.by[o2]*sgy*SUNS)*.0032;cr*=bs;cg*=bs;cb*=bs;} // bump light from the tile relief
+  cr*=1+.1*mm;cg*=1+.05*mm;cb*=1-.08*mm;
+  if(Wd.shadow){const sh=Wd.shadow[clamp((wy*.25)|0,0,255)*256+clamp((wx*.25)|0,0,255)];if(sh>0){cr*=1-.4*sh;cg*=1-.46*sh;cb*=1-.22*sh;}}
+  for(let q=0;q<NLIGHT.length;q++){const Lq=NLIGHT[q],dx=wx-Lq.x,dy=wy-Lq.y,d2=dx*dx+dy*dy;if(d2<Lq.r2){const k=1-d2/Lq.r2,k2=k*k*.55;cr+=(255-cr)*k2*.6;cg+=(176-cg)*k2*.5;cb+=(78-cb)*k2*.25;}}
+  GR0=cr;GR1=cg;GR2=cb;
+}
 function navView(){
   if(!vcv){vcv=document.createElement('canvas');vcv.width=VW;vcv.height=VH;vctx=vcv.getContext('2d');vimg=vctx.createImageData(VW,VH);v32=new Uint32Array(vimg.data.buffer);}
   const N=NAV,vis=N.vis||1,Wd=N.W,fx=Math.cos(N.hd),fy=Math.sin(N.hd),rx=-fy,ry=fx,camx=N.px-fx*CAMB,camy=N.py-fy*CAMB,camh=N.camh;
@@ -679,22 +734,20 @@ function navView(){
   if(N.stars)for(const q of N.stars)v32[q[1]*VW+q[0]]=pack(255,255,255);
   // far ridgeline
   if(!BGIMG)for(let x=0;x<VW;x++){const a=Math.atan2((x+.5)/VW*2-1,1/TANH)+N.hd,hh=HOR-5-(Math.sin(a*5.1)*3+Math.sin(a*11.3)*1.6+Math.sin(a*2.3)*4);for(let y=Math.max(0,hh|0);y<HOR+4;y++)v32[y*VW+x]=pack(120,140,176);}
+  NLIGHT.length=0;if(Wd.lights)for(const Lq of Wd.lights){if(Math.hypot(Lq.x-N.px,Lq.y-N.py)<110)NLIGHT.push(Lq);}
+  SUNC=Math.cos(Wd.sunAng||0);SUNS=Math.sin(Wd.sunAng||0);
   ybuf.fill(VH);let k=0,z=2;
   while(z<ZMAX&&k<KMAX){
     const cx0=camx+fx*z,cy0=camy+fy*z,lx=rx*z*TANH,ly=ry*z*TANH,f=clamp((z-45*vis)/(240*vis),0,1);
     for(let col=0;col<VW;col++){
       const u=(col+.5)/VW*2-1,wx=cx0+lx*u,wy=cy0+ly*u,ix=clamp(Math.floor(wx/CS),0,NN-1),iy=clamp(Math.floor(wy/CS),0,NN-1),i=iy*NN+ix,code=Wd.T[i];
       const h=code===6?WL:hAt(Wd,wx,wy),ys=HOR+(camh-h)*SCL/z;
-      if(ys<ybuf[col]){const p=TPAL[code],tx=((ix*73856093)^(iy*19349663))&7,s=(code===6?1+Math.sin(wx*.25+wy*.2+sceneT*2)*.06:Wd.shade[i])*(1+(tx-3.5)*.012);
-        let cr=p[0],cg=p[1],cb=p[2];const vl=TEXMAP[code],tl=TEXD[vl[((ix*7+iy*13)>>1)%vl.length]];
-        if(tl){const u=Math.abs(((wx/TS)%2+2)%2-1),v=Math.abs(((wy/TS)%2+2)%2-1);
-          if(z<26){const ux=u*31,vy=v*31,x0=ux|0,y0=vy|0,fx2=ux-x0,fy2=vy-y0,x1=x0<31?x0+1:31,y1=y0<31?y0+1:31,o00=(y0*32+x0)*4,o10=(y0*32+x1)*4,o01=(y1*32+x0)*4,o11=(y1*32+x1)*4,w00=(1-fx2)*(1-fy2),w10=fx2*(1-fy2),w01=(1-fx2)*fy2,w11=fx2*fy2;
-            cr=tl[o00]*w00+tl[o10]*w10+tl[o01]*w01+tl[o11]*w11;cg=tl[o00+1]*w00+tl[o10+1]*w10+tl[o01+1]*w01+tl[o11+1]*w11;cb=tl[o00+2]*w00+tl[o10+2]*w10+tl[o01+2]*w01+tl[o11+2]*w11;}
-          else{const o=(((v*31.99)|0)*32+((u*31.99)|0))*4;cr=tl[o];cg=tl[o+1];cb=tl[o+2];}const mz=z<12?(12-z)/12*.5:z>40?clamp((z-40)/70,0,.85):0;if(mz>0){const av=TEXAVG[vl[((ix*7+iy*13)>>1)%vl.length]];cr+=(av[0]-cr)*mz;cg+=(av[1]-cg)*mz;cb+=(av[2]-cb)*mz;}}
-        const r=cr*s*TINT[0]*(1-f)+SKYB[0]*f,g=cg*s*TINT[1]*(1-f)+SKYB[1]*f,b=cb*s*TINT[2]*(1-f)+SKYB[2]*f,cc=pack(r,g,b);
+      if(ys<ybuf[col]){const tx=((ix*73856093)^(iy*19349663))&7,s=(code===6?1+Math.sin(wx*.25+wy*.2+sceneT*2)*.06:Wd.shade[i])*(1+(tx-3.5)*.012);
+        groundRGB(wx,wy,z,ix,iy,code,Wd);
+        const r=GR0*s*TINT[0]*(1-f)+SKYB[0]*f,g=GR1*s*TINT[1]*(1-f)+SKYB[1]*f,b=GR2*s*TINT[2]*(1-f)+SKYB[2]*f,cc=pack(r,g,b);
         let y0=Math.max(0,ys|0);for(let y=y0;y<ybuf[col];y++)v32[y*VW+col]=cc;ybuf[col]=y0;}
       ytops[col*KMAX+k]=ybuf[col];}
-    zs[k++]=z;z+=Math.max(.6,z*.022);
+    zs[k++]=z;z+=Math.max(.6,z*(z>70?.045:.024));
   }
   // sprites (trees, ribbons, signs, the finish), far to near, clipped by the terrain in front of them
   vctx.putImageData(vimg,0,0);c.imageSmoothingEnabled=false;if(BGIMG&&N.pl&&PL.panoF)drawBackdropPL();else if(BGIMG&&IMG.pine)drawBackdrop();if(N.pl&&!PL.panoF)drawSkyLife();c.drawImage(vcv,0,0,VW*PXS,VH*PXS);
@@ -705,7 +758,7 @@ function navView(){
   for(const r of Wd.ribbons)add(r.x,r.y,1,9);
   for(const d of Wd.decoys)add(d.x,d.y,2,10);
   add((Wd.fin.x+.5)*CS,(Wd.fin.y+.5)*CS,3,24);
-  if(N.pl&&N.tb){const T_=Wd.tufts;for(let i=0;i<T_.length;i++){const q=T_[i],dx=q.x-camx,dy=q.y-camy;if(dx*dx+dy*dy>5200)continue;const zc=dx*fx+dy*fy;if(zc<3||zc>70)continue;const u=(dx*rx+dy*ry)/(zc*TANH);if(Math.abs(u)>1.12)continue;list.push({zc,u,wx:q.x,wy:q.y,kind:9,hgt:q.h,ti:i});}}
+  if(N.pl&&N.tb){const T_=Wd.tufts;for(let i=0;i<T_.length;i++){const q=T_[i],dx=q.x-camx,dy=q.y-camy;if(dx*dx+dy*dy>5200)continue;const zc=dx*fx+dy*fy;if(zc<3||zc>58||(zc>24&&(i&1))||(zc>40&&i%3))continue;const u=(dx*rx+dy*ry)/(zc*TANH);if(Math.abs(u)>1.12)continue;list.push({zc,u,wx:q.x,wy:q.y,kind:9,hgt:q.h,ti:i});}}
   list.sort((a,b)=>b.zc-a.zc);NEAR.length=0;
   const rect=(x0,y0,x1,y1,col,clip)=>{y1=Math.min(clip,y1);if(y1<=y0||x1<=x0)return;c.fillStyle=col;c.fillRect(Math.round(x0*PXS),Math.round(y0*PXS),Math.max(1,Math.round((x1-x0)*PXS)),Math.max(1,Math.round((y1-y0)*PXS)));};
   const fog=(c0,f)=>`rgb(${(c0[0]*(1-f)+SKYB[0]*f)|0},${(c0[1]*(1-f)+SKYB[1]*f)|0},${(c0[2]*(1-f)+SKYB[2]*f)|0})`;
