@@ -72,3 +72,7 @@ A profile of the marked course sits under the compass: ticks are trail events st
 - **Variation**: the variant is chosen by large-scale noise computed once per world cell (with a little dither), tiles are flipped per patch, and a slow colour wobble shifts greens toward gold, so stretches do not repeat.
 - **Detail and light**: flat flower and pebble decals, pebbles and grass clumps along the trail edges, bump lighting derived from each tile's own relief (sun side lit), long soft tree shadows falling away from the sun, and warm light pools on the ground around the lanterns.
 - **Resolution**: the Pine Ridge terrain view is rendered at a higher resolution (180 columns). Grass tufts use a cheap draw path and thin out with distance to keep the frame rate up. Other races keep the original tiles and resolution.
+
+## Trail in path coordinates (Pine Ridge)
+- The marked course is drawn from dedicated Pixel Lab path tiles (`assets/pl/pt_0..3.png`: a vertical dirt trail with two ruts and a worn grass fringe). Each ground sample near the course is converted to path coordinates (distance across the trail, distance along it), so the ruts and fringe follow every bend instead of running in one fixed direction. The fringe dithers into the surrounding meadow.
+- The bump light is rotated into the same frame. Close to the camera a fine grain breaks up big flat texels, and the painted castle now sits below the HUD.

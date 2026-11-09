@@ -449,8 +449,8 @@ function drawBackdropPL(){
   if(sunX>-120&&sunX<W+120){g=c.createRadialGradient(sunX,sunY,0,sunX,sunY,130);g.addColorStop(0,'rgba(255,230,160,.95)');g.addColorStop(.18,'rgba(255,190,110,.55)');g.addColorStop(1,'rgba(255,120,120,0)');c.fillStyle=g;c.fillRect(sunX-130,sunY-130,260,260);c.fillStyle='#fff2c0';c.beginPath();c.arc(sunX,sunY,15,0,TAU);c.fill();}
   const sc=PL.sclouds;if(sc){c.globalAlpha=.9;for(let i=0;i<3;i++){const w=sc.width*2.2,x=(((i*190+tt*(4+i*2)-hd*RAD*.9+N.dist*.01)%(W+w))+W+w)%(W+w)-w,y=18+i*24;c.drawImage(sc,x,y,w,sc.height*2.2);}c.globalAlpha=1;}
   // far panorama, centred on the finish bearing and faded at its edges
-  if(PL.panoF){const s2=1.6,pw=PL.panoF.width*s2,ph=PL.panoF.height*s2,x=W/2+nrm(N.finAng-hd)*RAD-185*s2-N.dist*.004;c.drawImage(PL.panoF,x,hz+30-ph,pw,ph);
-    const py=hz+30-ph,X=ix=>x+ix*s2,Y=iy=>py+iy*s2;c.save();c.globalCompositeOperation='lighter';
+  if(PL.panoF){const s2=1.6,pw=PL.panoF.width*s2,ph=PL.panoF.height*s2,x=W/2+nrm(N.finAng-hd)*RAD-185*s2-N.dist*.004;c.drawImage(PL.panoF,x,hz+58-ph,pw,ph);
+    const py=hz+58-ph,X=ix=>x+ix*s2,Y=iy=>py+iy*s2;c.save();c.globalCompositeOperation='lighter';
     for(const wf of [[178,50,87],[203,53,90]]){const len=wf[2]-wf[1];c.fillStyle='rgba(190,220,255,.16)';c.fillRect(X(wf[0])-2.5,Y(wf[1]),5,len*s2);for(let k=0;k<7;k++){const yy=wf[1]+((tt*34+k*(len/7)+wf[0]*3)%len),fr=(yy-wf[1])/len;c.fillStyle=`rgba(225,242,255,${.6-.45*fr})`;c.fillRect(X(wf[0])-1.5,Y(yy),3,Math.max(2,3.4*s2));}
       const m=.5+.5*Math.sin(tt*2+wf[0]);c.fillStyle=`rgba(230,240,255,${.18+.1*m})`;c.beginPath();c.ellipse(X(wf[0]),Y(wf[2]),14*s2*.5,5*s2*.5,0,0,TAU);c.fill();}
     for(let k=0;k<16;k++){const sx2=38+((k*53+Math.floor(tt*2.3+k))%72),sy2=74+((k*29)%22),a=.5+.5*Math.sin(tt*5+k*2.1);if(a>.72){c.fillStyle=`rgba(255,236,180,${a*.85})`;c.fillRect(X(sx2),Y(sy2),3.4,1.6);}}
@@ -683,7 +683,8 @@ function loadTile(idx,src,size,ts){const im=new Image();im.onload=()=>{const cv=
   const bx=new Int8Array(n),by=new Int8Array(n);for(let y=0;y<size;y++)for(let x=0;x<size;x++){const xl=lum[y*size+(x?x-1:x)],xr=lum[y*size+(x<size-1?x+1:x)],yu=lum[(y?y-1:y)*size+x],yd=lum[(y<size-1?y+1:y)*size+x];bx[y*size+x]=clamp((xr-xl)/3,-127,127);by[y*size+x]=clamp((yd-yu)/3,-127,127);}
   TILES[idx]={d,size,ts,avg:[r/n,g/n,b/n],bx,by};};im.src=src;}
 for(let i=0;i<16;i++){loadTile(i,'assets/pl/tile_'+i+'.png',32,8);loadTile(16+i,'assets/pl/gt_'+i+'.png',64,16);}
-function setTiles(r){const th=r.theme;MIXM={};
+for(let i=0;i<4;i++)loadTile(32+i,'assets/pl/pt_'+i+'.png',64,18);
+function setTiles(r){const th=r.theme;MIXM={};PATHON=r.id==='pine';
   if(r.id==='canyon')TEXMAP={0:[9],1:[9,12],2:[10],3:[10,5],4:[6],5:[7],6:[7],7:[3]};
   else if(th==='frost')TEXMAP={0:[11],1:[11,12],2:[4,11],3:[11,5],4:[6],5:[7],6:[7],7:[3]};
   else if(r.id==='fog')TEXMAP={0:[0,0,14],1:[12,12,1],2:[4],3:[5],4:[6,6,8],5:[7],6:[7],7:[3]};
@@ -691,16 +692,44 @@ function setTiles(r){const th=r.theme;MIXM={};
     MIXM={'0-7':20,'1-7':20,'7-0':20,'7-1':20,'7-3':21,'3-7':21,'0-2':23,'2-0':23,'1-2':23,'4-0':26,'0-4':26,'4-1':26,'1-4':26};}
   else TEXMAP={0:[0,0,0,14,2],1:[12,1],2:[4],3:[5],4:[6],5:[7],6:[7],7:[3]};
   rebuildMix();}
-let GR0=0,GR1=0,GR2=0,SUNC=1,SUNS=0;
-const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16),MIXN=new Int8Array(64).fill(-1);
+let GR0=0,GR1=0,GR2=0,SUNC=1,SUNS=0,SR=0,SG=0,SB=0,SBX=0,SBY=0,PATHON=false;
+const BAY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(v=>(v+.5)/16),MIXN=new Int8Array(64).fill(-1),PWW=18,PWH=9;
 const FLOWERS=[[255,255,240],[255,226,90],[196,124,232],[252,154,192]];
 function rebuildMix(){MIXN.fill(-1);for(const k in MIXM){const p=k.split('-');MIXN[(+p[0])*8+(+p[1])]=MIXM[k];}}
-// large-scale variation is computed once per world cell
+// per-world precomputation: large-scale variation per cell, and the course in path coordinates (arc length and tangent)
 function buildGroundGrids(Wd){const N=NN,mv=new Float32Array(N*N),mt=new Float32Array(N*N),mf=new Uint8Array(N*N);
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){const wx=(x+.5)*CS,wy=(y+.5)*CS;mv[y*N+x]=mac(wx,wy)*.5+.5;mt[y*N+x]=mac(wx*.5+40,wy*.5-20);mf[y*N+x]=(mac(wx*1.3+9,wy*.9)>0?1:0)|(mac(wx*.8,wy*1.1+5)>0?2:0);}
-  Wd.mv=mv;Wd.mt=mt;Wd.mf=mf;}
+  Wd.mv=mv;Wd.mt=mt;Wd.mf=mf;
+  const pts=Wd.pts,np=pts.length,cum=new Float32Array(np),tx=new Float32Array(np),ty=new Float32Array(np),pn=new Int16Array(N*N).fill(-1),pd=new Float32Array(N*N).fill(1e9);
+  for(let i=1;i<np;i++)cum[i]=cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y);
+  for(let i=0;i<np;i++){const a=pts[Math.max(0,i-1)],b=pts[Math.min(np-1,i+1)],dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1;tx[i]=dx/l;ty[i]=dy/l;}
+  for(let i=0;i<np;i++){const cx=Math.floor(pts[i].x/CS),cy=Math.floor(pts[i].y/CS);for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const X=cx+dx,Y=cy+dy;if(X<0||Y<0||X>=N||Y>=N)continue;const d=Math.hypot((X+.5)*CS-pts[i].x,(Y+.5)*CS-pts[i].y);if(d<pd[Y*N+X]){pd[Y*N+X]=d;pn[Y*N+X]=i;}}}
+  Wd.pn=pn;Wd.cum=cum;Wd.ptx=tx;Wd.pty=ty;}
+// u,v in 0..1 already mirrored; colour into SR/SG/SB and the tile's relief into SBX/SBY
+function sampleTile(tl,u,v,z){const S=tl.size-1,TW=tl.size,d=tl.d,ux=u*S,vy=v*S,x0=ux|0,y0=vy|0;
+  if(z<22){const fx2=ux-x0,fy2=vy-y0,x1=x0<S?x0+1:S,y1=y0<S?y0+1:S,o00=(y0*TW+x0)*4,o10=(y0*TW+x1)*4,o01=(y1*TW+x0)*4,o11=(y1*TW+x1)*4,w00=(1-fx2)*(1-fy2),w10=fx2*(1-fy2),w01=(1-fx2)*fy2,w11=fx2*fy2;
+    SR=d[o00]*w00+d[o10]*w10+d[o01]*w01+d[o11]*w11;SG=d[o00+1]*w00+d[o10+1]*w10+d[o01+1]*w01+d[o11+1]*w11;SB=d[o00+2]*w00+d[o10+2]*w10+d[o01+2]*w01+d[o11+2]*w11;}
+  else{const o=(y0*TW+x0)*4;SR=d[o];SG=d[o+1];SB=d[o+2];}
+  SBX=tl.bx[y0*TW+x0];SBY=tl.by[y0*TW+x0];}
+// softening, decals, bump light, grain, colour wobble, tree shadows, lantern pools
+function shadeGround(tl,z,wx,wy,i,Wd,sgx,sgy,lu,lv,decals){
+  let cr=SR,cg=SG,cb=SB;const mm=Wd.mt[i],mz=z<12?(12-z)/12*.5:z>40?(z-40)/55*.8:0;
+  if(mz>0){const av=tl.avg;cr+=(av[0]-cr)*mz;cg+=(av[1]-cg)*mz;cb+=(av[2]-cb)*mz;}
+  if(decals&&z>10&&z<34){const hh=hash3(Math.floor(wx*5.3),Math.floor(wy*5.3)+9);if(hh<.006){const fc=FLOWERS[Math.floor(hh*6000)%4];cr=fc[0];cg=fc[1];cb=fc[2];}else if(hh>.9975){cr=146;cg=136;cb=146;}}
+  if(z<70){const bs=1+(SBX*sgx*lu+SBY*sgy*lv)*.0032;cr*=bs;cg*=bs;cb*=bs;}
+  if(z<22){const g=1+(hash3(Math.floor(wx*9),Math.floor(wy*9)+3)-.5)*.07;cr*=g;cg*=g;cb*=g;}
+  cr*=1+.1*mm;cg*=1+.05*mm;cb*=1-.08*mm;
+  if(Wd.shadow){const sh=Wd.shadow[clamp((wy*.25)|0,0,255)*256+clamp((wx*.25)|0,0,255)];if(sh>0){cr*=1-.4*sh;cg*=1-.46*sh;cb*=1-.22*sh;}}
+  for(let q=0;q<NLIGHT.length;q++){const Lq=NLIGHT[q],dx=wx-Lq.x,dy=wy-Lq.y,d2=dx*dx+dy*dy;if(d2<Lq.r2){const k=1-d2/Lq.r2,k2=k*k*.55;cr+=(255-cr)*k2*.6;cg+=(176-cg)*k2*.5;cb+=(78-cb)*k2*.25;}}
+  GR0=cr;GR1=cg;GR2=cb;}
 function groundRGB(wx,wy,z,ix,iy,code,Wd){
-  const i=iy*NN+ix,fx=wx/CS-ix,fy=wy/CS-iy;let c2=code,tid=-1;
+  const i=iy*NN+ix,fx=wx/CS-ix,fy=wy/CS-iy;
+  // the marked course is drawn in path coordinates, so its ruts and worn edges follow the curve
+  if(PATHON&&z<=75){const pi=Wd.pn[i];if(pi>=0){const P0=Wd.pts[pi],tx=Wd.ptx[pi],ty=Wd.pty[pi],dx=wx-P0.x,dy=wy-P0.y,lat=-dx*ty+dy*tx,al=lat<0?-lat:lat;
+    if(al<PWH){const e=al-(PWH-2.5),tl=TILES[32];if(tl&&(e<=0||BAY[(Math.floor(wy*4)&3)*4+(Math.floor(wx*4)&3)]>=e/2.5)){
+      let sv=((Wd.cum[pi]+dx*tx+dy*ty)/PWW%2+2)%2,sgy=1;if(sv>=1){sv=2-sv;sgy=-1;}
+      sampleTile(tl,clamp(.5+lat/PWW,0,1),sv,z);shadeGround(tl,z,wx,wy,i,Wd,1,sgy,-SUNC*ty+SUNS*tx,SUNC*tx+SUNS*ty,false);return;}}}}
+  let c2=code,tid=-1;
   if(z<=95){const ex=fx<.5?fx:1-fx,ey=fy<.5?fy:1-fy;
     if(ex<.3||ey<.3){ // near a terrain border: dither into the neighbour, with a transition tile in the band between
       const cX=ex<.3?Wd.T[iy*NN+clamp(fx<.5?ix-1:ix+1,0,NN-1)]:code,cY=ey<.3?Wd.T[clamp(fy<.5?iy-1:iy+1,0,NN-1)*NN+ix]:code,wX=cX!==code?(1-ex/.3)*.5:0,wY=cY!==code?(1-ey/.3)*.5:0;
@@ -710,22 +739,10 @@ function groundRGB(wx,wy,z,ix,iy,code,Wd){
   if(tid<0)tid=L[clamp(Math.floor((Wd.mv[i]+(BAY[(Math.floor(wy*.7)&3)*4+(Math.floor(wx*.7)&3)]-.5)*.1)*L.length),0,L.length-1)];
   const tl=TILES[tid];
   if(!tl){const p=TPAL[c2];GR0=p[0];GR1=p[1];GR2=p[2];return;}
-  const mm=Wd.mt[i];
-  if(z>95){const av=tl.avg;GR0=av[0]*(1+.1*mm);GR1=av[1]*(1+.05*mm);GR2=av[2]*(1-.08*mm);return;}
-  const S=tl.size-1,ts=tl.ts,TW=tl.size,fl=Wd.mf[i];let u=((wx/ts)%2+2)%2,v=((wy/ts)%2+2)%2,sgx=u<1?1:-1,sgy=v<1?1:-1;u=u<1?u:2-u;v=v<1?v:2-v;
+  if(z>95){const av=tl.avg,mm=Wd.mt[i];GR0=av[0]*(1+.1*mm);GR1=av[1]*(1+.05*mm);GR2=av[2]*(1-.08*mm);return;}
+  const ts=tl.ts,fl=Wd.mf[i];let u=((wx/ts)%2+2)%2,v=((wy/ts)%2+2)%2,sgx=u<1?1:-1,sgy=v<1?1:-1;u=u<1?u:2-u;v=v<1?v:2-v;
   if(fl&1){u=1-u;sgx=-sgx;}if(fl&2){v=1-v;sgy=-sgy;}
-  let cr,cg,cb;const d=tl.d,ux=u*S,vy=v*S,x0=ux|0,y0=vy|0;
-  if(z<20){const fx2=ux-x0,fy2=vy-y0,x1=x0<S?x0+1:S,y1=y0<S?y0+1:S,o00=(y0*TW+x0)*4,o10=(y0*TW+x1)*4,o01=(y1*TW+x0)*4,o11=(y1*TW+x1)*4,w00=(1-fx2)*(1-fy2),w10=fx2*(1-fy2),w01=(1-fx2)*fy2,w11=fx2*fy2;
-    cr=d[o00]*w00+d[o10]*w10+d[o01]*w01+d[o11]*w11;cg=d[o00+1]*w00+d[o10+1]*w10+d[o01+1]*w01+d[o11+1]*w11;cb=d[o00+2]*w00+d[o10+2]*w10+d[o01+2]*w01+d[o11+2]*w11;}
-  else{const o=(y0*TW+x0)*4;cr=d[o];cg=d[o+1];cb=d[o+2];}
-  const mz=z<12?(12-z)/12*.5:z>40?(z-40)/55*.8:0;if(mz>0){const av=tl.avg;cr+=(av[0]-cr)*mz;cg+=(av[1]-cg)*mz;cb+=(av[2]-cb)*mz;}
-  // a few flat decals on lush ground (not too close, where they would be huge squares)
-  if(z>10&&z<34&&(c2===0||c2===1)&&tid!==19){const hh=hash3(Math.floor(wx*5.3),Math.floor(wy*5.3)+9);if(hh<.006){const fc=FLOWERS[Math.floor(hh*6000)%4];cr=fc[0];cg=fc[1];cb=fc[2];}else if(hh>.9975){cr=146;cg=136;cb=146;}}
-  if(z<70){const o2=y0*TW+x0,bs=1+(tl.bx[o2]*sgx*SUNC+tl.by[o2]*sgy*SUNS)*.0032;cr*=bs;cg*=bs;cb*=bs;} // bump light from the tile relief
-  cr*=1+.1*mm;cg*=1+.05*mm;cb*=1-.08*mm;
-  if(Wd.shadow){const sh=Wd.shadow[clamp((wy*.25)|0,0,255)*256+clamp((wx*.25)|0,0,255)];if(sh>0){cr*=1-.4*sh;cg*=1-.46*sh;cb*=1-.22*sh;}}
-  for(let q=0;q<NLIGHT.length;q++){const Lq=NLIGHT[q],dx=wx-Lq.x,dy=wy-Lq.y,d2=dx*dx+dy*dy;if(d2<Lq.r2){const k=1-d2/Lq.r2,k2=k*k*.55;cr+=(255-cr)*k2*.6;cg+=(176-cg)*k2*.5;cb+=(78-cb)*k2*.25;}}
-  GR0=cr;GR1=cg;GR2=cb;
+  sampleTile(tl,u,v,z);shadeGround(tl,z,wx,wy,i,Wd,sgx,sgy,SUNC,SUNS,(c2===0||c2===1)&&tid!==19);
 }
 function navView(){
   if(!vcv){vcv=document.createElement('canvas');vcv.width=VW;vcv.height=VH;vctx=vcv.getContext('2d');vimg=vctx.createImageData(VW,VH);v32=new Uint32Array(vimg.data.buffer);}
