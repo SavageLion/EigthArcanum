@@ -10,7 +10,7 @@ const arg = (n, d) => process.argv.includes(n) ? process.argv[process.argv.index
 const RUNS = +process.argv[2] || 3, SEASON = process.argv.includes('--season'), SEASONS = +arg('--season', 1) || 1;
 const shotDir = arg('--shots', ''), fixed = process.argv.includes('--effort') ? +arg('--effort') : null;
 const root = path.resolve('prototypes/trail');
-const MIME = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg' };
+const MIME = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.js': 'text/javascript' };
 const srv = http.createServer((q, s) => { const p = q.url.split('?')[0], f = path.join(root, p === '/' ? 'index.html' : p.split('..').join('')); try { s.setHeader('Content-Type', MIME[path.extname(f)] || 'text/plain'); s.end(fs.readFileSync(f)); } catch (e) { s.statusCode = 404; s.end(); } }).listen(0);
 const port = srv.address().port;
 const browser = await chromium.launch({ channel: 'chrome' }), errs = new Set();

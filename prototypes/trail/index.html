@@ -13,6 +13,7 @@ html,body{margin:0;height:100%;background:#0d1210;overflow:hidden;touch-action:n
 </head>
 <body>
 <canvas id="g" aria-label="Ridgeline"></canvas>
+<script src="score.js"></script>
 <script>
 
 /* RIDGELINE: a trail-running management roguelike for phones (prototype).
@@ -32,7 +33,7 @@ const MONO='ui-monospace,Menlo,Consolas,"Courier New",monospace';
 const rnd=(a,b)=>a+Math.random()*(b-a),rint=(a,b)=>Math.floor(rnd(a,b+1)),pick=a=>a[Math.floor(Math.random()*a.length)],clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 let audioCtx=null;
-function beep(f,d=.08,type='square',v=.04,sl=0){try{if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=f;if(sl)o.frequency.linearRampToValueAtTime(f+sl,audioCtx.currentTime+d);g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d);}catch(e){}}
+function beep(f,d=.08,type='square',v=.04,sl=0){try{if(MUTED)return;if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=f;if(sl)o.frequency.linearRampToValueAtTime(f+sl,audioCtx.currentTime+d);g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+d);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d);}catch(e){}}
 
 /* ---------- save ---------- */
 const KEY='ridgeline-v2';
@@ -1056,23 +1057,50 @@ function render(){
   else if(scene==='bear')bearScene();
   else if(scene==='nav')navScene();
   if(paused)pauseLayer();
-  if(scene!=='bear'||(BR&&BR.over))fsBtn();
+  if(scene!=='bear'||(BR&&BR.over)){fsBtn();muteBtn();}
   toastLayer();
 }
 
+/* ---------- music: the Eighth Arcanum score engine (generated live, no audio files) ---------- */
+let MUTED=false;try{MUTED=localStorage.getItem('ridgeline-mute')==='1';}catch(e){}
+let musCur=null,musEn=-1;
+// each race gets one of the Eighth Arcanum boss themes; the energy follows your heart rate
+const RACE_MUSIC={pine:['battle',14],lake:['battle',8],canyon:['battle',12],fog:['battle',2],sky:['battle',13],glacier:['battle',1],summit:['battle',7]};
+function musicFor(){
+  if(scene==='nav'){if(NAV&&NAV.brief)return ['draw',0];if(R_&&R_.wx==='storm')return ['battle',3];return race.train?['battle',9]:(RACE_MUSIC[race.id]||['battle',14]);}
+  if(scene==='bear')return ['battle',0];
+  if(scene==='map'||scene==='train')return ['title',0];
+  if(scene==='base'||scene==='shop')return ['shop',0];
+  if(scene==='aid')return ['hub',0];
+  if(scene==='physio')return ['battle',14];
+  if(scene==='result')return R_&&R_.res&&R_.res.medal==='gold'?['victory',0]:['reward',0];
+  if(scene==='dnf')return ['defeat',0];
+  return null;
+}
+function wakeAudio(){try{if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state!=='running')audioCtx.resume();}catch(e){}}
+function musicUpdate(){
+  if(typeof EAScore==='undefined')return;
+  if(MUTED){if(musCur){EAScore.stopScore(300);musCur=null;}return;}
+  if(!audioCtx||audioCtx.state!=='running')return;
+  const w=musicFor();if(w){const k=w[0]+':'+w[1];if(k!==musCur){musCur=k;musEn=-1;EAScore.startScore(audioCtx,w[0],w[1],.42,undefined,2);}}
+  if(scene==='nav'&&P&&NAV&&!NAV.brief){const e=P.hr<.62?1:P.hr<.82?2:3;if(e!==musEn){musEn=e;EAScore.setScoreEnergy(e,P.bonk>0);}}
+}
+function muteBtn(){const x=W-24,y=25;HIT.push({x:x-2,y:y-2,w:24,h:22,fn:()=>{MUTED=!MUTED;try{localStorage.setItem('ridgeline-mute',MUTED?'1':'0');}catch(e){}wakeAudio();}});
+  c.fillStyle='rgba(8,12,10,.7)';c.fillRect(x,y,20,18);c.fillStyle=MUTED?'#6a7a70':'#cfdad2';c.beginPath();c.ellipse(x+8,y+13,3.2,2.4,-.4,0,TAU);c.fill();c.fillRect(x+10.4,y+4,1.4,9);c.fillRect(x+10.4,y+4,5,2);
+  if(MUTED){c.strokeStyle='#ff6a5a';c.lineWidth=1.6;c.beginPath();c.moveTo(x+3,y+15);c.lineTo(x+17,y+3);c.stroke();}}
 /* ---------- input ---------- */
 const drags=new Map();let mapDrag=null,tapPend=null;
 const pt=e=>{const r=cvs.getBoundingClientRect();
   if(ROT){const s=r.height/W,cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy;return {x:(dy+W*s/2)/s,y:(-dx+H*s/2)/s};}
   return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};};
-cvs.addEventListener('pointerdown',e=>{try{cvs.setPointerCapture(e.pointerId);}catch(_){}const p=pt(e);
+cvs.addEventListener('pointerdown',e=>{wakeAudio();try{cvs.setPointerCapture(e.pointerId);}catch(_){}const p=pt(e);
   if(scene==='map')mapDrag={id:e.pointerId,y:p.y,off:mapOff,moved:false};
   for(let i=HIT.length-1;i>=0;i--){const b=HIT[i];if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h){if(b.tap){tapPend={b,id:e.pointerId};}else b.fn();return;}}
   if((scene==='run'||scene==='nav')&&!paused&&p.x>=FX-8&&p.y>=FY0-4&&p.y<=FY1+6){drags.set(e.pointerId,'f');setEffortFromY(p.y);}
   else if(scene==='nav'&&!paused&&!NAV.map&&p.x<=STP.x+STP.w+8&&p.y>=STP.y-10){drags.set(e.pointerId,'s');NAV.steer=steerFromX(p.x);}});
 cvs.addEventListener('pointermove',e=>{if(mapDrag&&e.pointerId===mapDrag.id){const dy=pt(e).y-mapDrag.y;if(Math.abs(dy)>6)mapDrag.moved=true;if(mapDrag.moved)mapOff=clamp(mapDrag.off-dy,0,MAPH-H);return;}const k=drags.get(e.pointerId);if(!k)return;const p=pt(e);if(k==='f')setEffortFromY(p.y);else if(NAV)NAV.steer=steerFromX(p.x);});
 const up=e=>{if(tapPend&&tapPend.id===e.pointerId&&!(mapDrag&&mapDrag.moved))tapPend.b.fn();tapPend=null;mapDrag=null;const k=drags.get(e.pointerId);if(k==='s'&&NAV)NAV.steer=0;drags.delete(e.pointerId);if(fsReq){fsReq=false;toggleFS();}};cvs.addEventListener('pointerup',up);cvs.addEventListener('pointercancel',up);cvs.addEventListener('contextmenu',e=>e.preventDefault());
-addEventListener('keydown',e=>{if(scene==='run'||scene==='nav'){if(e.key==='ArrowUp')P.effort=clamp(P.effort+.06,0,1);if(e.key==='ArrowDown')P.effort=clamp(P.effort-.06,0,1);if(e.key==='d'&&scene==='run')drink();if(e.key==='g')gel();if(e.key==='Escape')paused=!paused;}
+addEventListener('keydown',e=>{wakeAudio();if(e.key==='m'&&scene!=='nav'){MUTED=!MUTED;try{localStorage.setItem('ridgeline-mute',MUTED?'1':'0');}catch(_){}}if(scene==='run'||scene==='nav'){if(e.key==='ArrowUp')P.effort=clamp(P.effort+.06,0,1);if(e.key==='ArrowDown')P.effort=clamp(P.effort-.06,0,1);if(e.key==='d'&&scene==='run')drink();if(e.key==='g')gel();if(e.key==='Escape')paused=!paused;}
   if(scene==='nav'){if(e.key==='ArrowLeft'||e.key==='a')KEYS.l=1;if(e.key==='ArrowRight'||e.key==='d')KEYS.r=1;if((e.key==='m'||e.key==='Tab')&&!NAV.brief){NAV.map=!NAV.map;e.preventDefault();}if((e.key==='Enter'||e.key===' ')&&NAV.brief)beginNav();if(e.key==='q')drink();}
   if(scene==='event'){if(e.key==='1')chooseEvent(0);if(e.key==='2')chooseEvent(1);}
   if(scene==='physio'&&(e.key===' '))press();
@@ -1081,7 +1109,7 @@ addEventListener('keydown',e=>{if(scene==='run'||scene==='nav'){if(e.key==='Arro
 addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')KEYS.l=0;if(e.key==='ArrowRight'||e.key==='d')KEYS.r=0;});
 
 /* ---------- loop and test hooks ---------- */
-let last=0;function frame(now){const dt=Math.min(.05,(now-last)/1000||0);last=now;update(dt);render();requestAnimationFrame(frame);}requestAnimationFrame(n=>{last=n;frame(n);});
+let last=0;function frame(now){const dt=Math.min(.05,(now-last)/1000||0);last=now;update(dt);render();musicUpdate();requestAnimationFrame(frame);}requestAnimationFrame(n=>{last=n;frame(n);});
 const ALL=[...RACES,...TRAIN];
 window.__trail={state:()=>({scene,race,R_,P,S,save,PH,BR,NAV}),start:i=>beginRace(ALL[i]),startRace:i=>beginRace(ALL[i]),setEffort:e=>{if(P)P.effort=clamp(e,0,1);},drink,gel,choose:chooseEvent,draft:i=>draftPick(R_.draft[i]),cont:aidNext,
   step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,train:TRAIN,seg:()=>segAt(S,P.x),open:i=>{race=ALL[i];scene='brief';},reset:()=>{save=DEF();persist();},

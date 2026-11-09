@@ -54,3 +54,10 @@ A profile of the marked course sits under the compass: ticks are trail events st
 - **Framing and props along the course**: huge pines and spruces on both sides, a wooden fence on long stretches, signposts with a glowing lantern at junctions, lupines, mossy boulders, wildflowers, bushes and the long grass.
 - **Lighting**: warm sunset grade, dark vignette, and flickering additive light from the lanterns on signposts and on the aid station and finish gates.
 - **HUD**: kept out of the way, with the course info now in a small block in the bottom left.
+
+## Music (from Eighth Arcanum)
+- `score.js` is the Eighth Arcanum procedural score engine (`src/core/score.ts`) transpiled for this page, so the same live-generated tracks play here with no audio files. Regenerate it with `node_modules/.bin/tsc src/core/score.ts --ignoreConfig --outDir _tmp --target es2020 --module es2020 --lib es2020,dom --skipLibCheck`, then strip the `export` keywords and wrap it as `window.EAScore` (see the header of `score.js`).
+- Themes: map and training menu = `title`; home base and shop = `shop`; aid stations = `hub`; route briefing = `draw`; physio = High Priestess; bear fight = Cinder King; result = `reward` (or `victory` on gold); DNF = `defeat`.
+- Each race runs one boss theme: Pine Ridge High Priestess (harp and choir), Lakeside Drowned Queen (slow tide), Canyon Sand Prophet (desert hand drums), Fogbank Hollow Bell, Skyline Emperor, Glacier Gap Frost Matron (glassy arps), Summit Void Sovereign. Storm weather switches to Storm Eye and training runs use Clockwork Judge.
+- During a run the music's energy follows your heart rate: easy layers are bass and pad, harder effort adds drums and lead, and a bonk adds a frenzy.
+- The note button under the fullscreen button mutes music and effects (remembered between visits).
