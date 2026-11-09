@@ -135,3 +135,10 @@ The Team Manager race shows the whole course as a tilted 3D relief map with ever
 - **Finances:** weekly wages, prize money, fans' money, and bankruptcy (more than $250 in debt) ends the career.
 - **Roguelike layer:** after every race you pick one of three team relics (14 of them, such as Beer Fridge, Cheese Costume, Megaphone, Shady Bookie, Lucky Goat) that last the whole career; relics change wages, the pub, income, speed, surge recharge and training.
 - **Map:** runners are head badges with place tags, your runners trail a coloured line, runners in a pack spread across lanes so they do not sit on top of each other, and the map has a gold frame.
+
+## Map art: the hybrid (Pixel Lab tiles plus Blender light maps)
+The race map's ground is built in two layers.
+- **Tiles (Pixel Lab):** four 16 px Wang tilesets (meadow to forest, rock, water, dirt trail; `assets/pl/ts_*.png`) are autotiled onto a 64x64 grid of the race's terrain (`g3PaintTiles`), so the borders between ground types are drawn pixel edges. The route, start, aid and finish rings are painted on top.
+- **Light (Blender):** `prototypes/trail/concepts/bake_lightmaps.py` builds each of the seven race worlds in Blender 5.2 (terrain, trees and rocks), lights them with a north-west sun plus soft sky occlusion, and renders a top-down 1024x1024 light map (`assets/maps/lm_<race>.png`). The game reads that map to shade the tile ground in six dithered bands, so hills, ridges and tree shadows get Blender-quality lighting while the camera stays free. If a light map is missing (a generated course) it falls back to computed hill shading.
+- **Re-baking:** `node tests/_export_worlds.mjs <dir>` writes the seven worlds as JSON; then `blender -b -P bake_lightmaps.py -- <worlds dir> <assets/maps>` (set `ONLY=pine` to bake one). The light maps depend on the world generator, so re-bake after changing it.
+- `tm.tiles(false)` switches back to the original code-painted ground, and `tm.lm(false)` to computed hill shading, for comparison.
