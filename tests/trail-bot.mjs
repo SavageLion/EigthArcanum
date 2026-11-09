@@ -74,7 +74,7 @@ try {
       T.start(idx); let guard = 0, treated = 0;
       while (guard++ < 400000) {
         const st = T.state(), sc = st.scene;
-        if (sc === 'result' || sc === 'dnf') break;
+        if (sc === 'result' || sc === 'dnf' || sc === 'podium') break;
         if (sc === 'aid') {
           if (!st.R_.tentUsed && st.save.inj.length) { T.treat('tent', st.save.inj[0].k); window.__solve(acc); treated++; continue; }
           if (st.R_.draft.length) T.draft(Math.floor(Math.random() * st.R_.draft.length)); else T.cont(); continue;
@@ -85,14 +85,14 @@ try {
         T.step(1 / 30);
       }
       const st = T.state();
-      return { sc: st.scene, medal: st.R_.res && st.R_.res.medal, bonks: st.R_.bonks, total: Math.round(st.R_.total), why: st.R_.why, inj: st.R_.newInj.length, treated, coins: st.R_.coins };
+      return { sc: st.scene, medal: st.R_.res && st.R_.res.medal, bonks: st.R_.bonks, total: Math.round(st.R_.total), why: st.R_.why, inj: st.R_.newInj.length, treated, coins: st.R_.coins, place: st.R_.place };
     };
   });
   if (!SEASON) {
     for (let ri = 0; ri < 11; ri++) {
       const res = [];
       for (let k = 0; k < RUNS; k++) res.push(await page.evaluate(([ri, fixed]) => { window.__trail.reset(); return window.__run(ri, fixed, .8); }, [ri, fixed]));
-      console.log(NAMES[ri].padEnd(9), res.map(r => r.sc === 'result' ? `${r.medal || 'ok'}(${r.total}s,${r.bonks}b,${r.inj}inj,${r.treated}tx)` : `DNF:${r.why}`).join('  '));
+      console.log(NAMES[ri].padEnd(9), res.map(r => (r.sc === 'result' || r.sc === 'podium') ? `${r.place ? r.place + 'th' : ''} ${r.medal || 'ok'}(${r.total}s,${r.bonks}b,${r.inj}inj,${r.treated}tx)` : `DNF:${r.why}`).join('  '));
     }
   } else {
     for (let s = 0; s < SEASONS; s++) {
@@ -119,7 +119,7 @@ try {
           let idx; if (nextRace >= 0 && tot >= need) idx = nextRace; else { const ks = ['clm', 'end', 'heat', 'rec']; const k = ks.reduce((a, b) => lvs[a].l <= lvs[b].l ? a : b); idx = 7 + ks.indexOf(k); }
           const r = window.__run(idx, null, .8);
           sv = St();
-          out.push(`day ${sv.day} ${['Pine', 'Lakeside', 'Canyon', 'Fogbank', 'Skyline', 'Glacier', 'Summit', 'Hills', 'Long', 'Heat', 'Recov'][idx]}: ${r.sc === 'result' ? (r.medal || 'ok') : 'DNF ' + r.why} coins=${sv.coins} fat=${Math.round(sv.fatigue)} stats=${lvs.end.l}${lvs.clm.l}${lvs.heat.l}${lvs.rec.l} inj=${sv.inj.map(i => i.k + i.s).join(',')}`);
+          out.push(`day ${sv.day} ${['Pine', 'Lakeside', 'Canyon', 'Fogbank', 'Skyline', 'Glacier', 'Summit', 'Hills', 'Long', 'Heat', 'Recov'][idx]}: ${(r.sc === 'result' || r.sc === 'podium') ? (r.medal || 'ok') : 'DNF ' + r.why} coins=${sv.coins} fat=${Math.round(sv.fatigue)} stats=${lvs.end.l}${lvs.clm.l}${lvs.heat.l}${lvs.rec.l} inj=${sv.inj.map(i => i.k + i.s).join(',')}`);
         }
         return out;
       });
@@ -129,7 +129,7 @@ try {
   if (process.argv.includes('--nav')) {
     for (const mode of ['trail', 'direct']) {
       const res = []; for (let i = 0; i < 6; i++) res.push(await page.evaluate(m => window.__navBot(m), mode));
-      console.log('nav', mode.padEnd(6), res.map(r => r.sc === 'result' ? `${r.medal}(${r.total}s)` : 'DNF:' + r.why).join('  '));
+      console.log('nav', mode.padEnd(6), res.map(r => (r.sc === 'result' || r.sc === 'podium') ? `${r.medal}(${r.total}s)` : 'DNF:' + r.why).join('  '));
     }
   }
   if (process.argv.includes('--bear')) {
