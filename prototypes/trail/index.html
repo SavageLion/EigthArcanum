@@ -37,7 +37,7 @@ function beep(f,d=.08,type='square',v=.04,sl=0){try{if(MUTED)return;if(!audioCtx
 
 /* ---------- save ---------- */
 const KEY='ridgeline-v2';
-const DEF=()=>({medals:{},coins:80,day:1,fatigue:0,stats:{end:{l:0,x:0},clm:{l:0,x:0},heat:{l:0,x:0},rec:{l:0,x:0}},inj:[],owned:['hat'],cap:2,load:['hat'],loose:false,bear:{w:0,l:0},season:null});
+const DEF=()=>({medals:{},coins:80,day:1,fatigue:0,stats:{end:{l:0,x:0},clm:{l:0,x:0},heat:{l:0,x:0},rec:{l:0,x:0}},inj:[],owned:['hat'],cap:2,load:['hat'],loose:false,bear:{w:0,l:0},season:null,run:null,runs:{n:0,wins:0,best:0}});
 let save=DEF();
 try{const j=JSON.parse(localStorage.getItem(KEY)||'null');if(j&&j.medals){save=Object.assign(DEF(),j);save.stats=Object.assign(DEF().stats,j.stats||{});}
   else{const o=JSON.parse(localStorage.getItem('ridgeline-v1')||'null');if(o&&o.medals)save.medals=o.medals;}}catch(e){}
@@ -128,7 +128,7 @@ function advanceDay(rest,lines){save.day++;save.fatigue=Math.max(0,save.fatigue-
   const ch=(rest?.5:.12)*(save.fatigue<50?1:.5);save.inj.forEach(i=>{if(Math.random()<ch){i.s--;lines.push({s:INJ[i.k].n+(i.s>0?' eases':' has healed'),c:'#9fd8a0'});}});save.inj=save.inj.filter(i=>i.s>0);}
 
 /* ---------- state ---------- */
-let scene='map',race=null,R_=null,S=null,P=null,PH=null,t=0,sceneT=0,paused=false,shake=0,flash=0,msg='',msgT=0,note='',noteT=0;
+let RUN=null,scene='home',race=null,R_=null,S=null,P=null,PH=null,t=0,sceneT=0,paused=false,shake=0,flash=0,msg='',msgT=0,note='',noteT=0;
 const HIT=[],popups=[],parts=[];
 const pop=(s,x,y,col='#fff')=>popups.push({s,x,y,t:1.2,col});
 const banner=(s,n=1.6)=>{msg=s;msgT=n;};
@@ -155,7 +155,7 @@ const elevAt=(st,x)=>{const s=segAt(st,x);return s.e0+(Math.min(x,s.x0+s.len)-s.
 
 /* ---------- running ---------- */
 function beginRace(r){
-  race=r;R_={si:0,times:[],bonks:0,gear:save.load.filter(g=>save.owned.includes(g)),sips:3,gels:2,blister:false,fell:false,total:0,newInj:[],stageInj:[],tentUsed:false,report:[],climbXp:0,heatXp:0,easyXp:0,res:null,settled:false,parS:0,parG:0,wx:r.train?(r.wx||'clear'):forecast(r)};
+  RUN=null;race=r;R_={si:0,times:[],bonks:0,gear:save.load.filter(g=>save.owned.includes(g)),sips:3,gels:2,blister:false,fell:false,total:0,newInj:[],stageInj:[],tentUsed:false,report:[],climbXp:0,heatXp:0,easyXp:0,res:null,settled:false,parS:0,parG:0,wx:r.train?(r.wx||'clear'):forecast(r)};
   R_.sips=3+(has('flask')?2:0);R_.gels=2+(has('gels')?2:0);
   R_.calendar=!r.train&&r===curRace();if(!r.train)R_.field=SEA().field.map(q=>({id:q.id,m:q.m,rv:RIVALS[q.id],T:[],aid:[],start:[]}));
   R_.legs=clamp(100-save.fatigue*.25+(save.loose?10:0),40,100);R_.water=100;R_.fuel=100;if(save.loose){R_.report.push({s:'Loosened up by physio: +10 legs',c:'#9fd8a0'});}save.loose=false;
@@ -165,7 +165,7 @@ function startStage(){startNav();}
 const has=g=>R_&&R_.gear.includes(g);
 const PS=[19,17,15.5,15],PG=[23,20,18,17.4],avgL=()=>1000+120*race.tier+60*(race.stages-1)/2;
 const par=()=>({silver:R_.parS,gold:R_.parG});
-const simTS=()=>(race.km/race.stages)*5.54;
+const simTS=()=>RUN?1:(race.km/race.stages)*5.54;
 const fmtT=sec=>{sec=Math.round(sec);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0');};
 
 function sweetEffort(g,heat){return clamp((.74-.28-1.1*Math.max(0,g)-heat*.06)/.62,.1,.9);}
@@ -188,34 +188,34 @@ function update(dt){
   if(P.cramp>0){P.cramp-=dt;e=Math.min(e,.35);}
   // speed
   let v=9+26*Math.pow(e,.9);
-  if(g>0)v*=clamp(1-3.0*(1-.07*lv('clm'))*g*(has('poles')?.85:1)*(1+.1*sev('calf')),.4,1);else v*=1+Math.min(.35,-g*2.2);
-  const terPen=1-ter.f;v*=1-terPen*((has('shoes')&&seg.t!=='smooth')?.5:1);v*=((WXC().ter||{})[seg.t]||1);if(scene==='nav'&&WXC().wind)v*=1+WXC().wind*Math.cos(NAV.hd-NAV.windAng)*(1+.3*Math.sin(t*.4));
+  if(g>0)v*=clamp(1-3.0*(1-.07*lv('clm'))*g*(has('poles')?.85:1)*(has('goat')?.7:1)*(1+.1*sev('calf')),.4,1);else v*=1+Math.min(.35,-g*2.2);
+  const terPen=1-ter.f;v*=1-terPen*((has('shoes')&&seg.t!=='smooth')?.5:1);v*=wxTer(seg.t);if(scene==='nav'&&WXC().wind)v*=1+WXC().wind*Math.cos(NAV.hd-NAV.windAng)*(1+.3*Math.sin(t*.4));
   if(P.legs<25)v*=.6+.4*P.legs/25;
   if(R_.blister)v*=.92;v*=1-.045*sev('blister');if(P.ankle>0){P.ankle-=dt;v*=.85;}
   if(P.slow){P.slow.t-=dt;v*=P.slow.v;if(P.slow.t<=0)P.slow=null;}
   if(P.hike>0)v=Math.min(v,11*(has('poles')?1.2:1));
   if(P.bonk>0)v=Math.min(v,7);
-  if(P.drinkT>0){P.drinkT-=dt;v*=.55;}
+  if(P.drinkT>0){P.drinkT-=dt;v*=.55;}if(P.boost>0){P.boost-=dt;v*=1.1;}if(has('kick')&&NAV&&NAV.len&&NAV.dist>NAV.len*.75)v*=1.12;
   if(P.stop>0){P.stop-=dt;v=0;}
   P.speed+=(v-P.speed)*(1-Math.exp(-dt*3));if(scene==='nav'){navMove(P.speed*dt);if(scene!=='nav')return;}else P.x+=P.speed*dt;P.phase+=P.speed*dt*.085;
   // heart rate
-  let tgt=.28+.62*e+1.1*Math.max(0,g)+heat*.07+(P.water<20?.08:0)+(has('buff')&&heat>.3?-.03:0);tgt=clamp(tgt+(WXC().hr||0),.3,1);
+  let tgt=.28+.62*e+1.1*Math.max(0,g)+heat*.07+(P.water<20?.08:0)+(has('buff')&&heat>.3?-.03:0);tgt=clamp(tgt+(WXC().hr||0)-(has('lungs')?.035:0),.3,1);
   P.hr+=(tgt-P.hr)*(1-Math.exp(-dt/(tgt>P.hr?5:9)));
   // legs
   let drain=.35+13*Math.pow(Math.max(0,P.hr-.62),1.6);
-  if(g<-.06&&e>.55)drain+=Math.max(0,-g-.06)*30*e*(1+.6*sev('knee'));
+  if(g<-.06&&e>.55)drain+=Math.max(0,-g-.06)*30*e*(1+.6*sev('knee'))*(has('quads')?.4:1);
   if(g>0&&has('poles'))drain*=.9;
   if(g<.02)drain*=1+.08*sev('shin');if(e>.75)drain*=1+.2*sev('ach');
-  drain*=1-.05*lv('end');drain*=WXC().drain||1;
+  drain*=1-.05*lv('end');drain*=has('grip')?1+((WXC().drain||1)-1)*.5:(WXC().drain||1);if(has('metro')&&Math.abs(e-sweetEffort(g,heat))<.1)drain*=.85;
   if(P.fuel<20)drain*=1.5;if(P.water<20)drain*=1.3;
   if(P.hr<.6){const rec=.8*(.6-P.hr)/.3*(has('sleeves')?1.4:1)*(1+.12*lv('rec'))*(P.fuel<15?.6:1);P.legs=Math.min(100,P.legs+rec*dt);}
   if(P.hr>.62)P.legs-=drain*dt;else P.legs-=.2*dt;
-  if(P.legs<=0&&P.bonk<=0){P.legs=0;P.bonk=12;R_.bonks++;P.bonked=true;banner('BONK! Your legs give out',2);shake=6;beep(160,.4,'sawtooth',.06,-60);flash=.6;}
+  if(P.legs<=0&&P.bonk<=0){if(has('sw')&&!R_.swUsed){R_.swUsed=true;P.legs=32;banner('SECOND WIND!',2);flash=.5;beep(880,.2,'triangle');}else{P.legs=0;P.bonk=12;R_.bonks++;P.bonked=true;banner('BONK! Your legs give out',2);shake=6;beep(160,.4,'sawtooth',.06,-60);flash=.6;}}
   // stress tracking for injuries and training
   if(g<-.05&&e>.55)P.sDown+=dt;if(P.hr>.9)P.sRed+=dt;if(e>.7)P.sHard+=dt;if(g>.04&&P.hr>.8)P.sClimb+=dt;if(P.hr<.62)P.tEasy+=dt;
   if(g>.03)R_.climbXp+=dt;
   // hydration and fuel
-  P.water=Math.max(0,P.water-.45*(.5+e+heat*.6)*dt*(WXC().water||1));P.fuel=Math.max(0,P.fuel-.32*(.4+e)*dt);
+  P.water=Math.max(0,P.water-.45*(.5+e+heat*.6)*dt*(WXC().water||1)*(has('vest')?.7:1));P.fuel=Math.max(0,P.fuel-.32*(.4+e)*dt*(has('gut')?.65:1));
   // cramp from redlining while dry
   if(P.hr>.92){P.redT+=dt;if(P.redT>6-sev('calf')&&P.water<35&&P.cramp<=0){P.cramp=9;P.redT=0;banner('Cramp! Ease off',1.8);beep(200,.2,'sawtooth',.05);}}else P.redT=Math.max(0,P.redT-dt);
   // stumbles on technical ground
@@ -264,11 +264,11 @@ function chooseEvent(i){if(scene!=='event')return;const d=EVENTS[P.ev.k];scene='
 
 /* ---------- actions ---------- */
 function drink(){if((scene!=='run'&&scene!=='nav')||R_.sips<=0||P.drinkT>0)return;R_.sips--;P.water=Math.min(100,P.water+38);P.drinkT=1.3;beep(700,.1,'sine');pop('+water',RX,110,'#9ad8ff');}
-function gel(){if((scene!=='run'&&scene!=='nav')||R_.gels<=0||P.drinkT>0)return;R_.gels--;P.fuel=Math.min(100,P.fuel+42);P.legs=Math.min(100,P.legs+8);P.drinkT=1.1;beep(800,.1,'sine');pop('+fuel',RX,110,'#ffe08a');}
+function gel(){if((scene!=='run'&&scene!=='nav')||R_.gels<=0||P.drinkT>0)return;R_.gels--;P.fuel=Math.min(100,P.fuel+42);P.legs=Math.min(100,P.legs+8);P.drinkT=1.1;if(has('caff'))P.boost=8;beep(800,.1,'sine');pop('+fuel',RX,110,'#ffe08a');}
 
 // injuries are rolled at the end of every stage from how hard you ran it
 function rollInjuries(){
-  const fr=n=>P.t>0?n/P.t:0,f=save.fatigue*.0012,tr=race.train?.6:1,out=[];
+  const fr=n=>P.t>0?n/P.t:0,f=save.fatigue*.0012,tr=(race.train?.6:1)*(has('tough')?.5:1),out=[];
   const tryInj=(k,p)=>{if(Math.random()<clamp(p,0,.55)*tr)out.push(addInj(k));};
   tryInj('knee',.025+fr(P.sDown)*.9+f+(R_.fell?.25:0));
   tryInj('shin',.025+fr(P.sHard)*.3+f);
@@ -278,7 +278,7 @@ function rollInjuries(){
   R_.fell=false;P.bonked=false;R_.stageInj=out;R_.newInj.push(...out);
   R_.heatXp+=S.heat>.3?14:5;R_.easyXp+=fr(P.tEasy);R_.climbFrac=(R_.climbFrac||0)+fr(R_.climbXp);R_.climbXp=0;
 }
-function finishStage(){
+function finishStage(){if(RUN)return runLegDone();
   R_.times.push(P.t);R_.total+=P.t;R_.legs=P.legs;R_.water=P.water;R_.fuel=P.fuel;beep(988,.2,'triangle');rollInjuries();if(R_.field)R_.snap=fieldRows(R_.si+1,true);
   if(R_.si+1>=race.stages)return endRace(true);
   scene='aid';sceneT=0;R_.tentUsed=false;R_.draft=shuffle(Object.keys(GEAR).filter(g=>!R_.gear.includes(g))).slice(0,3);
@@ -302,7 +302,7 @@ function settle(done,medal){
   advanceDay(false,L);if(save.fatigue>=70)L.push({s:'You are overreached: rest soon!',c:'#ffb08a'});
   persist();
 }
-function fail(why){R_.why=why;rollInjuries();beep(150,.5,'sawtooth',.06,-80);
+function fail(why){if(RUN)return runFail(why);R_.why=why;rollInjuries();beep(150,.5,'sawtooth',.06,-80);
   if(!race.train){R_.res={total:R_.total,medal:null};recordRace(false);settle(false,null);afterRaceCalendar();}else settle(false);scene='dnf';sceneT=0;}
 function endRace(done){
   R_.res={total:R_.total,medal:null};
@@ -338,16 +338,16 @@ function press(){
     const ok=PH.hits>=need_;PH.mode='done';PH.res={ok};
     if(ok){const q=save.inj.find(i=>i.k===PH.k);if(q){q.s--;if(q.s<=0)save.inj=save.inj.filter(i=>i!==q);}const L=[];addXp('rec',8,L);
       if(PH.perf>=3){if(PH.from==='tent'){R_.legs=Math.min(100,R_.legs+10);}else save.loose=true;PH.res.loose=true;}}
-    if(PH.from==='tent'){R_.tentUsed=true;R_.total+=(40-(has('roller')?20:0))/simTS();}
+    if(PH.from==='tent'){R_.tentUsed=true;if(RUN)RUN.bank=Math.max(0,RUN.bank-tentCost());else R_.total+=(40-(has('roller')?20:0))/simTS();}
     persist();beep(ok?1046:180,.3,ok?'triangle':'sawtooth');
   }
 }
-function leaveTreat(){scene=PH&&PH.from==='tent'?'aid':'base';PH=null;}
+function leaveTreat(){if(RUN&&PH&&PH.from==='tent'){scene='camp';if(CAMP){CAMP.acts--;CAMP.pick=false;if(CAMP.acts<=0)CAMP.msg=PH.res&&PH.res.ok?'Treated. The tent crew patches you up.':'The treatment did not take.';}PH=null;return;}scene=PH&&PH.from==='tent'?'aid':'base';PH=null;}
 
 /* ---------- bear fight (old-school boxing): dodge the swipe, punch while it is open ---------- */
 let BR=null;
 function startBear(from){
-  BR={from,hp:100,php:from==='race'&&P&&P.legs<35?3:4,maxphp:0,state:'idle',st:1,side:0,open:0,combo:0,t:0,fb:'',fbT:0,dodge:0,dodgeSide:0,dcd:0,pcd:0,hand:0,punchT:0,flash:0,hurt:0,over:null,swing:0,feint:false,hits:0,whiffs:0};
+  BR={from,hp:from==='race'&&has('claw')?60:100,php:from==='race'&&P&&P.legs<35?3:4,maxphp:0,state:'idle',st:1,side:0,open:0,combo:0,t:0,fb:'',fbT:0,dodge:0,dodgeSide:0,dcd:0,pcd:0,hand:0,punchT:0,flash:0,hurt:0,over:null,swing:0,feint:false,hits:0,whiffs:0};
   BR.maxphp=BR.php;scene='bear';sceneT=0;banner('A BEAR!',1.4);beep(120,.4,'sawtooth',.06,-30);
 }
 const bearSpeed=()=>1+(1-BR.hp/100)*.75;
@@ -618,7 +618,7 @@ const tAt=(W_,x,y)=>W_.T[clamp(Math.floor(y/CS),0,NN-1)*NN+clamp(Math.floor(x/CS
 
 const NAVTH={dawn:{top:[116,104,188],bot:[244,186,160],tint:[1.05,.98,.92]},noon:{top:[84,156,230],bot:[222,238,248],tint:[1.04,1.03,.9]},dusk:{top:[64,46,118],bot:[240,128,98],tint:[1.12,.88,.8]},night:{top:[6,10,30],bot:[38,54,104],tint:[.5,.56,.82],stars:true},frost:{top:[150,182,222],bot:[232,242,252],tint:[1.2,1.28,1.38]}};
 const VS=[17,16,16.3,16],VG=[21.5,20,20.2,19.6],CUTD=[10,9.2,8.2,7.8];
-function makeEvents(r,L,seed){const rg=mulberry(seed*13+5),tr=r.train,n=tr?2:3+(r.tier>0?1:0),slots=[];for(let i=0;i<n;i++)slots.push(L*(.12+.6*(i+.2+rg()*.6)/n));
+function makeEvents(r,L,seed){const rg=mulberry(seed*13+5),tr=r.train,n=tr?2:(r.nEv!=null?r.nEv:3+(r.tier>0?1:0)),slots=[];for(let i=0;i<n;i++)slots.push(L*(.12+.6*(i+.2+rg()*.6)/n));
   const pool=['creek','climb','scree','fork','oranges','heat','blister'];for(let i=pool.length-1;i>0;i--){const j=Math.floor(rg()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
   const evs=slots.map((px,i)=>({x:px,k:pool[i%pool.length],done:false}));
   if(!tr&&(r.bear||[]).includes(R_.si))evs.push({x:L*(.4+.2*rg()),k:'bear',done:false});return evs;}
@@ -643,10 +643,10 @@ function startNav(){
   setTiles(r);
   if(NAV.pl&&Wd.tufts&&Wd.tufts.length){NAV.tb=new Float32Array(Wd.tufts.length);NAV.ts=new Int8Array(Wd.tufts.length);NAV.tg=new Map();Wd.tufts.forEach((q,i)=>{const kk=Math.floor(q.x/16)*1000+Math.floor(q.y/16);let L=NAV.tg.get(kk);if(!L){L=[];NAV.tg.set(kk,L);}L.push(i);});}
   bakeNavMap();navReveal(Wd.start.x,Wd.start.y,9);
-  popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;NAV.brief=true;NAV.map=true;
+  popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;NAV.brief=true;NAV.map=true;if(RUN)runLegSetup();
 }
 // the route briefing is over: the clock starts
-function beginNav(){if(!NAV||!NAV.brief)return;NAV.brief=false;NAV.map=false;banner(R_.si+1>=race.stages?'Find the FINISH (red gate)':'Find the AID STATION (blue gate)',2.6);beep(520,.12);}
+function beginNav(){if(!NAV||!NAV.brief)return;NAV.brief=false;NAV.map=false;banner(R_.si+1>=race.stages?'Find the FINISH (red gate)':RUN?'Find the CHECKPOINT (blue gate)':'Find the AID STATION (blue gate)',2.6);beep(520,.12);}
 function navReveal(cx,cy,r){const N=NAV,tc=N.tcv.getContext('2d');tc.fillStyle='#c8a468';for(let y=Math.max(0,Math.floor(cy-r));y<Math.min(NN,cy+r);y++)for(let x=Math.max(0,Math.floor(cx-r));x<Math.min(NN,cx+r);x++){const i=y*NN+x;if(N.W.trail[i]&&!N.rev[i]&&Math.hypot(x-cx,y-cy)<r){N.rev[i]=1;tc.fillRect(x,y,1,1);}}}
 function bakeNavMap(){
   const Wd=NAV.W,cv=document.createElement('canvas');cv.width=cv.height=NN;const q=cv.getContext('2d'),im=q.createImageData(NN,NN);
@@ -833,17 +833,17 @@ function diamond(x,y,r,fill,stroke){c.beginPath();c.moveTo(x,y-r);c.lineTo(x+r,y
 function measure(s,sz,w=700){c.font=`${w} ${sz}px ${MONO}`;return c.measureText(s).width;}
 function pill(x,y,str,col,o={}){const sz=o.sz||7,iw=o.icon?14:0,w=measure(str,sz)+11+iw;glass(x,y,w,16,7,o.a||.58);if(o.icon)o.icon(x+9.5,y+8);text(str,x+6+iw,y+11.4,col,sz,'left');return w;}
 function toggleMute(){MUTED=!MUTED;try{localStorage.setItem('ridgeline-mute',MUTED?'1':'0');}catch(e){}wakeAudio();}
-const navFinishName=()=>R_.si+1>=race.stages?'FINISH':'AID STATION';
+const navFinishName=()=>R_.si+1>=race.stages?'FINISH':RUN?'CHECKPOINT':'AID STATION';
 // the search circle shrinks and drifts onto the real gate as you close in
 function navRing(){const N=NAV,Wd=N.W,d=Math.hypot(N.px/CS-Wd.fin.x,N.py/CS-Wd.fin.y),k=clamp((d-10)/55,0,1);return {x:Wd.fin.x+(Wd.ring.x-Wd.fin.x)*k,y:Wd.fin.y+(Wd.ring.y-Wd.fin.y)*k,r:6+13*k};}
 function navCourse(){const N=NAV,pts=N.W.pts;let best=1e9,bi=0;for(let i=0;i<pts.length;i+=2){const d=Math.hypot(pts[i].x-N.px,pts[i].y-N.py);if(d<best){best=d;bi=i;}}return {d:best,p:pts[bi],i:bi};}
 function navHud(){
   const N=NAV,tn=t,cx=W/2,isF=R_.si+1>=race.stages,sm=(race.km*1000/race.stages)/N.len,co=navCourse(),fin=N.W.fin,fgx=(fin.x+.5)*CS,fgy=(fin.y+.5)*CS,seen=!!N.seenFin,rg=navRing();
-  const sim=(R_.total+P.t)*simTS(),fs=R_.field?fieldState():null;
+  const sim=RUN?P.t:(R_.total+P.t)*simTS(),fs=R_.field?fieldState():null;
   // ---- top bar
   glass(4,3,W-8,23,8,.52);
-  text(race.name,11,13,'#f6ecd2',7.5);text(race.stages>1?`Stage ${R_.si+1} of ${race.stages}`:'Training run',11,21.5,'#bcaa8e',6.4,'left',500);
-  text(fmtT(sim),121,18.5,'#fff',12,'center');text('cut '+fmtT(S.cut*simTS()),149,19,P.t>S.cut*.85?'#ff8a7a':'#a8987e',6.3,'left',500);
+  text(race.name,11,13,'#f6ecd2',7.5);text(RUN?`Leg ${RUN.legNo+1}  -  stop ${RUN.cur.L+1} of ${NLAY}`:race.stages>1?`Stage ${R_.si+1} of ${race.stages}`:'Training run',11,21.5,'#bcaa8e',6.4,'left',500);
+  text(fmtT(sim),121,18.5,'#fff',12,'center');text(RUN?'left '+fmtT(Math.max(0,S.cut-P.t)):'cut '+fmtT(S.cut*simTS()),149,19,P.t>S.cut*.85?'#ff8a7a':'#a8987e',6.3,'left',500);
   iconBtn(205,14.5,9,8,()=>{paused=true;});iconBtn(226,14.5,9,10,toggleMute,{slash:MUTED});iconBtn(247,14.5,9,11,()=>{fsReq=true;});
   // ---- compass tape
   const cy=30,half=108,bd=(((N.hd*180/Math.PI+90)%360)+360)%360,pxs=2.6,lim=half/pxs-3;
@@ -911,7 +911,7 @@ function navHud(){
 }
 function navMapOverlay(){
   const N=NAV,Wd=N.W,mx=PORT?15:10,my=PORT?36:18,sc=240/NN;
-  panelBg(1);text('MAP',mx,PORT?14:13,'#e8a23a',10);text(N.brief?`${race.name}  -  stage ${R_.si+1}/${race.stages}: plan your route, then press START`:'the clock keeps running while you read it',PORT?mx:mx+40,PORT?28:13,N.brief?'#9ae8a8':'#ff9a7a',6.5,'left',500);
+  panelBg(1);text('MAP',mx,PORT?14:13,'#e8a23a',10);text(N.brief?(RUN?`${race.name}: plan your route, then press START`:`${race.name}  -  stage ${R_.si+1}/${race.stages}: plan your route, then press START`):'the clock keeps running while you read it',PORT?mx:mx+40,PORT?28:13,N.brief?'#9ae8a8':'#ff9a7a',6.5,'left',500);
   c.imageSmoothingEnabled=false;c.drawImage(N.bake,mx,my,NN*sc,NN*sc);c.drawImage(N.tcv,mx,my,NN*sc,NN*sc);
   c.strokeStyle='#3a4a3e';c.lineWidth=1;c.strokeRect(mx+.5,my+.5,NN*sc-1,NN*sc-1);
   const M=(x,y)=>[mx+x*sc,my+y*sc];
@@ -927,7 +927,7 @@ function navMapOverlay(){
   if(PORT){
     legend.forEach((q,i)=>{const col=TPAL[q[0]],X=mx+(i%2)*126,Y=288+Math.floor(i/2)*13;c.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;c.fillRect(X,Y,9,9);text(q[1],X+13,Y+8,'#cfdad2',6.5,'left',500);});
     notes.forEach((q,i)=>text(q,mx,350+i*11,'#9fb0a4',6.5,'left',500));text('Weather: '+WXC().n+'  -  '+WXC().d,mx,410,'#9fb6d8',6.2,'left',500);
-    if(N.brief)btn(mx,420,240,34,R_.si+1>=race.stages?'START RACE':'START STAGE '+(R_.si+1),true,beginNav);else btn(mx,420,240,34,'BACK TO RUNNING',true,()=>{N.map=false;});
+    if(N.brief)btn(mx,420,240,34,RUN?'START LEG':R_.si+1>=race.stages?'START RACE':'START STAGE '+(R_.si+1),true,beginNav);else btn(mx,420,240,34,'BACK TO RUNNING',true,()=>{N.map=false;});
   }else{
     const X=264;text('HOW TO READ IT',X,34,'#e8a23a',8.5);
     legend.forEach((q,i)=>{const col=TPAL[q[0]];c.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;c.fillRect(X,42+i*13,9,9);text(q[1],X+14,50+i*13,'#cfdad2',7,'left',500);});
@@ -960,7 +960,7 @@ const STOPY=i=>MAPH-130-i*98,STOPX=i=>i%2?196:74;
 const nextGoal=()=>{const i=RACES.findIndex(r=>entry(r).ok&&medalOf(r.id)<2);return i<0?RACES.length-1:i;};
 function topBar(){
   c.fillStyle='rgba(6,10,8,.88)';c.fillRect(0,0,W,48);
-  text('RIDGELINE',8,16,'#e8a23a',12);text(`Day ${save.day}`,W-32,14,'#e8eee8',9,'right');text(`${save.coins} coins`,W-32,28,'#ffd24a',9,'right');
+  text('RIDGELINE',8,16,'#e8a23a',12);HIT.push({x:0,y:0,w:70,h:22,fn:()=>{scene='home';sceneT=0;}});text(`Day ${save.day}`,W-32,14,'#e8eee8',9,'right');text(`${save.coins} coins`,W-32,28,'#ffd24a',9,'right');
   bar(54,24,96,8,save.fatigue/100,save.fatigue>70?'#e84a3a':save.fatigue>40?'#e8a23a':'#6ac07a','TIRED',null);
   text(save.inj.length?`${save.inj.length} injur${save.inj.length>1?'ies':'y'}`:'healthy',8,42,save.inj.length?'#ff8a7a':'#9fd8a0',7.5);
 }
@@ -1020,7 +1020,7 @@ function baseScene(){
   text('CONDITION',14,268,'#9fb0a4',8);
   if(save.inj.length)save.inj.slice(0,5).forEach((i,j)=>{injLine(i,14,282+j*13,7.5);text(INJ[i.k].t,148,282+j*13,'#8a9a90',5.5,'left',500);});else text('No injuries. You feel good.',14,282,'#9fd8a0',8);
   bar(66,352,110,8,save.fatigue/100,save.fatigue>70?'#e84a3a':save.fatigue>40?'#e8a23a':'#6ac07a','TIRED',Math.round(save.fatigue)+'%');
-  btn(14,372,118,34,'SHOP',true,()=>{scene='shop';sceneT=0;});btn(138,372,118,34,'PHYSIO TENT 15c',false,()=>{PH={from:'base',mode:'pick'};scene='physio';sceneT=0;});
+  btn(14,372,118,34,'SHOP',true,()=>{shopBack='base';scene='shop';sceneT=0;});btn(138,372,118,34,'PHYSIO TENT 15c',false,()=>{PH={from:'base',mode:'pick'};scene='physio';sceneT=0;});
   btn(14,412,118,30,'REST A DAY',false,restDay);btn(138,412,118,30,'BACK TO MAP',false,()=>{scene='map';});
   text('Rest clears fatigue and may heal injuries',W/2,458,'#6a7a70',7,'center',500);
   toastLayer();
@@ -1034,7 +1034,7 @@ function shopScene(){
     if(own)text('OWNED',252,y+14,'#9fd8a0',8,'right');else btn(204,y+4,50,24,`${it.p}c`,can,()=>buy(id),!can);});
   const cc=CAPCOST[save.cap-2];
   if(cc!=null)btn(10,34+SHOPIDS.length*35+2,250,26,`Bigger pack: +1 loadout slot (${cc}c)`,save.coins>=cc,buyCap,save.coins<cc);else text('Pack is full size',W/2,34+SHOPIDS.length*35+18,'#9fb0a4',8,'center');
-  btn(80,446,110,24,'Back',false,()=>{scene='base';});
+  btn(80,446,110,24,'Back',false,()=>{scene=shopBack;});
   text('Choose what to carry on the race screen',W/2,438,'#6a7a70',6.5,'center',500);
   toastLayer();
 }
@@ -1075,7 +1075,7 @@ function physioScene(){
   }else{
     const ok=PH.res.ok;text(ok?(PH.s>1?'Better! Injury eased':'Healed!'):'Too sore. Try again later.',W/2,350,ok?'#9fd8a0':'#ff8a7a',12,'center');
     if(PH.res.loose)text('Perfect work: legs loosened (+10 legs next run)',W/2,368,'#ffd27a',7.5,'center');
-    if(inTent)text(`The treatment cost ${(40-(has('roller')?20:0))} s`,W/2,382,'#9fb0a4',7.5,'center',500);
+    if(inTent)text(`The treatment cost ${RUN?tentCost():(40-(has('roller')?20:0))} s`,W/2,382,'#9fb0a4',7.5,'center',500);
     btn(70,396,130,32,'DONE',true,leaveTreat);
   }
   toastLayer();
@@ -1140,7 +1140,7 @@ function render(){
   else if(scene==='event')eventScene();
   else if(scene==='bear')bearScene();
   else if(scene==='nav')navScene();
-  else if(scene==='podium')podiumScene();else if(scene==='standings')standingsScene();else if(scene==='field')fieldScene();else if(scene==='seasonend')seasonEndScene();
+  else if(scene==='podium')podiumScene();else if(scene==='standings')standingsScene();else if(scene==='field')fieldScene();else if(scene==='seasonend')seasonEndScene();else if(scene==='home')homeScene();else if(scene==='runmap')runMapScene();else if(scene==='camp')campScene();else if(scene==='revent')reventScene();else if(scene==='rshop')rshopScene();else if(scene==='reward')rewardScene();else if(scene==='runend')runEndScene();else if(scene==='perks')perksScene();
   if(paused)pauseLayer();
   if(scene!=='nav'&&(scene!=='bear'||(BR&&BR.over))){fsBtn();muteBtn();}
   toastLayer();
@@ -1170,6 +1170,7 @@ function newSeason(n){
 if(!save.season||!save.season.field)newSeason(1);
 // one rival's time for one stage: the par pace, their rating and style, the weather and some luck. Fully independent of how you run.
 function rivalStage(si,len,asc){
+  if(RUN){for(const f of R_.field){const rg=mulberry((f.id*977+RUN.seed+si*31)|0);f.T[si]=len/(runVpar(asc/len)*f.m)*(1+(rg()-.5)*.04);f.aid[si]=0;f.start[si]=R_.total;}return;}
   const r=race,par=len/VS[r.tier],cr=asc/len;
   for(const f of R_.field){const rv=f.rv,rg=mulberry((((SEA().n*131+SEA().idx)*977+si*31+f.id*7)|0)+11);let m=f.m/1.14*(RPACE[Math.max(0,RACES.indexOf(r))]||1.2)*1.05;
     if(rv.style==='climber')m*=1+.9*(cr-.1);else if(rv.style==='diesel')m*=1+.012*(r.stages-3);else if(rv.style==='sprinter')m*=1-.012*(r.stages-3);else if(rv.style==='heat'&&R_.wx==='hot')m*=1.05;
@@ -1331,7 +1332,8 @@ function musicFor(){
   if(scene==='nav'){if(NAV&&NAV.brief)return ['draw',0];if(R_&&R_.wx==='storm')return ['battle',3];return race.train?['battle',9]:(RACE_MUSIC[race.id]||['battle',14]);}
   if(scene==='bear')return ['battle',0];
   if(scene==='podium')return PODIUM&&PODIUM.place&&PODIUM.place<=3?['victory',0]:['reward',0];if(scene==='seasonend')return ['victory',0];if(scene==='standings'||scene==='field')return ['title',0];
-  if(scene==='map'||scene==='train')return ['title',0];
+  if(scene==='map'||scene==='train'||scene==='home'||scene==='runmap'||scene==='perks')return ['title',0];
+  if(scene==='camp'||scene==='revent')return ['hub',0];if(scene==='rshop')return ['shop',0];if(scene==='reward')return ['reward',0];if(scene==='runend')return END&&END.win?['victory',0]:['defeat',0];
   if(scene==='base'||scene==='shop')return ['shop',0];
   if(scene==='aid')return ['hub',0];
   if(scene==='physio')return ['battle',14];
@@ -1350,6 +1352,337 @@ function musicUpdate(){
 function muteBtn(){const x=W-24,y=25;HIT.push({x:x-2,y:y-2,w:24,h:22,fn:()=>{MUTED=!MUTED;try{localStorage.setItem('ridgeline-mute',MUTED?'1':'0');}catch(e){}wakeAudio();}});
   c.fillStyle='rgba(8,12,10,.7)';c.fillRect(x,y,20,18);c.fillStyle=MUTED?'#6a7a70':'#cfdad2';c.beginPath();c.ellipse(x+8,y+13,3.2,2.4,-.4,0,TAU);c.fill();c.fillRect(x+10.4,y+4,1.4,9);c.fillRect(x+10.4,y+4,5,2);
   if(MUTED){c.strokeStyle='#ff6a5a';c.lineWidth=1.6;c.beginPath();c.moveTo(x+3,y+15);c.lineTo(x+17,y+3);c.stroke();}}
+/* ---------- THE RUN: a roguelike climb up the ridge. Every leg is a Trail View run; the map, perks, camps and rivals are the roguelike layer on top. ---------- */
+let END=null,CAMP=null,REVT=null,SHOPN=null,perksBack='runmap',shopBack='base';
+const NLAY=9,BANKMAX=90,PARCLIMB=3;
+const PK={
+  goat:{n:'Mountain goat',t:'Climbs slow you 30% less.',r:1},
+  quads:{n:'Iron quads',t:'Fast descents drain your legs 60% less.',r:1},
+  caff:{n:'Caffeine gels',t:'Every gel also gives 8 s of extra speed.',r:0},
+  sw:{n:'Second wind',t:'Once per run, a bonk is cancelled and you get 32 legs back.',r:1},
+  lungs:{n:'Big lungs',t:'Your heart rate runs lower, so you can push harder.',r:0},
+  gut:{n:'Iron gut',t:'Fuel lasts 35% longer.',r:0},
+  vest:{n:'Hydration vest',t:'Water lasts 30% longer and you carry +1 drink.',r:0},
+  kick:{n:'Finishing kick',t:'The last quarter of every leg: +12% speed.',r:1},
+  tough:{n:'Thick skin',t:'Half as many injuries.',r:0},
+  bank:{n:'Time bank',t:'+8 s on the clock after every leg.',r:1},
+  sponsor:{n:'Sponsor',t:'+35% gold from legs.',r:0},
+  grip:{n:'Weather shell',t:'Rain, mud and storms hurt you half as much.',r:0},
+  claw:{n:'Bear charm',t:'Bears start the fight at 60% health.',r:1},
+  metro:{n:'Metronome',t:'Legs drain 15% slower while your effort is in the sweet spot.',r:1},
+};
+const PINEW=RACES[0].world;
+const LEGK={
+  flat:{n:'Valley trail',d:'Gentle, fast ground. Low risk, small reward.',col:'#6ac07a',w:{peak:34,noise:22,biome:{rock:80,loose:62,mud:.55,brush:.62}},span:.6,par:1,gold:9,ev:1},
+  climb:{n:'Steep climb',d:'A long grind up the slope. Pace it well for a better reward.',col:'#e8a23a',w:{peak:125,noise:55},span:.6,par:1,gold:15,ev:2},
+  tech:{n:'Rocky ridge',d:'Rock and scree slow you down and can make you fall.',col:'#b8a890',w:{peak:70,noise:50,biome:{rock:44,loose:30,mud:.66,brush:.6}},span:.6,par:.95,gold:15,ev:2},
+  bear:{n:'Bear country',d:'A bear waits in the trees. Win the fight for a RARE perk.',col:'#e8503a',w:{peak:85,noise:48},span:.6,par:.95,gold:20,ev:1,elite:1},
+  duel:{n:'Rival duel',d:'A rival runs this leg at their own pace. Beat their time for a RARE perk and bonus gold.',col:'#c07aff',w:{peak:60,noise:40},span:.65,par:1,gold:16,ev:1,elite:1,duel:1},
+  boss:{n:'The summit',d:'The last climb, with a bear on the way and the champion ahead. Reach the top to win.',col:'#ff5a5a',w:{peak:140,noise:62},span:.9,par:.95,gold:50,ev:2,boss:1,duel:1},
+};
+const NODEK=Object.assign({},LEGK,{
+  aid:{n:'Aid station',d:'Pick one: fuel up, rest, or get a physio.',col:'#5aaaf0'},
+  tent:{n:'Medical tent',d:'Treat up to two injuries with the physio game, or take a quick massage.',col:'#ff7a9a'},
+  event:{n:'Trail encounter',d:'Something happens on the trail. Every choice has a price.',col:'#ffd24a'},
+  shop:{n:'Trail shop',d:'Spend your gold on perks and supplies.',col:'#ffe08a'},
+});
+const PERKIDS=()=>[...Object.keys(GEAR),...Object.keys(PK)];
+const perkI=id=>PK[id]||GEAR[id]||{n:id,t:''};
+const perkRare=id=>PK[id]?PK[id].r:0;
+function perkDraft(rare){
+  const own=R_.gear,pool=PERKIDS().filter(g=>!own.includes(g)),com=shuffle(pool.filter(g=>!perkRare(g))),rar=shuffle(pool.filter(g=>perkRare(g)));
+  let out=rare?[rar[0],rar[1],(rar[2]&&Math.random()<.5)?rar[2]:com[0]]:[com[0],com[1],(rar[0]&&Math.random()<.3)?rar[0]:com[2]];
+  out=out.filter(Boolean);for(const g of [...com,...rar]){if(out.length>=3)break;if(!out.includes(g))out.push(g);}
+  return out.slice(0,3);}
+function takePerk(g){R_.gear.push(g);if(g==='flask')R_.sips+=2;if(g==='gels')R_.gels+=2;if(g==='vest')R_.sips+=1;beep(740,.1,'triangle');}
+const tentCost=()=>18-(has('roller')?9:0);
+const wxTer=k=>{const f=(WXC().ter||{})[k]||1;return has('grip')?1-(1-f)*.5:f;};
+
+// ----- the map: nine stops from the trailhead to the summit
+function genRunMap(seed){
+  const rg=mulberry(seed),widths=[3,3,3,3,3,3,3,2,1],map=[],legs=['flat','climb','tech'],wxs=['clear','clear','clear','hot','rain','fog','wind','cold'];
+  const kinds=(L)=>{const r=rg();return r<.5?legs[Math.floor(rg()*3)]:r<.64?'event':r<.74?'aid':r<.82?'shop':r<.9?'tent':'tech';};
+  const l0=shuffle(legs);
+  for(let L=0;L<NLAY;L++){const row=[];for(let i=0;i<widths[L];i++){
+    let k=L===NLAY-1?'boss':L===NLAY-2?(i?'tent':'aid'):L===0?l0[i]:kinds(L);
+    if(L===1&&!LEGK[k])k=legs[Math.floor(rg()*3)];
+    row.push({L,i,k,wx:'clear',seed:((seed*31+L*17+i*7)|0)||1,e:[],done:false,jx:(rg()-.5)*16,jy:(rg()-.5)*8,rv:Math.floor(rg()*RIVALS.length)});}
+    map.push(row);}
+  [[2,'event'],[3,'bear'],[4,'aid'],[5,'duel'],[6,'shop']].forEach(([L,k])=>{map[L][Math.floor(rg()*3)].k=k;});
+  for(const row of map)for(const n of row){if(LEGK[n.k]){n.wx=n.k==='boss'?['fog','storm','wind'][Math.floor(rg()*3)]:(n.L>=4&&rg()<.12?'storm':wxs[Math.floor(rg()*wxs.length)]);}}
+  for(let L=0;L<NLAY-1;L++){const a=map[L],b=map[L+1];
+    a.forEach((n,i)=>{const p=(i+.5)/a.length,cd=[];b.forEach((m,j)=>{const q=(j+.5)/b.length;if(Math.abs(p-q)<.4)cd.push([Math.abs(p-q),j]);});cd.sort((x,y)=>x[0]-y[0]);n.e=[cd[0][1]];for(let z=1;z<cd.length;z++)if(rg()<.55)n.e.push(cd[z][1]);});
+    b.forEach((m,j)=>{if(!a.some(n=>n.e.includes(j))){let bi=0,bd=9;a.forEach((n,i)=>{const d=Math.abs((i+.5)/a.length-(j+.5)/b.length);if(d<bd){bd=d;bi=i;}});a[bi].e.push(j);}});}
+  return map;
+}
+const NP=n=>({x:30+(n.i+.5)/RUN.map[n.L].length*210+n.jx,y:346-n.L*34+n.jy});
+const runReach=()=>RUN.pos?RUN.map[RUN.pos.L][RUN.pos.i].e.map(j=>RUN.map[RUN.pos.L+1][j]):RUN.map[0].slice();
+const nodeAt=o=>RUN.map[o.L][o.i];
+
+function newRun(){
+  R_={si:0,times:[],bonks:0,gear:save.load.filter(g=>save.owned.includes(g)),sips:3,gels:2,blister:false,fell:false,total:0,newInj:[],stageInj:[],tentUsed:false,report:[],climbXp:0,heatXp:0,easyXp:0,res:null,settled:false,parS:0,parG:0,wx:'clear',legs:100,water:100,fuel:100,field:null,bonusCoins:0,swUsed:false,calendar:false};
+  R_.sips=3+(has('flask')?2:0)+(has('vest')?1:0);R_.gels=2+(has('gels')?2:0);
+  const seed=((Math.random()*1e9)|0)+1;
+  RUN={seed,legNo:0,gold:0,bank:40,sel:null,pos:null,cur:null,map:genRunMap(seed),R:R_,stash:save.inj,path:[],nextWx:null,vpar:15,parT:60,champ:false};
+  save.inj=[];
+}
+function startRun(){newRun();save.run=RUN;persist();scene='runmap';sceneT=0;beep(660,.1,'triangle');}
+function continueRun(){RUN=save.run;R_=RUN.R;R_.field=null;scene='runmap';sceneT=0;}
+function enterNode(n){
+  if(!n||n.done)return;RUN.sel=null;RUN.cur={L:n.L,i:n.i};beep(520,.08,'triangle');
+  if(LEGK[n.k])return launchLeg(n);
+  if(n.k==='aid'||n.k==='tent'){CAMP={node:n,acts:n.k==='tent'?2:1,msg:'',pick:false};scene='camp';sceneT=0;return;}
+  if(n.k==='event'){const rg=mulberry(n.seed);REVT={node:n,ev:REV[Math.floor(rg()*REV.length)],res:null};scene='revent';sceneT=0;return;}
+  if(n.k==='shop'){const pool=PERKIDS().filter(g=>!R_.gear.includes(g)),rg=mulberry(n.seed),sh=pool.slice().sort(()=>rg()-.5).slice(0,3);SHOPN={node:n,stock:sh.map(g=>({g,p:perkRare(g)?85:45,sold:false})),heal:false,pack:false,msg:''};scene='rshop';sceneT=0;}
+}
+function completeNode(n){n.done=true;RUN.pos={L:n.L,i:n.i};RUN.path.push({L:n.L,i:n.i});RUN.cur=null;CAMP=null;REVT=null;SHOPN=null;scene='runmap';sceneT=0;save.run=RUN;persist();}
+function launchLeg(n){
+  const K=LEGK[n.k],ln=RUN.legNo,rv=RIVALS[n.rv];
+  const stg=K.boss?R_.si+1:R_.si+2;race={id:'pine',name:K.n,km:1500*(K.span/.6)*stg/1000,stages:stg,theme:'dawn',tier:0,seed:n.seed,climate:['clear'],world:Object.assign({},PINEW,K.w,{span:K.span}),bear:(n.k==='bear'||K.boss)?[R_.si]:[],nav:true,nEv:K.ev,blurb:''};
+  R_.wx=RUN.nextWx||n.wx;RUN.nextWx=null;R_.field=null;R_.bonusCoins=0;R_.stageInj=[];
+  if(K.duel)R_.field=[{id:rv.id,m:1.0+.02*ln+(K.boss?.07:0),rv,T:[],aid:[],start:[]}];
+  startNav();
+}
+// called at the end of startNav: the leg's cutoff is the par time plus whatever you have banked
+// the par pace: what a well-paced runner manages on this ground, tightening with every leg you clear
+function runVpar(cr){const K=LEGK[nodeAt(RUN.cur).k],ln=RUN.legNo,wf={rain:.96,storm:.9,hot:.98}[R_.wx]||1;return Math.max(9,25-130*Math.min(.17,cr))*(.86+.045*ln)*K.par*wf;}
+function runLegSetup(){
+  const len=NAV.len,Wd=NAV.W;let asc=0,prev=null;
+  for(let k=0;k<=64;k++){const q=Wd.pts[Math.min(Wd.pts.length-1,Math.round(k/64*(Wd.pts.length-1)))],h=hAt(Wd,q.x,q.y);if(prev!=null&&h>prev)asc+=h-prev;prev=h;}
+  RUN.cr=asc/len;RUN.vpar=runVpar(RUN.cr);const parT=len/RUN.vpar;S.cut=parT+RUN.bank;RUN.parT=parT;
+}
+function runLegDone(){
+  const n=nodeAt(RUN.cur),K=LEGK[n.k];
+  R_.times.push(P.t);R_.total+=P.t;R_.water=P.water;R_.fuel=P.fuel;beep(988,.2,'triangle');rollInjuries();
+  let duel=null;if(R_.field){const f=R_.field[0];duel={rv:f.rv,win:P.t<f.T[R_.si],gap:f.T[R_.si]-P.t};}
+  const early=RUN.parT-P.t;
+  RUN.bank=clamp(S.cut-P.t+(has('bank')?8:0),0,BANKMAX);
+  let g=K.gold+clamp(Math.round(early*.3),0,14)+(R_.bonusCoins||0)+(duel&&duel.win?20:0);g=Math.round(g*(has('sponsor')?1.35:1));
+  RUN.gold+=g;if(K.boss&&duel&&duel.win)RUN.champ=true;
+  R_.legs=Math.min(100,P.legs+12);
+  const inj=R_.stageInj.slice();
+  n.done=true;RUN.pos={L:n.L,i:n.i};RUN.path.push({L:n.L,i:n.i});RUN.cur=null;RUN.legNo++;R_.si++;R_.field=null;R_.bonusCoins=0;
+  RUN.rep={name:K.n,t:P.t,parT:RUN.parT,gold:g,duel,inj,early,bank:RUN.bank,n};
+  if(K.boss)return runEnd(true,'You reached the summit');
+  R_.draft=perkDraft(!!K.elite&&(!K.duel||(duel&&duel.win)));RUN.after=null;
+  scene='reward';sceneT=0;save.run=RUN;persist();
+}
+function runFail(why){if(!RUN)return;rollInjuries();beep(150,.5,'sawtooth',.06,-80);runEnd(false,why==='Missed the cutoff'?'The broom wagon caught you: you ran out of time':why);}
+function runEnd(win,why){
+  const legs=RUN.legNo,L=[];
+  const coins=Math.floor(RUN.gold*.5)+legs*6+(win?100:0)+(RUN.champ?40:0);
+  addXp('end',8*legs+(win?20:0),L);addXp('clm',Math.min(40,25*(R_.climbFrac||0)),L);if(R_.heatXp)addXp('heat',Math.min(30,R_.heatXp*.6),L);addXp('rec',4*legs,L);
+  save.coins+=coins;save.runs.n++;if(win)save.runs.wins++;save.runs.best=Math.max(save.runs.best,legs);
+  save.inj=RUN.stash||[];
+  END={win,why,legs,gold:RUN.gold,coins,lines:L,perks:R_.gear.slice(),total:R_.total,champ:RUN.champ,rep:RUN.rep};
+  RUN=null;save.run=null;persist();scene='runend';sceneT=0;beep(win?1046:150,.4,win?'triangle':'sawtooth');
+}
+function rewardPick(g){if(g)takePerk(g);else RUN.gold+=10;R_.draft=[];rewardDone();}
+function rewardDone(){if(RUN.after){const f=RUN.after;RUN.after=null;f();}else{scene='runmap';sceneT=0;save.run=RUN;persist();}}
+
+// ----- trail encounters
+const REV=[
+  {t:'A friendly dog',d:'A stray dog trots beside you and seems to know the way.',
+    a:{t:'Follow the dog',h:'70%: it finds a shortcut (+20 s). 30%: a detour (-10 legs).',fn(){if(Math.random()<.7){RUN.bank=Math.min(BANKMAX,RUN.bank+20);return 'The dog knows a shortcut. +20 s on the clock.';}R_.legs=Math.max(5,R_.legs-10);return 'A wild goose chase. -10 legs.';}},
+    b:{t:'Pat it and move on',h:'Legs +8.',fn(){R_.legs=Math.min(100,R_.legs+8);return 'A nice moment. +8 legs.';}}},
+  {t:'Mountain spring',d:'Ice-cold water pours from the rocks beside the trail.',
+    a:{t:'Cold plunge',h:'Legs +22, but -10 s on the clock.',fn(){R_.legs=Math.min(100,R_.legs+22);RUN.bank=Math.max(0,RUN.bank-10);return 'Brutal and brilliant. +22 legs, -10 s.';}},
+    b:{t:'Fill your bottles',h:'Water to 100% and +1 drink.',fn(){R_.water=100;R_.sips++;return 'Water full, one more drink in the pack.';}}},
+  {t:'The shrine',d:'A cairn with small offerings. Something about it feels lucky.',
+    a:{t:'Leave 20 gold',h:'Heal your worst injury by a level.',fn(){if(RUN.gold<20)return 'You do not have 20 gold. The cairn stays quiet.';if(!save.inj.length)return 'You have no injuries. The cairn keeps your gold safe: nothing happens.';RUN.gold-=20;const q=save.inj.slice().sort((x,y)=>y.s-x.s)[0];q.s--;if(q.s<=0)save.inj=save.inj.filter(i=>i!==q);return INJ[q.k].n+' eases.';}},
+    b:{t:'Take a coin',h:'+25 gold, but a cold gust takes 8 legs.',fn(){RUN.gold+=25;R_.legs=Math.max(5,R_.legs-8);return '+25 gold. A cold gust: -8 legs.';}}},
+  {t:'An old runner',d:'A grey-haired runner has done this ridge forty times.',
+    a:{t:'Listen to her',h:'A free perk draft.',draft:1,fn(){return 'She shares a few secrets.';}},
+    b:{t:'Run on',h:'+15 gold from a tip jar.',fn(){RUN.gold+=15;return '+15 gold.';}}},
+  {t:'Storm warning',d:'Dark clouds are rolling over the ridge.',
+    a:{t:'Rush on',h:'+18 s on the clock, but the next leg is a storm.',fn(){RUN.bank=Math.min(BANKMAX,RUN.bank+18);RUN.nextWx='storm';return '+18 s. The next leg will be stormy.';}},
+    b:{t:'Shelter and wait',h:'-12 s on the clock, legs +20.',fn(){RUN.bank=Math.max(0,RUN.bank-12);R_.legs=Math.min(100,R_.legs+20);return 'You wait it out. +20 legs, -12 s.';}}},
+  {t:'A dropped wallet',d:'Someone lost a wallet on the trail. It has a name and some gold in it.',
+    a:{t:'Keep it',h:'+35 gold.',fn(){RUN.gold+=35;return '+35 gold. You tell yourself it is fine.';}},
+    b:{t:'Hand it in',h:'A grateful ranger gives you a free perk draft.',draft:1,fn(){return 'The ranger rewards your honesty.';}}},
+  {t:'Trail magic',d:'A cooler sits on a rock with a sign: help yourself.',
+    a:{t:'Take the gels',h:'+2 gels and +15 fuel.',fn(){R_.gels+=2;R_.fuel=Math.min(100,R_.fuel+15);return '+2 gels, +15 fuel.';}},
+    b:{t:'Take the drinks',h:'+2 drinks and water to 100%.',fn(){R_.sips+=2;R_.water=100;return '+2 drinks, water full.';}}},
+];
+function reventPick(i){
+  if(!REVT||REVT.res)return;const o=i?REVT.ev.b:REVT.ev.a;REVT.res=o.fn();REVT.draft=!!o.draft;beep(i?520:440,.08,'triangle');
+}
+function reventDone(){
+  const n=REVT.node,dr=REVT.draft;
+  if(dr){completeNode(n);R_.draft=perkDraft(false);RUN.rep=null;RUN.after=null;scene='reward';sceneT=0;}else completeNode(n);
+}
+// ----- camps
+function campFuel(){R_.legs=Math.min(100,R_.legs+25);R_.water=100;R_.fuel=100;R_.sips=Math.max(R_.sips,3+(has('flask')?2:0)+(has('vest')?1:0));R_.gels=Math.max(R_.gels,2+(has('gels')?2:0));CAMP.acts--;CAMP.msg='Legs +25. Water and fuel full. Pack restocked.';beep(740,.1,'triangle');}
+function campRest(){RUN.bank=Math.max(0,RUN.bank-15);R_.legs=Math.min(100,R_.legs+55);CAMP.acts--;CAMP.msg='You sit down and breathe. Legs +55, -15 s.';beep(500,.15,'sine');}
+function campMassage(){R_.legs=Math.min(100,R_.legs+22);CAMP.acts--;CAMP.msg='A quick rub-down. Legs +22.';beep(600,.1,'sine');}
+function campTreat(k){CAMP.pick=false;openTreat('tent',k);}
+// ----- the trail shop
+function shopBuyPerk(i){const s=SHOPN.stock[i];if(!s||s.sold||RUN.gold<s.p)return;RUN.gold-=s.p;s.sold=true;takePerk(s.g);SHOPN.msg=perkI(s.g).n+' bought.';}
+function shopHeal(){if(SHOPN.heal||RUN.gold<30||!save.inj.length)return;RUN.gold-=30;SHOPN.heal=true;const q=save.inj.slice().sort((x,y)=>y.s-x.s)[0];q.s--;if(q.s<=0)save.inj=save.inj.filter(i=>i!==q);SHOPN.msg=INJ[q.k].n+' eases.';beep(740,.1,'triangle');}
+function shopPack(){if(SHOPN.pack||RUN.gold<15)return;RUN.gold-=15;SHOPN.pack=true;R_.sips=Math.max(R_.sips,3+(has('flask')?2:0)+(has('vest')?1:0))+1;R_.gels=Math.max(R_.gels,2+(has('gels')?2:0))+1;R_.water=100;R_.fuel=100;SHOPN.msg='Pack restocked, water and fuel full.';beep(740,.1,'triangle');}
+
+/* ---------- run scenes ---------- */
+function runBg(){
+  const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1c1a3a');g.addColorStop(.5,'#26384c');g.addColorStop(1,'#0f1a16');c.fillStyle=g;c.fillRect(0,0,W,H);
+  for(let k=0;k<3;k++){c.fillStyle=['#222a4a','#1c2a3a','#16241f'][k];c.beginPath();c.moveTo(0,H);for(let x=0;x<=W;x+=6)c.lineTo(x,170+k*90-Math.abs(Math.sin(x*.02+k*2))*70-Math.sin(x*.07+k)*10);c.lineTo(W,H);c.fill();}
+}
+function mbar(x,y,w,v,c1,c2,lab,low){rr(x,y,w,9,4.5);c.fillStyle='rgba(0,0,0,.55)';c.fill();const fw=w*clamp(v,0,1);if(fw>3){rr(x,y,fw,9,4.5);const g=c.createLinearGradient(0,y,0,y+9);g.addColorStop(0,c1);g.addColorStop(1,c2);c.fillStyle=g;c.fill();}rr(x,y,w,9,4.5);c.strokeStyle=low?'#ff6a5a':'rgba(255,210,140,.4)';c.lineWidth=1;c.stroke();text(lab,x+4,y+7,'#fff',6,'left');}
+function runHud(){
+  glass(4,3,W-32,46,8,.7);
+  text(`STOP ${(RUN.pos?RUN.pos.L+1:0)+1} OF ${NLAY}`,10,14,'#f6ecd2',7);
+  c.fillStyle='#ffd24a';c.beginPath();c.arc(84,10.5,4,0,TAU);c.fill();c.strokeStyle='#8a6a10';c.lineWidth=1;c.stroke();text(String(RUN.gold),91,14,'#ffe9a8',8);
+  text('TIME BANK '+fmtT(RUN.bank),132,14,RUN.bank<20?'#ff8a7a':'#cfe8c8',7);
+  mbar(10,20,62,R_.legs/100,'#8ae07a','#3a9a4a','LEGS '+Math.round(R_.legs),R_.legs<30);
+  mbar(78,20,62,R_.water/100,'#7ac0ff','#3a78d0','WATER '+Math.round(R_.water),R_.water<30);
+  mbar(146,20,62,R_.fuel/100,'#ffd060','#e08a20','FUEL '+Math.round(R_.fuel),R_.fuel<30);
+  text(`D${R_.sips} G${R_.gels}`,213,27.5,'#e8d8b0',6.5);
+  const inj=save.inj.map(i=>INJ[i.k].n+(i.s>1?' '+i.s:'')).join(', ');
+  text(inj?'Hurt: '+inj.slice(0,32):'No injuries',10,43,inj?'#ffb08a':'#9fd8a0',6.5,'left',500);
+  HIT.push({x:186,y:33,w:54,h:15,fn:()=>{perksBack=scene;scene='perks';}});glass(186,33,54,14,6,.85);text(`PERKS ${R_.gear.length}`,213,43,'#ffd27a',6.8,'center');
+}
+function nodeGlyph(k,x,y,col){
+  c.save();c.translate(x,y);c.strokeStyle=col;c.fillStyle=col;c.lineWidth=1.8;c.lineCap='round';c.lineJoin='round';
+  if(k==='flat'){c.beginPath();c.moveTo(-6,2);c.quadraticCurveTo(-3,-4,0,0);c.quadraticCurveTo(3,4,6,-2);c.stroke();}
+  else if(k==='climb'){c.beginPath();c.moveTo(-7,5);c.lineTo(-1,-6);c.lineTo(3,0);c.lineTo(5,-3);c.lineTo(8,5);c.closePath();c.fill();}
+  else if(k==='tech'){c.beginPath();c.moveTo(-6,5);c.lineTo(-5,-1);c.lineTo(-1,-5);c.lineTo(3,-3);c.lineTo(6,2);c.lineTo(5,5);c.closePath();c.fill();}
+  else if(k==='bear'){c.beginPath();c.arc(0,2,4.2,0,TAU);c.fill();for(const dx of [-5,-1.7,1.7,5]){c.beginPath();c.arc(dx,-3.6+Math.abs(dx)*.4,1.7,0,TAU);c.fill();}}
+  else if(k==='duel'){text('VS',0,3,col,8.5,'center');}
+  else if(k==='boss'){c.beginPath();c.moveTo(-7,6);c.lineTo(0,-5);c.lineTo(7,6);c.closePath();c.fill();c.fillRect(-.5,-9,1.2,6);c.fillStyle='#fff';c.fillRect(.7,-9,5,3.4);}
+  else if(k==='aid'){c.beginPath();c.moveTo(0,-6);c.quadraticCurveTo(7,2,0,6);c.quadraticCurveTo(-7,2,0,-6);c.fill();}
+  else if(k==='tent'){c.beginPath();c.moveTo(-7,6);c.lineTo(0,-6);c.lineTo(7,6);c.closePath();c.fill();c.fillStyle='#1a1020';c.fillRect(-1.6,0,3.2,6);}
+  else if(k==='event'){text('?',0,4,col,12,'center');}
+  else if(k==='shop'){text('$',0,4,col,11,'center');}
+  c.restore();
+}
+function runMapScene(){
+  runBg();const M=RUN.map,reach=runReach(),rs=new Set(reach.map(n=>n.L*10+n.i)),pulse=.5+.5*Math.sin(t*4),onPath=(L,i)=>RUN.path.some(q=>q.L===L&&q.i===i);
+  // edges
+  for(const row of M)for(const n of row){const a=NP(n);for(const j of n.e){const m=M[n.L+1][j],b=NP(m);
+    const trav=onPath(n.L,n.i)&&onPath(m.L,m.i),live=RUN.pos&&RUN.pos.L===n.L&&RUN.pos.i===n.i,ini=!RUN.pos&&false;
+    c.strokeStyle=trav?'#e8c070':live?'rgba(255,255,255,.75)':'rgba(190,200,220,.18)';c.lineWidth=trav||live?2:1.2;c.setLineDash(trav||live?[]:[3,3]);c.beginPath();c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);c.stroke();c.setLineDash([]);}}
+  // trailhead marker
+  text('TRAILHEAD',135,366,'#9fb0a4',7,'center');
+  for(const row of M)for(const n of row){
+    const p=NP(n),K=NODEK[n.k],can=rs.has(n.L*10+n.i),sel=RUN.sel&&RUN.sel.L===n.L&&RUN.sel.i===n.i,here=RUN.pos&&RUN.pos.L===n.L&&RUN.pos.i===n.i,R0=n.k==='boss'?15:11.5;
+    if(can){glow(p.x,p.y,R0+12,K.col,.25+.25*pulse);HIT.push({x:p.x-17,y:p.y-17,w:34,h:34,fn:()=>{RUN.sel={L:n.L,i:n.i};beep(600,.04,'triangle');}});}
+    c.beginPath();c.arc(p.x,p.y,R0,0,TAU);c.fillStyle=n.done?'#2a2418':'#10161c';c.fill();
+    c.lineWidth=sel?3:can?2:1.4;c.strokeStyle=sel?'#fff':n.done?'#7a6a40':can?K.col:'rgba(150,160,175,.45)';c.stroke();
+    c.globalAlpha=n.done?.45:(can||!RUN.pos&&n.L===0)?1:.62;nodeGlyph(n.k,p.x,p.y,K.col);c.globalAlpha=1;
+    if(n.done){c.strokeStyle='#e8c070';c.lineWidth=2;c.beginPath();c.moveTo(p.x-4,p.y);c.lineTo(p.x-1,p.y+3);c.lineTo(p.x+5,p.y-4);c.stroke();}
+    if(LEGK[n.k]&&!n.done){c.beginPath();c.arc(p.x+R0*.8,p.y-R0*.8,6.3,0,TAU);c.fillStyle='rgba(10,14,22,.92)';c.fill();c.strokeStyle='rgba(200,215,235,.5)';c.lineWidth=1;c.stroke();wxIcon(n.wx,p.x+R0*.8,p.y-R0*.8,8);}
+    if(here){c.fillStyle='#ff7a5a';c.beginPath();c.moveTo(p.x,p.y-R0-2);c.lineTo(p.x-4,p.y-R0-9);c.lineTo(p.x+4,p.y-R0-9);c.closePath();c.fill();}
+  }
+  runHud();
+  // detail panel
+  glass(6,372,W-12,102,9,.82);
+  const sel=RUN.sel?nodeAt(RUN.sel):null;
+  if(!sel){text(RUN.pos?'Choose your next stop':'Choose where to start',W/2,404,'#f6ecd2',11,'center');wrap('Tap one of the glowing stops. The weather badge shows the forecast for each leg.',40).forEach((q,i)=>text(q,W/2,424+i*11,'#bcaa8e',7.5,'center',500));
+    text('Run: green valley, amber climb, grey rocks, red bear, purple rival duel',W/2,462,'#7f9086',6.2,'center',500);}
+  else{const K=NODEK[sel.k],leg=!!LEGK[sel.k];
+    c.beginPath();c.arc(24,392,11,0,TAU);c.fillStyle='#10161c';c.fill();c.strokeStyle=K.col;c.lineWidth=2;c.stroke();nodeGlyph(sel.k,24,392,K.col);
+    text(K.n,42,390,K.col,11);
+    if(leg)text(K.elite?'ELITE':K.boss?'FINAL':'LEG',W-14,389,K.elite||K.boss?'#ff9a7a':'#9fb0a4',7,'right');
+    wrap(K.d,48).slice(0,2).forEach((q,i)=>text(q,16,408+i*10,'#e8dcc4',7.2,'left',500));
+    if(leg){const w=WX[sel.wx];wxIcon(sel.wx,22,438,10);text(`${w.n}: ${wrap(w.d,38)[0]}`,34,441,'#bfd6e8',6.5,'left',500);}
+    else text(sel.k==='shop'?'Costs gold. Perks, a healer and supplies.':sel.k==='event'?'You will have to choose.':'Safe stop: no clock.',16,441,'#9fb0a4',6.8,'left',500);
+    btn(14,451,W-28,19,sel.k==='aid'||sel.k==='tent'||sel.k==='shop'||sel.k==='event'?'ENTER':'RUN THIS LEG',true,()=>enterNode(sel));}
+  toastLayer();
+}
+function cardBox(x,y,w,h,col,dis,fn){HIT.push({x,y,w,h,fn:dis?()=>{}:fn});c.fillStyle=dis?'#141a1c':'#162428';c.fillRect(x,y,w,h);c.strokeStyle=dis?'#2a3a40':col;c.lineWidth=1.5;c.strokeRect(x+.5,y+.5,w-1,h-1);}
+function campScene(){
+  runBg();runHud();const n=CAMP.node,K=NODEK[n.k];
+  text(K.n.toUpperCase(),W/2,76,K.col,15,'center');
+  if(CAMP.pick){
+    text('Who needs help? Costs '+tentCost()+' s of your clock.',W/2,98,'#9fb0a4',7.5,'center',500);
+    save.inj.forEach((i,j)=>{const y=108+j*54;cardBox(14,y,W-28,48,'#e8a23a',false,()=>campTreat(i.k));injLine(i,24,y+18,9);text(INJ[i.k].t,24,y+34,'#b8c4bc',7,'left',500);});
+    btn(80,420,110,26,'Back',false,()=>{CAMP.pick=false;});
+  }else if(CAMP.acts>0){
+    text(n.k==='aid'?'Choose one':`Choose ${CAMP.acts>1?'up to two':'one more'}`,W/2,96,'#9fb0a4',8,'center',500);
+    const hurt=save.inj.length>0;
+    const opts=n.k==='aid'?[
+      ['Fuel up','Legs +25, water and fuel to 100%, drinks and gels restocked.',campFuel,false,'#6ac07a'],
+      ['Rest','Legs +55, but it costs 15 s of your time bank.',campRest,RUN.bank<=15,'#5aaaf0'],
+      ['Physio','Treat one injury with the physio game. Costs '+tentCost()+' s.',()=>{CAMP.pick=true;},!hurt,'#ff7a9a']]
+     :[['Treat an injury','Physio game: ease an injury a level. Costs '+tentCost()+' s each.',()=>{CAMP.pick=true;},!hurt,'#ff7a9a'],
+       ['Massage','Legs +22. Free.',campMassage,false,'#6ac07a']];
+    opts.forEach((o,i)=>{const y=108+i*84;cardBox(14,y,W-28,76,o[4],o[3],o[2]);text(o[0],26,y+24,o[3]?'#6a7a70':'#fff',12);wrap(o[3]&&o[0]!=='Rest'?(hurt?'Not available.':'You have no injuries.'):o[1],40).slice(0,3).forEach((q,j)=>text(q,26,y+42+j*11,o[3]?'#6a7a70':'#b8c4bc',7.5,'left',500));});
+    btn(80,440,110,24,'Leave',false,()=>completeNode(n));
+  }else{
+    wrap(CAMP.msg||'Done.',36).forEach((q,i)=>text(q,W/2,150+i*14,'#e8eee8',10,'center',500));
+    btn(60,300,150,34,'CONTINUE',true,()=>completeNode(n));
+  }
+  if(CAMP.msg&&CAMP.acts>0&&!CAMP.pick)text(CAMP.msg,W/2,432,'#9fd8a0',7,'center',500);
+  toastLayer();
+}
+function reventScene(){
+  runBg();runHud();const e=REVT.ev;
+  text(e.t,W/2,84,'#ffd24a',16,'center');wrap(e.d,36).forEach((q,i)=>text(q,W/2,108+i*12,'#e8eee8',9,'center',500));
+  if(!REVT.res){[e.a,e.b].forEach((o,i)=>{const y=170+i*92;cardBox(14,y,W-28,82,i?'#e8803a':'#6ac07a',false,()=>reventPick(i));text(o.t,28,y+26,'#fff',12);wrap(o.h,38).slice(0,3).forEach((q,j)=>text(q,28,y+44+j*11,'#b8c4bc',8,'left',500));});}
+  else{wrap(REVT.res,34).forEach((q,i)=>text(q,W/2,190+i*14,'#9fd8a0',10.5,'center',500));btn(60,300,150,34,REVT.draft?'CHOOSE A PERK':'CONTINUE',true,reventDone);}
+  toastLayer();
+}
+function rshopScene(){
+  runBg();runHud();text('TRAIL SHOP',W/2,76,'#ffe08a',15,'center');
+  SHOPN.stock.forEach((s,i)=>{const y=88+i*66,p=perkI(s.g),can=RUN.gold>=s.p&&!s.sold;cardBox(10,y,W-20,60,perkRare(s.g)?'#c07aff':'#e8a23a',s.sold||!can,()=>shopBuyPerk(i));
+    text(p.n,18,y+16,s.sold?'#6a7a70':perkRare(s.g)?'#e0b8ff':'#ffd27a',10);wrap(p.t,40).slice(0,2).forEach((q,j)=>text(q,18,y+30+j*10,'#b8c4bc',7,'left',500));
+    text(s.sold?'SOLD':s.p+'g',W-18,y+16,s.sold?'#6a7a70':can?'#ffe9a8':'#8a6a50',9,'right');});
+  [[ 'Heal an injury',30,SHOPN.heal||!save.inj.length,shopHeal],['Restock pack',15,SHOPN.pack,shopPack]].forEach((o,i)=>{const y=292+i*38,dis=o[2]||RUN.gold<o[1];cardBox(10,y,W-20,32,'#5aaaf0',dis,o[3]);text(o[0],18,y+20,dis?'#6a7a70':'#e8f4fa',9);text(o[2]?(o[0]==='Heal an injury'&&!SHOPN.heal?'no injuries':'done'):o[1]+'g',W-18,y+20,dis?'#6a7a70':'#ffe9a8',9,'right');});
+  if(SHOPN.msg)text(SHOPN.msg,W/2,378,'#9fd8a0',8,'center',500);
+  btn(60,396,150,34,'LEAVE',true,()=>completeNode(SHOPN.node));
+  toastLayer();
+}
+function rewardScene(){
+  runBg();runHud();const rp=RUN.rep;
+  if(rp){
+    text('LEG CLEAR',W/2,74,'#e8c070',15,'center');text(rp.name,W/2,88,'#cfdad2',8,'center',500);
+    text(`${fmtT(rp.t)}  vs par ${fmtT(rp.parT)}`,W/2,106,'#fff',10,'center');
+    const e=rp.early;text(e>=0?`${fmtT(e)} ahead of par: +${Math.round(e*.3)>0?Math.min(14,Math.round(e*.3)):0} bonus gold`:`${fmtT(-e)} behind par`,W/2,119,e>=0?'#9fd8a0':'#ffb08a',7.5,'center',500);
+    text(`+${rp.gold} gold    Time bank ${fmtT(rp.bank)}`,W/2,132,'#ffe9a8',8.5,'center');
+    if(rp.duel)text(rp.duel.win?`You beat ${rp.duel.rv.name} by ${fmtT(Math.abs(rp.duel.gap))}!`:`${rp.duel.rv.name} beat you by ${fmtT(Math.abs(rp.duel.gap))}.`,W/2,146,rp.duel.win?'#9fd8a0':'#ff8a7a',8.5,'center');
+    rp.inj.slice(0,2).forEach((q,i)=>text('Injury: '+q,W/2,160+i*11,'#ff8a7a',7.5,'center',500));
+  }else text('FREE PERK',W/2,86,'#e8c070',15,'center');
+  text('CHOOSE A PERK',W/2,184,'#e8a23a',9,'center');
+  R_.draft.forEach((g,i)=>{const y=192+i*62,p=perkI(g),rare=perkRare(g);cardBox(10,y,W-20,56,rare?'#c07aff':'#e8a23a',false,()=>rewardPick(g));
+    text(p.n,18,y+17,rare?'#e0b8ff':'#ffd27a',10);if(rare)text('RARE',W-18,y+17,'#c07aff',7,'right');wrap(p.t,42).slice(0,2).forEach((q,j)=>text(q,18,y+32+j*10,'#c8d4cc',7.2,'left',500));});
+  btn(70,446,130,22,'Skip (+10 gold)',false,()=>rewardPick(null));
+  toastLayer();
+}
+function perksScene(){
+  runBg();panelBg(.7);text('YOUR PERKS',W/2,26,'#e8a23a',14,'center');
+  const l=R_.gear;if(!l.length)text('None yet. Win them on the trail.',W/2,80,'#9fb0a4',9,'center',500);
+  l.slice(0,13).forEach((g,i)=>{const y=40+i*30,p=perkI(g);text(p.n,14,y+10,perkRare(g)?'#e0b8ff':'#ffd27a',8.5);wrap(p.t,52).slice(0,1).forEach(q=>text(q,14,y+22,'#b8c4bc',6.8,'left',500));});
+  btn(70,446,130,26,'Back',true,()=>{scene=perksBack;});
+}
+function runEndScene(){
+  const e=END;runBg();panelBg(.55);
+  text(e.win?'SUMMIT!':'RUN OVER',W/2,52,e.win?'#e8c070':'#e8503a',24,'center');
+  wrap(e.why||'',36).forEach((q,i)=>text(q,W/2,72+i*12,'#e8dcc4',8.5,'center',500));
+  text(`Legs run ${e.legs}    Gold ${e.gold}    Time ${fmtT(e.total)}`,W/2,112,'#fff',8.5,'center');
+  if(e.champ)text('You beat the summit champion!',W/2,126,'#9fd8a0',8.5,'center');
+  text('PERKS',14,150,'#e8a23a',8.5);
+  const names=e.perks.map(g=>perkI(g).n);wrap(names.join(', ')||'none',48).slice(0,4).forEach((q,i)=>text(q,14,163+i*11,'#e8dcc4',7.2,'left',500));
+  text('REWARDS',14,222,'#e8a23a',8.5);text(`+${e.coins} coins  (spend them in the shop)`,14,236,'#ffd24a',8.5);
+  e.lines.slice(0,8).forEach((q,i)=>text(q.s,14,252+i*12,q.c,7.5,'left',500));
+  btn(40,400,190,34,'NEW RUN',true,()=>{scene='home';sceneT=0;});
+  toastLayer();
+}
+function homeScene(){
+  runBg();
+  text('RIDGELINE',W/2,50,'#e8a23a',26,'center');text('a roguelike trail run',W/2,66,'#cfdad2',9,'center',500);
+  const rn=save.runs;text(`Runs ${rn.n}    Summits ${rn.wins}    Best ${rn.best} legs    ${save.coins} coins`,W/2,84,'#9fb0a4',6.8,'center',500);
+  text('RUNNER',14,108,'#9fb0a4',8);
+  ['end','clm','heat','rec'].forEach((k,i)=>{const y=114+i*16,s=save.stats[k];text(STATN[k],14,y+7,'#e8eee8',7.5);pips(116,y,s.l,5,'#6ac07a');
+    c.fillStyle='#10160f';c.fillRect(158,y+1,60,5);c.fillStyle='#e8a23a';c.fillRect(158,y+1,60*(s.l>=5?1:s.x/need(s.l)),5);text(s.l>=5?'MAX':`Lv ${s.l}`,224,y+7,'#9fb0a4',7);});
+  text(`STARTING GEAR  ${save.load.length}/${save.cap}  (tap to swap)`,W/2,196,'#e8a23a',8,'center');
+  save.owned.forEach((g,i)=>{const x=i%2?140:14,y=204+Math.floor(i/2)*23,on=save.load.includes(g);
+    HIT.push({x,y,w:116,h:20,fn:()=>toggleLoad(g)});c.fillStyle=on?'#2a3a1e':'#141c18';c.fillRect(x,y,116,20);c.strokeStyle=on?'#9aff9a':'#3a4a40';c.lineWidth=1;c.strokeRect(x+.5,y+.5,115,19);text(GEAR[g].n,x+58,y+13.5,on?'#e8ffe0':'#8a9a90',7.5,'center');});
+  const by=Math.max(330,204+Math.ceil(save.owned.length/2)*23+8);
+  if(save.run){btn(14,by,W-28,36,'CONTINUE RUN',true,continueRun);btn(14,by+42,W-28,22,'New run (abandons the current one)',false,()=>{save.inj=save.run.stash||save.inj;startRun();});}
+  else btn(14,by,W-28,40,'START RUN',true,startRun);
+  const y2=save.run?by+72:by+48;
+  btn(14,y2,122,28,'GEAR SHOP',false,()=>{shopBack='home';scene='shop';sceneT=0;});btn(142,y2,114,28,'CLASSIC SEASON',false,()=>{scene='map';sceneT=0;});
+  toastLayer();
+}
 /* ---------- input ---------- */
 const drags=new Map();let mapDrag=null,tapPend=null;
 const pt=e=>{const r=cvs.getBoundingClientRect();
@@ -1373,8 +1706,8 @@ addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')KEYS.l=0;if(e.k
 /* ---------- loop and test hooks ---------- */
 let last=0;function frame(now){const dt=Math.min(.05,(now-last)/1000||0);last=now;try{update(dt);render();musicUpdate();}catch(e){if(!frame.t||now-frame.t>2000){frame.t=now;console.error("frame error",e);}}requestAnimationFrame(frame);}requestAnimationFrame(n=>{last=n;frame(n);});
 const ALL=[...RACES,...TRAIN];
-window.__trail={state:()=>({scene,race,R_,P,S,save,PH,BR,NAV}),start:i=>beginRace(ALL[i]),startRace:i=>beginRace(ALL[i]),setEffort:e=>{if(P)P.effort=clamp(e,0,1);},drink,gel,choose:chooseEvent,draft:i=>draftPick(R_.draft[i]),cont:aidNext,
-  step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,train:TRAIN,seg:()=>segAt(S,P.x),open:i=>{race=ALL[i];scene='brief';},reset:()=>{save=DEF();newSeason(1);},
+window.__trail={state:()=>({scene,race,R_,P,S,save,PH,BR,NAV,RUN,END,CAMP,REVT,SHOPN}),start:i=>beginRace(ALL[i]),startRace:i=>beginRace(ALL[i]),setEffort:e=>{if(P)P.effort=clamp(e,0,1);},drink,gel,choose:chooseEvent,draft:i=>draftPick(R_.draft[i]),cont:aidNext,
+  step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,train:TRAIN,seg:()=>segAt(S,P.x),open:i=>{race=ALL[i];scene='brief';},reset:()=>{save=DEF();newSeason(1);RUN=null;},runNew:startRun,runState:()=>({RUN,R_,scene,END,CAMP,REVT,SHOPN}),runEnter:(L,i)=>enterNode(RUN.map[L][i]),runReach,runPick:rewardPick,runCamp:{fuel:()=>campFuel(),rest:()=>campRest(),massage:()=>campMassage(),treat:k=>campTreat(k),pick:()=>{CAMP.pick=true;}},runEvent:reventPick,runEventDone:reventDone,runShop:{perk:shopBuyPerk,heal:shopHeal,pack:shopPack},runDone:completeNode,runEnd,tentCost,
   buy,toggle:toggleLoad,buyCap,rest:restDay,treat:(from,k)=>openTreat(from,k),press,leave:leaveTreat,goto:s=>{scene=s;},give:n=>{save.coins+=n;},setSave:o=>{Object.assign(save,o);},
   navStart:()=>beginRace(RACES[0]),season:()=>save.season,newSeason,goRace:goToRace,podium:()=>PODIUM,entry:i=>entry(ALL[i]).ok,wx:()=>R_&&R_.wx,forecast:i=>forecast(ALL[i]),beginNav,steer:v=>{if(NAV)NAV.bot=v;},nav:()=>NAV,bearStart:from=>startBear(from||'test'),dodge:bearDodge,punch:bearPunch,bearEnd:endBear,bearForce:win=>{if(BR)BR.over=win?'win':'lose';}};
 })();

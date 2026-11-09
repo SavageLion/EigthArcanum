@@ -84,3 +84,18 @@ A profile of the marked course sits under the compass: ticks are trail events st
 - **Finish**: a podium ceremony (Pixel Lab podium, trophy, confetti), then a results table with prize money and championship points. Prize money by place: 1st 100% of the purse, then 55%, 30%, 15%, 8%; purses run from $120 to $1,200. Points are 25, 18, 15, 12, 10, 8, 6, 4. Placing 1-3 earns gold, silver or bronze.
 - **Season**: a standings table and the rivals' profiles are on the map ("Standings", "The Field"). After the 7th race the season finale crowns the champion (bonus $1,500, $800, $400 for the top three) and you can start the next season with your stats, gear and money.
 - A DNF counts as a finished race with no points and no prize.
+
+## The roguelike run (new default mode)
+The game now opens on a home screen with **START RUN**. The old season calendar is still there under **CLASSIC SEASON**.
+
+A run is one climb up the ridge: nine stops on a branching map (trailhead at the bottom, the summit at the top). You pick the next stop from the ones connected to where you are. Every leg is a normal Trail View run on Pine Ridge, with all the running logic (effort fader, heart rate, legs, water, fuel, terrain, weather, injuries, events, bear fights).
+
+- **Stops:** valley trail, steep climb and rocky ridge (normal legs); bear country and rival duel (elite legs with a RARE perk); aid station (fuel up, rest, or physio); medical tent (up to two physio treatments or a massage); trail encounter (a two-choice event with a price); trail shop (perks, a healer, supplies); the summit (boss leg: a bear on the way and the champion ahead).
+- **Weather per leg** is shown on the map, so you can choose a route by forecast.
+- **Time bank:** each leg has a par time from its length and climbing, tightening with every leg. Beat par and your bank grows; fall behind and it shrinks. The cutoff for a leg is par plus your bank, and running out ends the run ("the broom wagon caught you"). Rest and tent treatments cost bank time.
+- **Resources carry between legs:** legs, water, fuel, drinks, gels and injuries. Only camps restore them.
+- **Perks** (20): the ten existing gear items plus ten new ones (Mountain goat, Iron quads, Caffeine gels, Second wind, Big lungs, Iron gut, Hydration vest, Finishing kick, Thick skin, Time bank, Sponsor, Weather shell, Bear charm, Metronome). You pick 1 of 3 after each leg; elites offer rare ones.
+- **Rivals** appear as duel legs: a named runner on the course at a fixed pace (fair, independent of you). Beat their time for +20 gold and a rare draft.
+- **Between runs:** coins from a run, stat XP and the gear shop carry over. Your starting gear is the loadout you set on the home screen. A run is saved at each stop (CONTINUE RUN).
+
+Tuning: `runVpar` in `index.html` sets the par pace (fitted so a pacing bot gains time early and falls behind later); `tests/trail-run-bot.mjs [runs]` plays whole runs and prints each leg's time against par. Current naive bot: roughly 6 in 10 runs reach the summit.
