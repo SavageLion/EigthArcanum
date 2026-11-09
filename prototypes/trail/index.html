@@ -45,7 +45,7 @@ const MEDAL_COL={bronze:'#c98a4a',silver:'#cfd6e0',gold:'#ffd24a'};
 
 /* ---------- races and training trails ---------- */
 const RACES=[
-  {id:'pine',name:'Pine Ridge 5K',km:5,stages:2,theme:'dawn',tier:0,seed:11,climate:['clear','clear','fog','rain'],world:{peak:55,noise:28,lake:true,lakeR:7,river:true,biome:{rock:75,loose:58,mud:.64,brush:.6}},bear:[],blurb:'Cool morning, gentle hills and a quiet lake. A friendly first race to learn pacing.'},
+  {id:'pine',name:'Pine Ridge 5K',km:5,stages:2,theme:'dawn',tier:0,seed:11,climate:['clear','clear','fog','rain'],world:{peak:55,noise:28,decor:1700,trailW:0,lake:true,lakeR:7,river:true,biome:{rock:75,loose:58,mud:.64,brush:.6}},bear:[],blurb:'Cool morning, gentle hills and a quiet lake. A friendly first race to learn pacing.'},
   {id:'lake',name:'Lakeside 10K',km:10,stages:3,theme:'noon',tier:0,seed:23,climate:['clear','wind','clear','rain'],world:{peak:34,noise:22,lake:true,lakeR:15,river:false,biome:{rock:80,loose:62,mud:.55,brush:.62}},bear:[],blurb:'A huge flat lake, fast meadows and open ground. The wind decides your day.'},
   {id:'canyon',name:'Canyon Loop 15K',km:15,stages:3,theme:'noon',tier:1,seed:37,climate:['hot','hot','clear','wind'],world:{peak:80,noise:60,lake:false,river:true,trees:.25,biome:{rock:34,loose:26,mud:.72,brush:.7}},bear:[1],blurb:'Red rock and scree, almost no shade. Heat bites and there may be a bear in the rocks.'},
   {id:'fog',name:'Fogbank 21K',km:21,stages:4,theme:'dawn',tier:1,seed:41,climate:['fog','fog','rain','cold'],world:{peak:50,noise:46,lake:true,lakeR:9,river:true,trees:1.5,biome:{rock:72,loose:58,mud:.44,brush:.44}},bear:[2],blurb:'Mud, thick forest and mist. Hard to see the way, so trust your map.'},
@@ -400,6 +400,27 @@ function drawBear(cx,base){
 }
 const IMG={};const loadImg=(k,src)=>{const i=new Image();i.onload=()=>{IMG[k]=i;};i.src=src;};loadImg('pine','assets/pine_bg.jpg');
 // scenic backdrop behind the terrain view (Pine Ridge): mirrored tiles that scroll as you turn
+const PL={};const plLoad=(k,src)=>{const i=new Image();i.onload=()=>{PL[k]=i;};i.src='assets/pl/'+src+'.png';};
+['pine_a','spruce_b','aspen_c','bush','flowers','rocks','grass','cloud','runner_north'].forEach(n=>plLoad(n,n));for(let i=0;i<8;i++)plLoad('run'+i,'run_'+i);for(let i=0;i<7;i++){plLoad('bird'+i,'bird_'+i);plLoad('bfly'+i,'bfly_'+i);}
+function plSprite(s,sx,yb,hp,clip,f){
+  let im=null,k=1,sway=.03;
+  if(s.kind===0){const h=((Math.floor(s.wx*7.3+s.wy*13.1))%100+100)%100;im=PL[h<45?'pine_a':h<80?'spruce_b':'aspen_c'];k=1.7;}
+  else if(s.kind===4){im=PL.bush;sway=.012;}else if(s.kind===5){im=PL.flowers;sway=.05;}else if(s.kind===6){im=PL.rocks;sway=0;}else if(s.kind===7){im=PL.grass;sway=.07;}
+  else if(s.kind===8){im=PL['bfly'+(Math.floor(t*12+s.wx)%7)];sway=0;}else return false;
+  if(!im)return false;
+  const hpx=hp*k*3,wpx=hpx*(im.width/im.height);let x=sx*3,y=yb*3;
+  if(s.kind===8){y-=(5+2*Math.sin(t*2+s.wx))*SCL/s.zc*3;x+=Math.sin(t*1.1+s.wy*.3)*9*SCL/s.zc;}
+  c.save();c.beginPath();c.rect(0,0,W,clip*3);c.clip();c.globalAlpha=clamp(1-f*.92,.04,1);c.translate(x,y);
+  if(sway)c.transform(1,0,Math.sin(t*1.1+s.wx*.05+s.wy*.03)*sway*(1+(WXC().wind?1.6:0)),1,0,0);
+  c.imageSmoothingEnabled=false;c.drawImage(im,-wpx/2,-hpx,wpx,hpx);c.restore();return true;}
+function drawSkyLife(){
+  const cl=PL.cloud,hd=NAV.hd,tt=t;
+  if(cl){c.globalAlpha=.92;for(let i=0;i<4;i++){const wrap=W+220,x=(((i*173-tt*(5+i*2)-hd*(180+i*40))%wrap)+wrap)%wrap-110,y=22+i*21+Math.sin(tt*.2+i)*3,sc=1.1+i*.25;c.drawImage(cl,x,y,cl.width*sc,cl.height*sc);}c.globalAlpha=1;}
+  for(let i=0;i<5;i++){const fr=PL['bird'+(Math.floor(tt*9+i*2)%7)];if(!fr)continue;const wrap=W+120,x=(((i*61+tt*(18+i*3)-hd*340)%wrap)+wrap)%wrap-40,y=46+i*13+Math.sin(tt*1.5+i*2)*5;c.drawImage(fr,x,y,22,22);}
+}
+function drawAmbient(){const tt=t,wr=W+20;c.fillStyle='rgba(255,250,210,.7)';
+  for(let i=0;i<34;i++){const x=(((i*57+tt*(8+i%5*3)+Math.sin(tt*.7+i)*12-NAV.hd*60)%wr)+wr)%wr-10,y=120+((i*83+Math.sin(tt*.5+i*2)*20+tt*4*(i%3))%260);c.fillRect(x,y,1.6,1.6);}
+  for(let i=0;i<7;i++){const x=(((i*131+tt*14+Math.sin(tt+i)*20)%wr)+wr)%wr-10,y=(i*97+tt*(22+i*3))%(VH*3-60);c.fillStyle=['#e8a838','#d86a30','#a8c040'][i%3];c.fillRect(x,y,2.4,1.6);}}
 function drawBackdrop(){const im=IMG.pine,sh=HOR*3+40,sc=sh/1150,tw=im.width*sc,off=((NAV.hd*260)%(tw*2)+tw*2)%(tw*2),base=Math.floor(off/tw);
   for(let k=0;k<4;k++){const n=base+k,x=n*tw-off;if(x>W||x+tw<0)continue;c.save();if(n&1){c.translate(x+tw,0);c.scale(-1,1);c.drawImage(im,0,0,im.width,1150,0,0,tw,sh);}else c.drawImage(im,0,0,im.width,1150,x,0,tw,sh);c.restore();}
   if(NAV.gray){const g=NAV.gray[0];c.fillStyle=`rgba(${g[0]},${g[1]},${g[2]},${NAV.gray[1]})`;c.fillRect(0,0,W,sh);}}
@@ -513,7 +534,7 @@ function genWorld(op){op=op||{};
   let path=astar(W_,start.x,start.y,fin.x,fin.y,jit,.4);if(!path)path=astar(W_,start.x,start.y,fin.x,fin.y,jit,2);
   const pts=path.map(i=>({x:((i%N)+.5)*CS,y:(((i/N)|0)+.5)*CS}));
   for(let it=0;it<4;it++)for(let i=1;i<pts.length-1;i++){pts[i]={x:(pts[i-1].x+pts[i].x*2+pts[i+1].x)/4,y:(pts[i-1].y+pts[i].y*2+pts[i+1].y)/4};}
-  const mark=(list,val)=>{for(const i of list){const x=i%N,y=(i/N)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=N||ny>=N)continue;const j=ny*N+nx;if(T[j]===6)continue;T[j]=7;if(val===1)trail[j]=1;else if(!trail[j])trail[j]=2;}}};
+  const TW=op.trailW??1,mark=(list,val)=>{for(const i of list){const x=i%N,y=(i/N)|0;for(let dy=-TW;dy<=TW;dy++)for(let dx=-TW;dx<=TW;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=N||ny>=N)continue;const j=ny*N+nx;if(T[j]===6)continue;T[j]=7;if(val===1)trail[j]=1;else if(!trail[j])trail[j]=2;}}};
   mark(path,1);
   const decoys=[],lands=[];
   [[.2,'Viewpoint'],[.5,'Old hut']].forEach(([f,name],di)=>{const ji=Math.floor(path.length*f),jx=path[ji]%N,jy=(path[ji]/N)|0,a=pts[Math.min(pts.length-1,ji+3)],b=pts[Math.max(0,ji-3)],ang=Math.atan2(a.y-b.y,a.x-b.x);
@@ -522,8 +543,11 @@ function genWorld(op){op=op||{};
   // scenery and course furniture
   const trees=[];for(let i=0,tn=Math.round(1100*(op.trees??1));i<tn;i++){const x=rng()*N,y=rng()*N,k=(y|0)*N+(x|0),t=T[k];const p=t===1?.9:t===0?.12:t===4?.2:t===3?.05:t===2?.03:0;if(rng()<p&&!trail[k])trees.push({x:x*CS,y:y*CS,h:8+rng()*11});}
   const ribbons=[];for(let i=4;i<pts.length-2;i+=5)ribbons.push(pts[i]);
+  const decor=[];if(op.decor){for(let i=0;i<op.decor;i++){const x=rng()*N,y=rng()*N,k=(y|0)*N+(x|0),tt=T[k];if(trail[k]||tt===5||tt===6)continue;const r=rng();let kind;
+      if(tt===1)kind=r<.6?4:r<.85?7:5;else if(tt===0)kind=r<.5?5:r<.8?7:4;else if(tt===2||tt===3)kind=r<.7?6:7;else kind=7;
+      decor.push({x:x*CS,y:y*CS,kind,h:kind===4?9:kind===5?6:kind===6?8:6});if(kind===5&&rng()<.4)decor.push({x:x*CS+rng()*10,y:y*CS+rng()*10,kind:8,h:3});}}
   const rcx=fin.x+(rng()-.5)*16,rcy=fin.y+(rng()-.5)*16;
-  Object.assign(W_,{pts,trees,ribbons,decoys,lands:[{n:'Start',x:start.x,y:start.y},{n:'Mt Ridge',x:peak.x,y:peak.y},...(hasLake?[{n:'Lake',x:lake.x,y:lake.y}]:[]),...lands],ring:{x:rcx,y:rcy,r:19},riverLabel:op.river===false?null:{x:rflip?127-(20+.3*107):20+.3*107,y:30+7*Math.sin(2.4+ph)}});
+  Object.assign(W_,{pts,trees,ribbons,decor,decoys,lands:[{n:'Start',x:start.x,y:start.y},{n:'Mt Ridge',x:peak.x,y:peak.y},...(hasLake?[{n:'Lake',x:lake.x,y:lake.y}]:[]),...lands],ring:{x:rcx,y:rcy,r:19},riverLabel:op.river===false?null:{x:rflip?127-(20+.3*107):20+.3*107,y:30+7*Math.sin(2.4+ph)}});
   return W_;
 }
 const hAt=(W_,x,y)=>{x=clamp(x/CS-.5,0,NN-1.001);y=clamp(y/CS-.5,0,NN-1.001);const xi=x|0,yi=y|0,xf=x-xi,yf=y-yi,H=W_.H,i=yi*NN+xi;return H[i]*(1-xf)*(1-yf)+H[i+1]*xf*(1-yf)+H[i+NN]*(1-xf)*yf+H[i+NN+1]*xf*yf;};
@@ -549,7 +573,7 @@ function startNav(){
   R_.parS+=len/VS[r.tier];R_.parG+=len/VG[r.tier];
   P={x:0,effort:.3,hr:.45,legs:R_.legs,water:R_.water,fuel:R_.fuel,bonk:0,stop:0,slow:null,hike:0,cramp:0,redT:0,ankle:0,cool:0,phase:0,t:0,speed:0,cut:S.cut,elevCam:0,ev:null,drinkT:0,bonked:false,sDown:0,sRed:0,sHard:0,sClimb:0,tEasy:0};
   const px=(Wd.start.x+.5)*CS,py=(Wd.start.y+.5)*CS;
-  NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,seenFin:true,
+  NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,seenFin:true,pl:r.id==='pine',
     vis:wx.vis||1,windAng:Math.random()*TAU,gray:(ws&&BGIMG)?ws:null,stars:th.stars?Array.from({length:45},()=>[rint(0,VW-1),rint(0,HOR-3)]):null};
   bakeNavMap();navReveal(Wd.start.x,Wd.start.y,9);
   popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;NAV.brief=true;NAV.map=true;
@@ -598,25 +622,28 @@ function navView(){
     for(let col=0;col<VW;col++){
       const u=(col+.5)/VW*2-1,wx=cx0+lx*u,wy=cy0+ly*u,ix=clamp(Math.floor(wx/CS),0,NN-1),iy=clamp(Math.floor(wy/CS),0,NN-1),i=iy*NN+ix,code=Wd.T[i];
       const h=code===6?WL:hAt(Wd,wx,wy),ys=HOR+(camh-h)*SCL/z;
-      if(ys<ybuf[col]){const p=TPAL[code],tx=((ix*73856093)^(iy*19349663))&7,s=(code===6?1+Math.sin(wx*.25+wy*.2+sceneT*2)*.05:Wd.shade[i])*(1+(tx-3.5)*.012);
+      if(ys<ybuf[col]){const p=TPAL[code],tx=((ix*73856093)^(iy*19349663))&7,s=(code===6?1+Math.sin(wx*.25+wy*.2+sceneT*2)*.05:Wd.shade[i])*(1+(tx-3.5)*(N.pl?.032:.012));
         const r=p[0]*s*TINT[0]*(1-f)+SKYB[0]*f,g=p[1]*s*TINT[1]*(1-f)+SKYB[1]*f,b=p[2]*s*TINT[2]*(1-f)+SKYB[2]*f,cc=pack(r,g,b);
         let y0=Math.max(0,ys|0);for(let y=y0;y<ybuf[col];y++)v32[y*VW+col]=cc;ybuf[col]=y0;}
       ytops[col*KMAX+k]=ybuf[col];}
     zs[k++]=z;z+=Math.max(.9,z*.03);
   }
   // sprites (trees, ribbons, signs, the finish), far to near, clipped by the terrain in front of them
+  vctx.putImageData(vimg,0,0);c.imageSmoothingEnabled=false;if(BGIMG&&IMG.pine)drawBackdrop();if(N.pl)drawSkyLife();c.drawImage(vcv,0,0,VW*3,VH*3);
   const list=[];
   const add=(wx,wy,kind,hgt)=>{const rx0=wx-camx,ry0=wy-camy,zc=rx0*fx+ry0*fy;if(zc<3||zc>ZMAX-8)return;const lat=rx0*rx+ry0*ry,u=lat/(zc*TANH);if(Math.abs(u)>1.15)return;list.push({zc,u,wx,wy,kind,hgt});};
   for(const t of Wd.trees)add(t.x,t.y,0,t.h);
+  if(N.pl)for(const d of Wd.decor||[])add(d.x,d.y,d.kind,d.h);
   for(const r of Wd.ribbons)add(r.x,r.y,1,16);
   for(const d of Wd.decoys)add(d.x,d.y,2,10);
   add((Wd.fin.x+.5)*CS,(Wd.fin.y+.5)*CS,3,24);
   list.sort((a,b)=>b.zc-a.zc);
-  const rect=(x0,y0,x1,y1,col,clip)=>{x0=Math.max(0,Math.round(x0));x1=Math.min(VW,Math.round(x1));y0=Math.max(0,Math.round(y0));y1=Math.min(clip,Math.round(y1));for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)v32[y*VW+x]=col;};
-  const fog=(c0,f)=>pack(c0[0]*(1-f)+SKYB[0]*f,c0[1]*(1-f)+SKYB[1]*f,c0[2]*(1-f)+SKYB[2]*f);
+  const rect=(x0,y0,x1,y1,col,clip)=>{y1=Math.min(clip,y1);if(y1<=y0||x1<=x0)return;c.fillStyle=col;c.fillRect(Math.round(x0*3),Math.round(y0*3),Math.max(1,Math.round((x1-x0)*3)),Math.max(1,Math.round((y1-y0)*3)));};
+  const fog=(c0,f)=>`rgb(${(c0[0]*(1-f)+SKYB[0]*f)|0},${(c0[1]*(1-f)+SKYB[1]*f)|0},${(c0[2]*(1-f)+SKYB[2]*f)|0})`;
   for(const s of list){
     const sx=(s.u+1)/2*VW,col=clamp(Math.floor(sx),0,VW-1);let lo=0,hi=k-1;while(lo<hi){const m=(lo+hi)>>1;if(zs[m]<s.zc)lo=m+1;else hi=m;}
     const clip=ytops[col*KMAX+Math.max(0,lo-1)],yb=HOR+(camh-(tAt(Wd,s.wx,s.wy)===6?WL:hAt(Wd,s.wx,s.wy)))*SCL/s.zc,hp=s.hgt*SCL/s.zc,f=clamp((s.zc-45*vis)/(240*vis),0,1)*(s.kind===3?(vis<1?.45:.1):1);
+    if(N.pl&&plSprite(s,sx,yb,hp,clip,f))continue;
     if(s.kind===0){const w=Math.max(1,hp*.42);rect(sx-.5,yb-hp*.22,sx+.5,yb,fog([60,40,24],f),clip);rect(sx-w/2,yb-hp*.6,sx+w/2,yb-hp*.2,fog([22,70,40],f),clip);rect(sx-w*.3,yb-hp,sx+w*.3,yb-hp*.55,fog([30,86,48],f),clip);}
     else if(s.kind===1){rect(sx-.5,yb-hp,sx+.5,yb,fog([90,66,40],f),clip);rect(sx-.5,yb-hp,sx+2.5,yb-hp*.72,fog([255,90,170],f),clip);}
     else if(s.kind===2){rect(sx-.5,yb-hp,sx+.5,yb,fog([90,66,40],f),clip);rect(sx-2,yb-hp,sx+2,yb-hp*.7,fog([232,224,200],f),clip);}
@@ -626,9 +653,10 @@ function navView(){
       if(isF)for(let q=0;q<6;q++)rect(sx-hw+q*(hw/3),yb-hh+(q&1?hh*.11:0),sx-hw+q*(hw/3)+hw/6,yb-hh+hh*.11+(q&1?hh*.11:0),fog([255,255,255],ff),clip);
       rect(sx-.5,yb-hh*2.1,sx+.5,yb-hh,fog([232,224,208],ff),clip);rect(sx,yb-hh*2.1,sx+Math.max(2,hh*.5),yb-hh*1.7,fog([255,150,40],ff),clip);}
   }
-  vctx.putImageData(vimg,0,0);c.imageSmoothingEnabled=false;if(BGIMG&&IMG.pine)drawBackdrop();c.drawImage(vcv,0,0,VW*3,VH*3);
 }
 function drawRunnerBack(x,y,ph){
+  if(PL.run0&&PL.runner_north){const moving=P.speed>1.5,im=moving?(PL['run'+(Math.floor(ph*8)%8)]||PL.run0):PL.runner_north;
+    c.save();c.translate(x,y);c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(0,2,13,3.2,0,0,TAU);c.fill();c.imageSmoothingEnabled=false;c.drawImage(im,-32,-62,64,64);c.restore();return;}
   const run=P.speed>2?Math.min(1,P.speed/18):0,sw=Math.sin(ph*TAU)*run,bob=Math.abs(sw)*1.6;
   c.save();c.translate(x,y-bob);c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(0,bob+1,11,3,0,0,TAU);c.fill();
   const lg=(dx,lift,k)=>{c.fillStyle='#d9a070';c.fillRect(dx,-14+lift*.4,5,13-lift);c.fillStyle='#e8603a';c.fillRect(dx-.5,-2-lift,6,3);};
@@ -735,7 +763,7 @@ function drawWeatherFx(){
 }
 function navScene(){
   navView();
-  const N=NAV;drawRunnerBack(W/2,runY(),P.phase);drawWeatherFx();
+  const N=NAV;drawRunnerBack(W/2,runY(),P.phase);drawWeatherFx();if(NAV.pl)drawAmbient();
   for(const q of parts){c.globalAlpha=clamp(q.t*2,0,1);c.fillStyle=q.col;c.fillRect(q.x,q.y,q.s,q.s);}c.globalAlpha=1;
   for(const p of popups){c.globalAlpha=clamp(p.t*2,0,1);text(p.s,p.x,p.y-(1.2-p.t)*22,p.col,8,'center');}c.globalAlpha=1;
   if(P.hr>.85||P.legs<20||P.bonk>0){const a=clamp((P.hr-.85)*3+(20-P.legs)/40,0,.55)*(P.bonk>0?1.4:1);const vg=c.createRadialGradient(W/2,120,90,W/2,120,300);vg.addColorStop(0,'rgba(200,30,20,0)');vg.addColorStop(1,`rgba(200,30,20,${a*(.7+.3*Math.sin(t*(4+P.hr*6)))})`);c.fillStyle=vg;c.fillRect(0,0,W,H);}
