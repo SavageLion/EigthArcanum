@@ -47,3 +47,10 @@ A profile of the marked course sits under the compass: ticks are trail events st
 - **Long grass** (Pine Ridge): thousands of grass tufts, densest around the marked course. Run through them and they bend away from you and flatten, then spring back over about two seconds.
 - **Grounded sprites**: sprite art is trimmed to its visible pixels so trees, bushes and rocks stand on the ground instead of floating. Things in front of the runner draw over his legs.
 - **Map**: a single road of numbered race stops, each with a card (distance, stages, medal or what you need to unlock it, weather forecast). A pulsing gold card marks your next goal and the map opens scrolled to it. HOME BASE and TRAINING are fixed buttons at the bottom; training trails and the Bear Den live in the Training menu.
+
+## Pine Ridge: the scenic pass
+- **Camera**: higher and further back (looking down the course), with a raised horizon so there is room for sky.
+- **Painted backdrop** (Pixel Lab): a sunset panorama (lake, castle on a cliff with waterfalls, stone bridge, mist) centred on the direction of the aid station or finish, so you run toward it. Forested misty ridges and drifting fog bands sit in front of it, and everything scrolls as you turn and drift as you run. A sun glows off to one side.
+- **Framing and props along the course**: huge pines and spruces on both sides, a wooden fence on long stretches, signposts with a glowing lantern at junctions, lupines, mossy boulders, wildflowers, bushes and the long grass.
+- **Lighting**: warm sunset grade, dark vignette, and flickering additive light from the lanterns on signposts and on the aid station and finish gates.
+- **HUD**: kept out of the way, with the course info now in a small block in the bottom left.
