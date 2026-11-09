@@ -1908,7 +1908,7 @@ function tmStartRace(){
   startNav();NAV.brief=false;NAV.map=false;NAV.cards=false;
   const C=tmGetCourse(idx),DF=DFS[idx],rg=mulberry(RACES[idx].seed*91+tm.n*17+tm.day);
   const mine=ent.map(q=>mkSim(Object.assign(tmSpec(q),{}),C,DF,mulberry((rg()*1e9)|0))),riv=tm.field.map(f=>{const sp=tmRivalSpec(f,rg,idx),r=mkSim(sp,C,DF,mulberry((rg()*1e9)|0));r.id=f.id;return r;});
-  const all=[...mine,...riv];all.forEach((r,i)=>{r.uid=i;r.fe={id:i,rv:{name:r.name,col:r.col},g:0};});
+  const all=[...mine,...riv];all.forEach((r,i)=>{r.uid=i;r.fe={id:i,rv:{name:r.name,col:r.col},g:0};r.stop=rg()*1.6;});
   TR={idx,C,DF,Ltot:C.L*DF,wx:WX[wxk],wxk,heat:S.heat,t:0,speed:2,all,mine,sel:0,log:[],done:false,orderT:0,order:all.slice(),end:null};
   R_.field=all.map(r=>r.fe);P={x:0,effort:.3,hr:.4,legs:100,bonk:0,stop:0,speed:0,phase:0,t:0,cool:0,cut:1e9,drinkT:0};
   NAV.px=C.pts[0].x;NAV.py=C.pts[0].y;NAV.hd=Math.atan2(C.pts[3].y-C.pts[0].y,C.pts[3].x-C.pts[0].x);NAV.camh=hAt(C.W,NAV.px,NAV.py)+CAMH;
@@ -2105,7 +2105,7 @@ function s25Build(){
     col[k*n+i]=`rgb(${Math.min(255,base[0]*m)|0},${Math.min(255,base[1]*m)|0},${Math.min(255,base[2]*m)|0})`;}
   // scenery: every tree, bush, rock... placed by its distance along the course and its side offset
   const items=[],place=(x,z,key,H,tint,extra)=>{let bi=-1,bd=1e9;for(let i=0;i<n;i+=2){const dx=x-px[i],dz=z-pz[i],dd=dx*dx+dz*dz;if(dd<bd){bd=dd;bi=i;}}
-    if(bi<0||bd>95*95)return;const d=(x-px[bi])*nx[bi]+(z-pz[bi])*nz[bi];if(Math.abs(d)>100||Math.abs(d)<10)return;items.push(Object.assign({s:bi*S_STEP,d,hd:hAt(W_,x,z)-hs[bi],key,H,tint},extra||{}));};
+    if(bi<0||bd>95*95)return;const d=(x-px[bi])*nx[bi]+(z-pz[bi])*nz[bi];if(Math.abs(d)>100||Math.abs(d)<10)return;if(d<0&&d>-52&&(key==='pine_a'||key==='spruce_b'||key==='aspen_c'))return;items.push(Object.assign({s:bi*S_STEP,d,hd:hAt(W_,x,z)-hs[bi],key,H,tint},extra||{}));};
   for(const t0 of (W_.trees||[]).slice(0,1600)){const h2=g3H(Math.floor(t0.x*7),Math.floor(t0.y*13));place(t0.x,t0.y,h2<.45?'pine_a':h2<.8?'spruce_b':'aspen_c',t0.h*1.05,.82+g3H(Math.floor(t0.x),Math.floor(t0.y))*.3);}
   for(const dc of (W_.decor||[])){const m=S_DECOR[dc.kind];if(!m)continue;place(dc.x,dc.y,dc.kind===10?(g3H(Math.floor(dc.x),Math.floor(dc.y))<.5?'pine_a':'spruce_b'):m[0],Math.max(2.5,dc.h*m[1]),.85+g3H(Math.floor(dc.y),Math.floor(dc.x))*.25);}
   const gates=[{s:L/3,key:'gate_aid',H:26},{s:L*2/3,key:'gate_aid',H:26},{s:L-2,key:'gate_fin',H:30},{s:6,key:'sign',H:14}];
@@ -2145,13 +2145,17 @@ function s25Frame(dt){
   c.save();c.beginPath();c.rect(0,0,W,MAPH3);c.clip();
   s25Back(sc,Z,dt,th);
   const i0=clamp(Math.floor((sc-X0/KX-10)/S_STEP),0,n-2),i1=clamp(Math.ceil((sc+(W-X0)/KX+10)/S_STEP),1,n-1);
+  // runners spread across lanes so nobody sits on top of anybody else
+  {const LANES=[0,6,-6,12,-12,18,-18,24],win=tr.all.filter(r=>{const q=r.x/tr.DF;return q>sc-X0/KX-20&&q<sc+(W-X0)/KX+20;}).sort((a,b)=>b.x-a.x),taken=[];
+   for(const r of win){const q=r.x/tr.DF;if(r.lat===undefined)r.lat=LANES[r.uid%LANES.length];const cand=LANES.slice().sort((a,b)=>Math.abs(a-r.lat)-Math.abs(b-r.lat));let pick=null;for(const L of cand){if(!taken.some(t=>t.lane===L&&Math.abs(t.s-q)<9)){pick=L;break;}}r.tl=pick===null?cand[0]:pick;taken.push({lane:r.tl,s:q});}
+   for(const r of tr.all){if(r.lat===undefined)r.lat=LANES[r.uid%LANES.length];if(r.tl!==undefined)r.lat+=(r.tl-r.lat)*Math.min(1,dt*3);}}
   const list=[];
   for(let b=0;b<nr-1;b++)list.push({key:(S_ROWS[b]+S_ROWS[b+1])/2,t:0,b});
   list.push({key:-70,t:0,b:nr-1});
   // scenery in view
   let lo=0,hi=g.items.length;const sLo=sc-X0/KX-30,sHi=sc+(W-X0)/KX+30;while(lo<hi){const m=(lo+hi)>>1;if(g.items[m].s<sLo)lo=m+1;else hi=m;}
   for(let q=lo;q<g.items.length&&g.items[q].s<=sHi;q++)list.push({key:g.items[q].d,t:1,it:g.items[q]});
-  for(const r of tr.all){const sr=clamp(r.x/tr.DF,0,g.L);if(sr<sLo||sr>sHi)continue;list.push({key:((r.uid*37)%9-4)*3-(r.me?.1:0),t:2,r});}
+  for(const r of tr.all){const sr=clamp(r.x/tr.DF,0,g.L);if(sr<sLo||sr>sHi)continue;list.push({key:r.lat-(r.me?.1:0),t:2,r});}
   list.sort((a,b)=>b.key-a.key);
   const rowY=(k,i)=>Yt(i)-(S_ROWS[k]*S_KD+g.hr[k*n+i]*S_KH)*Z;
   const labels=[];
@@ -2170,11 +2174,11 @@ function s25Frame(dt){
     else{const r=e.r,sr=clamp(r.x/tr.DF,0,g.L),f=clamp(sr/S_STEP,0,n-1.001),i=f|0,d=e.key,sc2=clamp(1-d*.0045,.55,1.45)*Z,
         yb=Yt(i)+(Yt(Math.min(n-1,i+1))-Yt(i))*(f-i)-d*S_KD*Z,xx=X(sr),ahead=tyAt(sr+8),beh=tyAt(sr-8),ang=Math.atan2((ahead-beh)*Z,16*KX),dirn=ang<-.12?'NE':ang>.12?'SE':'E',set=s25RunSet(r.col);
       r.ph=(r.ph||r.uid*.4)+r.v*dt*tr.speed*.085;const moving=r.v>1.5&&r.fin==null,fr=moving?(set[dirn][Math.floor(r.ph*8)%Math.max(1,set[dirn].length)]||set.E[0]):(set.idle||set.E[0]);if(!fr)continue;
-      const bb=PLB.rE0||{x0:0,y0:0,x1:64,y1:64},bw=bb.x1-bb.x0,bh=bb.y1-bb.y0,hh=(r.me?44:38)*sc2,ww=hh*bw/bh,bob=moving?Math.abs(Math.sin(r.ph*TAU))*1.2*Z:0;
+      const bb=PLB.rE0||{x0:0,y0:0,x1:64,y1:64},bw=bb.x1-bb.x0,bh=bb.y1-bb.y0,hh=(r.me?31:26)*sc2,ww=hh*bw/bh,bob=moving?Math.abs(Math.sin(r.ph*TAU))*1.2*Z:0;
       c.fillStyle='rgba(20,10,30,.3)';c.beginPath();c.ellipse(xx,yb+1,ww*.38,2.6*sc2,0,0,TAU);c.fill();
       if(r===sel){c.strokeStyle=`rgb(${r.col.join(',')})`;c.lineWidth=1.6;c.beginPath();c.ellipse(xx,yb+1,ww*.55,3.8*sc2,0,0,TAU);c.stroke();}
       c.drawImage(fr,bb.x0,bb.y0,bw,bh,Math.round(xx-ww/2),Math.round(yb-hh-bob),Math.round(ww),Math.round(hh));
-      if(r.me||r.place<=3)labels.push({x:xx,y:yb-hh-bob-3,r});}
+      if(r.me||r.place===1)labels.push({x:xx,y:yb-hh-bob-3,r});}
   }
   c.restore();
   if(TRrace().theme==='night'){c.fillStyle='rgba(10,14,40,.32)';c.fillRect(0,0,W,MAPH3);}else if(TRrace().theme==='dusk'){c.fillStyle='rgba(240,120,90,.1)';c.fillRect(0,0,W,MAPH3);}
