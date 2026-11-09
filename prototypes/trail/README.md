@@ -99,3 +99,12 @@ A run is one climb up the ridge: nine stops on a branching map (trailhead at the
 - **Between runs:** coins from a run, stat XP and the gear shop carry over. Your starting gear is the loadout you set on the home screen. A run is saved at each stop (CONTINUE RUN).
 
 Tuning: `runVpar` in `index.html` sets the par pace (fitted so a pacing bot gains time early and falls behind later); `tests/trail-run-bot.mjs [runs]` plays whole runs and prints each leg's time against par. Current naive bot: roughly 6 in 10 runs reach the summit.
+
+## Pace cards (the leg itself)
+In a run, a leg is no longer a slider-and-steering race. Each leg is split into 6 to 10 trail **sections** shown in a strip at the top (slope, ground, and a diamond if an event waits there). The runner follows the course on its own. At the start of every section the clock pauses and you are dealt a hand of 4 cards from your deck; you tap a card (tap again to play) and the runner plays that section in Trail View under that card. Drink and gel buttons stay free.
+
+- **Basic deck** (9 cards): Steady x3 (your sweet-spot pace, always in your hand), Push x2, Ease off x2, Surge, Power-hike. Each card sets an effort and a few modifiers (speed, drain, recovery, slope and terrain penalties); the existing physics runs underneath unchanged.
+- **Special cards** (won as rewards or bought in the shop): Hill charge (climbs only), Downhill dash (descents only), Pick a line (rough ground only), Gel flow, Build (sets up the next section), Locked in, Shake out, Final kick (last two sections), Cut the corner (a gamble). Conditional cards can sit unplayable in your hand, so what you add to the deck matters.
+- **Perks** still change the physics underneath, and some pair with cards (Metronome with Steady, Mountain goat with climbs).
+- A hand of cards plus a time bank turns pacing into decisions: spend legs now for time, or save them for the climb you can see coming. Each card shows its effect on speed, heart rate and legs.
+- `tests/trail-run-bot.mjs --pol steady|smart`: a bot that only plays Steady fails every run; a simple rule-based bot (hills, descents, recovery, kick) summits about 3 in 4.

@@ -6,7 +6,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 const arg = (n, d) => process.argv.includes(n) ? process.argv[process.argv.indexOf(n) + 1] : d;
-const RUNS = +process.argv[2] || 5, SKILL = +arg('--skill', 0), shotDir = arg('--shots', '');
+const RUNS = +process.argv[2] || 5, SKILL = +arg('--skill', 0), shotDir = arg('--shots', ''), POL = arg('--pol', 'smart');
 const root = path.resolve('prototypes/trail');
 const MIME = { '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg', '.js': 'text/javascript' };
 const srv = http.createServer((q, s) => { const p = q.url.split('?')[0], f = path.join(root, p === '/' ? 'index.html' : p.split('..').join('')); try { s.setHeader('Content-Type', MIME[path.extname(f)] || 'text/plain'); s.end(fs.readFileSync(f)); } catch (e) { s.statusCode = 404; s.end(); } }).listen(0);
@@ -55,7 +55,32 @@ try {
       const log = [], used = {}; let guard = 0, legsRun = 0;
       while (T.state().RUN && guard++ < 600000) {
         const st = T.state(), sc = st.scene, R = st.R_, RUN = st.RUN;
-        if (sc === 'nav') { ctl(bias); T.step(1 / 30); continue; }
+        if (sc === 'nav') {
+          const N = T.nav(), P = st.P;
+          if (N.brief) T.beginNav();
+          if (N.cards) {
+            if (N.cardPhase) {
+              const hand = N.hand, ok = hand.map((id, i) => [id, i]).filter(([id]) => T.cardOK(id)), S_ = N.secs[N.sec];
+              let want = ['steady'];
+              if (pol !== 'steady') {
+                const legs = P.legs, hr = P.hr, last = N.sec >= N.ns - 2;
+                if (legs < 30) want = ['shake', 'ease', 'hike', 'steady'];
+                else if (hr > .88 || legs < 45) want = ['shake', 'ease', 'locked', 'steady'];
+                else if (S_.g > .03) want = legs > 55 ? ['hill', 'locked', 'push', 'hike', 'steady'] : ['hike', 'locked', 'steady'];
+                else if (S_.g < -.03) want = ['dash', 'locked', 'push', 'steady'];
+                else if (['rocky', 'loose', 'mud', 'brush'].includes(S_.ter)) want = ['line', 'locked', 'steady', 'push'];
+                else want = legs > 65 ? ['locked', 'push', 'build', 'surge', 'steady'] : ['locked', 'steady', 'build'];
+                if (last && legs > 35) want.unshift('kick');
+                if (P.fuel < 50 && R.gels > 0) want.unshift('gelc');
+              }
+              const pickId = want.find(w => ok.some(([id]) => id === w)) || 'steady', pi = ok.find(([id]) => id === pickId);
+              T.cardPlay(pi ? pi[1] : ok[0][1]); continue;
+            }
+            if (P.water < 45) T.drink(); if (P.fuel < 45) T.gel();
+            T.step(1 / 30); continue;
+          }
+          ctl(bias); T.step(1 / 30); continue;
+        }
         if (sc === 'event') { T.choose(st.P.ev.k === 'bear' ? 0 : Math.random() < .35 ? 1 : 0); continue; }
         if (sc === 'bear') { window.__bear(.3, .9); T.bearEnd(); continue; }
         if (sc === 'physio') { window.__solve(.8); continue; }
@@ -109,7 +134,7 @@ try {
   const summary = { win: 0, legs: [] };
   const byKind = {};
   for (let i = 0; i < RUNS; i++) {
-    const r = await page.evaluate(([b]) => window.__runBot(b), [SKILL]);
+    const r = await page.evaluate(([b, p]) => window.__runBot(b, p), [SKILL, POL]);
     const e = r.end;
     console.log(`run ${i + 1}: ${e ? (e.win ? 'SUMMIT' : 'out: ' + e.why) : r.scene + ' (guard ' + r.guard + ')'}  legs ${e ? e.legs : '?'}  gold ${e ? e.gold : '?'}  perks ${e ? e.perks.join(',') : ''}`);
     console.log('   ' + r.log.map(l => `${l.k}[${l.wx}] ${l.t ?? '-'}/${l.par ?? '-'}s b${l.bank ?? '-'}${l.duel || ''}${l.inj ? ' inj' + l.inj : ''} L${l.start.legs}`).join('  |  '));
@@ -122,7 +147,9 @@ try {
     const shot = async (name, fn) => { await page.evaluate(fn); await page.waitForTimeout(350); await page.screenshot({ path: shotDir + '/run_' + name + '.png' }); };
     await shot('home', () => { const T = window.__trail; T.reset(); T.give(200); T.goto('home'); });
     await shot('map', () => { const T = window.__trail; T.reset(); T.runNew(); const s = T.state(); const n = T.runReach()[1]; s.RUN.sel = { L: n.L, i: n.i }; });
-    await shot('nav', () => { const T = window.__trail; const n = T.runReach()[0]; T.runEnter(n.L, n.i); T.beginNav(); for (let i = 0; i < 150; i++) { T.setEffort(.5); T.steer(Math.sin(i / 30) * .2); T.step(1 / 30); } });
+    await shot('cards', () => { const T = window.__trail; T.reset(); T.runNew(); const n = T.runReach()[1]; T.runEnter(n.L, n.i); T.beginNav(); T.state().NAV.sel = 1; });
+    await shot('play', () => { const T = window.__trail; const N = T.nav(); const hand = N.hand; T.cardPlay(N.hand.findIndex(id => T.cardOK(id) && id !== 'steady') >= 0 ? N.hand.findIndex(id => T.cardOK(id) && id !== 'steady') : 0); for (let k = 0; k < 90; k++) T.step(1 / 30); });
+    await shot('navmap', () => { const T = window.__trail; T.state().NAV.map = true; });
     await shot('reward', () => { const T = window.__trail; let g = 0; while (T.state().scene !== 'reward' && g++ < 90000) { const st = T.state(); if (st.scene === 'event') T.choose(0); else if (st.scene === 'bear') { window.__bear(.3, .9); T.bearEnd(); } else if (st.scene === 'nav') { const n = T.nav(), P = st.P, W_ = n.W; n.__idx = n.__idx || 0; while (n.__idx < W_.pts.length - 1 && Math.hypot(W_.pts[n.__idx].x - n.px, W_.pts[n.__idx].y - n.py) < 18) n.__idx++; const q = W_.pts[Math.min(n.__idx + 2, W_.pts.length - 1)]; let a = Math.atan2(q.y - n.py, q.x - n.px) - n.hd; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; T.steer(Math.max(-1, Math.min(1, a * 3))); T.setEffort(T.sweet(n.seg.g, st.S.heat) + (.74 - P.hr) * 1.3); if (P.water < 45) T.drink(); T.step(1 / 30); } else break; } });
     await shot('camp', () => { const T = window.__trail; T.reset(); T.runNew(); const s = T.state(); s.save.inj.push({ k: 'knee', s: 2 }); s.RUN.map[1][0].k = 'aid'; T.runEnter(1, 0); });
     await shot('event', () => { const T = window.__trail; T.reset(); T.runNew(); const s = T.state(); s.RUN.map[1][0].k = 'event'; T.runEnter(1, 0); });
