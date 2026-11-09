@@ -45,6 +45,22 @@ try {
       }
       return T.state().BR.over;
     };
+    // trail view: 'trail' follows the marked course, 'direct' heads straight for the finish
+    window.__navBot = mode => {
+      T.reset(); T.navStart(); let g = 0, idx = 0, slow = 0, rnd = 0; const nrm = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+      while (T.state().scene === 'nav' && g++ < 120000) {
+        const n = T.nav(), st = T.state(), P = st.P, W_ = n.W; let tx, ty;
+        if (mode === 'trail') { while (idx < W_.pts.length - 1 && Math.hypot(W_.pts[idx].x - n.px, W_.pts[idx].y - n.py) < 18) idx++; const q = W_.pts[Math.min(idx + 2, W_.pts.length - 1)]; tx = q.x; ty = q.y; }
+        else { tx = (W_.fin.x + .5) * 8; ty = (W_.fin.y + .5) * 8; }
+        let steer = Math.max(-1, Math.min(1, nrm(Math.atan2(ty - n.py, tx - n.px) - n.hd) * 3));
+        if (mode !== 'trail') { if (P.speed < 3) slow++; else slow = 0; if (slow > 25) { rnd = 40; slow = 0; steer = Math.random() < .5 ? -1 : 1; n.__r = steer; } if (rnd > 0) { rnd--; steer = n.__r; } }
+        T.steer(steer);
+        T.setEffort(T.sweet(n.seg.g, st.S.heat) + (.74 - P.hr) * 1.3);
+        if (P.water < 45) T.drink(); if (P.fuel < 45) T.gel();
+        T.step(1 / 30);
+      }
+      const st = T.state(); return { sc: st.scene, medal: st.R_.res && st.R_.res.medal, total: Math.round(st.R_.total), why: st.R_.why, dist: Math.round(st.NAV ? st.NAV.dist : 0) };
+    };
     window.__run = (idx, fixed, acc) => {
       T.start(idx); let guard = 0, treated = 0;
       while (guard++ < 400000) {
@@ -104,6 +120,12 @@ try {
       console.log('--- season', s + 1); console.log(log.join('\n'));
     }
   }
+  if (process.argv.includes('--nav')) {
+    for (const mode of ['trail', 'direct']) {
+      const res = []; for (let i = 0; i < 6; i++) res.push(await page.evaluate(m => window.__navBot(m), mode));
+      console.log('nav', mode.padEnd(6), res.map(r => r.sc === 'result' ? `${r.medal}(${r.total}s)` : 'DNF:' + r.why).join('  '));
+    }
+  }
   if (process.argv.includes('--bear')) {
     for (const [rt, acc] of [[.2, .95], [.35, .9], [.5, .8], [.7, .7]]) {
       const res = await page.evaluate(([rt, acc]) => { const T = window.__trail, o = { win: 0, lose: 0, hits: 0, secs: 0 }; for (let i = 0; i < 20; i++) { T.reset(); T.bearStart('test'); const r = window.__bear(rt, acc), B = T.state().BR; o[r]++; o.hits += B.hits; o.secs += B.t; T.bearEnd(); } return o; }, [rt, acc]);
@@ -121,6 +143,8 @@ try {
     await shot('physio', () => { const T = window.__trail; T.goto('base'); T.treat('base', 'knee'); T.step(.4); });
     await shot('aid', () => { const T = window.__trail; T.start(1); T.setEffort(.8); let g = 0; while (T.state().scene !== 'aid' && g++ < 90000) { const st = T.state(); if (st.scene === 'event') T.choose(0); else { if (st.P.water < 40) T.drink(); T.step(1 / 30); } } });
     await shot('bear', () => { const T = window.__trail; T.reset(); T.bearStart('test'); for (let i = 0; i < 110; i++) T.step(1 / 60); });
+    await shot('nav', () => { const T = window.__trail; T.reset(); T.navStart(); for (let i = 0; i < 240; i++) { const n = T.nav(), P = T.state().P; T.setEffort(.5); T.steer(Math.sin(i / 40) * .3); T.step(1 / 30); } });
+    await shot('navmap', () => { window.__trail.nav().map = true; window.__trail.step(.1); });
     await shot('result', () => { window.__run(0, null, .8); });
   }
 } finally { await browser.close(); srv.close(); }

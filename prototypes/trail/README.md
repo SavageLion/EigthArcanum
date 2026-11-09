@@ -27,3 +27,11 @@ A standalone trail-running **management** roguelike for phones. One self-contain
 - **Bear fight** (old-school boxing): the bear telegraphs a swipe from one side with a red "!". Tap DODGE toward the opposite side as the swipe lands (the dodge lasts half a second, so do not go too early). A dodged swipe leaves the bear dizzy for a moment: tap PUNCH to hit it, combos hit harder. Punching a guarding bear does nothing. It gets faster and feints as it weakens. Keys: A/D or arrows dodge, space/J punch.
 - It appears as the "Bear Den" test node on the map, and as a rare trail event in the 15K and longer races (fight it for +25 coins and +12 legs, or back away and lose 8 s; losing costs 25 legs and 3 s).
 - Art: Pine Ridge uses a scenic backdrop image and the runner is a pixel-art sprite (both in `assets/`). `node tests/trail-bot.mjs 2 --bear` also plays bear fights at several reaction times.
+
+## Trail View (behind the runner, free route, find the finish)
+A second way to race, on the map as the teal "Trail View" node (an orienteering test).
+- A voxel-style 3D view from behind the runner. A new world is generated every run: a mountain, a lake, a river, meadows, thick brush, scree and mud, with a marked course (pink ribbons) that is the cheapest way round the mountain, plus unmarked decoy trails.
+- Steer with the pad (or arrow keys / A, D), set effort with the fader as usual. Terrain changes your speed (meadow 93%, brush 66%, rocky 84%, scree 74%, mud 80%, creek 70%, trail 100%), slopes slow you and spike your heart rate, the lake blocks you.
+- You are not told where the finish is. OPEN MAP (or M) shows the terrain, your position and a dashed circle the finish is somewhere inside; trails only appear on the map once you have seen them. A compass tape shows your heading and a "?" toward the circle. The clock keeps running while the map is open.
+- Held upright on a phone, Trail View switches to a portrait layout (view on top, controls underneath). All other screens stay landscape.
+- `node tests/trail-bot.mjs 1 --nav` runs a bot that follows the marked course and one that heads straight for the finish (the straight line is risky: it crosses the mountain and brush).
