@@ -20,3 +20,10 @@ A trail-running **management** game for phones, played in portrait. One page, no
 ## Testing
 - `node tests/trail-bot.mjs 2` plays every race and training trail with a bot that follows the marked course (and treats injuries in the tent).
 - `--bear` also plays bear fights at several reaction times, `--nav` compares a course-following bot with one that heads straight for the finish, `--season 3` plays whole management seasons, `--shots <dir>` saves screenshots of the main screens.
+
+## Finding the aid station and finish
+- The gate is colour coded: a blue banner is an aid station, a red and white checkered banner is the finish. A tall light beam stands over it and is barely fogged, so it can be seen from far away over hills.
+- The banner at the start of each stage says which one you are looking for, and the top bar names it.
+- Once it is within about 260 units it is "in sight": the compass tape shows a green A or F at its exact bearing, the distance to it appears on screen, and the map marks the gate with a green dot instead of the search circle.
+- Before that, the dashed search circle on the map shrinks and slides onto the real gate as you get closer.
+- A line under the terrain label says whether you are on the marked course; when off course it shows how far the nearest ribbons are and a pink dot on the compass points to them.

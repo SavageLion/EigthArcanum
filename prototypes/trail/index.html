@@ -513,7 +513,7 @@ function startNav(){
   NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,
     stars:th.stars?Array.from({length:45},()=>[rint(0,VW-1),rint(0,HOR-3)]):null};
   bakeNavMap();navReveal(Wd.start.x,Wd.start.y,9);
-  popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;banner(`Stage ${R_.si+1} of ${race.stages}`,1.8);beep(520,.12);
+  popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;banner(R_.si+1>=race.stages?'Find the FINISH (red gate)':'Find the AID STATION (blue gate)',2.6);beep(520,.12);
 }
 function navReveal(cx,cy,r){const N=NAV,tc=N.tcv.getContext('2d');tc.fillStyle='#c8a468';for(let y=Math.max(0,Math.floor(cy-r));y<Math.min(NN,cy+r);y++)for(let x=Math.max(0,Math.floor(cx-r));x<Math.min(NN,cx+r);x++){const i=y*NN+x;if(N.W.trail[i]&&!N.rev[i]&&Math.hypot(x-cx,y-cy)<r){N.rev[i]=1;tc.fillRect(x,y,1,1);}}}
 function bakeNavMap(){
@@ -533,7 +533,8 @@ function navMove(d){
   const blk=(x,y)=>x<4||y<4||x>NN*CS-4||y>NN*CS-4||tAt(Wd,x,y)===6;
   if(N.seg.g>1.4){P.speed*=.3;pop('too steep!',W/2,120,'#ffb08a');return;}
   let mx=nx,my=ny;if(blk(nx,ny)){if(!blk(nx,N.py)){my=N.py;P.speed*=.8;}else if(!blk(N.px,ny)){mx=N.px;P.speed*=.8;}else{P.speed*=.3;return;}}
-  N.px=mx;N.py=my;N.dist+=d;P.x+=d;navReveal(N.px/CS,N.py/CS,9);
+  N.px=mx;N.py=my;N.dist+=d;P.x+=d;
+  if(!N.seenFin&&Math.hypot(N.px-(Wd.fin.x+.5)*CS,N.py-(Wd.fin.y+.5)*CS)<260){N.seenFin=true;pop(navFinishName()+' in sight!',W/2,150,'#9aff9a');beep(900,.12,'triangle');}navReveal(N.px/CS,N.py/CS,9);
   if(Math.hypot(N.px/CS-Wd.fin.x,N.py/CS-Wd.fin.y)<2.2)finishNav();
 }
 function finishNav(){finishStage();}
@@ -566,7 +567,7 @@ function navView(){
   const list=[];
   const add=(wx,wy,kind,hgt)=>{const rx0=wx-camx,ry0=wy-camy,zc=rx0*fx+ry0*fy;if(zc<3||zc>ZMAX-8)return;const lat=rx0*rx+ry0*ry,u=lat/(zc*TANH);if(Math.abs(u)>1.15)return;list.push({zc,u,wx,wy,kind,hgt});};
   for(const t of Wd.trees)add(t.x,t.y,0,t.h);
-  for(const r of Wd.ribbons)add(r.x,r.y,1,11);
+  for(const r of Wd.ribbons)add(r.x,r.y,1,16);
   for(const d of Wd.decoys)add(d.x,d.y,2,10);
   add((Wd.fin.x+.5)*CS,(Wd.fin.y+.5)*CS,3,24);
   list.sort((a,b)=>b.zc-a.zc);
@@ -574,11 +575,14 @@ function navView(){
   const fog=(c0,f)=>pack(c0[0]*(1-f)+SKYB[0]*f,c0[1]*(1-f)+SKYB[1]*f,c0[2]*(1-f)+SKYB[2]*f);
   for(const s of list){
     const sx=(s.u+1)/2*VW,col=clamp(Math.floor(sx),0,VW-1);let lo=0,hi=k-1;while(lo<hi){const m=(lo+hi)>>1;if(zs[m]<s.zc)lo=m+1;else hi=m;}
-    const clip=ytops[col*KMAX+Math.max(0,lo-1)],yb=HOR+(camh-(tAt(Wd,s.wx,s.wy)===6?WL:hAt(Wd,s.wx,s.wy)))*SCL/s.zc,hp=s.hgt*SCL/s.zc,f=clamp((s.zc-45)/240,0,1)*(s.kind===3?.3:1);
+    const clip=ytops[col*KMAX+Math.max(0,lo-1)],yb=HOR+(camh-(tAt(Wd,s.wx,s.wy)===6?WL:hAt(Wd,s.wx,s.wy)))*SCL/s.zc,hp=s.hgt*SCL/s.zc,f=clamp((s.zc-45)/240,0,1)*(s.kind===3?.1:1);
     if(s.kind===0){const w=Math.max(1,hp*.42);rect(sx-.5,yb-hp*.22,sx+.5,yb,fog([60,40,24],f),clip);rect(sx-w/2,yb-hp*.6,sx+w/2,yb-hp*.2,fog([22,70,40],f),clip);rect(sx-w*.3,yb-hp,sx+w*.3,yb-hp*.55,fog([30,86,48],f),clip);}
-    else if(s.kind===1){rect(sx-.5,yb-hp,sx+.5,yb,fog([90,66,40],f),clip);rect(sx-.5,yb-hp,sx+1.5,yb-hp*.8,fog([255,90,170],f),clip);}
+    else if(s.kind===1){rect(sx-.5,yb-hp,sx+.5,yb,fog([90,66,40],f),clip);rect(sx-.5,yb-hp,sx+2.5,yb-hp*.72,fog([255,90,170],f),clip);}
     else if(s.kind===2){rect(sx-.5,yb-hp,sx+.5,yb,fog([90,66,40],f),clip);rect(sx-2,yb-hp,sx+2,yb-hp*.7,fog([232,224,200],f),clip);}
-    else{const hw=7*SCL/s.zc,hh=22*SCL/s.zc,ff=f;rect(sx-hw-.5,yb-hh,sx-hw+.5,yb,fog([232,224,208],ff),clip);rect(sx+hw-.5,yb-hh,sx+hw+.5,yb,fog([232,224,208],ff),clip);rect(sx-hw,yb-hh,sx+hw,yb-hh+Math.max(1.5,hh*.18),fog([232,80,58],ff),clip);
+    else{const isF=R_.si+1>=race.stages,bc=isF?[232,80,58]:[60,150,240],hw=8*SCL/s.zc,hh=26*SCL/s.zc,ff=f;
+      rect(sx-.5,yb-hh*5.5,sx+.5,yb,fog([255,240,160],ff),clip);rect(sx-1.5,yb-hh*5.5,sx+1.5,yb-hh*4.6,fog(bc,ff),clip);
+      rect(sx-hw-.5,yb-hh,sx-hw+.5,yb,fog([232,224,208],ff),clip);rect(sx+hw-.5,yb-hh,sx+hw+.5,yb,fog([232,224,208],ff),clip);rect(sx-hw,yb-hh,sx+hw,yb-hh+Math.max(2,hh*.22),fog(bc,ff),clip);
+      if(isF)for(let q=0;q<6;q++)rect(sx-hw+q*(hw/3),yb-hh+(q&1?hh*.11:0),sx-hw+q*(hw/3)+hw/6,yb-hh+hh*.11+(q&1?hh*.11:0),fog([255,255,255],ff),clip);
       rect(sx-.5,yb-hh*2.1,sx+.5,yb-hh,fog([232,224,208],ff),clip);rect(sx,yb-hh*2.1,sx+Math.max(2,hh*.5),yb-hh*1.7,fog([255,150,40],ff),clip);}
   }
   vctx.putImageData(vimg,0,0);c.imageSmoothingEnabled=false;if(BGIMG&&IMG.pine)drawBackdrop();c.drawImage(vcv,0,0,VW*3,VH*3);
@@ -593,23 +597,31 @@ function drawRunnerBack(x,y,ph){
   c.fillStyle='#d9a070';c.fillRect(-4,-44,8,7);c.fillStyle='#8a4a22';c.fillRect(-6,-52,12,12);c.fillRect(-5,-42,10,12);c.fillRect(-7,-48,2,8);c.fillRect(5,-48,2,8);c.fillStyle='#a8602c';c.fillRect(-3,-51,3,4);
   c.restore();
 }
+const navFinishName=()=>R_.si+1>=race.stages?'FINISH':'AID STATION';
+// the search circle shrinks and drifts onto the real gate as you close in
+function navRing(){const N=NAV,Wd=N.W,d=Math.hypot(N.px/CS-Wd.fin.x,N.py/CS-Wd.fin.y),k=clamp((d-10)/55,0,1);return {x:Wd.fin.x+(Wd.ring.x-Wd.fin.x)*k,y:Wd.fin.y+(Wd.ring.y-Wd.fin.y)*k,r:6+13*k};}
+function navCourse(){const N=NAV,pts=N.W.pts;let best=1e9,bi=0;for(let i=0;i<pts.length;i+=2){const d=Math.hypot(pts[i].x-N.px,pts[i].y-N.py);if(d<best){best=d;bi=i;}}return {d:best,p:pts[bi]};}
 function navHud(){
   const N=NAV,pr=PORT;
   c.fillStyle='rgba(8,12,10,.6)';c.fillRect(0,0,W,pr?48:26);
-  text(race.name,6,11,'#e8eee8',7.5);text(race.stages>1?`Stage ${R_.si+1}/${race.stages}  -  find the finish`:'Find the finish',6,21,'#9fb0a4',7);
+  text(race.name,6,11,'#e8eee8',7.5);text(race.stages>1?`Stage ${R_.si+1}/${race.stages}  -  find the ${navFinishName().toLowerCase()}`:'Find the finish',6,21,'#9fb0a4',7);
   // compass tape
   const cx=W/2,cy=pr?28:3,half=pr?112:120,bd=(((N.hd*180/Math.PI+90)%360)+360)%360,pxs=2.6;c.fillStyle='rgba(0,0,0,.35)';c.fillRect(cx-half,cy,half*2,20);
   for(let k=-48;k<=48;k+=5){const ang=Math.round((bd+k)/5)*5,off=(ang-bd)*pxs,x=cx+off;if(Math.abs(off)>half-3)continue;const m=((ang%360)+360)%360;c.fillStyle='#cfdad2';c.fillRect(x,cy+(m%15===0?2:5),1,m%15===0?5:2);
     const lab={0:'N',90:'E',180:'S',270:'W'}[m];if(lab)text(lab,x,cy+18,m===0?'#ff8a7a':'#fff',8,'center');}
   c.fillStyle='#ffd24a';c.fillRect(cx-.5,cy,1.5,5);
-  const rg=N.W.ring,tb=((Math.atan2(rg.y*CS-N.py,rg.x*CS-N.px)*180/Math.PI+90)%360+360)%360,rel=((tb-bd+540)%360)-180;
-  text(Math.abs(rel)<=(half/pxs-4)?'?':rel<0?'<?':'?>',cx+clamp(rel,-(half/pxs-4),half/pxs-4)*pxs,cy+10,'#ff9a3a',9,'center');
+  const rg=navRing(),fin=N.W.fin,fgx=(fin.x+.5)*CS,fgy=(fin.y+.5)*CS,seen=!!N.seenFin,co=navCourse(),lim=half/pxs-4,sm=(race.km*1000/race.stages)/N.len;
+  const brg=(x,y)=>(((Math.atan2(y-N.py,x-N.px)*180/Math.PI+90)%360)+360)%360,relB=b=>((b-bd+540)%360)-180;
+  {const rel=relB(seen?brg(fgx,fgy):brg(rg.x*CS,rg.y*CS)),lab=seen?(R_.si+1>=race.stages?'F':'A'):'?';text(Math.abs(rel)<=lim?lab:rel<0?'<'+lab:lab+'>',cx+clamp(rel,-lim,lim)*pxs,cy+10,seen?'#7aff9a':'#ff9a3a',9,'center');}
+  if(co.d>=22){const rel=relB(brg(co.p.x,co.p.y));if(Math.abs(rel)<=lim)text('.',cx+rel*pxs,cy+16,'#ff7ac0',14,'center');}
   const tx=pr?W-56:W-76,sim=(R_.total+P.t)*simTS();text(fmtT(sim),tx,12,'#fff',10,'right');text(`cutoff ${fmtT(S.cut*simTS())}`,tx,22,P.t>S.cut*.85?'#ff8a7a':'#9fb0a4',6.5,'right');
   HIT.push({x:tx+4,y:2,w:20,h:20,fn:()=>{paused=true;}});c.fillStyle='rgba(8,12,10,.7)';c.fillRect(tx+6,3,18,18);text('II',tx+15,16,'#cfdad2',9,'center');
   const sg=N.seg,fT=(TERRAIN[sg.t]||{f:1}).f,ty=pr?66:40;
   text(`${TNAME[N.ter]}  ${Math.round((N.ter===7?1:fT)*100)}%`+(sg.g>.03?`   ${Math.round(sg.g*100)}% climb`:sg.g<-.03?`   ${Math.round(-sg.g*100)}% descent`:''),W/2,ty,'#fff',8,'center');
   let st=[];if(P.cramp>0)st.push('CRAMP');if(P.bonk>0)st.push('BONK');if(P.hike>0)st.push('hiking');if(P.stop>0&&P.drinkT<=0&&!N.map)st.push('stopped');text(st.join('  '),W/2,ty+11,'#ffb08a',8,'center');
   if(save.inj.length)text('Carrying: '+save.inj.map(i=>INJ[i.k].n).join(', '),W/2,ty+21,'#e8a07a',6.5,'center',500);
+  if(seen)text(`${navFinishName()}  ${Math.round(Math.hypot(fgx-N.px,fgy-N.py)*sm)} m`,W/2,ty+34,'#7aff9a',9,'center');
+  text(co.d<22?'On the marked course':`Off course  -  ribbons ${Math.round(co.d*sm)} m away (pink dot)`,W/2,ty+(seen?46:34),co.d<22?'#9fd8a0':'#ffb08a',6.8,'center',500);
   if(msgT>0){c.globalAlpha=clamp(msgT*2,0,1);text(msg,W/2,pr?120:92,'#fff',14,'center');c.globalAlpha=1;}
   const z=ZONES.find(zz=>P.effort<=zz.max);
   if(!pr){
@@ -641,7 +653,9 @@ function navMapOverlay(){
   c.imageSmoothingEnabled=false;c.drawImage(N.bake,mx,my,NN*sc,NN*sc);c.drawImage(N.tcv,mx,my,NN*sc,NN*sc);
   c.strokeStyle='#3a4a3e';c.lineWidth=1;c.strokeRect(mx+.5,my+.5,NN*sc-1,NN*sc-1);
   const M=(x,y)=>[mx+x*sc,my+y*sc];
-  const rg=Wd.ring,[rx0,ry0]=M(rg.x,rg.y);c.strokeStyle='#ff9a3a';c.lineWidth=1.5;c.setLineDash([4,3]);c.beginPath();c.arc(rx0,ry0,rg.r*sc,0,TAU);c.stroke();c.setLineDash([]);text('FINISH IS INSIDE',rx0,ry0-2,'#ffb060',6.5,'center');text('THIS CIRCLE',rx0,ry0+7,'#ffb060',6.5,'center');
+  const rg=navRing(),[rx0,ry0]=M(rg.x,rg.y),nm=navFinishName();
+  if(N.seenFin){const [fx0,fy0]=M(Wd.fin.x+.5,Wd.fin.y+.5);c.fillStyle='#7aff9a';c.beginPath();c.arc(fx0,fy0,5,0,TAU);c.fill();c.strokeStyle='#fff';c.lineWidth=1.5;c.stroke();text(nm,fx0,fy0-9,'#7aff9a',8,'center');}
+  else{c.strokeStyle='#ff9a3a';c.lineWidth=1.5;c.setLineDash([4,3]);c.beginPath();c.arc(rx0,ry0,rg.r*sc,0,TAU);c.stroke();c.setLineDash([]);text(nm+' IS INSIDE',rx0,ry0-2,'#ffb060',6.5,'center');text('THIS CIRCLE',rx0,ry0+7,'#ffb060',6.5,'center');}
   for(const l of Wd.lands){const [x,y]=M(l.x,l.y);c.fillStyle=l.n==='Start'?'#5ac8ff':'#fff';c.beginPath();c.arc(x,y,2.4,0,TAU);c.fill();text(l.n,x+4,y+3,l.n==='Start'?'#9ad8ff':'#f4f4f4',7);}
   {const [x,y]=M(Wd.riverLabel.x,Wd.riverLabel.y);text('River',x,y,'#bfe0ff',7,'center');}
   const [px,py]=M(N.px/CS,N.py/CS);c.save();c.translate(px,py);c.rotate(N.hd);c.fillStyle='#ff3a3a';c.beginPath();c.moveTo(7,0);c.lineTo(-5,-4.5);c.lineTo(-5,4.5);c.closePath();c.fill();c.strokeStyle='#fff';c.lineWidth=1;c.stroke();c.restore();
