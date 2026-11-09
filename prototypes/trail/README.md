@@ -22,8 +22,7 @@ A trail-running **management** game for phones, played in portrait. One page, no
 - `--bear` also plays bear fights at several reaction times, `--nav` compares a course-following bot with one that heads straight for the finish, `--season 3` plays whole management seasons, `--shots <dir>` saves screenshots of the main screens.
 
 ## Finding the aid station and finish
-- The gate is colour coded: a blue banner is an aid station, a red and white checkered banner is the finish. A tall light beam stands over it and is barely fogged, so it can be seen from far away over hills.
-- The banner at the start of each stage says which one you are looking for, and the top bar names it.
-- Once it is within about 260 units it is "in sight": the compass tape shows a green A or F at its exact bearing, the distance to it appears on screen, and the map marks the gate with a green dot instead of the search circle.
-- Before that, the dashed search circle on the map shrinks and slides onto the real gate as you get closer.
-- A line under the terrain label says whether you are on the marked course; when off course it shows how far the nearest ribbons are and a pink dot on the compass points to them.
+- The gate is marked from the start. The map shows it as a green dot (blue banner in the world = aid station, red and white checkered = finish) and prints the marked course as a pink dotted line. The compass tape shows a green A or F at the gate's exact bearing and the distance shows on screen.
+- A tall light beam stands over the gate so it can be seen from far away over hills.
+- You can follow the marked course (ribbons on the cheapest way round the mountain), or cut your own route for a shortcut: terrain and slopes slow you, the lake blocks you, and unmarked trails may lead nowhere.
+- A line under the terrain name says whether you are on the marked course; off course it shows how far the ribbons are and a pink dot on the compass points to them.

@@ -510,7 +510,7 @@ function startNav(){
   R_.parS+=len/VS[r.tier];R_.parG+=len/VG[r.tier];
   P={x:0,effort:.3,hr:.45,legs:R_.legs,water:R_.water,fuel:R_.fuel,bonk:0,stop:0,slow:null,hike:0,cramp:0,redT:0,ankle:0,cool:0,phase:0,t:0,speed:0,cut:S.cut,elevCam:0,ev:null,drinkT:0,bonked:false,sDown:0,sRed:0,sHard:0,sClimb:0,tEasy:0};
   const px=(Wd.start.x+.5)*CS,py=(Wd.start.y+.5)*CS;
-  NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,
+  NAV={W:Wd,px,py,hd:Math.atan2(Wd.fin.y-Wd.start.y,Wd.fin.x-Wd.start.x),steer:0,bot:null,camh:hAt(Wd,px,py)+7,seg:{g:0,t:'grass'},ter:0,map:false,rev:new Uint8Array(NN*NN),bake:null,tcv:null,dist:0,len,seenFin:true,
     stars:th.stars?Array.from({length:45},()=>[rint(0,VW-1),rint(0,HOR-3)]):null};
   bakeNavMap();navReveal(Wd.start.x,Wd.start.y,9);
   popups.length=0;parts.length=0;R_.stageInj=[];scene='nav';sceneT=0;banner(R_.si+1>=race.stages?'Find the FINISH (red gate)':'Find the AID STATION (blue gate)',2.6);beep(520,.12);
@@ -653,6 +653,7 @@ function navMapOverlay(){
   c.imageSmoothingEnabled=false;c.drawImage(N.bake,mx,my,NN*sc,NN*sc);c.drawImage(N.tcv,mx,my,NN*sc,NN*sc);
   c.strokeStyle='#3a4a3e';c.lineWidth=1;c.strokeRect(mx+.5,my+.5,NN*sc-1,NN*sc-1);
   const M=(x,y)=>[mx+x*sc,my+y*sc];
+  c.fillStyle='#ff7ac0';for(let i=0;i<Wd.pts.length;i+=2){const [x,y]=M(Wd.pts[i].x/CS,Wd.pts[i].y/CS);c.fillRect(x-1,y-1,2.2,2.2);}
   const rg=navRing(),[rx0,ry0]=M(rg.x,rg.y),nm=navFinishName();
   if(N.seenFin){const [fx0,fy0]=M(Wd.fin.x+.5,Wd.fin.y+.5);c.fillStyle='#7aff9a';c.beginPath();c.arc(fx0,fy0,5,0,TAU);c.fill();c.strokeStyle='#fff';c.lineWidth=1.5;c.stroke();text(nm,fx0,fy0-9,'#7aff9a',8,'center');}
   else{c.strokeStyle='#ff9a3a';c.lineWidth=1.5;c.setLineDash([4,3]);c.beginPath();c.arc(rx0,ry0,rg.r*sc,0,TAU);c.stroke();c.setLineDash([]);text(nm+' IS INSIDE',rx0,ry0-2,'#ffb060',6.5,'center');text('THIS CIRCLE',rx0,ry0+7,'#ffb060',6.5,'center');}
@@ -660,7 +661,7 @@ function navMapOverlay(){
   {const [x,y]=M(Wd.riverLabel.x,Wd.riverLabel.y);text('River',x,y,'#bfe0ff',7,'center');}
   const [px,py]=M(N.px/CS,N.py/CS);c.save();c.translate(px,py);c.rotate(N.hd);c.fillStyle='#ff3a3a';c.beginPath();c.moveTo(7,0);c.lineTo(-5,-4.5);c.lineTo(-5,4.5);c.closePath();c.fill();c.strokeStyle='#fff';c.lineWidth=1;c.stroke();c.restore();
   const legend=[[7,'Trail (once seen) 100%'],[0,'Meadow 93%'],[1,'Thick brush 66%'],[2,'Rocky 84%'],[3,'Loose scree 74%'],[4,'Mud 80%'],[5,'Creek 70%'],[6,'Lake: no way through']];
-  const notes=['The marked course has pink ribbons and','the cheapest way round the mountain.','Unmarked trails can lead nowhere.','Steep slopes are slow, cliffs block you.','Brighter shading = slope facing the sun.'];
+  const notes=['Pink dots: the marked course (pink ribbons),','the cheapest way round the mountain.','Follow it, or cut across country for a','shortcut: terrain and slopes slow you.','Other trails may lead nowhere.'];
   if(PORT){
     legend.forEach((q,i)=>{const col=TPAL[q[0]],X=mx+(i%2)*126,Y=288+Math.floor(i/2)*13;c.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;c.fillRect(X,Y,9,9);text(q[1],X+13,Y+8,'#cfdad2',6.5,'left',500);});
     notes.forEach((q,i)=>text(q,mx,350+i*11,'#9fb0a4',6.5,'left',500));
