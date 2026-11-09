@@ -48,7 +48,7 @@ try {
     // trail view: 'trail' follows the marked course, 'direct' heads straight for the finish
     window.__navBot = mode => {
       T.reset(); T.navStart(); let g = 0, idx = 0, slow = 0, rnd = 0; const nrm = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
-      while (T.state().scene === 'nav' && g++ < 120000) {
+      while (['nav', 'event', 'bear', 'aid'].includes(T.state().scene) && g++ < 120000) { const sc0 = T.state().scene; if (sc0 === 'event') { T.choose(1); continue; } if (sc0 === 'bear') { window.__bear(.3, .9); T.bearEnd(); continue; } if (sc0 === 'aid') { T.cont(); continue; }
         const n = T.nav(), st = T.state(), P = st.P, W_ = n.W; let tx, ty;
         if (mode === 'trail') { while (idx < W_.pts.length - 1 && Math.hypot(W_.pts[idx].x - n.px, W_.pts[idx].y - n.py) < 18) idx++; const q = W_.pts[Math.min(idx + 2, W_.pts.length - 1)]; tx = q.x; ty = q.y; }
         else { tx = (W_.fin.x + .5) * 8; ty = (W_.fin.y + .5) * 8; }
