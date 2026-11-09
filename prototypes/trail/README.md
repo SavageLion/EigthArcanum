@@ -124,3 +124,14 @@ The Team Manager race shows the whole course as a tilted 3D relief map with ever
 - **Dots and flags:** every runner is a pixel dot that keeps a constant size on screen (yours bigger, the selected one bigger still, with a name and place tag; the top three get place tags); the sign, aid gates and finish gate are the Pixel Lab sprites at a constant screen size.
 - **Camera:** ALL (the whole course, start toward the bottom), FOLLOW (your selected runner) or LEADER; drag to turn and tilt, + / - or the wheel to zoom. Time of day and weather tint the map and add rain, fog or snow streaks.
 - A VIEW button switches to the behind-the-runner Trail View; the profile strip and the orders panel are unchanged.
+
+## Characters, club life and a bit of humour
+- **Characters:** 24 Pixel Lab characters (8 for your team: climber, endurance runner, sprinter, all-rounder, heat specialist, party animal, veteran, data nerd; 16 for the rivals), one full-body picture each (`assets/pl/pm0-7.png`, `pr0-15.png`). No animations: the team screens show the full-body picture and the race map shows the head as a round badge (yours ringed in their colour, rivals in their team colour).
+- **Personalities and mood:** each runner has a trait (Party Animal, Hothead, Chill, Perfectionist, Lone Wolf, Class Clown), a mood, a weekly wage and a potential (shown as a range when you scout). Mood changes pace (+-2.5%), training xp and how they respond to a team talk.
+- **Team talk** before a race (once per race): Fire them up, Keep it calm, Crack a joke or Promise beer; each trait likes a different one.
+- **Pub night:** take any of the team to the pub ($60). Each runner plays a beer-chug timing game (tap SIP in the gold zone, 5 sips, 3 spills ends it). Pints raise mood and clear fatigue, but 4 or 5 pints often mean a hangover for the next race (slower, higher heart rate, thirstier). A third of the time something silly happens (a statue fight, a lost shoe, a dance-off, a meat voucher).
+- **Beer in the race:** about 3 races in 4 a fan hands one of your runners a beer on the course: down it for a 50/50 of liquid courage or a stitch.
+- **Weekly events and the press:** 40% of weeks bring a two-choice event (a cheese costume sponsor, a stray dog, karaoke, a seagull); after each race a press conference (humble, cocky or funny) moves fans and mood.
+- **Finances:** weekly wages, prize money, fans' money, and bankruptcy (more than $250 in debt) ends the career.
+- **Roguelike layer:** after every race you pick one of three team relics (14 of them, such as Beer Fridge, Cheese Costume, Megaphone, Shady Bookie, Lucky Goat) that last the whole career; relics change wages, the pub, income, speed, surge recharge and training.
+- **Map:** runners are head badges with place tags, your runners trail a coloured line, runners in a pack spread across lanes so they do not sit on top of each other, and the map has a gold frame.

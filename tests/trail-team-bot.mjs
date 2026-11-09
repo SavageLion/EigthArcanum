@@ -20,6 +20,8 @@ try {
   await page.goto(`http://localhost:${port}/`); await page.waitForTimeout(800);
   await page.evaluate(() => {
     const T = window.__trail;
+    const dlgLoop = () => { let g = 0; while (g++ < 14 && T.tm.club.state().scene === 'tdlg') { const d = T.tm.club.state().DLG; if (d.res == null && d.opts) T.tm.club.pick(Math.floor(Math.random() * d.opts.length)); T.tm.club.done(); } };
+    const advance = () => { let g = 0; while (g++ < 30 && T.tm.get().day < T.tm.get().raceDay) { T.goto('team'); T.tm.skip(); dlgLoop(); if (T.tm.club.state().scene === 'tover') return false; } return true; };
     window.__tmSeason = (pol, withLive) => {
       const out = [], TM = () => T.tm.get();
       for (let guard = 0; guard < 60; guard++) {
@@ -32,7 +34,7 @@ try {
           const used = new Set();
           tm.rn.forEach(q => { for (const g of tm.inv) if (q.gear.length < 2 && !used.has(g)) { q.gear.push(g); used.add(g); } });
         } else tm.rn.forEach(q => { q.focus = 'end'; });
-        T.tm.skip();
+        if (!advance()) { out.push('BANKRUPT in race ' + (tm.idx + 1)); break; }
         const r = TM().idx, race = r;
         // plan
         tm.rn.forEach(q => {
@@ -55,7 +57,7 @@ try {
         T.tm.finish();
         const res = T.tm.tr().res;
         out.push(`${['Pine', 'Lakeside', 'Canyon', 'Fogbank', 'Skyline', 'Glacier', 'Summit'][res.idx]} [${T.tm.tr().wxk}] places ${res.rows.map(o => o.place).join(',')}  team ${res.teamRank}  $${res.prize}  money ${TM().money}  stats ${TM().rn.map(q => Object.values(q.st).reduce((a, b) => a + b, 0)).join('/')}  ${res.notes.map(n => n.inj.length).join('')}`);
-        T.goto('team');
+        T.tm.club.after(); dlgLoop(); if (T.tm.club.state().scene === 'tover') { out.push('BANKRUPT'); break; } T.goto('team');
       }
       return out;
     };

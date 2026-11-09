@@ -176,6 +176,7 @@ function update(dt){
   for(const q of parts){q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=q.g*dt;q.t-=dt;}for(let i=parts.length-1;i>=0;i--)if(parts[i].t<=0)parts.splice(i,1);
   if(paused)return;
   if(scene==='tmrace'){tmStep(dt);return;}
+  if(scene==='tchug'){chugStep(dt);return;}
   if(scene==='physio'){if(PH&&PH.mode==='play'){PH.t+=dt;if(PH.fbT>0)PH.fbT-=dt;}return;}
   if(scene==='bear'){bearStep(dt);return;}
   if(scene==='event'){P.ev.t-=dt;if(P.ev.t<=0)chooseEvent(0);return;}
@@ -407,7 +408,7 @@ function drawBear(cx,base){
 const IMG={};const loadImg=(k,src)=>{const i=new Image();i.onload=()=>{IMG[k]=i;};i.src=src;};loadImg('pine','assets/pine_bg.jpg');
 // scenic backdrop behind the terrain view (Pine Ridge): mirrored tiles that scroll as you turn
 const PL={};const plLoad=(k,src)=>{const i=new Image();i.onload=()=>{PL[k]=i;const cv=document.createElement('canvas');cv.width=i.width;cv.height=i.height;const q=cv.getContext('2d');q.drawImage(i,0,0);const d=q.getImageData(0,0,i.width,i.height).data;let x0=i.width,y0=i.height,x1=0,y1=0;for(let y=0;y<i.height;y++)for(let x=0;x<i.width;x++)if(d[(y*i.width+x)*4+3]>40){if(x<x0)x0=x;if(x+1>x1)x1=x+1;if(y<y0)y0=y;if(y+1>y1)y1=y+1;}PLB[k]=x1>x0?{x0,y0,x1,y1}:{x0:0,y0:0,x1:i.width,y1:i.height};};i.src='assets/pl/'+src+'.png';};
-['pine_a','spruce_b','aspen_c','bush','flowers','rocks','grass','cloud','runner_north','hills','fog','sclouds','sign','fence','lupine','boulder','gate_aid','gate_fin','runner_south','trophy','podium'].forEach(n=>plLoad(n,n));for(let i=0;i<7;i++)plLoad('flag'+i,'flag_'+i);for(let i=0;i<8;i++){plLoad('rE'+i,'rE_'+i);plLoad('rNE'+i,'rNE_'+i);plLoad('rSE'+i,'rSE_'+i);}plLoad('rEidle','rE_idle');
+['pine_a','spruce_b','aspen_c','bush','flowers','rocks','grass','cloud','runner_north','hills','fog','sclouds','sign','fence','lupine','boulder','gate_aid','gate_fin','runner_south','trophy','podium'].forEach(n=>plLoad(n,n));for(let i=0;i<7;i++)plLoad('flag'+i,'flag_'+i);for(let i=0;i<8;i++)plLoad('pm'+i,'pm'+i);for(let i=0;i<16;i++)plLoad('pr'+i,'pr'+i);
 {const im=new Image();im.onload=()=>{const cv=document.createElement('canvas');cv.width=im.width;cv.height=im.height;const q=cv.getContext('2d');q.drawImage(im,0,0);q.globalCompositeOperation='destination-in';const g=q.createLinearGradient(0,0,im.width,0);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(.16,'rgba(0,0,0,1)');g.addColorStop(.84,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');q.fillStyle=g;q.fillRect(0,0,im.width,im.height);PL.panoF=cv;};im.src='assets/pl/pano.png';}for(let i=0;i<8;i++)plLoad('run'+i,'run_'+i);for(let i=0;i<7;i++){plLoad('bird'+i,'bird_'+i);plLoad('bfly'+i,'bfly_'+i);}
 function tuftStep(dt){const N=NAV,tb=N.tb,ts=N.ts,T_=N.W.tufts,dec=dt*.55;for(let i=0;i<tb.length;i++)if(tb[i]>0)tb[i]=Math.max(0,tb[i]-dec);
   const fx=Math.cos(N.hd),fy=Math.sin(N.hd),rx=-fy,ry=fx,cx=Math.floor(N.px/16),cy=Math.floor(N.py/16);
@@ -1143,7 +1144,7 @@ function render(){
   else if(scene==='event')eventScene();
   else if(scene==='bear')bearScene();
   else if(scene==='nav')navScene();
-  else if(scene==='podium')podiumScene();else if(scene==='standings')standingsScene();else if(scene==='field')fieldScene();else if(scene==='seasonend')seasonEndScene();else if(scene==='home')homeScene();else if(scene==='runmap')runMapScene();else if(scene==='camp')campScene();else if(scene==='revent')reventScene();else if(scene==='rshop')rshopScene();else if(scene==='reward')rewardScene();else if(scene==='runend')runEndScene();else if(scene==='perks')perksScene();else if(scene==='team')teamScene();else if(scene==='tplan')tplanScene();else if(scene==='tmrace')tmrScene();else if(scene==='tmres')tmresScene();else if(scene==='tshop')tshopScene();else if(scene==='trecruit')trecruitScene();else if(scene==='tstand')tstandScene();else if(scene==='tseasonend')tseasonendScene();
+  else if(scene==='podium')podiumScene();else if(scene==='standings')standingsScene();else if(scene==='field')fieldScene();else if(scene==='seasonend')seasonEndScene();else if(scene==='home')homeScene();else if(scene==='runmap')runMapScene();else if(scene==='camp')campScene();else if(scene==='revent')reventScene();else if(scene==='rshop')rshopScene();else if(scene==='reward')rewardScene();else if(scene==='runend')runEndScene();else if(scene==='perks')perksScene();else if(scene==='team')teamScene();else if(scene==='tplan')tplanScene();else if(scene==='tmrace')tmrScene();else if(scene==='tmres')tmresScene();else if(scene==='tshop')tshopScene();else if(scene==='trecruit')trecruitScene();else if(scene==='tstand')tstandScene();else if(scene==='tseasonend')tseasonendScene();else if(scene==='tdlg')tdlgScene();else if(scene==='tpub')tpubScene();else if(scene==='tchug')tchugScene();else if(scene==='trelics')trelicsScene();else if(scene==='tover')toverScene();
   if(paused)pauseLayer();
   if(scene!=='nav'&&(scene!=='bear'||(BR&&BR.over))){fsBtn();muteBtn();}
   toastLayer();
@@ -1336,7 +1337,7 @@ function musicFor(){
   if(scene==='bear')return ['battle',0];
   if(scene==='podium')return PODIUM&&PODIUM.place&&PODIUM.place<=3?['victory',0]:['reward',0];if(scene==='seasonend')return ['victory',0];if(scene==='standings'||scene==='field')return ['title',0];
   if(scene==='map'||scene==='train'||scene==='home'||scene==='runmap'||scene==='perks')return ['title',0];
-  if(scene==='camp'||scene==='revent'||scene==='team'||scene==='tplan'||scene==='tshop'||scene==='trecruit'||scene==='tstand')return ['hub',0];if(scene==='tmrace')return ['battle',14];if(scene==='tmres'||scene==='tseasonend')return ['victory',0];if(scene==='rshop')return ['shop',0];if(scene==='reward')return ['reward',0];if(scene==='runend')return END&&END.win?['victory',0]:['defeat',0];
+  if(scene==='camp'||scene==='revent'||scene==='team'||scene==='tplan'||scene==='tshop'||scene==='trecruit'||scene==='tstand')return ['hub',0];if(scene==='tmrace')return ['battle',14];if(scene==='tmres'||scene==='tseasonend')return ['victory',0];if(scene==='tpub'||scene==='tchug')return ['shop',0];if(scene==='tdlg'||scene==='trelics')return ['hub',0];if(scene==='tover')return ['defeat',0];if(scene==='rshop')return ['shop',0];if(scene==='reward')return ['reward',0];if(scene==='runend')return END&&END.win?['victory',0]:['defeat',0];
   if(scene==='base'||scene==='shop')return ['shop',0];
   if(scene==='aid')return ['hub',0];
   if(scene==='physio')return ['battle',14];
@@ -1807,11 +1808,14 @@ const TEAMN=['Ridgewalkers','Peak Pacers','Granite Club','Summit Collective'];
 const DFS=[2.6,3,3.4,3.9,4.4,5,5.5],WEEKS=[3,4,4,5,5,6,6],STANCE_D=[-.18,0,.14,.3],STC=['#6a8ab0','#6ac07a','#e8d24a','#e8503a'],STN=['EASY','STEADY','TEMPO','ATTACK'];
 const TMGEAR=['hat','flask','gels','shoes','sleeves','poles','buff'],TM=()=>save.team,gearPrice=id=>Math.round(GEAR[id].p*1.4/5)*5;
 let TR=null,TMOTE='',tmPick=null,tmCand=null;
-function mkRunner(rg,arch,col){const st=Object.assign({},ARCH[arch]);TST.forEach(k=>st[k]=clamp(st[k]+Math.floor(rg()*3)-1,0,9));
-  return {name:TFIRST[Math.floor(rg()*TFIRST.length)]+' '+TLAST[Math.floor(rg()*TLAST.length)],col,arch,st,xp:{pow:0,end:0,clm:0,heat:0,rec:0},fat:0,inj:[],gear:[],focus:arch==='climber'?'clm':arch==='diesel'?'end':'pow',enter:true,plan:[1,1,1,2],races:0};}
+function mkRunner(rg,arch,col,special){const st=Object.assign({},ARCH[arch]);TST.forEach(k=>st[k]=clamp(st[k]+Math.floor(rg()*3)-1,0,9));
+  const sum=TST.reduce((a,k)=>a+st[k],0),face=special?5+Math.floor(rg()*3):FACEARCH[arch],trait=special?{5:'party',6:'wolf',7:'perf'}[face]:TRAITK[Math.floor(rg()*TRAITK.length)];
+  return {name:TFIRST[Math.floor(rg()*TFIRST.length)]+' '+TLAST[Math.floor(rg()*TLAST.length)],col,arch,face,trait,mood:60,wage:8+Math.round(sum*.35),pot:1+Math.floor(rg()*5),hang:0,talk:0,st,xp:{pow:0,end:0,clm:0,heat:0,rec:0},fat:0,inj:[],gear:[],focus:arch==='climber'?'clm':arch==='diesel'?'end':'pow',enter:true,plan:[1,1,1,2],races:0};}
 function newTeam(){
   const rg=mulberry((Math.random()*1e9)|0);
-  save.team={n:1,idx:0,day:1,raceDay:1+7*WEEKS[0],money:300,rn:[mkRunner(rg,'climber',TMCOL[0]),mkRunner(rg,'diesel',TMCOL[1]),mkRunner(rg,'sprinter',TMCOL[2])],inv:['hat'],staff:{phy:0,coach:0,nut:0},results:[],pts:{},field:[],teams:[],seed:(rg()*1e9)|0};
+  save.team={n:1,idx:0,day:1,raceDay:1+7*WEEKS[0],money:300,rn:[mkRunner(rg,'climber',TMCOL[0]),mkRunner(rg,'diesel',TMCOL[1]),mkRunner(rg,'sprinter',TMCOL[2])],inv:['hat'],staff:{phy:0,coach:0,nut:0},results:[],pts:{},field:[],teams:[],seed:(rg()*1e9)|0,fans:20,relics:[],cocky:false,talked:false,v2:1};
+  save.team.rn.forEach((q,i)=>{q.trait=TRAITK[(Math.floor(rg()*6)+i*2)%6];q.pot=3;});
+  {const used=new Set();save.team.rn.forEach(q=>{let n=0;while(used.has(q.name.split(' ')[0])&&n++<30)q.name=TFIRST[Math.floor(rg()*TFIRST.length)]+' '+q.name.split(' ')[1];used.add(q.name.split(' ')[0]);});}
   tmSeason();persist();
 }
 function tmSeason(){
@@ -1839,7 +1843,7 @@ function mkSim(spec,C,DF,rg){
   const G={};(spec.gear||[]).forEach(g=>G[g]=1);
   return {name:spec.name,col:spec.col,me:!!spec.me,ref:spec.ref||null,team:spec.team,style:spec.style||'allround',st:spec.st,ij:spec.ij||{},G,plan:spec.plan||[1,1,1,1],stance:1,q:-1,
     x:0,v:0,ci:0,hr:.42,legs:spec.legs,water:100,fuel:100,bonk:0,bonks:0,cramp:0,redT:0,stop:0,drinkT:0,surgeT:0,surgeCD:0,cool:0,bias:0,aid:[0,0],sips:spec.sips||3,gels:spec.gels||2,
-    sDown:0,sRed:0,sHard:0,sClimb:0,tClimb:0,fin:null,place:0,rg,atk:spec.atk||null,ai:!spec.me,nt:0};
+    sDown:0,sRed:0,sHard:0,sClimb:0,tClimb:0,fin:null,place:0,rg,atk:spec.atk||null,ai:!spec.me,nt:0,face:spec.face,moodMul:spec.moodMul||1,hang:spec.hang||0,cdMax:spec.cdMax||30};
 }
 function rstep(r,dt,TR_){
   const C=TR_.C,s=r.x/TR_.DF;while(r.ci<C.np-1&&C.cs[r.ci+1]<=s)r.ci++;
@@ -1851,13 +1855,13 @@ function rstep(r,dt,TR_){
   e=clamp(e+(r.bias||0),.1,.97);if(r.legs<12)e=Math.min(e,.5);
   if(r.bonk>0){r.bonk-=dt;e=Math.min(e,.15);if(r.bonk<=0)r.legs=Math.max(r.legs,14);}
   if(r.cramp>0){r.cramp-=dt;e=Math.min(e,.35);}
-  let v=(9+26*Math.pow(e,.9))*(.92+.016*st.pow);
+  let v=(9+26*Math.pow(e,.9))*(.92+.016*st.pow)*r.moodMul*(1-.035*r.hang);if(r.me){if((TR_.wxk==='rain'||TR_.wxk==='storm')&&TMR('luckyhat'))v*=1.025;if(TR_.wxk==='cold'&&TMR('thermos'))v*=1.02;}
   if(g>0)v*=clamp(1-3*(1-.035*st.clm)*g*(G.poles?.85:1)*(1+.1*(ij.calf||0)),.4,1);else v*=1+Math.min(.35,-g*2.2);
   v*=1-(1-ter.f)*((G.shoes&&tn!=='smooth')?.5:1);v*=((wx.ter||{})[tn]||1);
   if(r.legs<25)v*=.6+.4*r.legs/25;v*=1-.045*(ij.blister||0);
   if(r.drinkT>0){r.drinkT-=dt;v*=.55;}if(r.bonk>0)v=Math.min(v,7);if(r.stop>0){r.stop-=dt;v=0;}
   r.v+=(v-r.v)*(1-Math.exp(-dt*3));
-  let tgt=clamp(.28+.62*e+1.1*Math.max(0,g)+heat*.07+(r.water<20?.08:0)+(wx.hr||0)-(G.buff&&heat>.3?.03:0),.3,1);
+  let tgt=clamp(.28+.62*e+1.1*Math.max(0,g)+heat*.07+(r.water<20?.08:0)+(wx.hr||0)-(G.buff&&heat>.3?.03:0)+.03*r.hang,.3,1);
   r.hr+=(tgt-r.hr)*(1-Math.exp(-dt/(tgt>r.hr?5:9)));
   let drain=.35+13*Math.pow(Math.max(0,r.hr-.62),1.6);
   if(g<-.06&&e>.55)drain+=Math.max(0,-g-.06)*30*e*(1+.6*(ij.knee||0));
@@ -1866,7 +1870,7 @@ function rstep(r,dt,TR_){
   if(r.hr<.6)r.legs=Math.min(100,r.legs+.8*(.6-r.hr)/.3*(G.sleeves?1.4:1)*(1+.06*st.rec)*(r.fuel<15?.6:1)*dt);
   if(r.hr>.62)r.legs-=drain*dt;else r.legs-=.2*dt;
   if(r.legs<=0&&r.bonk<=0){r.legs=0;r.bonk=12;r.bonks++;tmLog(TR_,r,'bonks!','#ff8a7a');}
-  r.water=Math.max(0,r.water-.45*(.5+e+heat*.6)*dt*(wx.water||1)*(r.me?1-.05*(TM().staff.nut||0):1));r.fuel=Math.max(0,r.fuel-.32*(.4+e)*dt);
+  r.water=Math.max(0,r.water-.45*(.5+e+heat*.6)*dt*(wx.water||1)*(r.me?1-.05*(TM().staff.nut||0):1)*(1+.2*r.hang));r.fuel=Math.max(0,r.fuel-.32*(.4+e)*dt);
   if(r.hr>.92){r.redT+=dt;if(r.redT>6-(ij.calf||0)&&r.water<35&&r.cramp<=0){r.cramp=9;r.redT=0;tmLog(TR_,r,'cramps!','#ffb08a');}}else r.redT=Math.max(0,r.redT-dt);
   if((tn==='rocky'||tn==='loose')&&e>.8&&!TR_.noRand&&r.rg()<(G.shoes?.008:.016)*dt){r.stop=Math.max(r.stop,.7);r.legs-=6;}
   if(g<-.05&&e>.55)r.sDown+=dt;if(r.hr>.9)r.sRed+=dt;if(e>.7)r.sHard+=dt;if(g>.04&&r.hr>.8)r.sClimb+=dt;if(g>.03)r.tClimb+=dt;
@@ -1878,7 +1882,7 @@ function rstep(r,dt,TR_){
 }
 function tmDrink(r){if(r.sips<=0||r.drinkT>0)return;r.sips--;r.water=Math.min(100,r.water+38);r.drinkT=1.3;}
 function tmGel(r){if(r.gels<=0||r.drinkT>0)return;r.gels--;r.fuel=Math.min(100,r.fuel+42);r.legs=Math.min(100,r.legs+8);r.drinkT=1.1;}
-function tmSurge(r){if(r.surgeCD>0||r.surgeT>0||r.fin!=null)return;r.surgeT=8;r.surgeCD=30;}
+function tmSurge(r){if(r.surgeCD>0||r.surgeT>0||r.fin!=null)return;r.surgeT=8;r.surgeCD=r.cdMax;}
 function aiThink(r,TR_,p,g){
   const st=r.style;let b=0;
   if(st==='climber')b+=g>.03?.07:-.02;else if(st==='diesel')b+=p<.5?-.05:.05;else if(st==='sprinter')b+=p<.35?.06:p>.9?.12:-.03;else if(st==='tactician')b+=p>.88?.1:0;else if(st==='allround')b+=p>.9?.09:0;else if(st==='heat')b+=TR_.heat>.4?.04:0;
@@ -1890,20 +1894,20 @@ function tmLog(TR_,r,txt,col){if(!TR_||TR_.noRand)return;TR_.log.push({t:TR_.t,t
 // ----- a solo prediction for the plan screen (no rivals, no random events)
 const tmPC={};
 function tmPredict(q,idx,wxk){
-  const key=[idx,wxk,q.plan.join(''),q.gear.join(),q.inj.map(i=>i.k+i.s).join(),Math.round(q.fat),TST.map(k=>q.st[k]).join(''),TM().staff.nut].join('|');if(tmPC[key])return tmPC[key];
-  const C=tmGetCourse(idx),DF=DFS[idx],TR_={C,DF,Ltot:C.L*DF,wx:WX[wxk],heat:tmHeat(idx,wxk),t:0,noRand:true,log:[]};
+  const key=[idx,wxk,q.plan.join(''),q.gear.join(),q.inj.map(i=>i.k+i.s).join(),Math.round(q.fat),TST.map(k=>q.st[k]).join(''),TM().staff.nut,Math.round(q.mood/4),q.hang,q.talk,TM().relics.length].join('|');if(tmPC[key])return tmPC[key];
+  const C=tmGetCourse(idx),DF=DFS[idx],TR_={C,DF,Ltot:C.L*DF,wx:WX[wxk],wxk,heat:tmHeat(idx,wxk),t:0,noRand:true,log:[]};
   const r=mkSim(tmSpec(q),C,DF,Math.random);r.plan=q.plan.slice();let lmin=100,g=0;
   while(r.fin==null&&TR_.t<1400&&g++<9000){rstep(r,.25,TR_);TR_.t+=.25;lmin=Math.min(lmin,r.legs);}
   return tmPC[key]={t:r.fin==null?TR_.t:r.fin,lmin,legs:r.legs,bonks:r.bonks};
 }
-function tmSpec(q){const tm=TM();return {name:q.name,col:q.col,me:true,ref:q,st:q.st,ij:sevOf(q),gear:q.gear,plan:q.plan,legs:clamp(100-q.fat*.25,40,100),sips:3+(q.gear.includes('flask')?2:0)+(tm.staff.nut||0),gels:2+(q.gear.includes('gels')?2:0)+(tm.staff.nut>1?1:0),team:'me'};}
+function tmSpec(q){const tm=TM();return {name:q.name,col:q.col,me:true,ref:q,face:faceKey(q),st:q.st,ij:sevOf(q),gear:q.gear,plan:q.plan,legs:clamp(100-q.fat*.25,40,100),sips:3+(q.gear.includes('flask')?2:0)+(tm.staff.nut||0)+(TMR('thermos')?1:0),gels:2+(q.gear.includes('gels')?2:0)+(tm.staff.nut>1?1:0)+(TMR('gels')?1:0),team:'me',moodMul:(1+(q.mood-55)/45*.025)*(1+(q.talk||0)),hang:q.hang||0,cdMax:TMR('megaphone')?20:30};}
 function tmRivalSpec(f,rg,idx){const rv=RIVALS[f.id],lv_=(f.m-.88)*30,b=lv_*.9,o={pow:b,end:b,clm:b,heat:b,rec:b},sh={climber:{clm:3,pow:-1},diesel:{end:3,pow:-1},sprinter:{pow:2,end:-2},tactician:{rec:1,end:.5},allround:{pow:.5,end:.5,clm:.5},heat:{heat:3}}[rv.style]||{};
   TST.forEach(k=>o[k]=clamp(Math.round(o[k]+(sh[k]||0)+(rg()-.5)),0,10));
   const a=rg()<.6?[.45+rg()*.3,0]:null;if(a)a[1]=a[0]+.12;
-  return {name:rv.name,col:rv.col,me:false,st:o,style:rv.style,legs:100,team:f.team,atk:a};}
+  return {name:rv.name,col:rv.col,me:false,st:o,style:rv.style,legs:100,team:f.team,atk:a,face:'pr'+f.id};}
 // ----- starting and running a race
 function tmStartRace(){
-  const tm=TM(),idx=tm.idx,ent=tm.rn.filter(q=>q.enter);if(ent.length<2){toast('Enter at least 2 runners');return;}
+  tmMig();const tm=TM(),idx=tm.idx,ent=tm.rn.filter(q=>q.enter);if(ent.length<2){toast('Enter at least 2 runners');return;}
   const wxk=forecast(RACES[idx],tm.raceDay);race=tmRaceO(idx);RUN=null;
   R_={si:0,times:[],bonks:0,gear:[],total:0,newInj:[],stageInj:[],tentUsed:false,report:[],climbXp:0,heatXp:0,easyXp:0,res:null,settled:false,parS:0,parG:0,wx:wxk,legs:100,water:100,fuel:100,field:null,bonusCoins:0,swUsed:false,calendar:false,deck:[],pile:[],disc:[]};
   startNav();NAV.brief=false;NAV.map=false;NAV.cards=false;
@@ -1911,16 +1915,17 @@ function tmStartRace(){
   const mine=ent.map(q=>mkSim(Object.assign(tmSpec(q),{}),C,DF,mulberry((rg()*1e9)|0))),riv=tm.field.map(f=>{const sp=tmRivalSpec(f,rg,idx),r=mkSim(sp,C,DF,mulberry((rg()*1e9)|0));r.id=f.id;return r;});
   const all=[...mine,...riv];all.forEach((r,i)=>{r.uid=i;r.fe={id:i,rv:{name:r.name,col:r.col},g:0};r.stop=rg()*1.6;});
   TR={idx,C,DF,Ltot:C.L*DF,wx:WX[wxk],wxk,heat:S.heat,t:0,speed:2,all,mine,sel:0,log:[],done:false,orderT:0,order:all.slice(),end:null};
-  R_.field=all.map(r=>r.fe);P={x:0,effort:.3,hr:.4,legs:100,bonk:0,stop:0,speed:0,phase:0,t:0,cool:0,cut:1e9,drinkT:0};
+  TR.modal=null;TR.beer=false;TR.beerAt=.3+Math.random()*.25;R_.field=all.map(r=>r.fe);P={x:0,effort:.3,hr:.4,legs:100,bonk:0,stop:0,speed:0,phase:0,t:0,cool:0,cut:1e9,drinkT:0};
   NAV.px=C.pts[0].x;NAV.py=C.pts[0].y;NAV.hd=Math.atan2(C.pts[3].y-C.pts[0].y,C.pts[3].x-C.pts[0].x);NAV.camh=hAt(C.W,NAV.px,NAV.py)+CAMH;
   TR.view=g3Build()?'map':'trail';scene='tmrace';sceneT=0;banner('GO!',1.4);beep(660,.1,'triangle');
 }
 function tmOrder(){TR.all.forEach(r=>r.key=r.fin!=null?-1e6+r.fin:-r.x);TR.order=TR.all.slice().sort((a,b)=>a.key-b.key);TR.order.forEach((r,i)=>r.place=i+1);}
 function tmStep(dt){
-  if(!TR||TR.done)return;
+  if(!TR||TR.done||TR.modal)return;
   const ds=dt*TR.speed;let left=ds;
   while(left>1e-6){const h=Math.min(.1,left);left-=h;TR.t+=h;for(const r of TR.all)if(r.fin==null)rstep(r,h,TR);}
   tmOrder();
+  if(!TR.beer&&TR.mine.some(r=>r.fin==null&&r.x/TR.Ltot>TR.beerAt)){TR.beer=true;if(Math.random()<.75){tmBeerEvent();return;}}
   if(TR.mine.every(r=>r.fin!=null)){tmFinish();return;}
   if(TR.view!=='map'||!G3||!G3.ok)tmCam(dt);
 }
@@ -1945,58 +1950,67 @@ function tmFinish(){
   const myT=tp.find(t0=>t0.me);let money=0;
   TR.mine.forEach(r=>{const pz=Math.round(PURSE[idx]*1.6*(SPLIT[r.place-1]||0))+40;money+=pz;res.rows.push({r,place:r.place,time:r.fin,prize:pz,bonks:r.bonks});});
   const tb=Math.round(PURSE[idx]*1.6*[.5,.3,.15][myT.rank-1]||0);money+=tb;res.teamBonus=tb;res.teamRank=myT.rank;
-  tm.money+=money;res.prize=money;
+  const fansB=Math.round(tm.fans*.8)+(TMR('costume')?60:0)+(TMR('bookie')?Math.round(-40+Math.random()*160):0);money+=fansB;res.fansBonus=fansB;tm.money+=money;res.prize=money;tm.fans=clamp(tm.fans+(myT.rank<=2?(TMR('mascot')?7:4):myT.rank>=4?-3:(TMR('mascot')?3:1)),0,100);
   tp.forEach(t0=>{const k=t0.me?'me':t0.name;tm.pts[k]=(tm.pts[k]||0)+(PTS[t0.rank-1]||0);});
   // consequences for every runner of mine: xp, fatigue, injuries
   TR.mine.forEach(r=>{const q=r.ref,t=Math.max(1,r.fin),fr=n=>n/t,f=q.fat*.0012,L=[],tryInj=(k,p)=>{if(r.rg()<clamp(p,0,.55)*(1-.12*(tm.staff.phy||0))){const x=q.inj.find(i=>i.k===k);if(x){x.s=Math.min(3,x.s+1);x.wk=2;L.push(INJ[k].n+' worse');}else{q.inj.push({k,s:1,wk:2});L.push(INJ[k].n);}}};
     tryInj('knee',.025+fr(r.sDown)*.9+f);tryInj('shin',.025+fr(r.sHard)*.3+f);tryInj('calf',.025+fr(r.sClimb)*.9+f+(r.water<20?.08:0));tryInj('ach',.02+fr(r.sRed)+f+(r.bonks?.1:0));
     const xs=[['end',24+(r.bonks?0:8)],['clm',Math.min(40,fr(r.tClimb)*100)],['heat',TR.heat>.3?26:8],['pow',r.place<=6?18:9],['rec',10]];xs.forEach(([k,a])=>tmXp(q,k,a));
-    q.fat=clamp(q.fat+22+(r.bonks?8:0),0,100);q.races++;q.enter=true;
+    q.fat=clamp(q.fat+22+(r.bonks?8:0),0,100);q.races++;q.enter=true;{const pl=r.place,nn=TR.all.length;q.mood=clamp(q.mood+(pl===1?12:pl<=3?8:pl<=6?3:pl>=nn-1?-8:-3)+(TMR('mascot')&&pl<=6?2:0)+(TMR('costume')?-2:0)+(tm.cocky?(pl<=3?10:-10):0),0,100);q.hang=Math.max(0,q.hang-1);q.talk=0;}
     res.notes.push({name:q.name,inj:L,place:r.place});});
-  tm.results.push({idx,places:TR.mine.map(r=>r.place),teamRank:myT.rank,prize:money,wxk:TR.wxk});
+  tm.results.push({idx,places:TR.mine.map(r=>r.place),teamRank:myT.rank,prize:money,wxk:TR.wxk});tm.cocky=false;
   tm.idx++;tm.day=tm.raceDay;if(tm.idx<7)tm.raceDay=tm.day+7*WEEKS[tm.idx];
   TR.res=res;persist();scene='tmres';sceneT=0;beep(1046,.4,'triangle');
 }
 function tmXp(q,k,a){if(q.st[k]>=10)return;q.xp[k]+=a;while(q.st[k]<10&&q.xp[k]>=tneed(q.st[k])){q.xp[k]-=tneed(q.st[k]);q.st[k]++;}if(q.st[k]>=10)q.xp[k]=0;}
 // ----- between races: one week at a time
 function tmNextWeek(){
-  const tm=TM();if(tm.day>=tm.raceDay)return;tm.day+=7;const lines=[];
+  const tm=TM();if(tm.day>=tm.raceDay||scene==='tdlg'||scene==='tover')return;tm.day+=7;const lines=[],wg=tmWages();tm.money-=wg;
   tm.rn.forEach(q=>{
-    const hurt=q.inj.length>0,rest=q.focus==='rest';
-    if(rest)q.fat=clamp(q.fat-35,0,100);else{const g=Math.round(40*(1+.2*(tm.staff.coach||0))*(q.fat>70?.5:1)*(hurt?.7:1));tmXp(q,q.focus,g);q.fat=clamp(q.fat+12,0,100);lines.push(`${q.name.split(' ')[0]} +${g} ${TSTS[q.focus]}`);}
+    const hurt=q.inj.length>0,rest=q.focus==='rest',sau=TMR('sauna')?6:0;
+    if(rest)q.fat=clamp(q.fat-35-sau,0,100);
+    else{const xpm=(1+.2*(tm.staff.coach||0))*(TMR('whistle')?1.15:1)*(.8+q.mood/250)*(.85+.1*q.pot)*(q.fat>70?.5:1)*(hurt?.7:1)*(q.focus==='clm'&&TMR('goat')?1.3:1),g=Math.round(40*xpm);tmXp(q,q.focus,g);q.fat=clamp(q.fat+12-sau,0,100);lines.push(`${first(q)} +${g} ${TSTS[q.focus]}`);}
     q.inj.forEach(i=>{i.wk-=1+(tm.staff.phy||0)+(rest?1:0);if(i.wk<=0){i.s--;i.wk=2;}});q.inj=q.inj.filter(i=>i.s>0);
+    q.mood=clamp(q.mood+(55-q.mood)*.12+(TMR('poster')?3:0)+(rest?2:0)-(q.mood>60&&Math.random()<.1?4:0),0,100);
   });
-  TMOTE=lines.join('   ');persist();beep(500,.08,'triangle');
+  TMOTE=lines.join('   ')+`   (wages -$${wg})`;persist();beep(500,.08,'triangle');
+  if(tm.money<-250){tmOver('bankrupt');return;}
+  if(Math.random()<.4)tmRollEvent();
 }
-function tmSkipWeeks(){while(TM().day<TM().raceDay)tmNextWeek();}
+function tmSkipWeeks(){while(TM().day<TM().raceDay&&scene==='team')tmNextWeek();}
 // ----- shop and recruiting
 const STAFF={coach:{n:'Coach',d:'Training gives 20% more xp per level.',p:[200,350,550]},phy:{n:'Physio',d:'Injuries heal a week faster per level and happen less.',p:[150,260,400]},nut:{n:'Nutritionist',d:'More drinks and gels per race, and slower water loss.',p:[150,260,400]}};
 function tmBuyStaff(k){const tm=TM(),l=tm.staff[k],p=STAFF[k].p[l];if(p==null||tm.money<p)return;tm.money-=p;tm.staff[k]++;persist();beep(880,.1,'triangle');}
 function tmBuyGear(id){const tm=TM(),p=gearPrice(id);if(tm.inv.includes(id)||tm.money<p)return;tm.money-=p;tm.inv.push(id);persist();beep(880,.1,'triangle');}
 function tmCycleGear(q,slot){const tm=TM(),used=new Set();tm.rn.forEach(x=>{if(x!==q)x.gear.forEach(g=>used.add(g));});const opts=[null,...tm.inv.filter(g=>!used.has(g)&&(!q.gear.includes(g)||q.gear[slot]===g))],cur=opts.indexOf(q.gear[slot]||null),nx=opts[(cur+1)%opts.length];
   const o=q.gear.slice();while(o.length<=slot)o.push(null);o[slot]=nx;q.gear=o.filter(Boolean);beep(500,.04,'triangle');}
-function tmCands(){const tm=TM(),rg=mulberry(tm.seed+tm.n*101+tm.idx*13+5),ks=Object.keys(ARCH);return Array.from({length:3},(_,i)=>{const q=mkRunner(rg,ks[Math.floor(rg()*ks.length)],TMCOL[i]);TST.forEach(k=>q.st[k]=clamp(q.st[k]+Math.floor(rg()*2)+Math.floor(tm.idx/2),0,9));q.cost=150+Object.values(q.st).reduce((a,b)=>a+b,0)*14;return q;});}
+function tmCands(){const tm=TM(),rg=mulberry(tm.seed+tm.n*101+tm.idx*13+5),ks=Object.keys(ARCH);return Array.from({length:3},(_,i)=>{const sp=rg()<.35,q=mkRunner(rg,ks[Math.floor(rg()*ks.length)],TMCOL[i],sp);TST.forEach(k=>q.st[k]=clamp(q.st[k]+Math.floor(rg()*2)+Math.floor(tm.idx/2),0,9));q.wage=8+Math.round(Object.values(q.st).reduce((a,b)=>a+b,0)*.35);q.cost=150+Object.values(q.st).reduce((a,b)=>a+b,0)*14+q.pot*30;return q;});}
 function tmSign(c0,who){const tm=TM();if(tm.money<c0.cost)return;tm.money-=c0.cost;const old=tm.rn[who];c0.col=old.col;delete c0.cost;tm.rn[who]=c0;persist();tmPick=null;beep(880,.1,'triangle');}
 function tmEndSeason(){const tm=TM();tm.n++;tm.day+=14;tmSeason();tm.rn.forEach(q=>{q.fat=Math.max(0,q.fat-40);});persist();scene='team';}
 /* ---------- team scenes ---------- */
 function tmHdr(title,sub){c.fillStyle='rgba(6,8,18,.78)';c.fillRect(0,0,W,40);text(title,10,17,'#e8a23a',12);if(sub)text(sub,10,31,'#bcaa8e',7,'left',500);text('$'+TM().money,W-30,17,'#ffe9a8',9.5,'right');HIT.push({x:0,y:0,w:130,h:40,fn:()=>{scene='home';sceneT=0;}});}
 function tmStatBars(q,x,y){TST.forEach((k,i)=>mbar(x+i*49,y,45,q.st[k]/10,k==='pow'?'#ffb070':'#8ae07a',k==='pow'?'#e0702a':'#3a9a4a',`${TSTS[k]} ${q.st[k]}`,false));}
 function tmRunnerLine(q,y){return q.inj.length?q.inj.map(i=>INJ[i.k].n+(i.s>1?' '+i.s:'')).join(', '):'Healthy';}
+function tmStatBars2(q,x,y){TST.forEach((k,i)=>mbar(x+i*37,y,34,q.st[k]/10,k==='pow'?'#ffb070':'#8ae07a',k==='pow'?'#e0702a':'#3a9a4a',`${TSTS[k]} ${q.st[k]}`,false));}
 function teamScene(){
-  runBg();const tm=TM();if(tm.idx>=7){scene='tseasonend';return;}const r=RACES[tm.idx],wk=Math.ceil((tm.raceDay-tm.day)/7),wxk=forecast(r,tm.raceDay);
-  tmHdr('TEAM MANAGER',`Season ${tm.n}  -  race ${tm.idx+1} of 7`);
+  runBg();const tm=TM();tmMig();if(tm.over){scene='tover';return;}if(tm.idx>=7){scene='tseasonend';return;}const r=RACES[tm.idx],wk=Math.ceil((tm.raceDay-tm.day)/7),wxk=forecast(r,tm.raceDay);
+  tmHdr('TEAM MANAGER',`Season ${tm.n}  -  race ${tm.idx+1} of 7  -  ${tm.fans} fans`);text(`wages $${tmWages()}/wk`,W-30,28,tm.money<0?'#ff8a7a':'#d8b8a0',6.4,'right',500);
+  tm.money<0&&text('IN DEBT',W-30,36,'#ff8a7a',6,'right');
   glass(6,46,W-12,50,8,.8);text(r.name,14,62,'#fff',10.5);text(`${r.km} km  -  ${wk>0?wk+' week'+(wk>1?'s':'')+' to go':'RACE DAY'}  -  purse $${PURSE[tm.idx]}`,14,75,'#cfc6b0',7,'left',500);
   wxIcon(wxk,W-34,64,12);text(WX[wxk].n,W-34,87,'#bfd6e8',6.4,'center',500);text('forecast',14,88,'#9a90b0',6.2,'left',500);
   tm.rn.forEach((q,i)=>{const y=102+i*84;glass(6,y,W-12,78,8,.78);
-    c.fillStyle=`rgb(${q.col[0]},${q.col[1]},${q.col[2]})`;c.beginPath();c.arc(18,y+13,5,0,TAU);c.fill();text(q.name,28,y+16,'#fff',9);text(q.arch,28,y+26,'#9a90b0',6.2,'left',500);
-    const fx=W-100;HIT.push({x:fx,y:y+4,w:90,h:18,fn:()=>{q.focus=TFOC[(TFOC.indexOf(q.focus)+1)%TFOC.length];beep(500,.04,'triangle');}});rr(fx,y+4,90,18,8);c.fillStyle=q.focus==='rest'?'rgba(106,138,176,.35)':'rgba(232,162,58,.25)';c.fill();c.strokeStyle='rgba(255,210,140,.5)';c.lineWidth=1;c.stroke();text(q.focus==='rest'?'REST WEEKS':'TRAIN '+TSTS[q.focus],fx+45,y+16,'#ffe9a8',6.8,'center');
-    tmStatBars(q,12,y+34);
-    mbar(12,y+48,84,q.fat/100,q.fat>70?'#ff8a5a':'#ffd060',q.fat>70?'#e8402a':'#e08a20','TIRED '+Math.round(q.fat),q.fat>70);
-    if(q.focus!=='rest'){const k=q.focus;mbar(102,y+48,84,q.xp[k]/tneed(q.st[k]),'#7ac0ff','#3a78d0',`${TSTS[k]} xp`,false);}
-    text(tmRunnerLine(q),12,y+70,q.inj.length?'#ffb08a':'#9fd8a0',6.6,'left',500);text(q.gear.length?q.gear.map(g=>GEAR[g].n).join(', '):'no gear',W-14,y+70,'#9a90b0',6,'right',500);});
+    drawBody(faceKey(q),9,y+4,46,70);
+    text(q.name,60,y+14,'#fff',9);if(q.hang)text('HANGOVER',60+measure(q.name,9)+6,y+14,'#ff8a6a',6.4);
+    text(`${TRAITS[q.trait].n}  -  ${moodWord(q.mood)}  -  $${q.wage}/wk`,60,y+24,moodCol(q.mood),6.4,'left',500);
+    const fx=W-96;HIT.push({x:fx,y:y+4,w:88,h:16,fn:()=>{q.focus=TFOC[(TFOC.indexOf(q.focus)+1)%TFOC.length];beep(500,.04,'triangle');}});rr(fx,y+4,88,16,7);c.fillStyle=q.focus==='rest'?'rgba(106,138,176,.35)':'rgba(232,162,58,.25)';c.fill();c.strokeStyle='rgba(255,210,140,.5)';c.lineWidth=1;c.stroke();text(q.focus==='rest'?'REST WEEKS':'TRAIN '+TSTS[q.focus],fx+44,y+15,'#ffe9a8',6.4,'center');
+    tmStatBars2(q,60,y+30);
+    mbar(60,y+44,66,q.fat/100,q.fat>70?'#ff8a5a':'#ffd060',q.fat>70?'#e8402a':'#e08a20','TIRED '+Math.round(q.fat),q.fat>70);
+    mbar(130,y+44,66,q.mood/100,q.mood>=58?'#8ae07a':q.mood>=38?'#ffd060':'#ff8a5a',q.mood>=58?'#3a9a4a':'#e08a20','MOOD '+Math.round(q.mood),q.mood<35);
+    if(q.focus!=='rest'){const k=q.focus;mbar(200,y+44,52,q.xp[k]/tneed(q.st[k]),'#7ac0ff','#3a78d0',`${TSTS[k]} xp`,false);}
+    text(tmRunnerLine(q),60,y+66,q.inj.length?'#ffb08a':'#9fd8a0',6.4,'left',500);text(q.gear.length?q.gear.map(g=>GEAR[g].n).join(', '):'no gear',W-12,y+66,'#9a90b0',6,'right',500);text('pot '+'*'.repeat(q.pot),W-14,y+27,'#ffd27a',6,'right');});
   if(wk>0)btn(8,356,W-16,30,`NEXT WEEK  (${wk} to the race)`,true,tmNextWeek);else btn(8,356,W-16,30,'RACE DAY: PLAN THE RACE',true,()=>{scene='tplan';sceneT=0;});
-  btn(8,392,126,26,'STAFF & GEAR',false,()=>{scene='tshop';sceneT=0;});btn(138,392,124,26,'RECRUIT',false,()=>{tmCand=tmCands();tmPick=null;scene='trecruit';sceneT=0;});
-  btn(8,422,82,24,'STANDINGS',false,()=>{scene='tstand';sceneT=0;});btn(94,422,100,24,wk>0?'SKIP TO RACE DAY':'RACE PLAN',false,wk>0?tmSkipWeeks:()=>{scene='tplan';sceneT=0;});btn(198,422,64,24,'MENU',false,()=>{scene='home';sceneT=0;});
+  btn(8,392,82,26,'STAFF & GEAR',false,()=>{scene='tshop';sceneT=0;});btn(94,392,82,26,'RECRUIT',false,()=>{tmCand=tmCands();tmPick=null;scene='trecruit';sceneT=0;});btn(180,392,82,26,'PUB NIGHT',false,tmPubOpen);
+  btn(8,422,82,24,'STANDINGS',false,()=>{scene='tstand';sceneT=0;});btn(94,422,82,24,`RELICS ${tm.relics.length}`,false,()=>{scene='trelics';sceneT=0;});btn(180,422,82,24,wk>0?'SKIP WEEKS':'RACE PLAN',false,wk>0?tmSkipWeeks:()=>{scene='tplan';sceneT=0;});
   if(TMOTE)wrap(TMOTE,60).slice(0,2).forEach((q,i)=>text(q,W/2,458+i*9,'#9fd8a0',6.4,'center',500));
   toastLayer();
 }
@@ -2017,7 +2031,7 @@ function tplanScene(){
   tm.rn.forEach((q,i)=>{const y=100+i*98;glass(6,y,W-12,92,8,.8);
     HIT.push({x:10,y:y+3,w:96,h:20,fn:()=>{q.enter=!q.enter;beep(500,.04,'triangle');}});
     c.fillStyle=q.enter?'#6ac07a':'#3a4a44';c.fillRect(12,y+7,10,10);c.strokeStyle='#fff';c.lineWidth=1;c.strokeRect(12.5,y+7.5,9,9);if(q.enter){c.strokeStyle='#10200f';c.lineWidth=1.6;c.beginPath();c.moveTo(14,y+12);c.lineTo(16.5,y+15);c.lineTo(21,y+9);c.stroke();}
-    text(q.name,28,y+16,q.enter?'#fff':'#7a7490',9);
+    drawHead(faceKey(q),38,y+13,8,q.enter?'#caa05a':'#444');text(q.name,50,y+16,q.enter?'#fff':'#7a7490',9);
     [0,1].forEach(sl=>{const gx=W-124+sl*58;HIT.push({x:gx,y:y+4,w:54,h:16,fn:()=>tmCycleGear(q,sl)});rr(gx,y+4,54,16,6);c.fillStyle='rgba(255,255,255,.08)';c.fill();c.strokeStyle='rgba(255,210,140,.4)';c.lineWidth=1;c.stroke();text(q.gear[sl]?GEAR[q.gear[sl]].n.slice(0,9):'+ gear',gx+27,y+15,q.gear[sl]?'#ffe9a8':'#7a7490',6,'center');});
     // plan chips
     text('PLAN',12,y+37,'#9a90b0',6.2);
@@ -2028,20 +2042,20 @@ function tplanScene(){
     else text('Resting this race (recovers faster)',12,y+66,'#7a7490',7,'left',500);
     text(tmRunnerLine(q),W-14,y+84,q.inj.length?'#ffb08a':'#6a8a70',6,'right',500);
   });
-  btn(8,396,W-16,30,'START RACE',true,tmStartRace,tm.rn.filter(q=>q.enter).length<2);btn(8,430,90,22,'Back',false,()=>{scene='team';});text('Tap chips to change plan, gear and entries',W/2+30,445,'#6a7a70',6.2,'center',500);
+  btn(8,396,W-16,30,'START RACE',true,tmStartRace,tm.rn.filter(q=>q.enter).length<2);btn(8,430,70,22,'Back',false,()=>{scene='team';});btn(84,430,170,22,TM().talked?'TEAM TALK (done)':'TEAM TALK',false,tmTeamTalk,TM().talked);text('Tap chips to change plan, gear and entries',W/2,462,'#6a7a70',6.2,'center',500);
   toastLayer();
 }
 function tmresScene(){
   runBg();panelBg(.5);const res=TR.res,tm=TM();
   text('RACE RESULTS',W/2,24,'#e8a23a',14,'center');text(RACES[res.idx].name+'  -  '+WX[TR.wxk].n,W/2,38,'#cfdad2',7.5,'center',500);
   text('YOUR RUNNERS',12,58,'#9a90b0',7.5);
-  res.rows.forEach((o,i)=>{const y=64+i*30,r=o.r,col=o.place<=3?MEDAL_COL[['gold','silver','bronze'][o.place-1]]:'#e8dcc4';c.fillStyle=`rgb(${r.col[0]},${r.col[1]},${r.col[2]})`;c.beginPath();c.arc(18,y+9,4.5,0,TAU);c.fill();
-    text(`${ORD(o.place)}  ${r.name}`,28,y+12,col,9);text(fmtT(o.time),W-12,y+12,'#fff',9,'right');text(`${o.bonks?o.bonks+' bonk'+(o.bonks>1?'s':'')+'  ':''}${o.prize?'+$'+o.prize:''}`,28,y+23,o.bonks?'#ff9a7a':'#ffd27a',6.6,'left',500);});
+  res.rows.forEach((o,i)=>{const y=64+i*30,r=o.r,col=o.place<=3?MEDAL_COL[['gold','silver','bronze'][o.place-1]]:'#e8dcc4';drawHead(r.face,20,y+11,9,`rgb(${r.col[0]},${r.col[1]},${r.col[2]})`);
+    text(`${ORD(o.place)}  ${r.name}`,36,y+12,col,9);text(fmtT(o.time),W-12,y+12,'#fff',9,'right');text(`${o.bonks?o.bonks+' bonk'+(o.bonks>1?'s':'')+'  ':''}${o.prize?'+$'+o.prize:''}`,36,y+23,o.bonks?'#ff9a7a':'#ffd27a',6.6,'left',500);});
   const y1=64+res.rows.length*30+6;text('TEAM CLASSIFICATION (best two places)',12,y1+8,'#9a90b0',7.5);
   res.teams.forEach((t0,i)=>{const y=y1+14+i*14;text(`${t0.rank}  ${t0.name}`,14,y+9,t0.me?'#ffe9a8':'#cfc6b0',8,'left',t0.me?700:500);text(`${t0.sum>=40?'-':t0.sum}`,W-14,y+9,t0.me?'#ffe9a8':'#9a90b0',8,'right');});
-  const y2=y1+14+5*14+10;text(`Prize money +$${res.prize}${res.teamBonus?` (team bonus $${res.teamBonus})`:''}`,W/2,y2,'#ffd24a',8.5,'center');
+  const y2=y1+14+5*14+10;text(`Prize money +$${res.prize}${res.teamBonus?` (team bonus $${res.teamBonus}, fans $${res.fansBonus||0})`:''}`,W/2,y2,'#ffd24a',8.5,'center');
   res.notes.forEach((n,i)=>{text(n.inj.length?`${n.name.split(' ')[0]}: ${n.inj.join(', ')}`:`${n.name.split(' ')[0]}: no injuries`,W/2,y2+14+i*10,n.inj.length?'#ff9a7a':'#9fd8a0',7,'center',500);});
-  btn(40,410,190,32,tm.idx>=7?'SEASON SUMMARY':'BACK TO TEAM',true,()=>{scene=tm.idx>=7?'tseasonend':'team';sceneT=0;});
+  btn(40,410,190,32,'CONTINUE',true,tmAfterRace);
   toastLayer();
 }
 function tshopScene(){
@@ -2056,11 +2070,13 @@ function tshopScene(){
 }
 function trecruitScene(){
   runBg();const tm=TM();tmHdr('RECRUIT','Replace one of your runners');
-  if(tmPick!=null){const c0=tmCand[tmPick];text(`Sign ${c0.name} for $${c0.cost}?`,W/2,70,'#fff',10,'center');text('Who do they replace?',W/2,86,'#9a90b0',8,'center',500);
-    tm.rn.forEach((q,i)=>{const y=100+i*50;cardBox(14,y,W-28,44,'#e8803a',tm.money<c0.cost,()=>tmSign(c0,i));text(q.name,24,y+18,'#fff',10);tmStatBars(q,24,y+26);});
+  if(tmPick!=null){const c0=tmCand[tmPick];text(`Sign ${c0.name} for $${c0.cost}?`,W/2,64,'#fff',10,'center');text('Who do they replace?',W/2,80,'#9a90b0',8,'center',500);
+    tm.rn.forEach((q,i)=>{const y=92+i*54;cardBox(14,y,W-28,48,'#e8803a',tm.money<c0.cost,()=>tmSign(c0,i));drawBody(faceKey(q),18,y+3,34,44);text(q.name,60,y+18,'#fff',10);tmStatBars2(q,60,y+26);});
     btn(80,420,110,26,'Cancel',false,()=>{tmPick=null;});toastLayer();return;}
-  tmCand.forEach((q,i)=>{const y=48+i*92,can=tm.money>=q.cost;cardBox(8,y,W-16,86,'#5aaaf0',!can,()=>{tmPick=i;});text(q.name,16,y+16,'#fff',10);text(q.arch,16,y+27,'#9a90b0',6.4,'left',500);text('$'+q.cost,W-16,y+16,can?'#ffe9a8':'#8a6a50',10,'right');tmStatBars(q,14,y+38);text('Tap to sign',W-16,y+78,'#6a7a70',6.2,'right',500);});
-  btn(80,430,110,26,'Back',false,()=>{scene='team';});toastLayer();
+  tmCand.forEach((q,i)=>{const y=48+i*100,can=tm.money>=q.cost;cardBox(8,y,W-16,94,'#5aaaf0',!can,()=>{tmPick=i;});drawBody(faceKey(q),12,y+4,48,86);
+    text(q.name,66,y+16,'#fff',10);text(`${q.arch}  -  ${TRAITS[q.trait].n}`,66,y+27,'#9a90b0',6.4,'left',500);text('$'+q.cost,W-16,y+16,can?'#ffe9a8':'#8a6a50',10,'right');
+    tmStatBars2(q,66,y+36);text(`wage $${q.wage}/wk   potential ${Math.max(1,q.pot-1)}-${Math.min(5,q.pot+1)} stars`,66,y+60,'#cfc6b0',6.4,'left',500);text(TRAITS[q.trait].d,66,y+72,'#b8c4bc',6.2,'left',500);text('Tap to sign',W-16,y+86,'#6a7a70',6,'right',500);});
+  btn(80,452,110,22,'Back',false,()=>{scene='team';});toastLayer();
 }
 function tstandScene(){
   runBg();const tm=TM();tmHdr('STANDINGS',`Season ${tm.n}`);
@@ -2076,6 +2092,190 @@ function tseasonendScene(){
   rows.forEach((o,i)=>{const y=78+i*22;text(`${i+1}  ${o.n}`,40,y+12,o.me?'#ffe9a8':'#cfc6b0',9,'left',o.me?700:500);text(o.p+' pts',W-40,y+12,'#ffd27a',9,'right');});
   const bonus=[1500,800,400][rk-1]||0;text(bonus?`Championship bonus: $${bonus}`:'No championship bonus',W/2,205,'#ffd24a',9,'center');
   btn(40,260,190,34,'START NEXT SEASON',true,()=>{tm.money+=bonus;tmEndSeason();});
+}
+/* ---------- CLUB LIFE: character art, personalities and mood, wages, the pub and its mini-games, weekly events, press conferences, team talks, relics ---------- */
+const TRAITS={
+  party:{n:'Party Animal',d:'Never says no to a pint.',likes:{beer:15,joke:4,fire:2,calm:-4}},
+  hot:{n:'Hothead',d:'Needs to be fired up.',likes:{fire:12,joke:0,calm:-4,beer:5}},
+  chill:{n:'Chill',d:'Hates pressure.',likes:{calm:10,joke:8,fire:-5,beer:4}},
+  perf:{n:'Perfectionist',d:'Wants a proper plan.',likes:{calm:8,fire:2,joke:-4,beer:-6}},
+  wolf:{n:'Lone Wolf',d:'Prefers to be left alone.',likes:{calm:6,fire:-2,joke:-3,beer:-2}},
+  clown:{n:'Class Clown',d:'Everything is a joke.',likes:{joke:14,beer:8,fire:-1,calm:-6}},
+};
+const TRAITK=Object.keys(TRAITS),FACEARCH={climber:0,diesel:1,sprinter:2,allround:3,heat:4};
+const TALKS=[{k:'fire',n:'Fire them up!',h:'A loud speech about glory. Hotheads love it.'},{k:'calm',n:'Keep it calm',h:'Deep breaths and a plan. Calm souls love it.'},{k:'joke',n:'Crack a joke',h:'Something about a goat. Clowns love it.'},{k:'beer',n:'Promise beer ($20)',h:'Free pints after the race. Party animals love it.'}];
+const RELICS={
+  luckyhat:{n:'Lucky Hat',d:'Rain and storms: +2.5% speed for your runners.'},
+  fridge:{n:'Beer Fridge',d:'Pub nights cost half and hangovers are less likely.'},
+  bus:{n:'Team Bus',d:'Wages cost 25% less.'},
+  costume:{n:'Cheese Costume',d:'+$60 after every race. The runners hate it (-2 mood).'},
+  poster:{n:'Motivational Poster',d:'Everyone gets +3 mood each week.'},
+  gels:{n:'Magic Gels',d:'+1 gel for every runner.'},
+  thermos:{n:'Thermos of Tea',d:'+1 drink each, and cold races give +2% speed.'},
+  megaphone:{n:'Megaphone',d:'Surge recharges in 20 s instead of 30 s.'},
+  sauna:{n:'Team Sauna',d:'Everyone recovers 6 extra fatigue every week.'},
+  mascot:{n:'Team Mascot',d:'Fans grow faster and good results lift mood more.'},
+  whistle:{n:"Coach's Whistle",d:'Training xp +15%.'},
+  bookie:{n:'Shady Bookie',d:'After each race you win or lose some cash (-$40 to +$120).'},
+  foam:{n:'Foam Finger',d:'The beer-chug zone is wider.'},
+  goat:{n:'Lucky Goat',d:'Climbing training xp +30%.'},
+};
+const TMR=id=>!!(save.team&&save.team.relics&&save.team.relics.includes(id));
+const moodWord=m=>m>=78?'Buzzing':m>=58?'Happy':m>=38?'Meh':'Miserable',moodCol=m=>m>=58?'#8ae07a':m>=38?'#ffd060':'#ff8a6a';
+let DLG=null,PUB=null,CH=null,TMOVER=null;
+const first=q=>q.name.split(' ')[0];
+// ----- character art: full-body pictures for the team screens and head badges for the map
+const faceKey=q=>'pm'+(q.face||0);
+function drawBody(key,x,y,w,h){const im=PL[key];if(!im)return;const bb=PLB[key]||{x0:0,y0:0,x1:im.width,y1:im.height},bw=bb.x1-bb.x0,bh=bb.y1-bb.y0,s=Math.min(w/bw,h/bh),dw=bw*s,dh=bh*s;c.save();c.imageSmoothingEnabled=false;c.drawImage(im,bb.x0,bb.y0,bw,bh,Math.round(x+(w-dw)/2),Math.round(y+h-dh),Math.round(dw),Math.round(dh));c.restore();}
+function headRect(key){const im=PL[key];if(!im)return null;const bb=PLB[key]||{x0:0,y0:0,x1:im.width,y1:im.height},bw=bb.x1-bb.x0,bh=bb.y1-bb.y0,side=Math.min(bw,bh*.46);return {im,sx:bb.x0+(bw-side)/2,sy:bb.y0,sw:side};}
+function drawHead(key,cx,cy,r,ring){const h=headRect(key);if(ring){c.fillStyle=ring;c.beginPath();c.arc(cx,cy,r+1.6,0,TAU);c.fill();}if(!h){c.fillStyle='#555';c.beginPath();c.arc(cx,cy,r,0,TAU);c.fill();return;}
+  c.save();c.beginPath();c.arc(cx,cy,r,0,TAU);c.clip();c.fillStyle='#2a3a30';c.fillRect(cx-r,cy-r,r*2,r*2);c.imageSmoothingEnabled=false;c.drawImage(h.im,h.sx,h.sy,h.sw,h.sw,cx-r,cy-r,r*2,r*2);c.restore();}
+function tmMig(){
+  const tm=TM();if(!tm||tm.v2)return;tm.v2=1;tm.fans=tm.fans==null?20:tm.fans;tm.relics=tm.relics||[];tm.cocky=false;tm.talked=false;
+  tm.rn.forEach((q,i)=>{if(q.face==null)q.face=FACEARCH[q.arch]||0;if(!q.trait)q.trait=TRAITK[(i*2+1)%6];if(q.mood==null)q.mood=60;if(q.wage==null)q.wage=15;if(q.pot==null)q.pot=3;q.hang=q.hang||0;q.talk=q.talk||0;});
+}
+const tmWages=()=>Math.round(TM().rn.reduce((a,q)=>a+q.wage,0)*(TMR('bus')?.75:1));
+function tmOver(why){const tm=TM();tm.over=true;TMOVER={why,n:tm.n,idx:tm.idx,relics:tm.relics.slice(),money:tm.money};scene='tover';sceneT=0;persist();beep(150,.5,'sawtooth',.06,-80);}
+// ----- a small dialog used for events, press conferences, team talks and relic picks
+function openDlg(d){DLG=d;DLG.res=null;scene='tdlg';sceneT=0;}
+function dlgPick(i){if(!DLG||DLG.res!=null)return;const o=DLG.opts[i];DLG.res=o.f?o.f():'';beep(520,.08,'triangle');persist();}
+function dlgDone(){const a=DLG&&DLG.after;DLG=null;if(a)a();else scene='team';}
+function tdlgScene(){
+  runBg();panelBg(.55);const d=DLG;
+  text(d.title,W/2,52,d.col||'#ffd24a',14,'center');d.text.split(String.fromCharCode(10)).flatMap(s=>wrap(s,38)).slice(0,d.opts?5:17).forEach((q,i)=>text(q,W/2,76+i*12,'#e8eee8',d.opts?8.5:7.6,'center',500));
+  if(d.res!=null){String(d.res).split(String.fromCharCode(10)).flatMap(s=>wrap(s,36)).slice(0,9).forEach((q,i)=>text(q,W/2,200+i*13,'#9fd8a0',9.5,'center',500));btn(60,420,150,32,'CONTINUE',true,dlgDone);}
+  else if(d.opts){d.opts.forEach((o,i)=>{const n=d.opts.length,hh=n>3?64:78,y=150+i*(hh+8);cardBox(12,y,W-24,hh,o.col||(i?'#e8803a':'#6ac07a'),false,()=>dlgPick(i));text(o.t,24,y+20,'#fff',10.5);wrap(o.h||'',40).slice(0,3).forEach((q,j)=>text(q,24,y+36+j*11,'#b8c4bc',7.6,'left',500));});}
+  else btn(60,420,150,32,'CONTINUE',true,dlgDone);
+  toastLayer();
+}
+// ----- weekly events: a runner, a choice, a price
+const rpick=a=>a[Math.floor(Math.random()*a.length)];
+const EVTS=[
+  {t:'The Cheese Company',d:'A cheese maker will pay $120 if the team runs in giant cheese costumes.',o:[{t:'Say yes',h:'+$120, but nobody is happy about it (-6 mood).',f:(tm)=>{tm.money+=120;tm.rn.forEach(q=>q.mood=clamp(q.mood-6,0,100));tm.fans=clamp(tm.fans+4,0,100);return 'The photos go viral. Everybody smells of brie.';}},{t:'Politely decline',h:'Keep your dignity.',f:()=>'The cheese maker sends a sad wedge by courier.'}]},
+  {t:'A Stray Dog',d:'A stray dog has adopted the team and refuses to leave. It is wearing a tiny bib.',o:[{t:'Adopt it',h:'-$25 for food, +6 mood for everyone.',f:(tm)=>{tm.money-=25;tm.rn.forEach(q=>q.mood=clamp(q.mood+6,0,100));return 'Named Gerald. Runs faster than Dev already.';}},{t:'Shoo it away',h:'Heartless.',f:(tm)=>{tm.rn.forEach(q=>q.mood=clamp(q.mood-2,0,100));return 'It looks back at you for a very long time.';}}]},
+  {t:'Pub Quiz',d:'The local pub quiz has a meat voucher and a trophy shaped like a boot.',o:[{t:'Enter the team',h:'50%: win $80. 50%: lose $20. +3 mood either way.',f:(tm)=>{tm.rn.forEach(q=>q.mood=clamp(q.mood+3,0,100));if(Math.random()<.5){tm.money+=80;return 'You win on the tiebreak question about goats. +$80.';}tm.money-=20;return 'You lose to a team called Quizzy Rascals. -$20.';}},{t:'Stay in',h:'An early night.',f:(tm)=>{tm.rn.forEach(q=>q.fat=clamp(q.fat-5,0,100));return 'Everyone sleeps well. A bit boring.';}}]},
+  {t:'Karaoke Night',d:'{n} has found a microphone and will not give it back.',o:[{t:'Encourage them',h:'+10 mood for them, +10 fatigue.',f:(tm,q)=>{q.mood=clamp(q.mood+10,0,100);q.fat=clamp(q.fat+10,0,100);return first(q)+' performs a seven-minute power ballad. There is not a dry eye.';}},{t:'Confiscate the mic',h:'-5 mood.',f:(tm,q)=>{q.mood=clamp(q.mood-5,0,100);return first(q)+' sulks in a corner with a sausage roll.';}}]},
+  {t:'Seagull Incident',d:'A seagull has stolen {n}\'s lunch and one shoe.',o:[{t:'Chase it',h:'+12 fatigue, but good cardio (+10 mood).',f:(tm,q)=>{q.fat=clamp(q.fat+12,0,100);q.mood=clamp(q.mood+10,0,100);return first(q)+' catches it. Nobody knows how.';}},{t:'Buy new shoes',h:'-$30.',f:(tm)=>{tm.money-=30;return 'The seagull now owns better shoes than you.';}}]},
+  {t:'Rival Gloating',d:'A rival runner is mocking your team in the local paper.',o:[{t:'Ignore them',h:'+3 mood.',f:(tm)=>{tm.rn.forEach(q=>q.mood=clamp(q.mood+3,0,100));return 'Dignity: intact.';}},{t:'Trash talk back',h:'+8 mood, but a hothead pulls a calf.',f:(tm)=>{tm.rn.forEach(q=>q.mood=clamp(q.mood+8,0,100));const q=tm.rn.find(x=>x.trait==='hot');if(q&&!q.inj.some(i=>i.k==='calf'))q.inj.push({k:'calf',s:1,wk:2});return 'Your reply was spicy. '+(q?first(q)+' celebrates too hard.':'Everybody feels great.');}}]},
+  {t:'Free Protein Bars',d:'A salesman hands out free protein bars that taste of chalk and regret.',o:[{t:'Eat them',h:'30% stomach cramps (+15 fatigue), otherwise +2 mood.',f:(tm,q)=>{if(Math.random()<.3){q.fat=clamp(q.fat+15,0,100);return first(q)+' regrets everything.';}tm.rn.forEach(x=>x.mood=clamp(x.mood+2,0,100));return 'Surprisingly fine. Chalky, but fine.';}},{t:'Politely pass',h:'Your stomachs thank you.',f:()=>'The salesman writes "tough crowd" on his clipboard.'}]},
+  {t:'Group Yoga',d:'Someone has booked a yoga instructor called Moonbeam.',o:[{t:'Join in',h:'-15 fatigue, +4 mood, 30% someone pulls a muscle.',f:(tm)=>{tm.rn.forEach(q=>{q.fat=clamp(q.fat-15,0,100);q.mood=clamp(q.mood+4,0,100);});if(Math.random()<.3){const q=rpick(tm.rn);if(!q.inj.some(i=>i.k==='calf'))q.inj.push({k:'calf',s:1,wk:2});return first(q)+' does a downward dog and a very upward ouch.';}return 'Everyone feels bendy and smug.';}},{t:'Skip it',h:'Stay grumpy.',f:()=>'Moonbeam sends you positive vibes anyway.'}]},
+  {t:'The Wallet',d:'{n} finds a fat wallet on the trail, with $60 and a loyalty card for a sandwich shop.',o:[{t:'Keep the cash',h:'+$60, -3 mood (guilt).',f:(tm,q)=>{tm.money+=60;q.mood=clamp(q.mood-3,0,100);return first(q)+' feels a bit weird about the sandwich card.';}},{t:'Return it',h:'+5 fans, +4 mood.',f:(tm,q)=>{tm.fans=clamp(tm.fans+5,0,100);q.mood=clamp(q.mood+4,0,100);return 'The owner tweets about your honesty. A sandwich shop sends a voucher.';}}]},
+  {t:'Podcast Invite',d:'A running podcast wants {n} as a guest. The host is very enthusiastic about socks.',o:[{t:'Go on the show',h:'+6 fans, +3 mood, +$30.',f:(tm,q)=>{tm.fans=clamp(tm.fans+6,0,100);q.mood=clamp(q.mood+3,0,100);tm.money+=30;return first(q)+' mentions the goat plush eleven times.';}},{t:'No thanks',h:'Introverts rule.',f:()=>'The host is crushed. The socks are sold.'}]},
+];
+function tmRollEvent(){
+  const tm=TM(),q=rpick(tm.rn),e=EVTS[Math.floor(Math.random()*EVTS.length)];
+  openDlg({title:e.t.toUpperCase(),text:e.d.replace('{n}',first(q)),opts:e.o.map(o=>({t:o.t,h:o.h,f:()=>o.f(tm,q)})),after:()=>{scene='team';}});
+}
+// ----- press conference and relic pick after every race
+function tmPress(after){
+  const tm=TM(),res=TR.res,best=Math.min(...res.rows.map(o=>o.place)),good=best<=3;
+  openDlg({title:'PRESS CONFERENCE',text:good?'A reporter shoves a microphone at you: "Three podium places? What is the secret?"':'A reporter sighs: "That was a rough day. Whose fault was it?"',after,
+    opts:[
+      {t:good?'"Hard work and good snacks."':'"It was my fault."',h:'Humble. +2 fans, +3 mood for everyone.',f:()=>{tm.fans=clamp(tm.fans+2,0,100);tm.rn.forEach(q=>q.mood=clamp(q.mood+3,0,100));return 'The reporter writes "nice person" and goes for lunch.';}},
+      {t:good?'"I am obviously a genius."':'"The course was too hilly."',h:good?'Cocky. +7 fans, but next race: top 3 gives +10 mood, anything else -10.':'Blame it on the hills. +3 mood, -2 fans.',f:()=>{if(good){tm.fans=clamp(tm.fans+7,0,100);tm.cocky=true;return 'The headline reads: GENIUS, BY HIS OWN ADMISSION.';}tm.fans=clamp(tm.fans-2,0,100);tm.rn.forEach(q=>q.mood=clamp(q.mood+3,0,100));return 'The hills file a complaint.';}},
+      {t:'"Mostly beer, honestly."',h:'Funny. +4 fans; party animals and clowns +10 mood, perfectionists and loners -3.',f:()=>{tm.fans=clamp(tm.fans+4,0,100);tm.rn.forEach(q=>q.mood=clamp(q.mood+(q.trait==='party'||q.trait==='clown'?10:q.trait==='perf'||q.trait==='wolf'?-3:0),0,100));return 'A local brewery sends the team a crate. (It arrives with a note.)';}},
+    ]});
+}
+function tmRelicPick(after){
+  const tm=TM(),pool=shuffle(Object.keys(RELICS).filter(k=>!tm.relics.includes(k))).slice(0,3);
+  if(!pool.length){after();return;}
+  openDlg({title:'CHOOSE A TEAM RELIC',text:'The team is given a keepsake. Pick one: it stays with you for the whole career.',col:'#e0b8ff',after,opts:pool.map(k=>({t:RELICS[k].n,h:RELICS[k].d,col:'#c07aff',f:()=>{tm.relics.push(k);return `${RELICS[k].n} joins the team.`;}}))});
+}
+function tmAfterRace(){const tm=TM();tm.talked=false;tmPress(()=>tmRelicPick(()=>{scene=tm.idx>=7?'tseasonend':'team';sceneT=0;}));}
+// ----- team talk before a race
+function tmTeamTalk(){
+  const tm=TM(),ent=tm.rn.filter(q=>q.enter);
+  openDlg({title:'TEAM TALK',text:'The team huddles before the start. Choose your tone. It lands differently on different personalities.',after:()=>{scene='tplan';},opts:TALKS.map(t=>({t:t.n,h:t.h,f:()=>{
+    if(t.k==='beer')tm.money-=20;tm.talked=true;const lines=[];
+    ent.forEach(q=>{const like=TRAITS[q.trait].likes[t.k]||0;q.mood=clamp(q.mood+like,0,100);q.talk=like>=10?.012:like<=-4?-.012:0;lines.push(`${first(q)}: ${like>=10?'loves it':like>=4?'likes it':like>=0?'shrugs':'is not impressed'} (${like>=0?'+':''}${like})`);});
+    return lines.join('\n');}}))});
+}
+// ----- the pub: pick who goes, then a beer-chugging mini-game for each of them
+const pubCost=()=>TMR('fridge')?30:60;
+function tmPubOpen(){PUB={sel:TM().rn.map(()=>true),q:[],i:0,res:[]};scene='tpub';sceneT=0;}
+function tpubScene(){
+  runBg();const tm=TM();tmHdr('PUB NIGHT',`$${pubCost()} for the whole team`);
+  text('Who is going to the pub?',W/2,62,'#e8dcc4',9,'center',500);
+  tm.rn.forEach((q,i)=>{const y=74+i*86,on=PUB.sel[i];cardBox(10,y,W-20,80,on?'#e8a23a':'#3a4a44',false,()=>{PUB.sel[i]=!PUB.sel[i];beep(500,.04,'triangle');});
+    drawBody(faceKey(q),14,y+4,40,72);text(q.name,62,y+20,on?'#fff':'#7a7490',10);text(`${TRAITS[q.trait].n}  -  mood ${Math.round(q.mood)}`,62,y+34,moodCol(q.mood),7,'left',500);
+    text(q.trait==='party'?'Has been waiting all week.':q.trait==='perf'?'Will count every sip.':q.trait==='wolf'?'Will stand in the corner.':q.trait==='clown'?'Will be the entertainment.':q.trait==='hot'?'Might start something.':'Is just happy to be invited.',62,y+48,'#9a90b0',6.6,'left',500);
+    text(on?'GOING':'STAYING IN',W-20,y+20,on?'#9fd8a0':'#6a7a70',8,'right');if(q.hang)text('HANGOVER',W-20,y+34,'#ff8a6a',6.6,'right');});
+  const n=PUB.sel.filter(Boolean).length;
+  btn(8,340,W-16,34,n?`TO THE PUB!  (${n} going, -$${pubCost()})`:'Nobody is going',true,()=>{if(!n)return;tm.money-=pubCost();PUB.q=tm.rn.map((q,i)=>i).filter(i=>PUB.sel[i]);PUB.i=0;PUB.res=[];chugStart(PUB.q[0]);},!n);
+  btn(80,430,110,24,'Back',false,()=>{scene='team';});toastLayer();
+}
+const trw=x=>{x=((x%2)+2)%2;return x<1?x:2-x;};
+function chugStart(i){const q=TM().rn[i];CH={i,q,hits:0,miss:0,t:0,fb:'',fbT:0,zc:.3+Math.random()*.4,w:clamp(.3+(q.trait==='party'?.06:q.trait==='perf'?-.04:0)+(TMR('foam')?.06:0),.18,.5),speed:.95,end:false};scene='tchug';sceneT=0;}
+function chugStep(dt){if(!CH)return;CH.t+=dt;if(CH.fbT>0)CH.fbT-=dt;}
+const CHUGP=['Glug!','Smooth!','Beer legend!','Perfect pour!','Down the hatch!'],CHUGF=['Foam everywhere!','Up the nose!','Spilled!','Down the shirt!','The barman sighs.'];
+function chugPress(){
+  if(!CH||CH.end)return;const pos=trw(CH.t*CH.speed),d=Math.abs(pos-CH.zc);
+  if(d<=CH.w/2){CH.hits++;CH.fb=rpick(CHUGP);beep(880,.08,'triangle');}else{CH.miss++;CH.fb=rpick(CHUGF);beep(200,.12,'sawtooth',.04);}
+  CH.fbT=.8;CH.zc=.18+Math.random()*.64;CH.speed=.95+.13*CH.hits;CH.w=Math.max(.14,CH.w-.012);
+  if(CH.hits>=5||CH.miss>=3)chugEnd();
+}
+const PUBINC=[
+  (tm,q)=>{q.mood=clamp(q.mood+6,0,100);tm.fans=clamp(tm.fans+4,0,100);return first(q)+' climbs on the bar and sings. The crowd loves it.';},
+  (tm,q)=>{if(!q.inj.some(i=>i.k==='knee'))q.inj.push({k:'knee',s:1,wk:2});return first(q)+' picks a fight with a statue and loses. Sore knee.';},
+  (tm,q)=>{q.mood=clamp(q.mood+4,0,100);return first(q)+' befriends a pigeon and names it Gerald.';},
+  (tm,q)=>{tm.money-=30;return first(q)+' loses both shoes in a fountain. -$30.';},
+  (tm,q)=>{tm.money-=50;tm.rn.forEach(x=>x.mood=clamp(x.mood+4,0,100));return first(q)+' buys everyone a round. -$50, big cheers.';},
+  (tm,q)=>{q.mood=clamp(q.mood+8,0,100);tm.fans=clamp(tm.fans+3,0,100);return first(q)+' wins the dance-off.';},
+  (tm,q)=>{q.fat=clamp(q.fat+12,0,100);return first(q)+' is found asleep in a kebab shop.';},
+  (tm,q)=>{tm.money+=40;return first(q)+' wins a meat voucher at the pub quiz. +$40.';},
+];
+function chugEnd(){
+  const tm=TM(),q=CH.q,pints=CH.hits,m0=q.mood;CH.end=true;
+  q.mood=clamp(q.mood+(pints*4-CH.miss)*(q.trait==='party'?1.5:1),0,100);q.fat=clamp(q.fat-pints*4+(pints>=4?12:0),0,100);
+  const p=(pints>=4?.7:pints===3?.3:.05)*(TMR('fridge')?.7:1)*(q.trait==='party'?.6:1);let hang=false;if(Math.random()<p){q.hang=pints===5&&Math.random()<.4?2:1;hang=true;}
+  let inc='';if(Math.random()<.35)inc=rpick(PUBINC)(tm,q);
+  PUB.res.push(`${first(q)}: ${pints} pint${pints===1?'':'s'}${CH.miss?` (${CH.miss} spilled)`:''}. ${hang?'HANGOVER next race!':'Fresh as a daisy.'} Mood ${Math.round(m0)} to ${Math.round(q.mood)}.${inc?' '+inc:''}`);
+  setTimeout(()=>{if(scene!=='tchug')return;PUB.i++;if(PUB.i<PUB.q.length)chugStart(PUB.q[PUB.i]);else{CH=null;persist();openDlg({title:'THE MORNING AFTER',text:PUB.res.join('\n'),after:()=>{scene='team';}});}},1300);
+}
+function tchugScene(){
+  const q=CH.q;c.fillStyle='#2a1a10';c.fillRect(0,0,W,H);
+  for(let i=0;i<8;i++){c.fillStyle=i%2?'#3a2414':'#33200f';c.fillRect(0,i*60,W,30);}c.fillStyle='#5a3a20';c.fillRect(0,330,W,150);c.fillStyle='#6e4626';c.fillRect(0,330,W,6);
+  for(let i=0;i<5;i++){const x=24+i*55;glow(x,60,34,'#ffd27a',.28);c.fillStyle='#ffd27a';c.beginPath();c.arc(x,60,4,0,TAU);c.fill();}
+  text('BEER CHUG',W/2,28,'#ffd27a',15,'center');text(`${first(q)} is at the bar. Tap SIP in the gold zone.`,W/2,44,'#e8d8b0',7,'center',500);
+  drawBody(faceKey(q),14,60,70,120);
+  // the pint
+  const gx=150,gy=70,gw=70,gh=130;c.fillStyle='rgba(255,255,255,.12)';c.fillRect(gx,gy,gw,gh);c.strokeStyle='#e8d8b0';c.lineWidth=2;c.strokeRect(gx,gy,gw,gh);
+  const lv=CH.hits/5*(gh-8);c.fillStyle='#e8a23a';c.fillRect(gx+2,gy+gh-2-lv,gw-4,lv);c.fillStyle='#fff4d0';c.fillRect(gx+2,gy+gh-2-lv-6,gw-4,6);
+  for(let i=0;i<5;i++){c.fillStyle=i<CH.hits?'#ffd24a':'rgba(255,255,255,.2)';c.fillRect(gx+4+i*13,gy+gh+8,10,6);}
+  for(let i=0;i<3;i++){c.fillStyle=i<CH.miss?'#ff6a5a':'rgba(255,255,255,.2)';c.beginPath();c.arc(gx+12+i*14,gy+gh+30,4,0,TAU);c.fill();}text('spills',gx+54,gy+gh+34,'#c8b8a0',6.6,'left',500);
+  // the meter
+  const bx=20,bw=230,by=250,bh=26;c.fillStyle='#1a1008';c.fillRect(bx,by,bw,bh);c.strokeStyle='#8a6a40';c.strokeRect(bx+.5,by+.5,bw-1,bh-1);
+  c.fillStyle='rgba(255,210,70,.55)';c.fillRect(bx+bw*(CH.zc-CH.w/2),by,bw*CH.w,bh);const pos=trw(CH.t*CH.speed);c.fillStyle='#fff';c.fillRect(bx+bw*pos-1.5,by-5,3,bh+10);
+  if(CH.fbT>0){c.globalAlpha=clamp(CH.fbT*2,0,1);text(CH.fb,W/2,300,CHUGF.includes(CH.fb)?'#ff8a7a':'#ffd24a',14,'center');c.globalAlpha=1;}
+  if(!CH.end){btn(40,332,190,66,'SIP!',true,chugPress);HIT.push({x:0,y:240,w:W,h:100,fn:chugPress});HIT.unshift(HIT.pop());}
+  else text(CH.hits>=5?'Pint finished!':'The barman cuts you off.',W/2,360,'#ffe9a8',11,'center');
+  toastLayer();
+}
+// ----- a beer offered during the race
+function tmBeerEvent(){
+  const r=TR.mine.filter(x=>x.fin==null)[Math.floor(Math.random()*TR.mine.filter(x=>x.fin==null).length)];if(!r)return;
+  TR.modal={title:'A FAN OFFERS A BEER',text:`A cheering fan at the roadside hands ${first(r)} an ice-cold beer. The whole crowd is watching.`,opts:[
+    {t:'Down it!',h:'50/50: liquid courage (+14 legs, calmer heart) or a stitch (stops for 3 s, -8 legs).',f:()=>{r.ref.mood=clamp(r.ref.mood+6,0,100);if(Math.random()<.5){r.legs=Math.min(100,r.legs+14);r.hr=Math.max(.3,r.hr-.08);tmLog(TR,r,'feels GREAT!','#9aff9a');}else{r.stop=3;r.legs=Math.max(1,r.legs-8);tmLog(TR,r,'gets a stitch','#ff8a7a');}}},
+    {t:'Decline politely',h:'Boring but safe.',f:()=>{tmLog(TR,r,'waves it off','#cfc6b0');}}]};
+}
+function tmModal(){
+  const m=TR.modal;if(!m)return;c.fillStyle='rgba(6,8,18,.72)';c.fillRect(0,0,W,H);glass(10,70,W-20,200,10,.92);
+  text(m.title,W/2,96,'#ffd24a',11,'center');wrap(m.text,40).slice(0,4).forEach((q,i)=>text(q,W/2,114+i*11,'#e8eee8',7.4,'center',500));
+  m.opts.forEach((o,i)=>{const y=168+i*50;HIT.push({x:18,y,w:W-36,h:44,fn:()=>{o.f();TR.modal=null;beep(520,.08,'triangle');}});rr(18,y,W-36,44,8);c.fillStyle=i?'#2a1e16':'#16241e';c.fill();c.strokeStyle=i?'#e8803a':'#6ac07a';c.lineWidth=1.4;c.stroke();text(o.t,28,y+16,'#fff',9.5);wrap(o.h,46).slice(0,2).forEach((q,j)=>text(q,28,y+28+j*9,'#b8c4bc',6.4,'left',500));});
+}
+// ----- relics and the end of a career
+function trelicsScene(){
+  runBg();const tm=TM();tmHdr('TEAM RELICS',`${tm.fans} fans  -  wages $${tmWages()}/wk`);
+  if(!tm.relics.length)text('None yet. You earn one after each race.',W/2,90,'#9a90b0',9,'center',500);
+  tm.relics.forEach((k,i)=>{const y=52+i*32;glass(8,y,W-16,28,6,.78);text(RELICS[k].n,16,y+12,'#e0b8ff',8.6);wrap(RELICS[k].d,56).slice(0,1).forEach(q=>text(q,16,y+23,'#b8c4bc',6.4,'left',500));});
+  btn(80,452,110,22,'Back',false,()=>{scene='team';});
+}
+function toverScene(){
+  runBg();panelBg(.55);const o=TMOVER||{why:'bankrupt',n:1,idx:0,relics:[]};
+  text('CAREER OVER',W/2,60,'#e8503a',20,'center');
+  wrap(o.why==='bankrupt'?'The bank has taken the minibus, the goat plush and the tent. You owe too much money. The team is disbanded, but the pub keeps your tab.':'The team has been disbanded.',34).forEach((q,i)=>text(q,W/2,90+i*12,'#e8eee8',8.5,'center',500));
+  text(`Reached season ${o.n}, race ${Math.min(7,o.idx+1)} of 7`,W/2,190,'#ffd27a',9,'center');text(`${o.relics.length} relic${o.relics.length===1?'':'s'} collected`,W/2,206,'#e0b8ff',8,'center',500);
+  btn(40,300,190,34,'NEW CAREER',true,()=>{save.team=null;newTeam();scene='team';sceneT=0;});btn(70,342,130,24,'Back to menu',false,()=>{scene='home';});
 }
 /* ---------- RELIEF MAP (three.js, pixel-art): a tilted 3D terrain map of the whole course with every runner as a dot. The ground is painted into one texture
    (hill shading with ordered dithering, forests, rock, water, a dirt trail and a dotted route) and draped over the real heightmap; it renders at 270x300 and is shown unsmoothed. ---------- */
@@ -2141,6 +2341,14 @@ function g3Dot(col){
   q.fillStyle='rgba(255,255,255,.7)';q.fillRect(5,4,3,2);q.fillRect(4,5,1,2);q.fillStyle='rgba(0,0,0,.22)';for(let y=9;y<14;y++)for(let x=3;x<13;x++)if(Math.hypot(x-7.5,y-7.5)<=5.4&&y>9)q.fillRect(x,y,1,1);
   return G3.dots[key]=g3Tex(cv,true);
 }
+function g3Head(r){
+  const key=(r.face||'')+'|'+r.col.join(',')+(r.me?'m':'');if(G3.dots[key])return G3.dots[key];
+  const S=32,cv=document.createElement('canvas');cv.width=cv.height=S;const q=cv.getContext('2d'),h=headRect(r.face),ring=r.me?`rgb(${r.col[0]},${r.col[1]},${r.col[2]})`:(typeof r.team==='number'?TEAMC[r.team]:'#dcdcdc');
+  q.fillStyle='rgba(10,8,20,.7)';q.beginPath();q.arc(16,16,15.6,0,TAU);q.fill();q.fillStyle=ring;q.beginPath();q.arc(16,16,14,0,TAU);q.fill();
+  q.save();q.beginPath();q.arc(16,16,11.6,0,TAU);q.clip();q.fillStyle='#2a3a30';q.fillRect(0,0,S,S);if(h){q.imageSmoothingEnabled=false;q.drawImage(h.im,h.sx,h.sy,h.sw,h.sw,4.4,4.4,23.2,23.2);}else{q.fillStyle=`rgb(${r.col.join(',')})`;q.fillRect(0,0,S,S);}q.restore();
+  return G3.dots[key]=g3Tex(cv,true);
+}
+const TEAMC=['#ff7864','#64a0ff','#78dc8c','#dca0ff'];
 function g3Build(){
   if(!g3ok())return false;
   try{
@@ -2164,7 +2372,8 @@ function g3Build(){
   const flag=(key,p,H)=>{const cr=g3Crop(key);if(!cr)return null;const sp=new T3.Sprite(new T3.SpriteMaterial({map:g3Tex(cr.cv,true),alphaTest:.4,transparent:true,fog:false,sizeAttenuation:false,depthTest:false}));sp.material.userData.own=true;sp.center.set(.5,0);sp.scale.set(H*cr.w/cr.h,H,1);sp.position.set(p.x,p.y+2,p.z);sp.renderOrder=4;scene.add(sp);return sp;};
   const s0=at(0),aids=[1/3,2/3].map(k=>at(k)),f0=at(1);flag('sign',s0,.042);aids.forEach(p=>flag('gate_aid',p,.052));flag('gate_fin',f0,.058);
   // runners: dots
-  for(const r of TR.all){const sp=new T3.Sprite(new T3.SpriteMaterial({map:g3Dot(r.col),transparent:true,depthTest:false,sizeAttenuation:false,fog:false}));sp.center.set(.5,.5);sp.renderOrder=r.me?7:6;r.sp=sp;scene.add(sp);}
+  for(const r of TR.all){const sp=new T3.Sprite(new T3.SpriteMaterial({map:g3Head(r),transparent:true,depthTest:false,sizeAttenuation:false,fog:false}));sp.center.set(.5,.5);sp.renderOrder=r.me?7:6;r.sp=sp;scene.add(sp);
+    if(r.me){const tg=new T3.BufferGeometry();tg.setAttribute('position',new T3.BufferAttribute(new Float32Array(14*3),3));const ln=new T3.Line(tg,new T3.LineBasicMaterial({color:new T3.Color().setRGB(r.col[0]/255,r.col[1]/255,r.col[2]/255,T3.SRGBColorSpace),transparent:true,opacity:.95,depthTest:false}));ln.renderOrder=5;ln.frustumCulled=false;r.trl=ln;scene.add(ln);}}
   const bb={x0:1e9,x1:-1e9,z0:1e9,z1:-1e9};for(const p of pts){bb.x0=Math.min(bb.x0,p.x);bb.x1=Math.max(bb.x1,p.x);bb.z0=Math.min(bb.z0,p.y);bb.z1=Math.max(bb.z1,p.y);}
   const cx=(bb.x0+bb.x1)/2,cz=(bb.z0+bb.z1)/2,sp0=Math.max(bb.x1-bb.x0,bb.z1-bb.z0)+170;
   // yaw in quarter turns so the start is toward the bottom of the screen
@@ -2187,7 +2396,10 @@ function g3Frame(dt){
   const k=Math.min(1,dt*5);g.tx+=(tx-g.tx)*k;g.ty+=(ty-g.ty)*k;g.tz+=(tz-g.tz)*k;
   const hd=D*Math.cos(ph);cam.position.set(g.tx+Math.sin(yaw)*hd,g.ty+D*Math.sin(ph),g.tz+Math.cos(yaw)*hd);cam.lookAt(g.tx,g.ty,g.tz);
   const sz=g.mode==='all'?1:1.25;
-  for(const r of tr.all){const p=g3Pos(r.x/tr.DF,0),sp=r.sp,sc=(r.me?.05:.036)*sz*(r===sel?1.25:1);r.p3=p;sp.position.set(p.x,p.y+3,p.z);sp.scale.set(sc,sc,1);sp.visible=true;}
+  const upp=D*.0024,spacing=upp*10,LANES=[0,1,-1,2,-2];
+  {const ord=tr.all.slice().sort((a,b)=>b.x-a.x),taken=[];for(const r of ord){const s=r.x/tr.DF;if(r.lat===undefined)r.lat=0;const cand=LANES.slice().sort((a,b)=>Math.abs(a-r.lat)-Math.abs(b-r.lat));let pick=null;for(const L of cand){if(!taken.some(t=>t.lane===L&&Math.abs(t.s-s)<spacing*1.1)){pick=L;break;}}r.tl=pick===null?cand[0]:pick;taken.push({lane:r.tl,s});}}
+  for(const r of tr.all){r.lat+=(r.tl-r.lat)*Math.min(1,dt*3);const s=r.x/tr.DF,p=g3Pos(s,r.lat*spacing),sp=r.sp,sc=(r.me?.054:.04)*sz*(r===sel?1.2:1);r.p3=p;sp.position.set(p.x,p.y+3,p.z);sp.scale.set(sc,sc,1);sp.visible=true;
+    if(r.trl){const pa=r.trl.geometry.attributes.position;for(let k=0;k<14;k++){const q2=g3Pos(Math.max(0,s-k*upp*3.2),r.lat*spacing);pa.setXYZ(k,q2.x,q2.y+2,q2.z);}pa.needsUpdate=true;}}
   g.rd.render(g.scene,cam);
   c.save();c.imageSmoothingEnabled=false;c.drawImage(g.rd.domElement,0,0,PXW,PXH,0,0,W,MAPH3);c.restore();
 }
@@ -2200,7 +2412,7 @@ function g3Labels(){
 function tmrScene(){
   const map=TR.view==='map'&&G3&&G3.ok&&G3.scene,sel=TR.mine[TR.sel],by=map?342:VH*PXS,N=NAV;
   c.fillStyle='#0d1210';c.fillRect(0,0,W,H);
-  if(map){const now=performance.now(),dt0=Math.min(.05,(now-(TR.pn||now))/1000);TR.pn=now;g3Frame(dt0);}
+  if(map){const now=performance.now(),dt0=Math.min(.05,(now-(TR.pn||now))/1000);TR.pn=now;g3Frame(dt0);c.strokeStyle='#caa05a';c.lineWidth=2;rr(2,2,W-4,MAPH3-4,8);c.stroke();c.strokeStyle='rgba(0,0,0,.55)';c.lineWidth=1;rr(4.5,4.5,W-9,MAPH3-9,7);c.stroke();}
   else{navView();drawRunnerBack(W/2,runY(),P.phase);for(const a of NEAR){if(a[0].kind===20)drawRivalSprite(a[0],a[1],a[2],a[3],a[4],a[5]);else plSprite(a[0],a[1],a[2],a[3],a[4],a[5]);}drawWeatherFx();if(NAV.pl){drawAmbient();if(PL.panoF)drawLighting();}
     for(const q of parts){c.globalAlpha=clamp(q.t*2,0,1);c.fillStyle=q.col;c.fillRect(q.x,q.y,q.s,q.s);}c.globalAlpha=1;}
   if(map&&(TR.wxk==='rain'||TR.wxk==='storm'||TR.wxk==='fog'||TR.wxk==='cold'||TR.wxk==='hot'||TR.wxk==='wind')){c.save();c.beginPath();c.rect(0,0,W,MAPH3);c.clip();drawWeatherFx();c.restore();}
@@ -2216,19 +2428,19 @@ function tmrScene(){
   }
   TR.log.filter(l=>TR.t-l.t<7).slice(-3).forEach((l,i)=>{c.globalAlpha=clamp((7-(TR.t-l.t))/2,0,1);text(l.txt,W/2,(map?112:134)+i*10,l.col,7.5,'center');c.globalAlpha=1;});
   if(msgT>0){c.globalAlpha=clamp(msgT*2,0,1);text(msg,W/2,map?160:110,'#fff',14,'center');c.globalAlpha=1;}
-  tmPanel(by);
+  tmPanel(by);tmModal();
 }
 function tmPanel(by){
   const sel=TR.mine[TR.sel];
   const pg=c.createLinearGradient(0,by,0,H);pg.addColorStop(0,'rgba(38,24,62,.98)');pg.addColorStop(1,'rgba(12,8,26,1)');c.fillStyle=pg;c.fillRect(0,by,W,H-by);c.fillStyle='#c9924e';c.fillRect(0,by,W,2);
   TR.mine.forEach((r,i)=>{const w=(W-12)/TR.mine.length,x=4+i*(w+2),on=i===TR.sel;HIT.push({x,y:by+4,w,h:26,fn:()=>{TR.sel=i;beep(600,.04,'triangle');}});
     rr(x,by+4,w,26,6);c.fillStyle=on?'rgba(255,210,120,.2)':'rgba(255,255,255,.06)';c.fill();c.strokeStyle=on?'#ffd27a':'rgba(200,190,170,.3)';c.lineWidth=on?1.6:1;c.stroke();
-    c.fillStyle=`rgb(${r.col[0]},${r.col[1]},${r.col[2]})`;c.beginPath();c.arc(x+8,by+13,3.5,0,TAU);c.fill();text(r.name.split(' ')[0],x+15,by+14,'#fff',7);text(r.fin!=null?'DONE '+r.place+ORD(r.place).slice(-2):'P'+r.place,x+w-5,by+14,r.place<=3?'#ffe9a8':'#cfc6b0',7.5,'right');
+    drawHead(r.face,x+11,by+13,8,`rgb(${r.col[0]},${r.col[1]},${r.col[2]})`);text(r.name.split(' ')[0],x+23,by+14,'#fff',7);text(r.fin!=null?'DONE '+r.place+ORD(r.place).slice(-2):'P'+r.place,x+w-5,by+14,r.place<=3?'#ffe9a8':'#cfc6b0',7.5,'right');
     c.fillStyle='rgba(0,0,0,.5)';c.fillRect(x+4,by+21,w-8,4);c.fillStyle=r.legs<25?'#ff6a5a':'#8ae07a';c.fillRect(x+4,by+21,(w-8)*r.legs/100,4);});
   const y0=by+34;mbar(6,y0,60,(sel.hr-.3)/.7,'#ff8a5a','#e8402a','HR '+Math.round(sel.hr*190),sel.hr>.9);mbar(70,y0,60,sel.legs/100,'#8ae07a','#3a9a4a','LEGS '+Math.round(sel.legs),sel.legs<25);mbar(134,y0,60,sel.water/100,'#7ac0ff','#3a78d0','H2O '+Math.round(sel.water),sel.water<25);mbar(198,y0,60,sel.fuel/100,'#ffd060','#e08a20','FUEL '+Math.round(sel.fuel),sel.fuel<25);
   const g=TR.C.gs[sel.ci];text(`${g>.03?'Climb '+Math.round(g*100)+'%':g<-.03?'Descent '+Math.round(-g*100)+'%':'Flat'}  -  ${(TNAME[TCODE.indexOf(TR.C.ts[sel.ci])]||'').toLowerCase()}   plan: ${STN[sel.plan[Math.min(3,Math.max(0,sel.q))]].toLowerCase()}`,W/2,y0+19,'#e8dcc4',6.4,'center',500);
   [0,1,2,3].forEach(k=>{const bx=6+k*65,on=sel.stance===k&&sel.surgeT<=0;HIT.push({x:bx,y:y0+24,w:61,h:20,fn:()=>{sel.stance=k;beep(600,.04,'triangle');}});rr(bx,y0+24,61,20,6);c.fillStyle=on?STC[k]:'rgba(10,8,24,.7)';c.fill();c.strokeStyle=STC[k];c.lineWidth=on?2:1.2;c.stroke();text(STN[k],bx+30.5,y0+37,on?'#10100a':'#fff',7.2,'center');});
-  const sg=sel.surgeCD>0?1-sel.surgeCD/30:1;HIT.push({x:6,y:y0+49,w:100,h:22,fn:()=>tmSurge(sel)});rr(6,y0+49,100,22,7);c.fillStyle='rgba(10,8,24,.7)';c.fill();if(sg>0){rr(6,y0+49,Math.max(8,100*sg),22,7);c.fillStyle=sel.surgeT>0?'#ff9a3a':sg>=1?'#e8503a':'rgba(232,80,58,.35)';c.fill();}rr(6,y0+49,100,22,7);c.strokeStyle='#e8503a';c.lineWidth=1.2;c.stroke();text(sel.surgeT>0?'SURGING!':sg>=1?'SURGE (8 s)':'recovering',56,y0+63,'#fff',7.5,'center');
+  const sg=sel.surgeCD>0?1-sel.surgeCD/(sel.cdMax||30):1;HIT.push({x:6,y:y0+49,w:100,h:22,fn:()=>tmSurge(sel)});rr(6,y0+49,100,22,7);c.fillStyle='rgba(10,8,24,.7)';c.fill();if(sg>0){rr(6,y0+49,Math.max(8,100*sg),22,7);c.fillStyle=sel.surgeT>0?'#ff9a3a':sg>=1?'#e8503a':'rgba(232,80,58,.35)';c.fill();}rr(6,y0+49,100,22,7);c.strokeStyle='#e8503a';c.lineWidth=1.2;c.stroke();text(sel.surgeT>0?'SURGING!':sg>=1?'SURGE (8 s)':'recovering',56,y0+63,'#fff',7.5,'center');
   HIT.push({x:112,y:y0+49,w:70,h:22,fn:()=>tmDrink(sel)});rr(112,y0+49,70,22,7);c.fillStyle=sel.sips>0?'rgba(70,130,220,.55)':'rgba(10,8,24,.7)';c.fill();c.strokeStyle='#7ac0ff';c.lineWidth=1.2;c.stroke();text(`DRINK ${sel.sips}`,147,y0+63,'#fff',7.2,'center');
   HIT.push({x:188,y:y0+49,w:70,h:22,fn:()=>tmGel(sel)});rr(188,y0+49,70,22,7);c.fillStyle=sel.gels>0?'rgba(220,150,40,.55)':'rgba(10,8,24,.7)';c.fill();c.strokeStyle='#ffd060';c.lineWidth=1.2;c.stroke();text(`GEL ${sel.gels}`,223,y0+63,'#fff',7.2,'center');
   [['II',0],['1x',1],['2x',2],['4x',4],['8x',8]].forEach(([l,v],i)=>{const bx=6+i*28,yy=y0+76;HIT.push({x:bx,y:yy,w:26,h:18,fn:()=>{TR.speed=v;}});rr(bx,yy,26,18,6);c.fillStyle=TR.speed===v?'#e8a23a':'rgba(10,8,24,.7)';c.fill();c.strokeStyle='rgba(255,210,140,.5)';c.lineWidth=1;c.stroke();text(l,bx+13,yy+12,TR.speed===v?'#1a1208':'#e0d0b8',7,'center');});
@@ -2260,7 +2472,7 @@ addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')KEYS.l=0;if(e.k
 let last=0;function frame(now){const dt=Math.min(.05,(now-last)/1000||0);last=now;try{update(dt);if(FF&&scene==='nav'&&NAV&&NAV.cards&&!NAV.cardPhase&&!NAV.brief)update(dt);render();musicUpdate();}catch(e){if(!frame.t||now-frame.t>2000){frame.t=now;console.error("frame error",e);}}requestAnimationFrame(frame);}requestAnimationFrame(n=>{last=n;frame(n);});
 const ALL=[...RACES,...TRAIN];
 window.__trail={state:()=>({scene,race,R_,P,S,save,PH,BR,NAV,RUN,END,CAMP,REVT,SHOPN}),start:i=>beginRace(ALL[i]),startRace:i=>beginRace(ALL[i]),setEffort:e=>{if(P)P.effort=clamp(e,0,1);},drink,gel,choose:chooseEvent,draft:i=>draftPick(R_.draft[i]),cont:aidNext,
-  step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,train:TRAIN,seg:()=>segAt(S,P.x),open:i=>{race=ALL[i];scene='brief';},reset:()=>{save=DEF();newSeason(1);RUN=null;},runNew:startRun,tm:{view:v=>{TR.view=v;},g3:()=>G3,wx:()=>forecast(RACES[save.team.idx],save.team.raceDay),new:newTeam,get:()=>save.team,tr:()=>TR,week:tmNextWeek,skip:tmSkipWeeks,start:tmStartRace,finish:tmFinish,predict:tmPredict,buyStaff:tmBuyStaff,buyGear:tmBuyGear,cycleGear:tmCycleGear,cands:tmCands,sign:tmSign,endSeason:tmEndSeason,surge:tmSurge,drink:tmDrink,gel:tmGel,speed:v=>{TR.speed=v;},sel:i=>{TR.sel=i;}},cardPlay:playCard,cardOK,cards:()=>CARDS,runState:()=>({RUN,R_,scene,END,CAMP,REVT,SHOPN}),runEnter:(L,i)=>enterNode(RUN.map[L][i]),runReach,runPick:rewardPick,runCamp:{fuel:()=>campFuel(),rest:()=>campRest(),massage:()=>campMassage(),treat:k=>campTreat(k),pick:()=>{CAMP.pick=true;}},runEvent:reventPick,runEventDone:reventDone,runShop:{perk:shopBuyPerk,heal:shopHeal,pack:shopPack},runDone:completeNode,runEnd,tentCost,
+  step:dt=>update(dt),sweet:sweetEffort,par,render,races:RACES,train:TRAIN,seg:()=>segAt(S,P.x),open:i=>{race=ALL[i];scene='brief';},reset:()=>{save=DEF();newSeason(1);RUN=null;},runNew:startRun,tm:{club:{recruit:()=>{tmCand=tmCands();tmPick=null;scene='trecruit';},pubOpen:tmPubOpen,chug:chugPress,dlg:()=>DLG,pick:dlgPick,done:dlgDone,after:tmAfterRace,talk:tmTeamTalk,event:tmRollEvent,state:()=>({scene,DLG,PUB,CH,TMOVER}),mig:tmMig,wages:tmWages,pubGo:()=>{const tm=TM();tm.money-=pubCost();PUB.q=tm.rn.map((q,i)=>i).filter(i=>PUB.sel[i]);PUB.i=0;PUB.res=[];chugStart(PUB.q[0]);},chugEnd},view:v=>{TR.view=v;},g3:()=>G3,wx:()=>forecast(RACES[save.team.idx],save.team.raceDay),new:newTeam,get:()=>save.team,tr:()=>TR,week:tmNextWeek,skip:tmSkipWeeks,start:tmStartRace,finish:tmFinish,predict:tmPredict,buyStaff:tmBuyStaff,buyGear:tmBuyGear,cycleGear:tmCycleGear,cands:tmCands,sign:tmSign,endSeason:tmEndSeason,surge:tmSurge,drink:tmDrink,gel:tmGel,speed:v=>{TR.speed=v;},sel:i=>{TR.sel=i;}},cardPlay:playCard,cardOK,cards:()=>CARDS,runState:()=>({RUN,R_,scene,END,CAMP,REVT,SHOPN}),runEnter:(L,i)=>enterNode(RUN.map[L][i]),runReach,runPick:rewardPick,runCamp:{fuel:()=>campFuel(),rest:()=>campRest(),massage:()=>campMassage(),treat:k=>campTreat(k),pick:()=>{CAMP.pick=true;}},runEvent:reventPick,runEventDone:reventDone,runShop:{perk:shopBuyPerk,heal:shopHeal,pack:shopPack},runDone:completeNode,runEnd,tentCost,
   buy,toggle:toggleLoad,buyCap,rest:restDay,treat:(from,k)=>openTreat(from,k),press,leave:leaveTreat,goto:s=>{scene=s;},give:n=>{save.coins+=n;},setSave:o=>{Object.assign(save,o);},
   navStart:()=>beginRace(RACES[0]),season:()=>save.season,newSeason,goRace:goToRace,podium:()=>PODIUM,entry:i=>entry(ALL[i]).ok,wx:()=>R_&&R_.wx,forecast:i=>forecast(ALL[i]),beginNav,steer:v=>{if(NAV)NAV.bot=v;},nav:()=>NAV,bearStart:from=>startBear(from||'test'),dodge:bearDodge,punch:bearPunch,bearEnd:endBear,bearForce:win=>{if(BR)BR.over=win?'win':'lose';}};
 })();
