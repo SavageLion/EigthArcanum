@@ -60,3 +60,6 @@ Things that give you something to chase, risk or cause every few seconds while d
 - **Weapon pickups** (16 s): Ketchup Cannon (5-shot piercing fan), Flame Trail (burning fire behind you), Ice Slick (slows chasers), Pie Turret (homing pies). Shown in the HUD with a timer.
 
 Test: `node tests/foodtruck-fun.mjs [--shots dir]` checks ramps, stalls, crates, loot, customers, nitro and all four weapons.
+
+## Solid traffic
+Cars are solid: the truck can no longer drive through civilian cars, minions, cops or rivals. A crash shoves the car away (it stalls for a second and eases back to its lane), bounces the truck, costs HP and adds heat in proportion to the impact speed (gentle bumps are free). With nitro on you bowl cars aside for free (+streak, +heat) instead.

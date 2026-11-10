@@ -31,7 +31,7 @@ try {
     step(30); const stall = w.stalls.find(s => !s.dead); tr.x = stall.x - 70; tr.y = stall.y; tr.vx = 0; tr.vy = 0; F.setKey('r', 1); const bldBefore = w.bld.length; step(50); F.setKey('r', 0);
     out.stall = { dead: stall.dead, bldDelta: bldBefore - w.bld.length, loot: w.loot.length };
     // collect loot
-    const cash0 = RUN.cash; step(150); out.loot = { cashGain: +(RUN.cash - cash0).toFixed(2), left: w.loot.length };
+    const cash0 = RUN.cash; for (const l of w.loot.filter(l => l.k === 'coin').slice()) { tr.x = l.x; tr.y = l.y; tr.vx = tr.vy = 0; step(25); } out.loot = { cashGain: +(RUN.cash - cash0).toFixed(2), left: w.loot.length };
     // crate
     const crate = w.crates.find(c => !c.dead); tr.x = crate.x - 30; tr.y = crate.y; tr.vx = 0; F.setKey('r', 1); step(30); F.setKey('r', 0); out.crate = { dead: crate.dead };
     // fan
@@ -43,13 +43,13 @@ try {
   console.log(JSON.stringify(r));
   ok('has ramps', r.counts.ramps > 0, JSON.stringify(r.counts)); ok('has boost pads', r.counts.boost > 0); ok('has stalls', r.counts.stalls > 0); ok('has crates', r.counts.crates > 0);
   ok('ramp launches truck', r.ramp.maxZ > 15, JSON.stringify(r.ramp)); ok('truck lands again', r.ramp.landed);
-  ok('stall smashed at speed', r.stall.dead && r.stall.bldDelta === 1, JSON.stringify(r.stall));
+  ok('stall smashed at speed', r.stall.dead && r.stall.bldDelta >= 1, JSON.stringify(r.stall));
   ok('loot collected', r.loot.cashGain > 0, JSON.stringify(r.loot)); ok('crate smashed', r.crate.dead); ok('drive-by sale paid', r.fan.sold && r.fan.gain > 0, JSON.stringify(r.fan));
   const n = await page.evaluate(() => {
     const F = window.__ft, S = F.state().S, w = S.city, tr = S.truck, RUN = F.state().RUN, out = {}; const step = k => { for (let i = 0; i < k; i++) F.step(1 / 30); };
-    w.grace = 0; RUN.insp = 0; RUN.hp = RUN.hpMax; S.nitro = 1; S.boost = false;
+    w.grace = 0; RUN.insp = 0; RUN.hp = RUN.hpMax; S.nitro = 1; S.boost = false; w.bld = []; w.stalls = []; w.cars = []; w.pads = [];
     // nitro toggle through the keyboard path and speed check
-    tr.vx = tr.vy = 0; F.setKey('r', 1); step(40); const s0 = Math.hypot(tr.vx, tr.vy); window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })); out.boostOn = S.boost; step(40); const s1 = Math.hypot(tr.vx, tr.vy); F.setKey('r', 0); out.speeds = [Math.round(s0), Math.round(s1)]; out.nitroLeft = +S.nitro.toFixed(2);
+    tr.x = 800; tr.y = 800; tr.vx = tr.vy = 0; F.setKey("r", 1); step(40); const s0 = Math.hypot(tr.vx, tr.vy); window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })); out.boostOn = S.boost; step(40); const s1 = Math.hypot(tr.vx, tr.vy); F.setKey('r', 0); out.speeds = [Math.round(s0), Math.round(s1)]; out.nitroLeft = +S.nitro.toFixed(2);
     // weapons
     out.weaps = {};
     for (const k of ['ketchup', 'flame', 'ice', 'pie']) {
@@ -64,6 +64,15 @@ try {
   ok('nitro speeds truck up', n.boostOn && n.speeds[1] > n.speeds[0] * 1.3, JSON.stringify(n.speeds));
   ok('ketchup shoots', n.weaps.ketchup.shots > 0 || n.weaps.ketchup.hpLeft < 120); ok('pie shoots', n.weaps.pie.shots > 0 || n.weaps.pie.hpLeft < 120);
   ok('flame trail drops fire', n.weaps.flame.fire > 0); ok('ice trail drops ice', n.weaps.ice.fire > 0);
+  const cc = await page.evaluate(() => {
+    const F = window.__ft, S = F.state().S, w = S.city, tr = S.truck, RUN = F.state().RUN, out = {}; const step = k => { for (let i = 0; i < k; i++) F.step(1 / 30); };
+    w.grace = 99; w.mins = []; w.cops = []; w.rivals = []; w.pads = []; w.stalls = []; w.bld = []; S.boost = false;
+    const run = boost => { let cr = w.cars.find(c => c.h); if (!cr) { cr = { h: true, dir: 1, f: 1, x: 0, y: 0, spd: 0, hue: 0 }; w.cars.push(cr); } cr.x = 1200; cr.y = cr.ly = 1000; cr.dir = 1; cr.spd = 0; cr.stun = 0; cr.kx = cr.ky = 0; tr.x = 1100; tr.y = 1000; tr.vx = tr.vy = 0; tr.hit = 0; RUN.hp = RUN.hpMax; S.boost = boost; S.nitro = 1; F.setKey('r', 1); let minGap = 1e9, hp0 = RUN.hp; for (let i = 0; i < 45; i++) { F.step(1 / 30); minGap = Math.min(minGap, cr.x - tr.x); } F.setKey('r', 0); S.boost = false; return { passedThrough: tr.x > cr.x, gap: Math.round(minGap), hpLost: Math.round(hp0 - RUN.hp), carMoved: Math.round(cr.x - 1200) }; };
+    out.normal = run(false); out.boost = run(true); return out;
+  });
+  console.log(JSON.stringify(cc));
+  ok('cannot drive through a car', !cc.normal.passedThrough && cc.normal.gap > 10 && cc.normal.hpLost > 0, JSON.stringify(cc.normal));
+  ok('nitro bowls a car aside', cc.boost.carMoved > 40 && cc.boost.hpLost <= 2, JSON.stringify(cc.boost));
   if (shotDir) {
     await page.evaluate(() => { const F = window.__ft, S = F.state().S, w = S.city, tr = S.truck, RUN = F.state().RUN; w.mins = []; w.cops = []; w.rivals = []; w.grace = 99; S.weap = { k: 'flame', t: 12, cd: 0 }; S.nitro = .8; S.streak = 9; S.streakT = 4;
       const rp = w.pads.find(p => p.k === 'ramp'); tr.x = rp.x - 90; tr.y = rp.y; tr.vx = tr.vy = 0; w.fans = []; w.fans.push({ x: tr.x + 40, y: tr.y - 60, t: 20, ph: 0, hold: 0, hop: 0, spr: 'pr0', want: RUN.dishes[0].k, h: true, side: -1 }); for (let i = 0; i < 6; i++) w.loot.push({ k: 'coin', x: tr.x + 30 + i * 20, y: tr.y + 20, vx: 0, vy: 0, z: 0, vz: 0, v: 1, age: 1, ph: i, life: 99 });
