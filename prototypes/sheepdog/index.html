@@ -106,10 +106,28 @@ function updateDog(dt){
  const sp=dogSpeed()*(d.stun>0?.3:1)*speedK;
  d.vx+=(ax*sp-d.vx)*Math.min(1,dt*9);d.vy+=(ay*sp-d.vy)*Math.min(1,dt*9);
  d.x+=d.vx*dt;d.y+=d.vy*dt;collide(d,6,0);
+ bumpSheep(d,dt);
  const v=hyp(d.vx,d.vy);if(v>20){d.hx=d.vx/v;d.hy=d.vy/v;if(Math.abs(d.vx)>10)d.face=d.vx>0?1:-1;}
  d.run+=dt*(v/22);
  if(v>110&&Math.random()<dt*14)dust(d.x,d.y+5,1);
  G.barkCd=Math.max(0,G.barkCd-dt);
+}
+/* the dog is solid: you shoulder sheep aside (and slow down). A hard bump startles them; a slow crouching nudge does not. */
+function bumpSheep(d,dt){
+ for(const s of G.sheep){
+  s.bumpT=Math.max(0,(s.bumpT||0)-dt);
+  const dx=s.x-d.x,dy=s.y-d.y,dist=hyp(dx,dy),min=6+s.T.r;
+  if(dist>=min||dist<.01)continue;
+  const nx=dx/dist,ny=dy/dist,pen=min-dist,heavy=s.type==='ram';
+  const impact=Math.max(0,d.vx*nx+d.vy*ny);           // how fast the dog is driving into this sheep
+  // separate the bodies: sheep give way more than the dog does (rams barely move)
+  const ks=heavy?.15:.7;s.x+=nx*pen*ks;s.y+=ny*pen*ks;d.x-=nx*pen*(1-ks);d.y-=ny*pen*(1-ks);
+  if(impact>0){d.vx-=nx*impact*(heavy?.85:.55);d.vy-=ny*impact*(heavy?.85:.55);}
+  s.vx+=nx*(impact*(heavy?.15:.55)+18);s.vy+=ny*(impact*(heavy?.15:.55)+18);
+  if(impact>115&&!s.inPen&&s.bumpT<=0&&!heavy){            // a hard bump: the sheep bolts and the panic spreads
+   s.bumpT=.6;s.panic=Math.max(s.panic,.75);s.flash=.2;dust(s.x,s.y,5,'#fff6c8');addText(s.x,s.y-14,'BUMP!','#ffb84a');buzz(18);
+  }
+ }
 }
 function updateHelper(dt){
  const h=G.helper;if(!h)return;
@@ -341,6 +359,6 @@ function render(){
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={W:()=>W,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>{G.round=1;G.perks={};G.score=0;newRound();},next:i=>{G.perks[G.offers[i||0].id]=perk(G.offers[i||0].id)+1;G.round++;newRound();},bot:v=>{G.bot=v;},bark,render};
+window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>{G.round=1;G.perks={};G.score=0;newRound();},next:i=>{G.perks[G.offers[i||0].id]=perk(G.offers[i||0].id)+1;G.round++;newRound();},bot:v=>{G.bot=v;},bark,render};
 })();
 </script></body></html>
