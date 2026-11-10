@@ -33,3 +33,6 @@ You are inside the truck looking out of the serving window at a hungry queue. Yo
 
 ## Test
 `node tests/foodtruck-bot.mjs [runs] --shots dir` (Playwright bot, landscape + portrait rotation check). Serve with `node prototypes/foodtruck/serve.mjs` (port 8081).
+
+## Map art (Pixel Lab, top-down)
+Everything on the driving map is top-down Pixel Lab art in : the food truck (animated, rumbling, recoloured per truck and per rival), a donut-siren cop car (animated), minion cars (sedan, van, bus, scooter, muscle car, armoured pickle truck) that are rotated to face their heading and hue-tinted for variety, rooftop food statues on the buildings (hot dog, burger, donut, taco animated, pizza), animated googly-eyed trees and broccoli bushes, and landmark art in every stop (gas pumps, kitchen, garage, picnic rush, golden spatula stage). Sheets named  are 9 columns x 2 rows (row 2 is the animation). Cars honk funny things when they ram you and the truck leaves a dust trail.
