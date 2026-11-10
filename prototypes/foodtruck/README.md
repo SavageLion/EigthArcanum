@@ -11,16 +11,16 @@ Three legs (Town, Downtown, Golden Spatula). Each leg is a **free-roam city**:
 - **Rival trucks**: six named rivals (Taco Tyrant, Burger Baron, Frosty Freddie, Sour Sue, Pizza Pete, Dessert Dolly) roam the city, 2 at a time on leg 1 up to 4 on leg 3. They shoot flavoured food (frozen/sour slow you, spicy burns) and ram. Your truck auto-fires at the nearest rival or cop. Beat one for cash plus a stolen recipe (free perk/dish/flavour card).
 - **Map**: wide map top-right with markers ($ rush, K kitchen, M mechanic, G gas, * cook-off, R rival, white = you). Tap it for the full city map. Edge arrows point to off-screen stops.
 
-## The shift (window view): order tickets
-You are inside the truck looking out of the serving window. Every customer walks up with an **order bubble** (a dish, sometimes with a required flavour ring). Pick a dish from the counter, then **tap or drag it onto the customer who ordered it**.
+## The shift (window view): cook, flick, combo
+You are inside the truck looking out of the serving window at a hungry queue. You can flick **any** food at **any** customer, but you can only throw what you have cooked.
 
-- Right dish: fed, tip, and **COMBO** (up to +64%). Wrong dish: they get angry (>:( ), move faster and chew harder, and your combo resets.
-- Dishes serve extra matching customers (taco serves 3 at once; Intern Kevin and the Cast Iron Pan add more), so queue of mobs with the same order = big wins.
-- Flavours on a serve: spicy x1.4 tips (heats the kitchen), frozen chills the whole queue, sour stuns the 3 nearest, sweet doubles tips, greasy pushes the crowd back.
-- Customers who reach the counter chew on the truck. Karens throw complaints: tap them to dismiss.
-- **Stove fires**: now and then a station catches fire (it can't serve and drains the truck): tap it 3 times to put it out. Spicy dishes catch fire more.
-- **Staff** (hired from the shop after a shift, max 4): Sous Chef Gordon (auto-serves the front customer), Waiter Wendy (+35% tips), Dishwasher Dave (cooler kitchen, auto-extinguishes), Bouncer Bruno (less chewing), Intern Kevin (free, lucky extra serves).
-- The Food Critic boss wants a run of orders (a new one after each correct serve).
+- **Cook**: you have 2 burners (a third with Sous Chef Gordon). **Tap a dish** to put a burner on it (or take it off). A cooking dish adds a portion every few seconds, up to 4 in stock. Decide what to cook: tacos for crowds, hot dogs for lines, ice cream for chilling.
+- **Flick**: drag from a dish toward a customer and let go. The food flies from that dish's station; flicks snap to the customer nearest your finger (Magnet perks widen the snap). Empty stations can't throw.
+- **Combos** (chain 3 throws; the CHAIN panel shows your last three, COMBOS button shows the list): same dish x3 = TRIPLE DECKER (giant piercing shot); spicy + frozen within 3 = THERMAL SHOCK (burns and stuns everyone); A,B,A = SURF & TURF (chain lightning); 3 different dishes = COMBO MEAL (hits every customer).
+- Flavours, recipes and fusions still work (spicy burns and spreads but heats the kitchen, frozen chills, sour stuns, sweet doubles tips, greasy knocks back).
+- **Stove fires**: now and then a station catches fire (it stops cooking and can't throw, and drains the truck): tap it 3 times to put it out. Spicy dishes and burners catch fire more.
+- **Staff** (hired from the shop after a shift, max 4): Sous Chef Gordon (third burner), Waiter Wendy (+35% tips), Dishwasher Dave (cooler kitchen, auto-extinguishes), Bouncer Bruno (less chewing), Intern Kevin (free, cooks 25% faster).
+- Customers who reach the counter chew on the truck; Karens throw complaints you can tap or shoot down.
 
 ## Test
 `node tests/foodtruck-bot.mjs [runs] --shots dir` (Playwright bot, landscape + portrait rotation check). Serve with `node prototypes/foodtruck/serve.mjs` (port 8081).
