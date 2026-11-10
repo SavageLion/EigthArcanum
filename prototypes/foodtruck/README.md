@@ -11,8 +11,12 @@ Three legs (Town, Downtown, Golden Spatula). Each leg is a **free-roam city**:
 - **Rival trucks**: six named rivals (Taco Tyrant, Burger Baron, Frosty Freddie, Sour Sue, Pizza Pete, Dessert Dolly) roam the city, 2 at a time on leg 1 up to 4 on leg 3. They shoot flavoured food (frozen/sour slow you, spicy burns) and ram. Your truck auto-fires at the nearest rival or cop. Beat one for cash plus a stolen recipe (free perk/dish/flavour card).
 - **Map**: wide map top-right with markers ($ rush, K kitchen, M mechanic, G gas, * cook-off, R rival, white = you). Tap it for the full city map. Edge arrows point to off-screen stops.
 
+## Stages and unlocks
+Each stage is its own map with its own look, size and difficulty: Sunny Town (start), Dusty Highway, Frostbite Harbour (icy, slidey driving), Neon Downtown (dense, dark) and The Golden Spatula (final gala). Clearing a stage's cook-off unlocks new stages (saved between runs) and you pick the next one from the stage screen. Beat the Golden Spatula to win the run. Trucks unlock too: Grape Soda (clear Dusty Highway), Pickle Express (clear Frostbite Harbour), Golden Spatula rig (clear The Golden Spatula).
+After each shift you can hang one **dash trinket** (the old relics) for a permanent perk.
+
 ## City swarm
-Ordinary cars are the minions. Rush hour builds as the leg goes on: sedans, scooters, vans and (later) buses chase and ram you in growing waves, plus a hangry pack every ~40 s. Your truck auto-fires at the nearest ones (each dish picks a different target), kills give cash and XP, and you can level up while driving. Cops (heat) and rivals are the elites. Entering a lot clears everything.
+Ordinary cars are the minions. Rush hour builds as the leg goes on: sedans, scooters, vans and (later) buses chase and ram you in growing waves, plus a hangry pack every ~40 s. Your truck auto-fires at the nearest ones (each dish picks a different target), kills give cash and XP, and you can level up while driving. Cops (heat) and rivals are the elites. Chargers dash at you and armoured cars halve damage. Only stops (and rivals) show on the minimap: no direction arrows. Entering a lot clears everything.
 
 The city is regenerated each leg: 7x5 roads with random spacing and widths (about 3600-4400 px wide), lots of different sizes placed irregularly in their blocks, buildings, parks and ponds. 13 stops: 5 lunch rushes, 2 kitchens, 2 mechanics, 3 gas stations, 1 cook-off.
 
