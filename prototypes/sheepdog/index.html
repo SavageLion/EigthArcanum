@@ -2,13 +2,13 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Sheepdog</title>
-<style>html,body{margin:0;height:100%;background:#0f140f;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}</style>
+<style>html,body{margin:0;height:100%;background:#0f140f;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}canvas{display:block;width:100vw;height:100vh;object-fit:contain;image-rendering:pixelated}</style>
 </head><body><canvas id="c"></canvas>
 <script>
 /* Sheepdog: real-time flock herding roguelike prototype. You are the dog. Sheep flee from pressure, so move around them
    to steer the flock through the gate into the pen before time runs out. Bark = burst of pressure. Crouch = steady, calm pressure. */
 (()=>{
-const W=960,H=540,cv=document.getElementById('c'),c=cv.getContext('2d');
+let W=960;const H=540,cv=document.getElementById('c'),c=cv.getContext('2d');
 cv.width=W;cv.height=H;
 const TAU=Math.PI*2,rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),pick=a=>a[Math.floor(Math.random()*a.length)];
 const hyp=Math.hypot;
@@ -36,7 +36,7 @@ const TYPES={
 };
 
 function newRound(){
- const n=G.round;G.state='play';G.t=0;G.parts=[];G.texts=[];G.rings=[];G.barkCd=0;
+ fit();const n=G.round;G.state='play';G.t=0;G.parts=[];G.texts=[];G.rings=[];G.barkCd=0;
  const count=Math.min(30,8+2*n);
  G.limit=72+4*n+10*perk('treats');G.time=G.limit;
  // pen on the right, gate in its left wall at a random height
@@ -82,7 +82,7 @@ function dust(x,y,n,col='#cbb98a'){for(let i=0;i<n;i++){const a=rnd(0,TAU),v=rnd
 
 /* ---------------- the dog ---------------- */
 const barkR=()=>150*(1+.3*perk('bark')), barkCD=()=>2.4*(1-.2*Math.min(2,perk('bark')));
-const dogSpeed=()=>(G.dog.crouch?85:200)*(1+.15*perk('legs'));
+const dogSpeed=()=>(G.dog.crouch?95:210)*(1+.15*perk('legs'));
 const zoneMult=()=>(G.dog.crouch?1.18:1)*(1+.15*perk('nose'));
 function bark(){
  const d=G.dog;if(G.barkCd>0||G.state!=='play'||d.stun>0)return;
@@ -92,10 +92,18 @@ function bark(){
 }
 function updateDog(dt){
  const d=G.dog;d.stun=Math.max(0,d.stun-dt);
- let ax=0,ay=0;
- if(keys.l||keys.r||keys.u||keys.d){ax=(keys.r?1:0)-(keys.l?1:0);ay=(keys.d?1:0)-(keys.u?1:0);const l=hyp(ax,ay)||1;ax/=l;ay/=l;d.tx=d.x+ax*60;d.ty=d.y+ay*60;}
- else{const dx=d.tx-d.x,dy=d.ty-d.y,dist=hyp(dx,dy);if(dist>6){ax=dx/dist;ay=dy/dist;const k=Math.min(1,dist/50);ax*=k;ay*=k;}}
- const sp=dogSpeed()*(d.stun>0?.3:1);
+ let ax=0,ay=0,mag=0;
+ if(G.bot){const dx=d.tx-d.x,dy=d.ty-d.y,dist=hyp(dx,dy);if(dist>6){ax=dx/dist;ay=dy/dist;mag=Math.min(1,dist/50);}}
+ else{
+  let jx=(keys.r?1:0)-(keys.l?1:0),jy=(keys.d?1:0)-(keys.u?1:0);
+  if(stick.on){jx=stick.vx;jy=stick.vy;}
+  mag=Math.min(1,hyp(jx,jy));if(mag>.02){ax=jx/hyp(jx,jy);ay=jy/hyp(jx,jy);}
+  // analog: a light push is a slow, steady walk (calm pressure), a full push runs
+  d.walk=stick.on&&mag>0.12&&mag<.58;
+  d.crouch=calmHeld||d.walk;
+ }
+ const speedK=G.bot?mag:(d.crouch?Math.max(.55,mag):(mag<.12?0:.62+.38*Math.min(1,(mag-.12)/.5)));
+ const sp=dogSpeed()*(d.stun>0?.3:1)*speedK;
  d.vx+=(ax*sp-d.vx)*Math.min(1,dt*9);d.vy+=(ay*sp-d.vy)*Math.min(1,dt*9);
  d.x+=d.vx*dt;d.y+=d.vy*dt;collide(d,6,0);
  const v=hyp(d.vx,d.vy);if(v>20){d.hx=d.vx/v;d.hy=d.vy/v;if(Math.abs(d.vx)>10)d.face=d.vx>0?1:-1;}
@@ -201,31 +209,42 @@ function botThink(dt){
  void nearFlock;
 }
 
-/* ---------------- input ---------------- */
+/* ---------------- input: floating thumb stick on the left, BARK / CALM on the right ---------------- */
 const keys={l:0,r:0,u:0,d:0};
-let ptr={id:-1},btn={bark:null,crouch:null},holdIds={};
-const BTN_BARK={x:W-130,y:H-120,r:46},BTN_CROUCH={x:W-250,y:H-100,r:40};
+const stick={on:false,id:-1,ox:0,oy:0,x:0,y:0,vx:0,vy:0,R:62};
+let calmHeld=false,calmId=-1,holdIds={};
+const BTN_BARK={x:W-96,y:H-96,r:66},BTN_CALM={x:W-236,y:H-70,r:54};
+const buzz=ms=>{try{if(navigator.vibrate)navigator.vibrate(ms);}catch(_){}};
 function pt(e){const b=cv.getBoundingClientRect(),sc=Math.min(b.width/W,b.height/H),ox=(b.width-W*sc)/2,oy=(b.height-H*sc)/2;return {x:(e.clientX-b.left-ox)/sc,y:(e.clientY-b.top-oy)/sc};}
-const inBtn=(p,B)=>hyp(p.x-B.x,p.y-B.y)<B.r+8;
+const inBtn=(p,B)=>hyp(p.x-B.x,p.y-B.y)<B.r+14;
+function stickMove(p){const dx=p.x-stick.ox,dy=p.y-stick.oy,l=hyp(dx,dy),k=Math.min(1,l/stick.R);stick.x=stick.ox+(l?dx/l:0)*Math.min(l,stick.R);stick.y=stick.oy+(l?dy/l:0)*Math.min(l,stick.R);stick.vx=l?dx/l*k:0;stick.vy=l?dy/l*k:0;}
+const FS={x:W-50,y:6,w:44,h:28};
+// the field widens to match the screen (a wide phone gets a wider field, no black bars)
+function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;cv.width=W;cv.height=H;BTN_BARK.x=W-96;BTN_CALM.x=W-236;FS.x=W-50;}
+fit();
+function goFull(){try{const d=document;if(!d.fullscreenElement){const r=d.documentElement.requestFullscreen();if(r&&r.then)r.then(()=>{try{screen.orientation.lock('landscape');}catch(_){}}).catch(()=>{});}else d.exitFullscreen();}catch(_){}}
 cv.addEventListener('pointerdown',e=>{
  const p=pt(e);try{cv.setPointerCapture(e.pointerId);}catch(_){}
+ if(p.x>FS.x&&p.y<FS.y+FS.h&&p.y>FS.y-6){goFull();return;}
  if(G.state==='ready'){newRound();return;}
  if(G.state==='lost'){G.round=1;G.perks={};G.score=0;newRound();return;}
  if(G.state==='won'){
   const ofs=layoutOffers();for(let i=0;i<ofs.length;i++){const o=ofs[i];if(p.x>o.x&&p.x<o.x+o.w&&p.y>o.y&&p.y<o.y+o.h){G.perks[G.offers[i].id]=perk(G.offers[i].id)+1;G.round++;newRound();return;}}return;}
  if(G.state!=='play')return;
- if(inBtn(p,BTN_BARK)){bark();holdIds[e.pointerId]='bark';return;}
- if(inBtn(p,BTN_CROUCH)){G.dog.crouch=true;holdIds[e.pointerId]='crouch';return;}
- if(ptr.id<0){ptr.id=e.pointerId;G.dog.tx=p.x;G.dog.ty=p.y;}
+ if(inBtn(p,BTN_BARK)){bark();buzz(25);holdIds[e.pointerId]='bark';return;}
+ if(inBtn(p,BTN_CALM)){calmHeld=true;calmId=e.pointerId;buzz(10);return;}
+ if(!stick.on&&p.y>46){stick.on=true;stick.id=e.pointerId;stick.ox=p.x;stick.oy=p.y;stickMove(p);}
 });
-cv.addEventListener('pointermove',e=>{if(e.pointerId===ptr.id){const p=pt(e);G.dog.tx=p.x;G.dog.ty=p.y;}});
-const up=e=>{if(e.pointerId===ptr.id)ptr.id=-1;if(holdIds[e.pointerId]==='crouch'&&G.dog)G.dog.crouch=false;delete holdIds[e.pointerId];};
-cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('pointermove',e=>{if(stick.on&&e.pointerId===stick.id)stickMove(pt(e));});
+const up=e=>{if(e.pointerId===stick.id){stick.on=false;stick.id=-1;stick.vx=stick.vy=0;}if(e.pointerId===calmId){calmHeld=false;calmId=-1;}delete holdIds[e.pointerId];};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);cv.addEventListener('lostpointercapture',up);
 addEventListener('keydown',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a')keys.l=1;if(k==='ArrowRight'||k==='d')keys.r=1;if(k==='ArrowUp'||k==='w')keys.u=1;if(k==='ArrowDown'||k==='s')keys.d=1;
  if(k===' '){e.preventDefault();if(G.state==='ready'||G.state==='lost'){if(G.state==='lost'){G.round=1;G.perks={};G.score=0;}newRound();}else bark();}
- if((k==='c'||k==='Shift')&&G.dog)G.dog.crouch=true;
+ if(k==='c'||k==='Shift')calmHeld=true;
+ if(k==='f')goFull();
  if(G.state==='won'&&'123'.includes(k)&&G.offers[+k-1]){G.perks[G.offers[+k-1].id]=perk(G.offers[+k-1].id)+1;G.round++;newRound();}});
-addEventListener('keyup',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a')keys.l=0;if(k==='ArrowRight'||k==='d')keys.r=0;if(k==='ArrowUp'||k==='w')keys.u=0;if(k==='ArrowDown'||k==='s')keys.d=0;if((k==='c'||k==='Shift')&&G.dog)G.dog.crouch=false;});
+addEventListener('keyup',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a')keys.l=0;if(k==='ArrowRight'||k==='d')keys.r=0;if(k==='ArrowUp'||k==='w')keys.u=0;if(k==='ArrowDown'||k==='s')keys.d=0;if(k==='c'||k==='Shift')calmHeld=false;});
+addEventListener('contextmenu',e=>e.preventDefault());
 
 /* ---------------- drawing (placeholder vector art; Pixel Lab sprites come next) ---------------- */
 function drawGrass(){
@@ -269,7 +288,7 @@ function drawDog(d,col,crouch){
  c.strokeStyle=col;c.lineWidth=2.4;c.beginPath();c.moveTo(-8,-2);c.quadraticCurveTo(-14,-6+Math.sin(G.t*14)*2,-15,-2);c.stroke();c.strokeStyle='#f2efe6';c.beginPath();c.moveTo(-14,-4);c.lineTo(-15,-2);c.stroke();
  c.restore();
 }
-function btnDraw(B,label,on){c.globalAlpha=on?.9:.6;c.fillStyle=on?'#ffd24a':'#2a1a30';c.beginPath();c.arc(B.x,B.y,B.r,0,TAU);c.fill();c.strokeStyle='#ffb84a';c.lineWidth=3;c.stroke();c.globalAlpha=1;c.fillStyle=on?'#2a1408':'#ffe9c0';c.font='bold 15px monospace';c.textAlign='center';c.fillText(label,B.x,B.y+5);}
+function btnDraw(B,label,on){c.globalAlpha=on?.9:.6;c.fillStyle=on?'#ffd24a':'#2a1a30';c.beginPath();c.arc(B.x,B.y,B.r,0,TAU);c.fill();c.strokeStyle='#ffb84a';c.lineWidth=3;c.stroke();c.globalAlpha=1;c.fillStyle=on?'#2a1408':'#ffe9c0';c.font='bold 17px monospace';c.textAlign='center';c.fillText(label,B.x,B.y+6);}
 function txt(s,x,y,col='#fff',size=16,al='left'){c.font=`bold ${size}px monospace`;c.textAlign=al;c.fillStyle='rgba(0,0,0,.55)';c.fillText(s,x+1.5,y+1.5);c.fillStyle=col;c.fillText(s,x,y);}
 function layoutOffers(){const n=G.offers.length,w=250,gap=18,x0=(W-(n*w+(n-1)*gap))/2;return G.offers.map((o,i)=>({x:x0+i*(w+gap),y:170,w,h:210}));}
 function render(){
@@ -289,18 +308,24 @@ function render(){
   txt('TIME '+Math.ceil(G.time),170,26,G.time<15?'#ff8a6a':'#fff',17);
   txt(`PEN ${G.inPen}/${G.need}  (of ${G.sheep.length})`,300,26,'#9aff9a',17);
   txt('SCORE '+G.score,560,26,'#ffe9a8',15);
-  const pk=PERKS.filter(p=>perk(p.id));pk.forEach((p,i)=>{c.fillStyle='#ffd24a';c.beginPath();c.arc(W-30-i*26,20,10,0,TAU);c.fill();txt(p.ic,W-30-i*26,25,'#2a1408',13,'center');});
+  const pk=PERKS.filter(p=>perk(p.id));pk.forEach((p,i)=>{c.fillStyle='#ffd24a';c.beginPath();c.arc(W-78-i*26,20,10,0,TAU);c.fill();txt(p.ic,W-78-i*26,25,'#2a1408',13,'center');});
  }
  if(G.state==='play'){
+  // thumb stick: a faint ghost where it will appear, the real one under your thumb
+  const sx=stick.on?stick.ox:110,sy=stick.on?stick.oy:H-110;
+  c.globalAlpha=stick.on?.5:.2;c.fillStyle='#fff';c.beginPath();c.arc(sx,sy,stick.R,0,TAU);c.fill();
+  c.globalAlpha=stick.on?.85:.3;c.fillStyle='#fff';c.beginPath();c.arc(stick.on?stick.x:sx,stick.on?stick.y:sy,24,0,TAU);c.fill();c.globalAlpha=1;
+  if(stick.on&&G.dog&&G.dog.walk){txt('steady',stick.ox,stick.oy-stick.R-8,'#bfe4ff',13,'center');}
   btnDraw(BTN_BARK,G.barkCd>0?(G.barkCd).toFixed(1):'BARK',G.barkCd<=0);
-  btnDraw(BTN_CROUCH,'CROUCH',G.dog&&G.dog.crouch);
+  btnDraw(BTN_CALM,'CALM',calmHeld||(G.dog&&G.dog.crouch));
+  c.fillStyle='rgba(20,12,26,.7)';c.fillRect(FS.x,FS.y,FS.w,FS.h);c.strokeStyle='#ffb84a';c.lineWidth=2;c.strokeRect(FS.x,FS.y,FS.w,FS.h);txt('FULL',FS.x+FS.w/2,FS.y+19,'#ffe9c0',12,'center');
   if(G.msgT>0){c.globalAlpha=clamp(G.msgT,0,1);txt(G.msg,W/2,110,'#fff',34,'center');c.globalAlpha=1;}
  }
  if(G.state==='ready'){c.fillStyle='rgba(10,20,10,.6)';c.fillRect(0,0,W,H);txt('SHEEPDOG',W/2,170,'#fff6c8',60,'center');
   txt('Sheep run from you. Steer the flock through the gate.',W/2,225,'#e8f0d8',18,'center');
-  txt('Drag to run.  BARK = burst.  CROUCH = calm, steady pressure.',W/2,256,'#e8f0d8',16,'center');
-  txt('Keys: WASD/arrows, Space = bark, C = crouch',W/2,282,'#b8c8a8',14,'center');
-  txt('TAP TO START',W/2,350,'#ffd24a',26,'center');}
+  txt('Left thumb: stick. Light push = slow steady walk, full push = run.',W/2,256,'#e8f0d8',16,'center');txt('Right thumb: BARK = burst.  hold CALM = stare, no panic.',W/2,278,'#e8f0d8',16,'center');
+  txt('Keys: WASD/arrows, Space = bark, C = calm, F = fullscreen',W/2,306,'#b8c8a8',14,'center');
+  txt('TAP TO START',W/2,370,'#ffd24a',26,'center');}
  if(G.state==='won'){c.fillStyle='rgba(10,20,10,.72)';c.fillRect(0,0,W,H);
   txt('ROUND '+G.round+' CLEARED!',W/2,92,'#ffd24a',38,'center');txt('★'.repeat(G.stars)+'☆'.repeat(3-G.stars)+'   '+Math.ceil(G.time)+'s left',W/2,128,'#fff',20,'center');
   txt('Pick a perk',W/2,160,'#e8f0d8',16,'center');
@@ -316,6 +341,6 @@ function render(){
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>{G.round=1;G.perks={};G.score=0;newRound();},next:i=>{G.perks[G.offers[i||0].id]=perk(G.offers[i||0].id)+1;G.round++;newRound();},bot:v=>{G.bot=v;},bark,render};
+window.__sd={W:()=>W,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>{G.round=1;G.perks={};G.score=0;newRound();},next:i=>{G.perks[G.offers[i||0].id]=perk(G.offers[i||0].id)+1;G.round++;newRound();},bot:v=>{G.bot=v;},bark,render};
 })();
 </script></body></html>
