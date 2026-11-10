@@ -39,3 +39,11 @@ Everything on the driving map is top-down Pixel Lab art in `assets/tt/`: the foo
 
 ## Sunny Town: detailed angled top-down art (assets/sl/)
 Sunny Town now uses the new detailed painterly style (style-anchored Pixel Lab sprites). The ground (pavement, roads, crosswalks, lane marks, bins, hydrants, manholes, lawns, plazas) is baked per 512px chunk; shopfronts (3 variants, stacked in rows facing the street), cafe terraces, trees and the stop landmarks (rush plaza, kitchen, garage, gas station, cook-off stage) are y-sorted sprites with collision footprints. Every vehicle is an 8-direction sprite (food truck, taxi traffic, donut-siren cop car, van, bus, scooter, muscle car, armoured truck); rival trucks and traffic are hue-shifted. The player truck plays an attack animation (serving window flaps, recoil, smoke) in the direction it is firing. Other stages still use the older look. `slice.html` is the original standalone art test.
+
+## Town life, obstacles, warnings, stops and music
+- **Zoomed out** a little (0.78x) so you see more street.
+- **Living town**: animated shops (fluttering awnings), trees, terraces and stop landmarks; pedestrians stroll the sidewalks (they hop out of the way, chat, and cannot be hit); traffic lights that cycle and that the civilian traffic obeys (so cars queue at red); steam from manholes, chimney smoke, bunting.
+- **Road obstacles**: cones (knock them over, +heat), striped barriers and a parked wagon (solid), potholes (damage and slow) and oil slicks (you slide). Cops and minions get stuck on them too.
+- **Warnings**: cops now arrive almost straight away (heat 8+) and each warning adds more cops. Crashes, cones and traffic raise warnings, keeping to a stop lowers them. The HUD shows WARNINGS stars (max 5).
+- **Stops** have painted bays, fluttering bunting, a pulsing border and an animated landmark. Parking triggers an entry animation: the truck pulls in, the camera zooms, an iris closes with an ENTERING banner, and the iris opens again when you leave.
+- **Music**: the Eighth Arcanum procedural score engine (`score.js`, copied from Ridgeline) now plays per scene (title/stages, driving battle themes whose energy follows your warnings, shift theme, hub for kitchen/mechanic/gas, shop for results, victory/defeat). Mute with the title-screen button.
