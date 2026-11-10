@@ -464,6 +464,7 @@ addEventListener('contextmenu',e=>e.preventDefault());
 /* ---------------- drawing (placeholder vector art; Pixel Lab sprites come next) ---------------- */
 /* ---- natural scenery: noise-painted ground, swaying Pixel Lab grass / flowers / trees ---- */
 const IM={};for(const n of['tree','fence','gate','tuft','flowers_a','flowers_b','bush','rock2','tree_big_a','tree_big_b','shrub_big']){const i=new Image();i.src='assets/'+n+'.png';IM[n]=i;}
+for(let i=0;i<4;i++){const im=new Image();im.src='assets/ground/g'+i+'.png';IM['g'+i]=im;}
 const okImg=i=>i&&i.complete&&i.naturalWidth>0;
 const PAL={SPRING:['#4f8f3c','#5fa048','#74b457','#3f7a34'],SUMMER:['#6a9a3a','#7cac46','#94bf54','#58832f'],AUTUMN:['#7a7a38','#8c8640','#a39648','#66602e'],WINTER:['#cfdce6','#e1ebf2','#f3f8fb','#b3c6d6']};
 const TINT={AUTUMN:'sepia(.8) saturate(2.4) hue-rotate(-16deg) brightness(.95)',WINTER:'saturate(.2) brightness(1.7)'};
@@ -475,6 +476,21 @@ function vn(x,y,sd){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf
 const BAY=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
 const bg=document.createElement('canvas');let bgKey='';
 function inZone(z,x,y,m=0){if(z.k==='water')return x>z.x-m&&x<z.x+z.w+m&&y>z.y-m&&y<z.y+z.h+m;const rx=z.w/2+m,ry=z.h/2+m,dx=(x-z.x-z.w/2)/rx,dy=(y-z.y-z.h/2)/ry;return dx*dx+dy*dy<1;}
+const GM=[];
+function groundMasked(v){
+ if(GM[v])return GM[v];
+ const cc=document.createElement('canvas');cc.width=cc.height=256;const x=cc.getContext('2d');x.drawImage(IM['g'+v],0,0);
+ const m=x.createImageData(256,256),md=m.data;
+ for(let j=0;j<256;j++)for(let i=0;i<256;i++){const r=k=>{const t=Math.min(1,Math.min(k,255-k)/44);return t*t*(3-2*t);};const o=(j*256+i)*4;md[o+3]=255*Math.min(r(i),r(j));}
+ const mc=document.createElement('canvas');mc.width=mc.height=256;mc.getContext('2d').putImageData(m,0,0);
+ x.globalCompositeOperation='destination-in';x.drawImage(mc,0,0);return GM[v]=cc;
+}
+function paintGround(b,sn){
+ let s4=(G.zid||0)*313+5;const R=()=>(s4=(s4*16807)%2147483647)/2147483647;
+ b.imageSmoothingEnabled=false;b.filter=TINT[sn]||'none';
+ for(let gy=-40;gy<H;gy+=200)for(let gx=-40;gx<W;gx+=200){const r=R(),v=r<.07?1:r<.16?3:r<.42?2:0;b.drawImage(groundMasked(v),Math.round(gx+R()*16-8),Math.round(gy+R()*16-8));}
+ b.filter='none';
+}
 function buildBg(){
  const sn=season().n,P=PAL[sn].map(hx),lw=Math.ceil(W/2),lh=Math.ceil(H/2);
  const lo=document.createElement('canvas');lo.width=lw;lo.height=lh;const lc=lo.getContext('2d'),im=lc.createImageData(lw,lh),d=im.data;
@@ -483,28 +499,32 @@ function buildBg(){
  if(Pn){const x0=-10,y0=H*.5,x2=Pn.x-50,y2=Pn.gy,cx=(x0+x2)/2,cy=(y0+y2)/2+Math.sin((G.zid||0)*1.7)*110;for(let i=0;i<=60;i++){const t=i/60;PATH.push([(1-t)*(1-t)*x0+2*(1-t)*t*cx+t*t*x2,(1-t)*(1-t)*y0+2*(1-t)*t*cy+t*t*y2]);}}
  const DIRT=['#b08a5a','#c49c6a','#9a7448'].map(hx),DIRTW=['#d8dde0','#c6ccd2'].map(hx);
  const ET=edgeTrees(),SH=[];for(const k of G.rocks||[])if(k.tree)SH.push({x:k.x+16,y:k.y+8,rx:36,ry:15});for(const e of ET)SH.push({x:e.x+22,y:e.y+6,rx:56*e.sc*1.5,ry:20*e.sc*1.5});
+ const im2=lc.createImageData(lw,lh),d2=im2.data;
  for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){
   const n=vn(x/16,y/16,1)*.55+vn(x/6,y/6,2)*.3+vn(x/2.4,y/2.4,3)*.15+(BAY[y&3][x&3]/16-.5)*.07;
-  let c0=n<.36?P[3]:n<.58?P[0]:n<.76?P[1]:P[2];
-  const X=x*2,Y=y*2;
-  if(PATH.length){let md=1e9;for(let i=0;i<PATH.length;i++){const q=PATH[i],ex=x*2-q[0],ey=y*2-q[1],dd2=ex*ex+ey*ey;if(dd2<md)md=dd2;}if(Math.sqrt(md)+(vn(x/4,y/4,11)-.5)*10<15){const t=vn(x/3,y/3,12);c0=sn==='WINTER'?(t<.5?DIRTW[0]:DIRTW[1]):(t<.3?DIRT[2]:t<.8?DIRT[0]:DIRT[1]);}}
+  const c0=n<.36?P[3]:n<.58?P[0]:n<.76?P[1]:P[2];
+  const X=x*2,Y=y*2;let ov=null,oa=255;
+  if(PATH.length){let md=1e9;for(let i=0;i<PATH.length;i++){const q=PATH[i],ex=X-q[0],ey=Y-q[1],dd2=ex*ex+ey*ey;if(dd2<md)md=dd2;}if(Math.sqrt(md)+(vn(x/4,y/4,11)-.5)*10<15){const t=vn(x/3,y/3,12);ov=sn==='WINTER'?(t<.5?DIRTW[0]:DIRTW[1]):(t<.3?DIRT[2]:t<.8?DIRT[0]:DIRT[1]);}}
   for(const z of G.zones||[]){
    const wob=(vn(x/5,y/5,7)-.5)*14;
    if(!inZone(z,X,Y,wob))continue;
    const t=vn(x/4,y/4,9);
-   c0=z.k==='water'?(t<.4?WAT[0]:t<.8?WAT[1]:WAT[2]):z.k==='snow'?(t<.4?SNOW[1]:t<.8?SNOW[0]:SNOW[2]):(t<.35?MUD[2]:t<.8?MUD[0]:MUD[1]);
+   ov=z.k==='water'?(t<.4?WAT[0]:t<.8?WAT[1]:WAT[2]):z.k==='snow'?(t<.4?SNOW[1]:t<.8?SNOW[0]:SNOW[2]):(t<.35?MUD[2]:t<.8?MUD[0]:MUD[1]);oa=255;
   }
-  for(const e of SH){const dx=(X-e.x)/e.rx,dy=(Y-e.y)/e.ry;if(dx*dx+dy*dy<1+(vn(x/5,y/5,13)-.5)*.5){c0=[c0[0]*.72,c0[1]*.75,c0[2]*.82];break;}}
+  if(!ov)for(const e of SH){const dx=(X-e.x)/e.rx,dy=(Y-e.y)/e.ry;if(dx*dx+dy*dy<1+(vn(x/5,y/5,13)-.5)*.5){ov=[8,26,18];oa=78;break;}}
   const o=(y*lw+x)*4;d[o]=c0[0];d[o+1]=c0[1];d[o+2]=c0[2];d[o+3]=255;
+  if(ov){d2[o]=ov[0];d2[o+1]=ov[1];d2[o+2]=ov[2];d2[o+3]=oa;}
  }
  lc.putImageData(im,0,0);
  bg.width=W;bg.height=H;const b=bg.getContext('2d');b.imageSmoothingEnabled=false;b.drawImage(lo,0,0,lw*2,lh*2);
+ paintGround(b,sn);
+ const l2=document.createElement('canvas');l2.width=lw;l2.height=lh;l2.getContext('2d').putImageData(im2,0,0);b.imageSmoothingEnabled=false;b.drawImage(l2,0,0,lw*2,lh*2);
  // scatter: grass tufts, flower patches, bushes (seeded so a day looks the same every frame)
  let s2=(G.zid||0)*977+13;const R=()=>(s2=(s2*16807)%2147483647)/2147483647;
  const deco=[],P_=G.pen,free=(x,y)=>!(G.zones||[]).some(z=>inZone(z,x,y,10))&&!(P_&&x>P_.x-90&&x<P_.x+P_.w+10&&y>P_.y-10&&y<P_.y+P_.h+10);
- const nC=Math.round(W*H/16000),nF=sn==='WINTER'?0:sn==='AUTUMN'?5:sn==='SUMMER'?12:20;
+ const nC=Math.round(W*H/60000),nF=sn==='WINTER'?0:3;
  for(let q=0;q<nC;q++){const cx=R()*W,cy=45+R()*(H-55),n=3+Math.floor(R()*4);for(let i=0;i<n;i++){const x=cx+(R()-.5)*60,y=cy+(R()-.5)*30;if(x>0&&x<W&&y>44&&y<H&&free(x,y))deco.push({k:'tuft',x,y,ph:R()*6.28,sc:.65+R()*.4});}}
- for(let q=0;q<40;q++){const x=R()*W,y=48+R()*(H-58);if(free(x,y))deco.push({k:'tuft',x,y,ph:R()*6.28,sc:.6+R()*.3});}
+ for(let q=0;q<14;q++){const x=R()*W,y=48+R()*(H-58);if(free(x,y))deco.push({k:'tuft',x,y,ph:R()*6.28,sc:.6+R()*.3});}
  for(let q=0;q<nF;q++){const cx=R()*W,cy=60+R()*(H-80),v=R()<.5?'flowers_a':'flowers_b';for(let i=0;i<3;i++){const x=cx+(R()-.5)*50,y=cy+(R()-.5)*26;if(free(x,y))deco.push({k:v,x,y,ph:R()*6.28,sc:.7});}}
  for(let i=0;i<4;i++){const x=40+R()*(W-80),y=70+R()*(H-110);if(free(x,y)&&!(G.rocks||[]).some(r=>hyp(r.x-x,r.y-y)<r.r+40))deco.push({k:'bush',x,y});}
  if(sn!=='WINTER')for(let i=0;i<5;i++){const x=40+R()*(W-80),y=80+R()*(H-120);if(free(x,y)&&!(G.rocks||[]).some(r=>hyp(r.x-x,r.y-y)<r.r+50))deco.push({k:'shrub',x,y});}
@@ -512,12 +532,12 @@ function buildBg(){
  deco.sort((a,b)=>a.y-b.y);G.deco=deco;
 }
 function drawBg(){
- if(!okImg(IM.tuft)||!okImg(IM.tree))return false;
+ if(!okImg(IM.tuft)||!okImg(IM.tree)||![0,1,2,3].every(i=>okImg(IM['g'+i])))return false;
  const key=W+season().n+G.zid;if(key!==bgKey){bgKey=key;buildBg();}
  c.drawImage(bg,0,0);return true;
 }
 function edgeTrees(){
- let s3=(G.zid||0)*131+7;const R=()=>(s3=(s3*16807)%2147483647)/2147483647,out=[],sc=.62,pn=G.pen;
+ let s3=(G.zid||0)*131+7;const R=()=>(s3=(s3*16807)%2147483647)/2147483647,out=[],sc=.85,pn=G.pen;
  for(let x=-10;x<W-30;x+=105+R()*60)out.push({x,y:96+R()*12,v:R()<.5?'a':'b',sc:sc*(.9+R()*.25)});
  for(let x=10;x<W-40;x+=115+R()*60)out.push({x,y:H+80+R()*14,v:R()<.5?'a':'b',sc:sc*(.9+R()*.25)});
  for(let y=190;y<H-110;y+=150+R()*40)out.push({x:-30+R()*14,y,v:R()<.5?'a':'b',sc:sc*(.9+R()*.2)});
@@ -540,10 +560,10 @@ function drawDeco(){
 }
 function drawBush(b){const im=spr('bush');if(!im)return;c.imageSmoothingEnabled=false;const sw=Math.sin(G.t*1.1+b.x)*.015;c.save();c.translate(b.x,b.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-24,-34,48,40);c.restore();}
 function drawTree(k){
- const im=spr('tree');if(!im)return;
+ const im=spr('tree_big_b');if(!im)return;
  c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(k.x+4,k.y+10,24,8,0,0,TAU);c.fill();
  c.imageSmoothingEnabled=false;const sw=Math.sin(G.t*.9+k.x*.05)*.022+Math.sin(G.t*.4+k.y)*.012;
- c.save();c.translate(k.x,k.y+14);c.transform(1,0,sw,1,0,0);c.drawImage(im,-40,-96);c.restore();
+ c.save();c.translate(k.x,k.y+14);c.transform(1,0,sw,1,0,0);c.drawImage(im,-45,-100,90,101);c.restore();
 }
 function drawRock(k){const im=IM.rock2;if(!okImg(im))return;const w=k.r*2.8,h=w*im.height/im.width;c.imageSmoothingEnabled=false;c.drawImage(im,Math.round(k.x-w/2),Math.round(k.y-h*.62),w,h);}
 function drawFence(w,dmg){
