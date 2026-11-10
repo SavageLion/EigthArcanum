@@ -66,6 +66,12 @@ var msg_label: Label
 var msg_t := 0.0
 var dbg_bot := false
 var last_pos := Vector2.ZERO
+var combat: Combat
+var ground_fx: Node2D
+var map_pts := PackedVector2Array()
+var map_scale := 1.0
+var map_origin := Vector2.ZERO
+var fs_layer: CanvasLayer
 
 func tex(n: String) -> Texture2D:
 	if not tex_cache.has(n):
@@ -96,6 +102,8 @@ func _ready() -> void:
 	mats = Node2D.new()
 	mats.draw.connect(_draw_mats)
 	add_child(mats)
+	ground_fx = Node2D.new()
+	add_child(ground_fx)
 	world = Node2D.new()
 	world.y_sort_enabled = true
 	add_child(world)
@@ -104,7 +112,16 @@ func _ready() -> void:
 	_make_traffic()
 	_make_player()
 	_make_ui()
+	combat = Combat.new()
+	add_child(combat)
+	combat.setup(self)
+	combat.busted.connect(func(): _game_over("The Food Police boxed you in. The truck is shut down."))
+	combat.wrecked.connect(func(): _game_over("The truck was wrecked."))
+	_compute_map()
 	last_pos = player.position
+	if _arg("heat") != "":
+		Run.insp = float(_arg("heat"))
+		combat.grace = 0.0
 	var tp := _arg("tp")
 	if tp != "":
 		for lot in lots:
@@ -237,6 +254,8 @@ func _add_stop(ty: String, base: Vector2, venues: Array) -> void:
 	s.position = Vector2(0, -14)
 	n.add_child(s)
 	var sb := StaticBody2D.new()
+	sb.collision_layer = 2
+	sb.collision_mask = 0
 	var cs := CollisionShape2D.new()
 	var rs := RectangleShape2D.new()
 	rs.size = Vector2(dw - 28.0, dh * 0.66 - 8.0)
@@ -280,6 +299,25 @@ func _draw_mats() -> void:
 				var y := r.end.y - p
 				mats.draw_polyline(PackedVector2Array([Vector2(cx - 9, y + 6), Vector2(cx, y - 2), Vector2(cx + 9, y + 6)]), Color(1, 1, 1, 0.85), 2.4)
 
+func lane_pos(off: float, lane: float) -> Vector2:
+	return _lane_pos(off, lane)
+
+func tangent_at(off: float) -> Vector2:
+	return _tangent(off)
+
+func normal_at(off: float) -> Vector2:
+	var tg := _tangent(off)
+	return Vector2(-tg.y, tg.x)
+
+func in_zone(p: Vector2) -> Dictionary:
+	return _in_zone(p)
+
+func shake_cam(v: float) -> void:
+	shake = minf(shake + v, 9.0)
+
+func add_nitro(v: float) -> void:
+	nitro = clampf(nitro + v, 0.0, 1.0)
+
 func _in_zone(p: Vector2) -> Dictionary:
 	for lot in lots:
 		if lot["zone"].has_point(p):
@@ -299,6 +337,8 @@ func _add_item(tname: String, base: Vector2, solid: Vector2) -> void:
 	n.add_child(s)
 	if solid.x > 0.0:
 		var sb := StaticBody2D.new()
+		sb.collision_layer = 2
+		sb.collision_mask = 0
 		var cs := CollisionShape2D.new()
 		var rs := RectangleShape2D.new()
 		rs.size = solid
@@ -397,7 +437,7 @@ func _make_player() -> void:
 	dust.emitting = false
 	world.add_child(dust)
 
-func _on_crash(speed: float, at: Vector2) -> void:
+func _on_crash(speed: float, at: Vector2, other: Node) -> void:
 	if Time.get_ticks_msec() - last_crash < 600:
 		return
 	last_crash = Time.get_ticks_msec()
@@ -432,8 +472,10 @@ func _on_crash(speed: float, at: Vector2) -> void:
 	add_child(p)
 	p.emitting = true
 	get_tree().create_timer(1.0).timeout.connect(p.queue_free)
-	if mode == Mode.DRIVE:
-		Run.hp = maxf(1.0, Run.hp - clampf(speed / 60.0, 0.5, 3.0) * Run.perks["armor"])
+	if mode == Mode.DRIVE and player.lift <= 2.0:
+		Run.hp -= clampf(speed / 60.0, 0.5, 3.0) * Run.perks["armor"]
+		if other is Vehicle and cars.has(other):
+			Run.insp = clampf(Run.insp + 2.0, 0.0, 100.0)
 
 # ---------- hud, screens, iris ----------
 func _make_ui() -> void:
@@ -461,7 +503,7 @@ func _make_ui() -> void:
 	hud_nodes["warn"] = UI.stars(layer, Vector2(124, 38), 0, 7, Color(1.0, 0.45, 0.4), 0.3)
 	hud_nodes["lv"] = UI.label(layer, Vector2(14, 52), "", 6, "#d8c8b0")
 	hud_label = Label.new()
-	hud_label.position = Vector2(170, 4)
+	hud_label.position = Vector2(172, 4)
 	hud_label.add_theme_font_size_override("font_size", 8)
 	hud_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	hud_label.add_theme_constant_override("outline_size", 3)
@@ -497,6 +539,10 @@ func _make_ui() -> void:
 	ui_layer = CanvasLayer.new()
 	ui_layer.layer = 10
 	add_child(ui_layer)
+	fs_layer = CanvasLayer.new()
+	fs_layer.layer = 20
+	add_child(fs_layer)
+	UI.button(fs_layer, Rect2(440, 4, 36, 18), "FULL", _toggle_fullscreen, false, 7)
 	shift = Shift.new()
 	shift.visible = false
 	shift.set_process(false)
@@ -508,6 +554,29 @@ func _make_ui() -> void:
 	screens.visible = false
 	screens.closed.connect(_on_screen_closed)
 	ui_layer.add_child(screens)
+
+func _toggle_fullscreen() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("(function(){var d=document;if(!d.fullscreenElement){var p=d.documentElement.requestFullscreen();if(p&&p.then){p.then(function(){try{screen.orientation.lock('landscape');}catch(e){}}).catch(function(){});}}else{d.exitFullscreen();}})()")
+	else:
+		var md := DisplayServer.window_get_mode()
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if md == DisplayServer.WINDOW_MODE_FULLSCREEN else DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+func _compute_map() -> void:
+	map_pts = curve.tessellate(5, 2.0)
+	var mn := Vector2(1e9, 1e9)
+	var mx := Vector2(-1e9, -1e9)
+	for p in map_pts:
+		mn = Vector2(minf(mn.x, p.x), minf(mn.y, p.y))
+		mx = Vector2(maxf(mx.x, p.x), maxf(mx.y, p.y))
+	var sz := mx - mn
+	map_scale = minf(136.0 / sz.x, 78.0 / sz.y)
+	map_origin = mn - Vector2(7.0 + (136.0 / map_scale - sz.x) / 2.0, 6.0 + (78.0 / map_scale - sz.y) / 2.0) / 1.0 * 0.0
+	map_origin = mn
+	map_pts = map_pts
+
+func _mp(p: Vector2) -> Vector2:
+	return Vector2(287.0, 15.0) + (p - map_origin) * map_scale
 
 func _bar(parent: Node, pos: Vector2, col: Color) -> ColorRect:
 	var r := ColorRect.new()
@@ -532,6 +601,39 @@ func _hud_draw() -> void:
 	var d := Rect2(Vector2(480 - 116, 270 - 58), Vector2(50, 50))
 	hud.draw_style_box(UI.box("panel", 12), d)
 	hud.draw_string(ThemeDB.fallback_font, d.position + Vector2(8, 30), "DRIFT", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#ffe9a8") if btn_drift else Color.WHITE)
+	# minimap: the ring, stops, rivals, cops and you
+	hud.draw_rect(Rect2(280, 8, 150, 90), Color(0.06, 0.04, 0.08, 0.88))
+	hud.draw_rect(Rect2(280, 8, 150, 90), Color("#ffb84a"), false, 1.5)
+	var mpts := PackedVector2Array()
+	for q in map_pts:
+		mpts.append(_mp(q))
+	hud.draw_polyline(mpts, Color("#6a776e"), 3.0)
+	var LET := {"shift": "$", "kitchen": "K", "mechanic": "M", "gas": "G", "cook": "*"}
+	for lot in lots:
+		var lp := _mp(lot["door"])
+		var used: bool = lot["used"] and lot["type"] != "gas"
+		var lc := Color("#666666") if used else Color(Data.STOPC[lot["type"]])
+		hud.draw_circle(lp, 6.0, Color("#161018"))
+		hud.draw_circle(lp, 5.0, lc)
+		hud.draw_string(ThemeDB.fallback_font, lp + Vector2(-3, 3), LET[lot["type"]], HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color("#161018"))
+	for c in combat.cops:
+		hud.draw_circle(_mp(c.position), 2.0, Color("#ff4a3a") if int(Time.get_ticks_msec() / 200) % 2 == 0 else Color("#4a6aff"))
+	for r in combat.rivals:
+		var rp := _mp(r.position)
+		hud.draw_circle(rp, 5.0, Color(r.info["def"]["col"]))
+		hud.draw_string(ThemeDB.fallback_font, rp + Vector2(-2.5, 3), "R", HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color("#161018"))
+	var pp := _mp(player.position)
+	hud.draw_arc(pp, 5.0 + 1.5 * sin(Time.get_ticks_msec() / 160.0), 0.0, TAU, 14, Color(1, 1, 1, 0.6), 1.2)
+	hud.draw_circle(pp, 3.0, Color.WHITE)
+	if combat.streak >= 2:
+		var mu := combat.mult()
+		hud.draw_string(ThemeDB.fallback_font, Vector2(172, 22), "TIP STREAK  x%.2f  (%d)" % [mu, combat.streak], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#ffd24a") if mu >= 2.0 else Color("#ffe9a8"))
+		hud.draw_rect(Rect2(172, 25, 96, 4), Color("#2a1a0a"))
+		hud.draw_rect(Rect2(172, 25, 96.0 * clampf(combat.streak_t / 4.5, 0.0, 1.0), 4), Color("#ffb84a"))
+	if combat.bust > 0.0:
+		hud.draw_rect(Rect2(200, 250, 80, 6), Color("#2a1010"))
+		hud.draw_rect(Rect2(200, 250, 80.0 * clampf(combat.bust / 3.2, 0.0, 1.0), 6), Color("#ff4a3a"))
+		hud.draw_string(ThemeDB.fallback_font, Vector2(200, 247), "BUSTED!", HORIZONTAL_ALIGNMENT_CENTER, 80, 8, Color("#ffb0a0"))
 	if park_t > 0.0:
 		hud.draw_rect(Rect2(210, 236, 60, 6), Color(0, 0, 0, 0.5))
 		hud.draw_rect(Rect2(210, 236, 60.0 * park_t / 0.7, 6), Color("#ffd24a"))
@@ -638,6 +740,14 @@ func _physics_process(dt: float) -> void:
 		return
 	if mode != Mode.DRIVE:
 		return
+	if Run.xp >= Run.need_xp():
+		Run.xp -= Run.need_xp()
+		Run.lv += 1
+		mode = Mode.SCREEN
+		world.process_mode = Node.PROCESS_MODE_DISABLED
+		on_closed = _resume_drive
+		screens.show_levelup()
+		return
 	var moved := player.position.distance_to(last_pos)
 	last_pos = player.position
 	Run.fuel = maxf(0.0, Run.fuel - moved * 0.0078 * Run.fuel_use)
@@ -718,7 +828,13 @@ func _begin_entry(lot: Dictionary) -> void:
 	btn_boost = false
 	btn_drift = false
 
+func _resume_drive() -> void:
+	world.process_mode = Node.PROCESS_MODE_INHERIT
+	mode = Mode.DRIVE
+	last_pos = player.position
+
 func _open_stop() -> void:
+	combat.clear_enemies()
 	print("ENTERED ", cur_lot["type"])
 	mode = Mode.SCREEN
 	var lot := cur_lot
@@ -764,10 +880,14 @@ func _on_shift_finished(kind: String) -> void:
 	if dbg_bot:
 		screens.hide_screen()
 
-func _game_over() -> void:
+func _game_over(why: String = "The hungry crowd stormed the truck.") -> void:
+	if mode == Mode.SCREEN and screens.visible:
+		return
+	mode = Mode.SCREEN
+	world.process_mode = Node.PROCESS_MODE_DISABLED
 	screens.reset("#2a0f12")
 	UI.label(screens, Vector2(0, 60), "SHUT DOWN", 26, "#ff6a5a", 1, 480)
-	UI.label(screens, Vector2(0, 100), "The hungry crowd stormed the truck.", 9, "#e8d8c0", 1, 480)
+	UI.label(screens, Vector2(0, 100), why, 9, "#e8d8c0", 1, 480)
 	UI.label(screens, Vector2(0, 120), "Customers fed %d     Shifts %d     Level %d" % [Run.fed, Run.shift_n, Run.lv], 9, "#ffffff", 1, 480)
 	UI.button(screens, Rect2(170, 170, 140, 32), "TRY AGAIN", func():
 		Run.new_run(0)
@@ -791,6 +911,7 @@ func _exit_stop() -> void:
 	last_pos = player.position
 	exit_t = 0.0
 	mode = Mode.EXIT
+	combat.resume()
 	show_msg("Back on the road", 1.4)
 
 # ---------- debugging hooks: ?stop=shift / gas / mechanic / kitchen / results / levelup (also --stop=...) ----------

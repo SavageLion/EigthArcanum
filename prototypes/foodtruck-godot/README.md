@@ -8,7 +8,18 @@ Stops are real buildings on the curvy road (8 per lap: 3 lunch rushes, kitchen, 
 - **Kitchen** (fuse / master class), **Mechanic** (6 upgrades, repair), **Gas** (buy petrol), **Results shop** (3 offers + staff, a dash trinket, repair, review) and the **Level-up** picker, all in `screens.gd`.
 - Shared run state and rules in `run.gd` (autoload `Run`), tables in `data.gd`, Pixel Lab UI skin + helpers in `ui.gd`.
 - Petrol drains as you drive and the cook-off unlocks after 3 lunch rushes.
-- Not yet ported: cops/warnings, rival trucks, the minion swarm, auto-fire, loot, drive-by customers, nitro/ramps/stalls, title/stage screens, saving, music.
+- Not yet ported: weapon pickups, potholes/oil/cones, traffic lights, pedestrians (only the drive-by customers), title/stage screens, saving, music, the other four stages.
+
+## Stage 2: the road fights back (`combat.gd`)
+- **Heat and the Food Police**: warnings rise while you drive and with crashes, shifts and smashed stalls; from 8% heat cops spawn on the road and chase (more per warning, up to 6). Several cops touching you fill the bust meter (BUSTED = run over). Lose them by getting 800 px away for 6 s; entering a stop clears them.
+- **Hangry swarm**: ordinary cars (sedan, hatchback, pickup, taxi, scooter, van, bus, charger, armoured truck) spawn on the road, chase and ram you in growing waves.
+- **Rival trucks**: six named rivals (own truck models) keep their distance, circle and shoot flavoured food (frozen/sour slow, spicy burns). Beat one for cash, loot and a stolen recipe.
+- **Auto-fire**: your dishes shoot the nearest enemies (flavours chill, stun, burn); nitro rams enemies for damage.
+- **Loot**: kills drop coins, XP gems, petrol, repair kits and nitro; coins are pulled in as you get close; a **tip streak** multiplies the cash (x1 to x3).
+- **Drive-by customers**: people on the pavement ask for a dish; roll past slowly (under about 200 px/s, so not on nitro) to sell. Their favourite dish pays 50% more.
+- **Road fun**: breakable crates and fruit/flower/taco stalls (hit stalls fast), ramps (airtime, landing shockwave, big tips) and boost pads.
+- **Minimap** (top right) with the ring, stops, rivals and cops, **level-ups while driving**, and a **FULL** button (top right, on every screen): fullscreen and a landscape lock where the browser allows it.
+- Extra debug parameters: `?heat=40` (starting warnings, no grace), `&log=1` (print combat stats in a desktop run), `&auto=1` laps the ring.
 
 Debug URL parameters (also `--name=value` on the command line): `?tp=gas|shift|kitchen|mechanic|cook` teleports to that stop (add `&view=1` to look without entering), `?stop=shift|gas|mechanic|kitchen|levelup|results` opens a screen directly, `&bot=1` plays the shift with a bot, `?auto=1` laps the ring, `&speed=10` speeds up time. Screenshot helper: `node tests/godot-shot.mjs <outdir> 9000 "tp=gas" "stop=results"`.
 
