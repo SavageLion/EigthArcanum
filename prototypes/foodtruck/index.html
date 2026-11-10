@@ -692,18 +692,17 @@ function levelScene(){
 function resultsScene(){
   c.fillStyle='#1a1020';c.fillRect(0,0,LW,LH);const g=c.createLinearGradient(0,0,0,LH);g.addColorStop(0,'#2a1830');g.addColorStop(1,'#120c14');c.fillStyle=g;c.fillRect(0,0,LW,LH);
   text(S.legDone?'COOK-OFF WON!':`SHIFT ${RUN.shift} COMPLETE`,16,24,'#ffd24a',14);text(`${S.fedThis} customers fed   +$${Math.floor(S.tipsThis)} in tips   Cash $${Math.floor(RUN.cash)}`,16,38,'#e8d8c0',7.5,'left',500);
-  text('SHOP',16,56,'#ffb84a',9);
-  S.shop.forEach((s,i)=>{const x=14+i*112,y=62,w=104,can=RUN.cash>=s.price&&!s.sold;HIT.push({x,y,w,h:112,fn:()=>{if(!can)return;RUN.cash-=s.price;s.sold=true;s.o.fn();beep(900,.1,'triangle',.05);}});panel(x,y,w,112,s.sold?'#443a4c':can?(s.o.col||'#ffb84a'):'#6a5a4a',.92);
-    drawCardIcon(s.o,x+w/2,y+18);text(s.o.t,x+w/2,y+40,s.sold?'#7a6a7a':'#fff',7.6,'center');wrap(s.o.d,20).slice(0,4).forEach((q,j)=>text(q,x+w/2,y+54+j*9,s.sold?'#6a5a6a':'#cfc0a8',6.4,'center',500));text(s.sold?'SOLD':'$'+s.price,x+w/2,y+104,s.sold?'#7a6a7a':can?'#ffe9a8':'#9a7a6a',9,'center');});
-  const rx=14,ry=182;btn(rx,ry,150,30,S.healed?'Repaired':`REPAIR TRUCK  +40   $${Math.round(10+3*RUN.shift)}`,()=>{const p=Math.round(10+3*RUN.shift);if(RUN.cash>=p&&!S.healed){RUN.cash-=p;S.healed=true;RUN.hp=Math.min(RUN.hpMax,RUN.hp+40);beep(700,.15,'triangle',.05);}},{dis:S.healed||RUN.cash<Math.round(10+3*RUN.shift),sz:7.5});
-  text(`Truck ${Math.ceil(RUN.hp)}/${RUN.hpMax}`,rx+75,ry+44,'#9fd8a0',7,'center');
-  // relic
-  text('DASH TRINKET: hang one up',352,56,'#e0b8ff',9,'center');
-  S.relicOffers.forEach((r,i)=>{const x=252,y=62+i*38,w=214,dis=S.relicTaken;HIT.push({x,y,w,h:34,fn:()=>{if(S.relicTaken)return;S.relicTaken=true;RUN.relics.push(r.id);r.fn(RUN);beep(1000,.15,'triangle',.05);}});panel(x,y,w,34,dis?'#443a4c':'#c07aff',.9);text(r.t,x+8,y+14,dis?'#7a6a7a':'#fff',8);text(r.d,x+8,y+26,dis?'#6a5a6a':'#d0c0e0',6.4,'left',500);});
-  btn(LW/2-80,226,160,32,S.legDone?'CHOOSE NEXT STAGE':'BACK ON THE ROAD',()=>{if(S.legDone){S.legDone=false;S.stageFrom='results';scene='stages';sceneT=0;}else resumeTrip();},{main:true,sz:9});
+  text('SHOP: buy as many as you can afford',16,56,'#ffb84a',9);
+  S.shop.forEach((s,i)=>{const w=110,x=8+i*116,y=60,h=96,can=RUN.cash>=s.price&&!s.sold;HIT.push({x,y,w,h,fn:()=>{if(!can)return;RUN.cash-=s.price;s.sold=true;s.o.fn();beep(900,.1,'triangle',.05);}});panel(x,y,w,h,s.sold?'#443a4c':can?(s.o.col||'#ffb84a'):'#6a5a4a',.92);
+    drawCardIcon(s.o,x+w/2,y+18);text(s.o.t,x+w/2,y+40,s.sold?'#7a6a7a':'#fff',7.2,'center');wrap(s.o.d,24).slice(0,3).forEach((q,j)=>text(q,x+w/2,y+52+j*8.5,s.sold?'#6a5a6a':'#cfc0a8',5.8,'center',500));text(s.sold?'SOLD':'$'+s.price,x+w/2,y+h-6,s.sold?'#7a6a7a':can?'#ffe9a8':'#9a7a6a',9,'center');});
+  text('DASH TRINKET: hang one up (free)',16,168,'#e0b8ff',8.5);
+  S.relicOffers.forEach((r,i)=>{const x=8+i*158,y=172,w=152,dis=S.relicTaken;HIT.push({x,y,w,h:36,fn:()=>{if(S.relicTaken)return;S.relicTaken=true;RUN.relics.push(r.id);r.fn(RUN);beep(1000,.15,'triangle',.05);}});panel(x,y,w,36,dis?'#443a4c':'#c07aff',.9);text(r.t,x+6,y+13,dis?'#7a6a7a':'#fff',7.4);wrap(r.d,36).slice(0,2).forEach((q,j)=>text(q,x+6,y+23+j*8,dis?'#6a5a6a':'#d0c0e0',5.6,'left',500));});
+  const rp=Math.round(10+3*RUN.shift);btn(8,216,126,24,S.healed?'Repaired':'REPAIR +40  $'+rp,()=>{if(RUN.cash>=rp&&!S.healed){RUN.cash-=rp;S.healed=true;RUN.hp=Math.min(RUN.hpMax,RUN.hp+40);beep(700,.15,'triangle',.05);}},{dis:S.healed||RUN.cash<rp,sz:7});
+  text('Truck '+Math.ceil(RUN.hp)+'/'+RUN.hpMax,71,252,'#9fd8a0',7,'center');
+  btn(LW-172,222,164,34,S.legDone?'CHOOSE NEXT STAGE':'BACK ON THE ROAD',()=>{if(S.legDone){S.legDone=false;S.stageFrom='results';scene='stages';sceneT=0;}else resumeTrip();},{main:true,sz:9});
+  if(RUN.review){const rv=RUN.review;text('★'.repeat(rv.stars)+'☆'.repeat(5-rv.stars)+'  '+rv.pct+'% fed',144,226,'#ffd24a',8);wrap(rv.q,30).slice(0,3).forEach((q,i)=>text(q,144,237+i*8.5,'#e8d8c0',5.8,'left',500));}
   if(S.legDone&&S.newStages&&S.newStages.length)text('NEW UNLOCKED: '+S.newStages.join(', '),16,48,'#ffd24a',7.5);
-  text(`${S.stage.n}${S.legDone?': cook-off won!':''}   Petrol ${Math.ceil(RUN.fuel)}   Heat ${Math.round(RUN.insp)}%`,LW-16,258,'#9a8a7a',7,'right',500);
-  if(RUN.review){const rv=RUN.review;text('★'.repeat(rv.stars)+'☆'.repeat(5-rv.stars)+'  '+rv.pct+'% fed',16,226,'#ffd24a',9);wrap(rv.q,52).slice(0,2).forEach((q,i)=>text(q,16,238+i*9,'#e8d8c0',6.6,'left',500));}
+  text(`${S.stage.n}${S.legDone?': cook-off won!':''}   Petrol ${Math.ceil(RUN.fuel)}   Heat ${Math.round(RUN.insp)}%`,LW-8,266,'#9a8a7a',6.4,'right',500);
 }
 function titleScene(){
   const g=c.createLinearGradient(0,0,0,LH);g.addColorStop(0,'#3a2050');g.addColorStop(.6,'#8a3a4a');g.addColorStop(1,'#e8a040');c.fillStyle=g;c.fillRect(0,0,LW,LH);
