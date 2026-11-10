@@ -22,7 +22,7 @@ try {
   const r = await page.evaluate(() => {
     const F = window.__ft, out = {}; F.newRun(0); F.startTrip(); const st = () => F.state(); const S = st().S, w = S.city, tr = S.truck, RUN = st().RUN;
     const step = n => { for (let i = 0; i < n; i++) F.step(1 / 30); };
-    w.grace = 99; RUN.insp = 0; w.mins = []; w.cops = []; w.rivals = [];
+    w.grace = 99; RUN.insp = 0; w.mins = []; w.cops = []; w.rivals = []; w.lots.forEach(l => { l.used = true; });
     out.counts = { pads: w.pads.length, ramps: w.pads.filter(p => p.k === 'ramp').length, boost: w.pads.filter(p => p.k === 'boost').length, stalls: w.stalls.length, crates: w.crates.length };
     // ramp
     const ramp = w.pads.find(p => p.k === 'ramp'); tr.x = ramp.x - (ramp.h2 ? 60 : 0); tr.y = ramp.y - (ramp.h2 ? 0 : 60); F.setKey(ramp.h2 ? 'r' : 'd', 1); let maxZ = 0; for (let i = 0; i < 60; i++) { F.step(1 / 30); maxZ = Math.max(maxZ, tr.z || 0); } F.setKey('r', 0); F.setKey('d', 0);
@@ -47,7 +47,7 @@ try {
   ok('loot collected', r.loot.cashGain > 0, JSON.stringify(r.loot)); ok('crate smashed', r.crate.dead); ok('drive-by sale paid', r.fan.sold && r.fan.gain > 0, JSON.stringify(r.fan));
   const n = await page.evaluate(() => {
     const F = window.__ft, S = F.state().S, w = S.city, tr = S.truck, RUN = F.state().RUN, out = {}; const step = k => { for (let i = 0; i < k; i++) F.step(1 / 30); };
-    w.grace = 0; RUN.insp = 0; RUN.hp = RUN.hpMax; S.nitro = 1; S.boost = false; w.bld = []; w.stalls = []; w.cars = []; w.pads = [];
+    w.lots.forEach(l => { l.used = true; }); w.grace = 0; RUN.insp = 0; RUN.hp = RUN.hpMax; S.nitro = 1; S.boost = false; w.bld = []; w.stalls = []; w.cars = []; w.pads = [];
     // nitro toggle through the keyboard path and speed check
     tr.x = 800; tr.y = 800; tr.vx = tr.vy = 0; F.setKey("r", 1); step(40); const s0 = Math.hypot(tr.vx, tr.vy); window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })); out.boostOn = S.boost; step(40); const s1 = Math.hypot(tr.vx, tr.vy); F.setKey('r', 0); out.speeds = [Math.round(s0), Math.round(s1)]; out.nitroLeft = +S.nitro.toFixed(2);
     // weapons
@@ -66,7 +66,7 @@ try {
   ok('flame trail drops fire', n.weaps.flame.fire > 0); ok('ice trail drops ice', n.weaps.ice.fire > 0);
   const cc = await page.evaluate(() => {
     const F = window.__ft, S = F.state().S, w = S.city, tr = S.truck, RUN = F.state().RUN, out = {}; const step = k => { for (let i = 0; i < k; i++) F.step(1 / 30); };
-    w.grace = 99; w.mins = []; w.cops = []; w.rivals = []; w.pads = []; w.stalls = []; w.bld = []; S.boost = false;
+    w.lots.forEach(l => { l.used = true; }); w.grace = 99; w.mins = []; w.cops = []; w.rivals = []; w.pads = []; w.stalls = []; w.bld = []; S.boost = false;
     const run = boost => { let cr = w.cars.find(c => c.h); if (!cr) { cr = { h: true, dir: 1, f: 1, x: 0, y: 0, spd: 0, hue: 0 }; w.cars.push(cr); } cr.x = 1200; cr.y = cr.ly = 1000; cr.dir = 1; cr.spd = 0; cr.stun = 0; cr.kx = cr.ky = 0; tr.x = 1100; tr.y = 1000; tr.vx = tr.vy = 0; tr.hit = 0; RUN.hp = RUN.hpMax; S.boost = boost; S.nitro = 1; F.setKey('r', 1); let minGap = 1e9, hp0 = RUN.hp; for (let i = 0; i < 45; i++) { F.step(1 / 30); minGap = Math.min(minGap, cr.x - tr.x); } F.setKey('r', 0); S.boost = false; return { passedThrough: tr.x > cr.x, gap: Math.round(minGap), hpLost: Math.round(hp0 - RUN.hp), carMoved: Math.round(cr.x - 1200) }; };
     out.normal = run(false); out.boost = run(true); return out;
   });

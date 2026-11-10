@@ -63,3 +63,8 @@ Test: `node tests/foodtruck-fun.mjs [--shots dir]` checks ramps, stalls, crates,
 
 ## Solid traffic
 Cars are solid: the truck can no longer drive through civilian cars, minions, cops or rivals. A crash shoves the car away (it stalls for a second and eases back to its lane), bounces the truck, costs HP and adds heat in proportion to the impact speed (gentle bumps are free). With nitro on you bowl cars aside for free (+streak, +heat) instead.
+
+## Stop buildings and a softer town (Sunny Town)
+- **Stops are real buildings** now (Pixel Lab, `assets/sl/bld_*.png`): the diner/food hall (lunch rush), bakery kitchen, garage, gas station with a canopy, and the cook-off theatre. Each stands on the street frontage of its block at 1.5x scale with a glowing doorway, ambient animation (chimney smoke, string lights, welding sparks, fireworks, door glow) and a name sign above the roof. The rest of the block is filled with shops around it.
+- **Entering**: pull up on the pavement in front of the door (a pulsing painted mat with chevrons marks the spot) and stop for 0.7 s. The camera zooms in, the truck drives into the doorway and disappears behind the facade, the iris closes with an ENTERING banner. The old giant tinted lot squares and separate parking pad are gone.
+- **Softer layout**: road junctions have rounded kerbs, park blocks have a winding path and (often) a round pond with lily pads, plaza blocks have a round fountain with spray. The road network underneath is still a grid.
