@@ -370,7 +370,7 @@ function update(dt){
  for(const p of G.parts){p.t-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;}G.parts=G.parts.filter(p=>p.t>0);
  for(const t of G.texts){t.t-=dt;t.y-=18*dt;}G.texts=G.texts.filter(t=>t.t>0);
  for(const r of G.rings){r.t-=dt;r.r+=(r.max-r.r)*Math.min(1,dt*9);}G.rings=G.rings.filter(r=>r.t>0);
- for(const w of G.warns)w.t-=dt;G.warns=G.warns.filter(w=>w.t>0);
+ for(const w of G.warns)w.t-=dt;windParts(dt);G.warns=G.warns.filter(w=>w.t>0);
  if(G.flare){G.flare.t-=dt;if(G.flare.t<=0)G.flare=null;}
  if(G.state!=='play')return;
  if(G.bot)(G.mode==='day'?botDay:botNight)(dt);
@@ -542,6 +542,16 @@ function drawBg(){
  const key=W+season().n+G.zid;if(key!==bgKey){bgKey=key;buildBg();}
  c.drawImage(bg,0,0);return true;
 }
+const WSTR={SPRING:1.5,SUMMER:.8,AUTUMN:1.25,WINTER:1};
+function wind(x,y){const t=G.t,g=Math.max(0,Math.sin(t*.38-x*.0045+y*.002)),gust=g*g*g;return(Math.sin(t*1.5-x*.012+y*.004)*.06+gust*.2+Math.sin(t*.7)*.015)*(WSTR[season().n]||1);}
+const WP=[];
+const WPC={SPRING:['#ffd7e6','#ffffff','#ffc0d4','#fff3b0'],SUMMER:['#fff2a0','#ffffff'],AUTUMN:['#d8782a','#c25a1e','#e8a040','#a8461a'],WINTER:['#ffffff','#e8f2fa']};
+function windParts(dt){
+ const sn=season().n;
+ if(WP.sn!==sn||!WP.length){WP.length=0;WP.sn=sn;const n=sn==='SPRING'?50:sn==='AUTUMN'?36:sn==='WINTER'?80:22,cs=WPC[sn];for(let i=0;i<n;i++)WP.push({x:rnd(0,W),y:rnd(44,H),ph:rnd(0,6.28),s:rnd(.7,1.3),c:cs[i%cs.length]});}
+ for(const p of WP){const w=wind(p.x,p.y);p.x+=(30+w*320)*p.s*dt*(sn==='WINTER'?.55:1);p.y+=(Math.sin(G.t*2.2+p.ph)*12+(sn==='AUTUMN'||sn==='WINTER'?16:3)*p.s)*dt;if(p.x>W+10){p.x=-10;p.y=rnd(44,H);}if(p.y>H+6)p.y=44;if(p.y<42)p.y=H;}
+}
+function drawWindParts(){c.globalAlpha=.9;for(const p of WP){c.fillStyle=p.c;const sn=WP.sn;if(sn==='SPRING'||sn==='AUTUMN'){c.fillRect(Math.round(p.x),Math.round(p.y),3,2);c.fillRect(Math.round(p.x)+1,Math.round(p.y)+(Math.sin(G.t*6+p.ph)>0?-1:2),2,1);}else c.fillRect(Math.round(p.x),Math.round(p.y),2,2);}c.globalAlpha=1;}
 function edgeTrees(){
  let s3=(G.zid||0)*131+7;const R=()=>(s3=(s3*16807)%2147483647)/2147483647,out=[],sc=.85,pn=G.pen;
  for(let x=-10;x<W-30;x+=105+R()*60)out.push({x,y:96+R()*12,v:R()<.5?'a':'b',sc:sc*(.9+R()*.25)});
@@ -549,8 +559,8 @@ function edgeTrees(){
  for(let y=190;y<H-110;y+=150+R()*40)out.push({x:-30+R()*14,y,v:R()<.5?'a':'b',sc:sc*(.9+R()*.2)});
  return out.filter(e=>!(pn&&e.x>pn.x-70&&e.y>pn.y-40&&e.y<pn.y+pn.h+60));
 }
-function drawEdgeTree(e){const im=spr('tree_big_'+e.v);if(!im)return;const w=im.width*e.sc,h=im.height*e.sc;c.imageSmoothingEnabled=false;const sw=Math.sin(G.t*.8+e.ph)*.02+Math.sin(G.t*.35+e.ph*.3)*.012;c.save();c.translate(e.x,e.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-w/2,-h+8,w,h);c.restore();}
-function drawShrub(b){const im=spr('shrub_big');if(!im)return;c.imageSmoothingEnabled=false;const w=70,h=w*im.height/im.width,sw=Math.sin(G.t*1.2+b.x)*.02;c.save();c.translate(b.x,b.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-w/2,-h+8,w,h);c.restore();}
+function drawEdgeTree(e){const im=spr('tree_big_'+e.v);if(!im)return;const w=im.width*e.sc,h=im.height*e.sc;c.imageSmoothingEnabled=false;const sw=wind(e.x,e.y)*.16+Math.sin(G.t*.7+e.ph)*.008;c.save();c.translate(e.x,e.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-w/2,-h+8,w,h);c.restore();}
+function drawShrub(b){const im=spr('shrub_big');if(!im)return;c.imageSmoothingEnabled=false;const w=70,h=w*im.height/im.width,sw=wind(b.x,b.y)*.14;c.save();c.translate(b.x,b.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-w/2,-h+8,w,h);c.restore();}
 function drawDeco(){
  if(!G.deco||!okImg(IM.tuft))return;
  const movers=[];if(G.dog&&G.state==='play'||G.state==='dusk'){if(G.dog)movers.push(G.dog);if(G.helper)movers.push(G.helper);}for(const s of G.sheep)if(!s.carried)movers.push(s);
@@ -558,17 +568,17 @@ function drawDeco(){
  for(const dd of G.deco){
   if(dd.k==='bush'||dd.k==='shrub'||dd.k==='etree')continue;
   const im=spr(dd.k);if(!im)continue;
-  let sw=Math.sin(G.t*1.7+dd.ph+dd.x*.012)*.10+Math.sin(G.t*.6+dd.x*.008)*.08*(.5+gust);
+  let sw=wind(dd.x,dd.y)*(dd.k==='tuft'?1.6:1.2)+Math.sin(G.t*2.1+dd.ph)*.03;
   for(const m of movers){const dx=dd.x-m.x,dy=dd.y-(m.y+4);if(Math.abs(dx)<24&&Math.abs(dy)<12){const k=1-Math.hypot(dx,dy*2)/24;if(k>0)sw+=(dx>0?1:-1)*.55*k;}}
   const w=Math.round((dd.k==='tuft'?20:28)*(dd.sc||1)),h=w*im.height/im.width;
   c.save();c.translate(dd.x,dd.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-w/2,-h+2,w,h);c.restore();
  }
 }
-function drawBush(b){const im=spr('bush');if(!im)return;c.imageSmoothingEnabled=false;const sw=Math.sin(G.t*1.1+b.x)*.015;c.save();c.translate(b.x,b.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-24,-34,48,40);c.restore();}
+function drawBush(b){const im=spr('bush');if(!im)return;c.imageSmoothingEnabled=false;const sw=wind(b.x,b.y)*.14;c.save();c.translate(b.x,b.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-24,-34,48,40);c.restore();}
 function drawTree(k){
  const im=spr('tree_big_b');if(!im)return;
  c.fillStyle='rgba(0,0,0,.2)';c.beginPath();c.ellipse(k.x+4,k.y+10,24,8,0,0,TAU);c.fill();
- c.imageSmoothingEnabled=false;const sw=Math.sin(G.t*.9+k.x*.05)*.022+Math.sin(G.t*.4+k.y)*.012;
+ c.imageSmoothingEnabled=false;const sw=wind(k.x,k.y)*.17+Math.sin(G.t*.8+k.x)*.008;
  c.save();c.translate(k.x,k.y+14);c.transform(1,0,sw,1,0,0);c.drawImage(im,-45,-100,90,101);c.restore();
 }
 function drawRock(k){const im=IM.rock2;if(!okImg(im))return;const w=Math.round(clamp(k.r*1.7,30,52)),h=Math.round(w*im.height/im.width);c.imageSmoothingEnabled=false;c.drawImage(im,Math.round(k.x-w/2),Math.round(k.y-h*.62),w,h);}
@@ -698,9 +708,10 @@ function drawNight(){
 function render(){
  drawGrass();drawZones();drawDeco();for(const d of G.deco||[])if(d.k==='etree')drawEdgeTree(d);drawPen();drawRocks();
  for(const r of G.rings){c.strokeStyle=`rgba(255,255,255,${clamp(r.t*2.2,0,.7)})`;c.lineWidth=3;c.beginPath();c.arc(r.x,r.y,r.r,0,TAU);c.stroke();}
- if(G.dog&&(G.state==='play')&&G.mode==='day'){const d=G.dog,Z=120*zoneMult();c.strokeStyle=d.crouch?'rgba(160,220,255,.45)':'rgba(255,255,255,.14)';c.lineWidth=1.5;c.setLineDash([5,6]);c.beginPath();c.arc(d.x,d.y,Z,0,TAU);c.stroke();c.setLineDash([]);}
+ if(G.dog&&(G.state==='play')){const d=G.dog,Z=120*zoneMult();const gr=c.createRadialGradient(d.x,d.y,Z*.55,d.x,d.y,Z);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(1,d.crouch?'rgba(150,210,255,.20)':'rgba(255,255,255,.13)');c.fillStyle=gr;c.beginPath();c.arc(d.x,d.y,Z,0,TAU);c.fill();c.setLineDash([9,7]);c.lineDashOffset=-G.t*14;c.lineWidth=4.5;c.strokeStyle='rgba(20,40,20,.35)';c.beginPath();c.arc(d.x,d.y,Z,0,TAU);c.stroke();c.lineWidth=2.5;c.strokeStyle=d.crouch?'rgba(170,225,255,.95)':'rgba(255,255,255,.8)';c.beginPath();c.arc(d.x,d.y,Z,0,TAU);c.stroke();c.setLineDash([]);c.lineDashOffset=0;}
  const list=G.sheep.map(s=>({y:s.y,s})).concat(G.preds.map(p=>({y:p.y,p}))).concat(G.dog&&G.state!=='ready'?[{y:G.dog.y,dog:1}]:[]).concat(G.helper?[{y:G.helper.y,helper:1}]:[]).concat(G.rocks.filter(k=>k.tree).map(k=>({y:k.y+10,tree:k}))).concat((G.deco||[]).filter(d=>d.k==='bush'||d.k==='shrub').map(d=>({y:d.y,bush:d}))).sort((a,b)=>a.y-b.y);
  for(const o of list){if(o.s)drawSheep(o.s);else if(o.p){if(o.p.k==='fox')drawFox(o.p);else if(o.p.k==='eagle')drawEagle(o.p);else if(o.p.k==='bear')drawBear(o.p);else drawWolf(o.p);}else if(o.tree)drawTree(o.tree);else if(o.bush){const d=o.bush;if(d.k==='etree')drawEdgeTree(d);else if(d.k==='shrub')drawShrub(d);else drawBush(d);}else if(o.dog)drawDog(G.dog,'#2a2220',G.dog.crouch);else drawDog(G.helper,'#6a4a2a',false);}
+ drawWindParts();
  for(const p of G.parts){c.globalAlpha=clamp(p.t/p.max*1.5,0,1);c.fillStyle=p.col;c.fillRect(p.x-p.r/2,p.y-p.r/2,p.r,p.r);}c.globalAlpha=1;
  if(G.mode==='night'&&G.state!=='ready'&&G.dog){
   drawNight();
