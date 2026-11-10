@@ -8,6 +8,10 @@ run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 run/max_fps=60
 
+[autoload]
+
+Run="*res://run.gd"
+
 [display]
 
 window/size/viewport_width=480
