@@ -47,3 +47,16 @@ Sunny Town now uses the new detailed painterly style (style-anchored Pixel Lab s
 - **Warnings**: cops now arrive almost straight away (heat 8+) and each warning adds more cops. Crashes, cones and traffic raise warnings, keeping to a stop lowers them. The HUD shows WARNINGS stars (max 5).
 - **Stops** have painted bays, fluttering bunting, a pulsing border and an animated landmark. Parking triggers an entry animation: the truck pulls in, the camera zooms, an iris closes with an ENTERING banner, and the iris opens again when you leave.
 - **Music**: the Eighth Arcanum procedural score engine (`score.js`, copied from Ridgeline) now plays per scene (title/stages, driving battle themes whose energy follows your warnings, shift theme, hub for kitchen/mechanic/gas, shop for results, victory/defeat). Mute with the title-screen button.
+
+## Street fun layer (Sunny Town)
+Things that give you something to chase, risk or cause every few seconds while driving:
+- **Loot**: everything you kill drops coins and an XP gem instead of paying out directly, plus a small chance of a petrol can, a repair kit, a nitro bottle or a weapon crate. Loot pops out, bounces and is pulled to you when you are close. Smashing crates and stalls drops it too.
+- **Coin trails**: every ~14 s a line of coins appears along a nearby road. Mystery weapon crates (with a light beam) appear on the road every ~35 s.
+- **Drive-by customers**: people on the pavement wave you down with a dish bubble and a countdown ring. Roll slowly past (under ~125 px/s, so no nitro) for half a second to sell them a dish. Their favourite dish (one you carry) pays 50% more.
+- **Tip streak**: sales, coins, near misses with traffic, smashes, crates and air time build a streak that multiplies coin and sale cash (up to x3). It drops after 4.5 s of nothing.
+- **Nitro**: refills as you drive well (and from near misses, sales, ramp landings, pickups). Tap the NITRO button (or Space/Shift) to burn it: 1.7x speed, flames, and you ram minions, cops and rivals for damage. Too fast to sell to customers.
+- **Ramps and boost pads**: wooden ramps launch the truck into the air (no collisions with traffic/obstacles; landing shockwave hurts nearby enemies and pays coins). Blue chevron pads give a speed burst.
+- **Smashables**: market stalls (fruit, flowers, tacos) are solid unless you hit them at speed (or nitro): they explode into produce and coins (+2 heat). Crates break on touch. Stalls block cops and minions too.
+- **Weapon pickups** (16 s): Ketchup Cannon (5-shot piercing fan), Flame Trail (burning fire behind you), Ice Slick (slows chasers), Pie Turret (homing pies). Shown in the HUD with a timer.
+
+Test: `node tests/foodtruck-fun.mjs [--shots dir]` checks ramps, stalls, crates, loot, customers, nitro and all four weapons.
