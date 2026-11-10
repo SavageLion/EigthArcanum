@@ -463,7 +463,7 @@ addEventListener('contextmenu',e=>e.preventDefault());
 
 /* ---------------- drawing (placeholder vector art; Pixel Lab sprites come next) ---------------- */
 /* ---- natural scenery: noise-painted ground, swaying Pixel Lab grass / flowers / trees ---- */
-const IM={};for(const n of['tree','fence','gate','tuft','flowers_a','flowers_b','bush','rock2']){const i=new Image();i.src='assets/'+n+'.png';IM[n]=i;}
+const IM={};for(const n of['tree','fence','gate','tuft','flowers_a','flowers_b','bush','rock2','tree_big_a','tree_big_b','shrub_big']){const i=new Image();i.src='assets/'+n+'.png';IM[n]=i;}
 const okImg=i=>i&&i.complete&&i.naturalWidth>0;
 const PAL={SPRING:['#4f8f3c','#5fa048','#74b457','#3f7a34'],SUMMER:['#6a9a3a','#7cac46','#94bf54','#58832f'],AUTUMN:['#7a7a38','#8c8640','#a39648','#66602e'],WINTER:['#cfdce6','#e1ebf2','#f3f8fb','#b3c6d6']};
 const TINT={AUTUMN:'sepia(.8) saturate(2.4) hue-rotate(-16deg) brightness(.95)',WINTER:'saturate(.2) brightness(1.7)'};
@@ -479,16 +479,22 @@ function buildBg(){
  const sn=season().n,P=PAL[sn].map(hx),lw=Math.ceil(W/2),lh=Math.ceil(H/2);
  const lo=document.createElement('canvas');lo.width=lw;lo.height=lh;const lc=lo.getContext('2d'),im=lc.createImageData(lw,lh),d=im.data;
  const MUD=['#5e4128','#6f4d30','#4a3220'].map(hx),SNOW=['#f6fbff','#e4eef6','#cfdde9'].map(hx),WAT=['#3a78b8','#4f92cf','#8cc4ee'].map(hx);
+ const Pn=G.pen,PATH=[];
+ if(Pn){const x0=-10,y0=H*.5,x2=Pn.x-50,y2=Pn.gy,cx=(x0+x2)/2,cy=(y0+y2)/2+Math.sin((G.zid||0)*1.7)*110;for(let i=0;i<=60;i++){const t=i/60;PATH.push([(1-t)*(1-t)*x0+2*(1-t)*t*cx+t*t*x2,(1-t)*(1-t)*y0+2*(1-t)*t*cy+t*t*y2]);}}
+ const DIRT=['#b08a5a','#c49c6a','#9a7448'].map(hx),DIRTW=['#d8dde0','#c6ccd2'].map(hx);
+ const ET=edgeTrees(),SH=[];for(const k of G.rocks||[])if(k.tree)SH.push({x:k.x+16,y:k.y+8,rx:36,ry:15});for(const e of ET)SH.push({x:e.x+22,y:e.y+6,rx:56*e.sc*1.5,ry:20*e.sc*1.5});
  for(let y=0;y<lh;y++)for(let x=0;x<lw;x++){
   const n=vn(x/16,y/16,1)*.55+vn(x/6,y/6,2)*.3+vn(x/2.4,y/2.4,3)*.15+(BAY[y&3][x&3]/16-.5)*.07;
   let c0=n<.36?P[3]:n<.58?P[0]:n<.76?P[1]:P[2];
   const X=x*2,Y=y*2;
+  if(PATH.length){let md=1e9;for(let i=0;i<PATH.length;i++){const q=PATH[i],ex=x*2-q[0],ey=y*2-q[1],dd2=ex*ex+ey*ey;if(dd2<md)md=dd2;}if(Math.sqrt(md)+(vn(x/4,y/4,11)-.5)*10<15){const t=vn(x/3,y/3,12);c0=sn==='WINTER'?(t<.5?DIRTW[0]:DIRTW[1]):(t<.3?DIRT[2]:t<.8?DIRT[0]:DIRT[1]);}}
   for(const z of G.zones||[]){
    const wob=(vn(x/5,y/5,7)-.5)*14;
    if(!inZone(z,X,Y,wob))continue;
    const t=vn(x/4,y/4,9);
    c0=z.k==='water'?(t<.4?WAT[0]:t<.8?WAT[1]:WAT[2]):z.k==='snow'?(t<.4?SNOW[1]:t<.8?SNOW[0]:SNOW[2]):(t<.35?MUD[2]:t<.8?MUD[0]:MUD[1]);
   }
+  for(const e of SH){const dx=(X-e.x)/e.rx,dy=(Y-e.y)/e.ry;if(dx*dx+dy*dy<1+(vn(x/5,y/5,13)-.5)*.5){c0=[c0[0]*.72,c0[1]*.75,c0[2]*.82];break;}}
   const o=(y*lw+x)*4;d[o]=c0[0];d[o+1]=c0[1];d[o+2]=c0[2];d[o+3]=255;
  }
  lc.putImageData(im,0,0);
@@ -496,10 +502,13 @@ function buildBg(){
  // scatter: grass tufts, flower patches, bushes (seeded so a day looks the same every frame)
  let s2=(G.zid||0)*977+13;const R=()=>(s2=(s2*16807)%2147483647)/2147483647;
  const deco=[],P_=G.pen,free=(x,y)=>!(G.zones||[]).some(z=>inZone(z,x,y,10))&&!(P_&&x>P_.x-90&&x<P_.x+P_.w+10&&y>P_.y-10&&y<P_.y+P_.h+10);
- const nT=Math.round(W*H/2100),nF=sn==='WINTER'?0:sn==='AUTUMN'?12:sn==='SUMMER'?34:60;
- for(let i=0;i<nT;i++){const x=R()*W,y=40+R()*(H-40);if(free(x,y))deco.push({k:'tuft',x,y,ph:R()*6.28,sc:.65+R()*.4});}
- for(let i=0;i<nF;i++){const x=R()*W,y=50+R()*(H-60);if(free(x,y))deco.push({k:R()<.5?'flowers_a':'flowers_b',x,y,ph:R()*6.28,sc:.7});}
- for(let i=0;i<7;i++){const x=40+R()*(W-80),y=70+R()*(H-110);if(free(x,y)&&!(G.rocks||[]).some(r=>hyp(r.x-x,r.y-y)<r.r+40))deco.push({k:'bush',x,y});}
+ const nC=Math.round(W*H/16000),nF=sn==='WINTER'?0:sn==='AUTUMN'?5:sn==='SUMMER'?12:20;
+ for(let q=0;q<nC;q++){const cx=R()*W,cy=45+R()*(H-55),n=3+Math.floor(R()*4);for(let i=0;i<n;i++){const x=cx+(R()-.5)*60,y=cy+(R()-.5)*30;if(x>0&&x<W&&y>44&&y<H&&free(x,y))deco.push({k:'tuft',x,y,ph:R()*6.28,sc:.65+R()*.4});}}
+ for(let q=0;q<40;q++){const x=R()*W,y=48+R()*(H-58);if(free(x,y))deco.push({k:'tuft',x,y,ph:R()*6.28,sc:.6+R()*.3});}
+ for(let q=0;q<nF;q++){const cx=R()*W,cy=60+R()*(H-80),v=R()<.5?'flowers_a':'flowers_b';for(let i=0;i<3;i++){const x=cx+(R()-.5)*50,y=cy+(R()-.5)*26;if(free(x,y))deco.push({k:v,x,y,ph:R()*6.28,sc:.7});}}
+ for(let i=0;i<4;i++){const x=40+R()*(W-80),y=70+R()*(H-110);if(free(x,y)&&!(G.rocks||[]).some(r=>hyp(r.x-x,r.y-y)<r.r+40))deco.push({k:'bush',x,y});}
+ if(sn!=='WINTER')for(let i=0;i<5;i++){const x=40+R()*(W-80),y=80+R()*(H-120);if(free(x,y)&&!(G.rocks||[]).some(r=>hyp(r.x-x,r.y-y)<r.r+50))deco.push({k:'shrub',x,y});}
+ for(const e of ET)deco.push({k:'etree',x:e.x,y:e.y,v:e.v,sc:e.sc,ph:e.x});
  deco.sort((a,b)=>a.y-b.y);G.deco=deco;
 }
 function drawBg(){
@@ -507,12 +516,21 @@ function drawBg(){
  const key=W+season().n+G.zid;if(key!==bgKey){bgKey=key;buildBg();}
  c.drawImage(bg,0,0);return true;
 }
+function edgeTrees(){
+ let s3=(G.zid||0)*131+7;const R=()=>(s3=(s3*16807)%2147483647)/2147483647,out=[],sc=.62,pn=G.pen;
+ for(let x=-10;x<W-30;x+=105+R()*60)out.push({x,y:96+R()*12,v:R()<.5?'a':'b',sc:sc*(.9+R()*.25)});
+ for(let x=10;x<W-40;x+=115+R()*60)out.push({x,y:H+80+R()*14,v:R()<.5?'a':'b',sc:sc*(.9+R()*.25)});
+ for(let y=190;y<H-110;y+=150+R()*40)out.push({x:-30+R()*14,y,v:R()<.5?'a':'b',sc:sc*(.9+R()*.2)});
+ return out.filter(e=>!(pn&&e.x>pn.x-70&&e.y>pn.y-40&&e.y<pn.y+pn.h+60));
+}
+function drawEdgeTree(e){const im=spr('tree_big_'+e.v);if(!im)return;const w=im.width*e.sc,h=im.height*e.sc;c.imageSmoothingEnabled=false;const sw=Math.sin(G.t*.8+e.ph)*.02+Math.sin(G.t*.35+e.ph*.3)*.012;c.save();c.translate(e.x,e.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-w/2,-h+8,w,h);c.restore();}
+function drawShrub(b){const im=spr('shrub_big');if(!im)return;c.imageSmoothingEnabled=false;const w=70,h=w*im.height/im.width,sw=Math.sin(G.t*1.2+b.x)*.02;c.save();c.translate(b.x,b.y);c.transform(1,0,sw,1,0,0);c.drawImage(im,-w/2,-h+8,w,h);c.restore();}
 function drawDeco(){
  if(!G.deco||!okImg(IM.tuft))return;
  const movers=[];if(G.dog&&G.state==='play'||G.state==='dusk'){if(G.dog)movers.push(G.dog);if(G.helper)movers.push(G.helper);}for(const s of G.sheep)if(!s.carried)movers.push(s);
  const gust=Math.sin(G.t*.6)*.5+.5;c.imageSmoothingEnabled=false;
  for(const dd of G.deco){
-  if(dd.k==='bush')continue;
+  if(dd.k==='bush'||dd.k==='shrub'||dd.k==='etree')continue;
   const im=spr(dd.k);if(!im)continue;
   let sw=Math.sin(G.t*1.7+dd.ph+dd.x*.012)*.10+Math.sin(G.t*.6+dd.x*.008)*.08*(.5+gust);
   for(const m of movers){const dx=dd.x-m.x,dy=dd.y-(m.y+4);if(Math.abs(dx)<24&&Math.abs(dy)<12){const k=1-Math.hypot(dx,dy*2)/24;if(k>0)sw+=(dx>0?1:-1)*.55*k;}}
@@ -650,11 +668,11 @@ function drawNight(){
  c.drawImage(dk,0,0);
 }
 function render(){
- drawGrass();drawZones();drawDeco();drawPen();drawRocks();
+ drawGrass();drawZones();drawDeco();for(const d of G.deco||[])if(d.k==='etree')drawEdgeTree(d);drawPen();drawRocks();
  for(const r of G.rings){c.strokeStyle=`rgba(255,255,255,${clamp(r.t*2.2,0,.7)})`;c.lineWidth=3;c.beginPath();c.arc(r.x,r.y,r.r,0,TAU);c.stroke();}
  if(G.dog&&(G.state==='play')&&G.mode==='day'){const d=G.dog,Z=120*zoneMult();c.strokeStyle=d.crouch?'rgba(160,220,255,.45)':'rgba(255,255,255,.14)';c.lineWidth=1.5;c.setLineDash([5,6]);c.beginPath();c.arc(d.x,d.y,Z,0,TAU);c.stroke();c.setLineDash([]);}
- const list=G.sheep.map(s=>({y:s.y,s})).concat(G.preds.map(p=>({y:p.y,p}))).concat(G.dog&&G.state!=='ready'?[{y:G.dog.y,dog:1}]:[]).concat(G.helper?[{y:G.helper.y,helper:1}]:[]).concat(G.rocks.filter(k=>k.tree).map(k=>({y:k.y+10,tree:k}))).concat((G.deco||[]).filter(d=>d.k==='bush').map(d=>({y:d.y,bush:d}))).sort((a,b)=>a.y-b.y);
- for(const o of list){if(o.s)drawSheep(o.s);else if(o.p){if(o.p.k==='fox')drawFox(o.p);else if(o.p.k==='eagle')drawEagle(o.p);else if(o.p.k==='bear')drawBear(o.p);else drawWolf(o.p);}else if(o.tree)drawTree(o.tree);else if(o.bush)drawBush(o.bush);else if(o.dog)drawDog(G.dog,'#2a2220',G.dog.crouch);else drawDog(G.helper,'#6a4a2a',false);}
+ const list=G.sheep.map(s=>({y:s.y,s})).concat(G.preds.map(p=>({y:p.y,p}))).concat(G.dog&&G.state!=='ready'?[{y:G.dog.y,dog:1}]:[]).concat(G.helper?[{y:G.helper.y,helper:1}]:[]).concat(G.rocks.filter(k=>k.tree).map(k=>({y:k.y+10,tree:k}))).concat((G.deco||[]).filter(d=>d.k==='bush'||d.k==='shrub').map(d=>({y:d.y,bush:d}))).sort((a,b)=>a.y-b.y);
+ for(const o of list){if(o.s)drawSheep(o.s);else if(o.p){if(o.p.k==='fox')drawFox(o.p);else if(o.p.k==='eagle')drawEagle(o.p);else if(o.p.k==='bear')drawBear(o.p);else drawWolf(o.p);}else if(o.tree)drawTree(o.tree);else if(o.bush){const d=o.bush;if(d.k==='etree')drawEdgeTree(d);else if(d.k==='shrub')drawShrub(d);else drawBush(d);}else if(o.dog)drawDog(G.dog,'#2a2220',G.dog.crouch);else drawDog(G.helper,'#6a4a2a',false);}
  for(const p of G.parts){c.globalAlpha=clamp(p.t/p.max*1.5,0,1);c.fillStyle=p.col;c.fillRect(p.x-p.r/2,p.y-p.r/2,p.r,p.r);}c.globalAlpha=1;
  if(G.mode==='night'&&G.state!=='ready'&&G.dog){
   drawNight();
@@ -665,7 +683,7 @@ function render(){
  }
  for(const t of G.texts){c.globalAlpha=clamp(t.t*2,0,1);txt(t.s,t.x,t.y,t.col,13,'center');}c.globalAlpha=1;
  if(G.state==='play'||G.state==='dusk'||G.state==='dawn'||G.state==='lost'){
-  c.fillStyle='rgba(20,12,26,.78)';c.fillRect(0,0,W,40);
+  c.fillStyle='rgba(20,12,26,.62)';c.fillRect(0,0,W,40);
   if(G.mode==='day'){
    txt('DAY '+G.day+' '+season().n.slice(0,3),14,26,'#ffd24a',16);txt('TIME '+Math.ceil(G.time),130,26,G.time<15?'#ff8a6a':'#fff',17);
    txt(`PEN ${G.penned}/${G.sheep.length}`,260,26,'#9aff9a',17);txt('SCORE '+G.score,W-330,26,'#ffe9a8',15);
