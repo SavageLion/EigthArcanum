@@ -97,12 +97,10 @@ func resume() -> void:
 func road_spot(dmin: float, dmax: float) -> Variant:
 	var p: Vector2 = m.player.position
 	for i in 40:
-		var off: float = rng.randf() * m.length
-		var lane: float = 1.0 if rng.randf() < 0.5 else -1.0
-		var pos: Vector2 = m.lane_pos(off, lane)
-		var d := pos.distance_to(p)
+		var s: Dictionary = m.city.random_lane_spot(rng)
+		var d: float = s["pos"].distance_to(p)
 		if d > dmin and d < dmax:
-			return {"pos": pos, "off": off}
+			return s
 	return null
 
 func ftext(pos: Vector2, s: String, col: Color) -> void:
@@ -543,9 +541,8 @@ func _update_fans(dt: float) -> void:
 	if fan_t <= 0.0 and fans.filter(func(f): return not f["sold"]).size() < 4:
 		fan_t = rnd(3.5, 6.0)
 		for i in 30:
-			var off: float = rng.randf() * m.length
-			var side := 1.0 if rng.randf() < 0.5 else -1.0
-			var pos: Vector2 = m.curve.sample_baked(off) + m.normal_at(off) * side * (m.ROAD_W / 2.0 + 24.0)
+			var ws: Dictionary = m.city.random_walk_spot(rng)
+			var pos: Vector2 = ws["pos"]
 			var d := pos.distance_to(p.position)
 			if d > 160.0 and d < 600.0 and m.in_zone(pos).is_empty():
 				var dk: String = pick(Run.dishes)["k"] if not Run.dishes.is_empty() and rng.randf() < 0.75 else pick(Data.DISH.keys())
@@ -578,71 +575,75 @@ func _update_fans(dt: float) -> void:
 
 # ---------- crates, stalls, ramps, boost pads ----------
 func _make_fun() -> void:
-	var off := 150.0
-	while off < m.length:
-		off += rnd(110.0, 240.0)
-		var o := fposmod(off, m.length)
-		var pt: Vector2 = m.curve.sample_baked(o)
-		var tg: Vector2 = m.tangent_at(o)
-		var nm: Vector2 = m.normal_at(o)
-		var r := rng.randf()
-		if r < 0.07:
-			var pos: Vector2 = pt + nm * rnd(-14.0, 14.0)
-			if not m.in_zone(pos).is_empty(): continue
-			var s := Sprite2D.new()
-			s.texture = m.tex("pad_ramp")
-			s.position = pos
-			s.rotation = tg.angle() + PI / 2.0
-			m.ground_fx.add_child(s)
-			pads.append({"k": "ramp", "pos": pos, "cool": 0.0})
-		elif r < 0.19:
-			var pos: Vector2 = pt + nm * rnd(-14.0, 14.0)
-			if not m.in_zone(pos).is_empty(): continue
-			var s := Sprite2D.new()
-			s.texture = m.tex("pad_boost")
-			s.position = pos
-			s.rotation = tg.angle()
-			m.ground_fx.add_child(s)
-			pads.append({"k": "boost", "pos": pos, "cool": 0.0})
-		elif r < 0.35:
-			var side := 1.0 if rng.randf() < 0.5 else -1.0
-			var pos: Vector2 = pt + nm * side * (m.ROAD_W / 2.0 + 10.0)
-			if not m.in_zone(pos).is_empty(): continue
-			var kind: String = pick(["fruit", "flowers", "tacos"])
-			var n := Node2D.new()
-			n.position = pos + Vector2(0, 13)
-			var t: Texture2D = m.tex("stall_" + kind)
-			var s := Sprite2D.new()
-			s.texture = t
-			s.centered = false
-			s.offset = Vector2(-t.get_width() / 2.0, -t.get_height())
-			n.add_child(s)
-			var sb := StaticBody2D.new()
-			sb.collision_layer = 2
-			sb.collision_mask = 0
-			var cs := CollisionShape2D.new()
-			var rs := RectangleShape2D.new()
-			rs.size = Vector2(34, 26)
-			cs.shape = rs
-			cs.position = Vector2(0, -13)
-			sb.add_child(cs)
-			n.add_child(sb)
-			m.world.add_child(n)
-			stalls.append({"pos": pos, "node": n, "kind": kind})
-		elif r < 0.62:
-			for i in int(rnd(1.0, 3.99)):
-				var pos: Vector2 = pt + nm * rnd(-70.0, 70.0)
+	for ei in m.city.edges.size():
+		var e: Dictionary = m.city.edges[ei]
+		var off := 100.0
+		while off < e["len"] - 100.0:
+			off += rnd(110.0, 240.0)
+			if off > e["len"] - 100.0:
+				break
+			var pt: Vector2 = m.city.point(ei, off)
+			var tg: Vector2 = m.city.tangent(ei, off)
+			var nm: Vector2 = m.city.normal(ei, off)
+			var half: float = e["w"] / 2.0
+			var r := rng.randf()
+			if r < 0.07:
+				var pos: Vector2 = pt + nm * rnd(-14.0, 14.0)
 				if not m.in_zone(pos).is_empty(): continue
-				var n := Node2D.new()
-				n.position = pos + Vector2(0, 8)
 				var s := Sprite2D.new()
-				s.texture = m.tex("prop_crate")
-				s.scale = Vector2(0.6, 0.6)
+				s.texture = m.tex("pad_ramp")
+				s.position = pos
+				s.rotation = tg.angle() + PI / 2.0
+				m.ground_fx.add_child(s)
+				pads.append({"k": "ramp", "pos": pos, "cool": 0.0})
+			elif r < 0.17:
+				var pos: Vector2 = pt + nm * rnd(-14.0, 14.0)
+				if not m.in_zone(pos).is_empty(): continue
+				var s := Sprite2D.new()
+				s.texture = m.tex("pad_boost")
+				s.position = pos
+				s.rotation = tg.angle()
+				m.ground_fx.add_child(s)
+				pads.append({"k": "boost", "pos": pos, "cool": 0.0})
+			elif r < 0.31:
+				var side := 1.0 if rng.randf() < 0.5 else -1.0
+				var pos: Vector2 = pt + nm * side * (half + 12.0)
+				if not m.in_zone(pos).is_empty(): continue
+				var kind: String = pick(["fruit", "flowers", "tacos"])
+				var n := Node2D.new()
+				n.position = pos + Vector2(0, 13)
+				var t: Texture2D = m.tex("stall_" + kind)
+				var s := Sprite2D.new()
+				s.texture = t
 				s.centered = false
-				s.offset = Vector2(-16.5, -42)
+				s.offset = Vector2(-t.get_width() / 2.0, -t.get_height())
 				n.add_child(s)
+				var sb := StaticBody2D.new()
+				sb.collision_layer = 2
+				sb.collision_mask = 0
+				var cs := CollisionShape2D.new()
+				var rs := RectangleShape2D.new()
+				rs.size = Vector2(34, 26)
+				cs.shape = rs
+				cs.position = Vector2(0, -13)
+				sb.add_child(cs)
+				n.add_child(sb)
 				m.world.add_child(n)
-				crates.append({"pos": pos, "node": n})
+				stalls.append({"pos": pos, "node": n, "kind": kind})
+			elif r < 0.58:
+				for i in int(rnd(1.0, 3.99)):
+					var pos: Vector2 = pt + nm * rnd(-(half + 40.0), half + 40.0)
+					if not m.in_zone(pos).is_empty(): continue
+					var n := Node2D.new()
+					n.position = pos + Vector2(0, 8)
+					var s := Sprite2D.new()
+					s.texture = m.tex("prop_crate")
+					s.scale = Vector2(0.6, 0.6)
+					s.centered = false
+					s.offset = Vector2(-16.5, -42)
+					n.add_child(s)
+					m.world.add_child(n)
+					crates.append({"pos": pos, "node": n})
 
 func _update_fun(dt: float) -> void:
 	var p: Vehicle = m.player

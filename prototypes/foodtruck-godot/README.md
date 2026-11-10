@@ -2,6 +2,9 @@
 
 A small comparison build of the driving game in Godot 4.7 (GL Compatibility renderer, single-threaded web export), to judge the feel against the canvas version in `../foodtruck/`.
 
+## The city
+The single ring road is gone. `city.gd` generates a street network from a jittered grid with uneven spacing: about 110 streets and avenues (each a gently bent Curve2D), junctions with zebra crossings, and a few missing links. The 48 blocks between the streets are shops (rows of shopfronts), parks (winding path, pond, trees, benches), plazas (fountain with spray, terraces), car parks (rows of parked cars) or stops. Traffic picks its way through the junctions (`main.gd` `_follow`), cops/rivals/swarm spawn on any street, and the minimap shows the whole network. Debug: `?seed=N` makes a different city, `?zoom=0.16` is an overview, `&perf=1` prints timings in a desktop run.
+
 ## Stage 1: stops and shifts
 Stops are real buildings on the curvy road (8 per lap: 3 lunch rushes, kitchen, mechanic, 2 gas stations, cook-off). Park on the pavement mat in front of the door for 0.7 s: the camera zooms, the truck drives in behind the facade, the iris closes. Inside:
 - **Lunch rush / cook-off**: the window-view shift (`shift.gd`, ported from the canvas version): cook with limited burners, flick dishes at customers, 3-throw combos, stove fires, staff, hangry waves, boss. Level-ups interrupt it.

@@ -1,9 +1,8 @@
 extends Node2D
-# Hot & Hangry: Godot build. A closed, curvy ring road (a Curve2D, not a grid) with textured roads and pavement,
-# shops and trees from the Pixel Lab art, ambient traffic that follows the curve, a physics-driven food truck,
-# and stops that are real buildings: park on the pavement in front of the door to drive in.
-# Stage 1 adds: lunch-rush shifts and the cook-off (the window view), the kitchen, mechanic and gas screens,
-# level-ups and the results shop, all running on the shared run state in run.gd.
+# Hot & Hangry: Godot build. A real city: a street network (city.gd) of avenues, streets and junctions with blocks of
+# shops, parks, plazas and car parks between them, shops and trees from the Pixel Lab art, ambient traffic that finds its
+# way through the junctions, a physics-driven food truck, and stops that are real buildings: park on the pavement in front
+# of the door to drive in. Stage 1: shifts and the stop screens. Stage 2: heat, cops, rivals, swarm, loot (combat.gd).
 
 enum Mode { DRIVE, ENTER, SCREEN, EXIT }
 
@@ -18,14 +17,12 @@ const BLD := {
 }
 const STOP_TYPES := ["shift", "kitchen", "shift", "gas", "mechanic", "shift", "gas", "cook"]
 const VENUES := ["beach", "office", "stadium", "festival", "night"]
-const ROAD_W := 96.0
-const WALK_W := 190.0
-const LANE := 22.0
 const BS := 1.5
 
-var curve := Curve2D.new()
-var length := 0.0
+var city := City.new()
 var world: Node2D
+var ground_layer: Node2D
+var ground_fx: Node2D
 var player: Vehicle
 var cam: Camera2D
 var cars: Array[Vehicle] = []
@@ -45,7 +42,9 @@ var btn_boost := false
 var btn_drift := false
 var auto := false
 var auto_t := 0.0
+var auto_st: Dictionary = {}
 var placed: Array[Vector2] = []
+var mat_cache := {}
 
 var mode := Mode.DRIVE
 var lots: Array = []
@@ -58,20 +57,20 @@ var iris: ColorRect
 var iris_mat: ShaderMaterial
 var enter_label: Label
 var ui_layer: CanvasLayer
+var fs_layer: CanvasLayer
 var screens: Screens
 var shift: Shift
+var combat: Combat
 var on_closed: Callable = Callable()
 var hud_nodes := {}
 var msg_label: Label
 var msg_t := 0.0
 var dbg_bot := false
 var last_pos := Vector2.ZERO
-var combat: Combat
-var ground_fx: Node2D
-var map_pts := PackedVector2Array()
 var map_scale := 1.0
 var map_origin := Vector2.ZERO
-var fs_layer: CanvasLayer
+var dbg_zoom := 0.0
+var perf_log := false
 
 func tex(n: String) -> Texture2D:
 	if not tex_cache.has(n):
@@ -91,12 +90,15 @@ func _arg(name: String) -> String:
 	return ""
 
 func _ready() -> void:
-	rng.seed = 12345
+	rng.seed = int(_arg("seed")) if _arg("seed") != "" else 12345
 	auto = _arg("auto") == "1"
+	perf_log = _arg("perf") == "1"
+	dbg_zoom = float(_arg("zoom")) if _arg("zoom") != "" else 0.0
 	dbg_bot = _arg("bot") == "1"
 	if _arg("speed") != "":
 		Engine.time_scale = float(_arg("speed"))
-	_make_curve()
+	city.generate(rng)
+	_assign_cells()
 	_make_ground()
 	_make_roads()
 	mats = Node2D.new()
@@ -107,14 +109,18 @@ func _ready() -> void:
 	world = Node2D.new()
 	world.y_sort_enabled = true
 	add_child(world)
+	_make_walls()
 	_make_stops()
-	_make_scenery()
+	_make_blocks()
+	_make_street_props()
 	_make_traffic()
 	_make_player()
 	_make_ui()
 	combat = Combat.new()
 	add_child(combat)
 	combat.setup(self)
+	if _arg("nocombat") == "1":
+		combat.set_physics_process(false)
 	combat.busted.connect(func(): _game_over("The Food Police boxed you in. The truck is shut down."))
 	combat.wrecked.connect(func(): _game_over("The truck was wrecked."))
 	_compute_map()
@@ -136,21 +142,7 @@ func _ready() -> void:
 	if dbg != "":
 		call_deferred("_debug_open", dbg)
 
-# ---------- geometry ----------
-func _make_curve() -> void:
-	var n := 18
-	var pts: Array[Vector2] = []
-	for i in n:
-		var a := TAU * i / n
-		var r := 1000.0 + 260.0 * sin(2.0 * a + 0.7) + 170.0 * cos(3.0 * a + 0.3)
-		pts.append(Vector2(cos(a) * r * 1.5, sin(a) * r * 0.9))
-	for i in n:
-		var h := (pts[(i + 1) % n] - pts[(i - 1 + n) % n]) / 6.0
-		curve.add_point(pts[i], -h, h)
-	var h0 := (pts[1] - pts[n - 1]) / 6.0
-	curve.add_point(pts[0], -h0, h0)
-	length = curve.get_baked_length()
-
+# ---------- ground, blocks and streets ----------
 func _pattern(names: Array, seed_i: int) -> ImageTexture:
 	var cells := 4
 	var img := Image.create(cells * 28, cells * 28, false, Image.FORMAT_RGBA8)
@@ -163,49 +155,102 @@ func _pattern(names: Array, seed_i: int) -> ImageTexture:
 			img.blit_rect(src, Rect2i(0, 0, 28, 28), Vector2i(i * 28, j * 28))
 	return ImageTexture.create_from_image(img)
 
-func _tile_mat(names: Array, seed_i: int) -> ShaderMaterial:
+func _tile_mat(kind: String) -> ShaderMaterial:
+	if mat_cache.has(kind):
+		return mat_cache[kind]
+	var names: Array = {"grass": ["gt_grass0", "gt_grass1"], "lawn": ["gt_grass1"], "pave": ["gt_pave0", "gt_pave1"], "road": ["gt_road0", "gt_road1"], "plaza": ["gt_plaza0", "gt_plaza1"]}[kind]
 	var m := ShaderMaterial.new()
 	m.shader = load("res://shaders/worldtile.gdshader")
-	m.set_shader_parameter("tex", _pattern(names, seed_i))
+	m.set_shader_parameter("tex", _pattern(names, {"grass": 3, "lawn": 4, "pave": 5, "road": 9, "plaza": 6}[kind]))
 	m.set_shader_parameter("tex_size", Vector2(112, 112))
+	mat_cache[kind] = m
 	return m
+
+func _assign_cells() -> void:
+	var idxs: Array = []
+	for i in city.cells.size():
+		idxs.append(i)
+	idxs.shuffle()
+	var chosen: Array = []
+	var gap := 1250.0
+	while chosen.size() < STOP_TYPES.size() and gap > 300.0:
+		chosen = []
+		for i in idxs:
+			var c: Vector2 = city.cells[i]["rect"].get_center()
+			if chosen.all(func(j): return city.cells[j]["rect"].get_center().distance_to(c) >= gap):
+				chosen.append(i)
+				if chosen.size() >= STOP_TYPES.size():
+					break
+		gap -= 150.0
+	for k in chosen.size():
+		city.cells[chosen[k]]["type"] = "stop"
+		city.cells[chosen[k]]["stop"] = STOP_TYPES[k]
+	for c in city.cells:
+		if c["type"] == "stop":
+			continue
+		var r := rng.randf()
+		c["type"] = "park" if r < 0.2 else ("plaza" if r < 0.3 else ("lot" if r < 0.37 else "shops"))
 
 func _make_ground() -> void:
 	var g := ColorRect.new()
-	g.position = Vector2(-5200, -3600)
-	g.size = Vector2(10400, 7200)
-	g.material = _tile_mat(["gt_grass0", "gt_grass1"], 3)
+	var b := city.bounds.grow(1600.0)
+	g.position = b.position
+	g.size = b.size
+	g.material = _tile_mat("grass")
 	add_child(g)
+	ground_layer = Node2D.new()
+	add_child(ground_layer)
 
 func _line(pts: PackedVector2Array, w: float, mat: Material, col: Color) -> Line2D:
 	var l := Line2D.new()
 	l.points = pts
-	l.closed = true
 	l.width = w
 	l.joint_mode = Line2D.LINE_JOINT_ROUND
+	l.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	l.end_cap_mode = Line2D.LINE_CAP_ROUND
 	l.default_color = col
 	l.antialiased = false
 	if mat != null:
 		l.material = mat
-	add_child(l)
+	ground_layer.add_child(l)
 	return l
 
 func _make_roads() -> void:
-	var pts := curve.tessellate(5, 2.0)
-	pts.remove_at(pts.size() - 1)
-	_line(pts, WALK_W, _tile_mat(["gt_pave0", "gt_pave1"], 5), Color.WHITE)
-	_line(pts, ROAD_W + 8.0, null, Color("#8a8070"))
-	_line(pts, ROAD_W, _tile_mat(["gt_road0", "gt_road1"], 9), Color.WHITE)
+	# block ground first (pavement for shop blocks, plaza stone, car park asphalt, lawn for parks), then the streets on top
+	for c in city.cells:
+		var kind: String = {"shops": "pave", "stop": "pave", "plaza": "plaza", "lot": "road", "park": "lawn"}[c["type"]]
+		var r: Rect2 = c["rect"].grow(28.0)
+		var g := ColorRect.new()
+		g.position = r.position
+		g.size = r.size
+		g.material = _tile_mat(kind)
+		ground_layer.add_child(g)
+	for e in city.edges:
+		_line(e["pts"], e["w"] + City.PAVE_EXTRA, _tile_mat("pave"), Color.WHITE)
+	for e in city.edges:
+		_line(e["pts"], e["w"] + 8.0, null, Color("#8a8070"))
+	for e in city.edges:
+		_line(e["pts"], e["w"], _tile_mat("road"), Color.WHITE)
 	var d := Node2D.new()
 	d.set_script(load("res://dashes.gd"))
-	d.curve = curve
-	d.length = length
-	add_child(d)
+	d.city = city
+	ground_layer.add_child(d)
+
+func _make_walls() -> void:
+	var b := city.bounds.grow(260.0)
+	for r in [Rect2(b.position.x - 200, b.position.y, 200, b.size.y), Rect2(b.end.x, b.position.y, 200, b.size.y), Rect2(b.position.x, b.position.y - 200, b.size.x, 200), Rect2(b.position.x, b.end.y, b.size.x, 200)]:
+		var sb := StaticBody2D.new()
+		sb.collision_layer = 2
+		sb.collision_mask = 0
+		var cs := CollisionShape2D.new()
+		var rs := RectangleShape2D.new()
+		rs.size = r.size
+		cs.shape = rs
+		cs.position = r.get_center()
+		sb.add_child(cs)
+		add_child(sb)
 
 # ---------- stops: real buildings with a door you drive into ----------
-func _tangent(off: float) -> Vector2:
-	return (curve.sample_baked(fposmod(off + 8.0, length)) - curve.sample_baked(off)).normalized()
-
 func _free_spot(p: Vector2, r: float) -> bool:
 	for q in placed:
 		if q.distance_to(p) < r:
@@ -215,28 +260,14 @@ func _free_spot(p: Vector2, r: float) -> bool:
 func _make_stops() -> void:
 	var venues := VENUES.duplicate()
 	venues.shuffle()
-	var n := STOP_TYPES.size()
-	for a in n:
-		var ty: String = STOP_TYPES[a]
-		var found := false
-		for strict in [0.85, 0.7, 0.5]:
-			var off := length * float(a) / n + 120.0
-			var end := length * float(a + 1) / n - 80.0
-			while off < end and not found:
-				var p := curve.sample_baked(off)
-				var tg := _tangent(off)
-				var nm := Vector2(-tg.y, tg.x)
-				for side in [-1.0, 1.0]:
-					var out: Vector2 = nm * side
-					if out.y < -strict:
-						var base: Vector2 = p + out * (WALK_W / 2.0 + 6.0)
-						if _free_spot(base, 260.0):
-							_add_stop(ty, base, venues)
-							found = true
-							break
-				off += 40.0
-			if found:
-				break
+	for c in city.cells:
+		if c["type"] != "stop":
+			continue
+		var R: Rect2 = c["rect"]
+		var D: Dictionary = BLD[c["stop"]]
+		var dw: float = D["w"] * BS
+		var cx := rng.randf_range(R.position.x + dw / 2.0 + 20.0, maxf(R.position.x + dw / 2.0 + 21.0, R.end.x - dw / 2.0 - 20.0))
+		_add_stop(c["stop"], Vector2(cx, R.end.y), venues)
 
 func _add_stop(ty: String, base: Vector2, venues: Array) -> void:
 	var D: Dictionary = BLD[ty]
@@ -265,9 +296,9 @@ func _add_stop(ty: String, base: Vector2, venues: Array) -> void:
 	n.add_child(sb)
 	var door_x: float = base.x + (D["df"] - 0.5) * dw
 	var lot := {"type": ty, "name": Data.STOPN[ty].to_upper(), "venue": "gala" if ty == "cook" else (venues.pop_back() if ty == "shift" else ""), "used": false, "cool": 0.0, "bot": base.y,
-		"door": Vector2(door_x, base.y - 22.0), "zone": Rect2(door_x - 62.0, base.y - 8.0, 124.0, 68.0), "node": n, "top": base.y - dh}
+		"door": Vector2(door_x, base.y - 22.0), "zone": Rect2(door_x - 62.0, base.y - 8.0, 124.0, 76.0), "node": n, "top": base.y - dh}
 	lots.append(lot)
-	for dx in [-110.0, 0.0, 110.0]:
+	for dx in [-120.0, 0.0, 120.0]:
 		placed.append(base + Vector2(dx, 0))
 		placed.append(base + Vector2(dx, -90))
 	var lab := Label.new()
@@ -299,18 +330,11 @@ func _draw_mats() -> void:
 				var y := r.end.y - p
 				mats.draw_polyline(PackedVector2Array([Vector2(cx - 9, y + 6), Vector2(cx, y - 2), Vector2(cx + 9, y + 6)]), Color(1, 1, 1, 0.85), 2.4)
 
-func lane_pos(off: float, lane: float) -> Vector2:
-	return _lane_pos(off, lane)
-
-func tangent_at(off: float) -> Vector2:
-	return _tangent(off)
-
-func normal_at(off: float) -> Vector2:
-	var tg := _tangent(off)
-	return Vector2(-tg.y, tg.x)
-
 func in_zone(p: Vector2) -> Dictionary:
-	return _in_zone(p)
+	for lot in lots:
+		if lot["zone"].has_point(p):
+			return lot
+	return {}
 
 func shake_cam(v: float) -> void:
 	shake = minf(shake + v, 9.0)
@@ -318,13 +342,19 @@ func shake_cam(v: float) -> void:
 func add_nitro(v: float) -> void:
 	nitro = clampf(nitro + v, 0.0, 1.0)
 
-func _in_zone(p: Vector2) -> Dictionary:
-	for lot in lots:
-		if lot["zone"].has_point(p):
-			return lot
-	return {}
+# ---------- blocks ----------
+func _solid(parent: Node, size: Vector2, at: Vector2) -> void:
+	var sb := StaticBody2D.new()
+	sb.collision_layer = 2
+	sb.collision_mask = 0
+	var cs := CollisionShape2D.new()
+	var rs := RectangleShape2D.new()
+	rs.size = size
+	cs.shape = rs
+	cs.position = at
+	sb.add_child(cs)
+	parent.add_child(sb)
 
-# ---------- scenery ----------
 func _add_item(tname: String, base: Vector2, solid: Vector2) -> void:
 	var t := tex(tname)
 	var n := Node2D.new()
@@ -336,73 +366,186 @@ func _add_item(tname: String, base: Vector2, solid: Vector2) -> void:
 	s.offset = Vector2(-t.get_width() / 2.0, -t.get_height() + 4.0)
 	n.add_child(s)
 	if solid.x > 0.0:
-		var sb := StaticBody2D.new()
-		sb.collision_layer = 2
-		sb.collision_mask = 0
-		var cs := CollisionShape2D.new()
-		var rs := RectangleShape2D.new()
-		rs.size = solid
-		cs.shape = rs
-		cs.position = Vector2(0, -solid.y / 2.0)
-		sb.add_child(cs)
-		n.add_child(sb)
+		_solid(n, solid, Vector2(0, -solid.y / 2.0))
 
-func _make_scenery() -> void:
-	var off := 30.0
-	while off < length:
-		var p := curve.sample_baked(off)
-		var tg := _tangent(off)
-		var nm := Vector2(-tg.y, tg.x)
-		for side in [-1.0, 1.0]:
-			var out: Vector2 = nm * side
-			var base: Vector2 = p + out * (WALK_W / 2.0 + 6.0)
-			if out.y > 0.35:
-				base += out * 100.0
-			if _free_spot(base, 118.0):
+func _make_blocks() -> void:
+	for c in city.cells:
+		var R: Rect2 = c["rect"]
+		match c["type"]:
+			"shops", "stop":
+				_shop_rows(R)
+			"park":
+				_park(R)
+			"plaza":
+				_plaza(R)
+			"lot":
+				_lot(R)
+
+func _shop_rows(R: Rect2) -> void:
+	var y := R.end.y
+	var row := 0
+	while y - 40.0 > R.position.y + 20.0 and row < 4:
+		var x := R.position.x + 62.0 + rng.randf_range(0.0, 14.0)
+		while x < R.end.x - 48.0:
+			var base := Vector2(x, y)
+			if _free_spot(base, 100.0):
 				placed.append(base)
-				if rng.randf() < 0.82:
+				if rng.randf() < 0.88:
 					_add_item(SHOPS[rng.randi() % SHOPS.size()], base, Vector2(98, 56))
 				else:
-					_add_item(TREES[rng.randi() % TREES.size()], base + out * 20.0, Vector2(12, 10))
-		off += 62.0
-	off = 20.0
-	while off < length:
-		var p := curve.sample_baked(off)
-		var tg := _tangent(off)
-		var nm := Vector2(-tg.y, tg.x)
-		var side := 1.0 if int(off / 180.0) % 2 == 0 else -1.0
-		var kind: String = ["prop_lamp", "prop_bench", "prop_bin", "prop_hydrant"][rng.randi() % 4]
-		var pos: Vector2 = p + nm * side * (ROAD_W / 2.0 + 20.0)
-		if _in_zone(pos).is_empty():
-			_add_item(kind, pos, Vector2.ZERO)
-		off += 150.0
-	for i in 260:
-		var pos := Vector2(rng.randf_range(-2600.0, 2600.0), rng.randf_range(-1700.0, 1700.0))
-		var cp := curve.get_closest_point(pos)
-		if pos.distance_to(cp) < 260.0 and pos.distance_to(cp) > 130.0 and _free_spot(pos, 60.0):
+					_add_item(TREES[rng.randi() % TREES.size()], base, Vector2(12, 10))
+			x += 122.0 + (rng.randf_range(6.0, 20.0) if rng.randf() < 0.15 else 0.0)
+		y -= 108.0
+		row += 1
+
+func _blob(center: Vector2, rx: float, ry: float, col: Color, parent: Node) -> Polygon2D:
+	var p := Polygon2D.new()
+	var pts := PackedVector2Array()
+	for i in 28:
+		var a := TAU * i / 28.0
+		pts.append(center + Vector2(cos(a) * rx, sin(a) * ry))
+	p.polygon = pts
+	p.color = col
+	parent.add_child(p)
+	return p
+
+func _park(R: Rect2) -> void:
+	# a winding path, a pond, benches and lots of trees
+	var path := Line2D.new()
+	path.width = 9.0
+	path.default_color = Color("#c8b484")
+	path.joint_mode = Line2D.LINE_JOINT_ROUND
+	path.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	path.end_cap_mode = Line2D.LINE_CAP_ROUND
+	var c0 := Curve2D.new()
+	c0.add_point(Vector2(R.position.x, R.end.y - R.size.y * 0.28), Vector2.ZERO, Vector2(R.size.x * 0.25, -R.size.y * 0.4))
+	c0.add_point(Vector2(R.end.x, R.position.y + R.size.y * 0.3), Vector2(-R.size.x * 0.25, R.size.y * 0.45), Vector2.ZERO)
+	path.points = c0.tessellate(5, 2.0)
+	ground_layer.add_child(path)
+	var pond := Vector2(-9999, -9999)
+	if rng.randf() < 0.65 and R.size.x > 260.0 and R.size.y > 200.0:
+		var rx := rng.randf_range(48.0, 80.0)
+		var ry := rng.randf_range(32.0, 50.0)
+		pond = Vector2(rng.randf_range(R.position.x + rx + 24.0, R.end.x - rx - 24.0), rng.randf_range(R.position.y + ry + 24.0, R.end.y - ry - 24.0))
+		_blob(pond, rx + 7.0, ry + 6.0, Color("#b8a878"), ground_layer)
+		_blob(pond, rx, ry, Color("#3a78a8"), ground_layer)
+		_blob(pond + Vector2(-3, -2), rx * 0.8, ry * 0.7, Color("#4a92c0"), ground_layer)
+		var holder := Node2D.new()
+		holder.position = pond
+		world.add_child(holder)
+		_solid(holder, Vector2(rx * 1.6, ry * 1.3), Vector2.ZERO)
+		placed.append(pond)
+	var n := int(R.get_area() / 11000.0)
+	for i in n:
+		var pos := Vector2(rng.randf_range(R.position.x + 20.0, R.end.x - 20.0), rng.randf_range(R.position.y + 30.0, R.end.y - 4.0))
+		if _free_spot(pos, 62.0) and (pond.x < -9000.0 or pos.distance_to(pond) > 100.0):
 			placed.append(pos)
 			_add_item(TREES[rng.randi() % TREES.size()], pos, Vector2(12, 10))
-		elif pos.distance_to(cp) >= 260.0 and rng.randf() < 0.25 and _free_spot(pos, 90.0):
+	for i in 3:
+		var pos := Vector2(rng.randf_range(R.position.x + 30.0, R.end.x - 30.0), rng.randf_range(R.position.y + 40.0, R.end.y - 10.0))
+		if _free_spot(pos, 50.0):
+			placed.append(pos)
+			_add_item(["prop_bench", "prop_lamp", "bush_planter"][i % 3], pos, Vector2.ZERO)
+
+func _plaza(R: Rect2) -> void:
+	var c := R.get_center()
+	_blob(c + Vector2(0, 4), 36.0, 26.0, Color("#8c8272"), ground_layer)
+	_blob(c + Vector2(0, 2), 31.0, 21.0, Color("#a89c88"), ground_layer)
+	_blob(c + Vector2(0, 2), 26.0, 17.0, Color("#4aa8d8"), ground_layer)
+	_blob(c + Vector2(0, 1), 18.0, 11.0, Color("#7ac8f0"), ground_layer)
+	var holder := Node2D.new()
+	holder.position = c
+	world.add_child(holder)
+	_solid(holder, Vector2(62, 34), Vector2(0, 4))
+	var sp := CPUParticles2D.new()
+	sp.position = c + Vector2(0, -2)
+	sp.amount = 22
+	sp.lifetime = 0.9
+	sp.direction = Vector2(0, -1)
+	sp.spread = 28.0
+	sp.initial_velocity_min = 40.0
+	sp.initial_velocity_max = 60.0
+	sp.gravity = Vector2(0, 120)
+	sp.scale_amount_min = 1.5
+	sp.scale_amount_max = 2.5
+	sp.color = Color(0.8, 0.93, 1.0, 0.85)
+	ground_layer.add_child(sp)
+	placed.append(c)
+	for k in 2:
+		var pos := Vector2(R.position.x + 60.0 + (R.size.x - 120.0) * k, R.position.y + R.size.y * 0.35)
+		if _free_spot(pos, 60.0):
+			placed.append(pos)
+			_add_item("terrace", pos, Vector2(60, 40))
+	for pos in [R.position + Vector2(36, 60), Vector2(R.end.x - 36, R.position.y + 60), Vector2(R.position.x + 36, R.end.y - 8), Vector2(R.end.x - 36, R.end.y - 8)]:
+		if _free_spot(pos, 50.0):
 			placed.append(pos)
 			_add_item(TREES[rng.randi() % TREES.size()], pos, Vector2(12, 10))
 
+func _lot(R: Rect2) -> void:
+	var kinds := ["sedan", "hatch", "taxi", "pickup"]
+	var rows := int(R.size.y / 70.0)
+	for j in rows:
+		var y := R.position.y + 40.0 + j * 70.0
+		if y > R.end.y - 20.0:
+			break
+		var x := R.position.x + 40.0
+		while x < R.end.x - 30.0:
+			if rng.randf() < 0.55 and _free_spot(Vector2(x, y), 40.0):
+				var n := Node2D.new()
+				n.position = Vector2(x, y)
+				var s := Sprite2D.new()
+				s.texture = tex("%s_%s" % [kinds[rng.randi() % 4], "south" if rng.randf() < 0.5 else "north"])
+				s.offset = Vector2(0, -10)
+				n.add_child(s)
+				world.add_child(n)
+				_solid(n, Vector2(24, 36), Vector2.ZERO)
+				placed.append(Vector2(x, y))
+			x += 42.0
+
+func _make_street_props() -> void:
+	for ei in city.edges.size():
+		var e: Dictionary = city.edges[ei]
+		var off := 120.0
+		while off < e["len"] - 120.0:
+			var side := 1.0 if int(off / 170.0) % 2 == 0 else -1.0
+			var pos: Vector2 = city.point(ei, off) + city.normal(ei, off) * side * (e["w"] / 2.0 + 20.0)
+			var kind: String = ["prop_lamp", "prop_bench", "prop_bin", "prop_hydrant", "prop_lamp"][rng.randi() % 5]
+			if in_zone(pos).is_empty():
+				_add_item(kind, pos, Vector2.ZERO)
+			off += 150.0
+
 # ---------- vehicles ----------
-func _lane_pos(off: float, lane: float) -> Vector2:
-	var tg := _tangent(off)
-	return curve.sample_baked(off) + Vector2(-tg.y, tg.x) * LANE * lane
+func _follow(pos: Vector2, st: Dictionary, look: float) -> Vector2:
+	var e: Dictionary = city.edges[st["e"]]
+	var off: float = e["curve"].get_closest_offset(pos)
+	var dir: int = st["dir"]
+	var ahead: float = off + look * dir
+	if ahead > e["len"] or ahead < 0.0:
+		if st["next"] == null:
+			st["next"] = city.pick_next(st["e"], dir, rng)
+		var nx: Dictionary = st["next"]
+		var over: float = (ahead - e["len"]) if dir > 0 else (-ahead)
+		var ne: Dictionary = city.edges[nx["e"]]
+		var noff: float = over if nx["dir"] > 0 else ne["len"] - over
+		if (dir > 0 and off > e["len"] - 40.0) or (dir < 0 and off < 40.0):
+			st["e"] = nx["e"]
+			st["dir"] = nx["dir"]
+			st["next"] = null
+		return city.lane_pos(nx["e"], clampf(noff, 0.0, ne["len"]), nx["dir"])
+	st["next"] = null
+	return city.lane_pos(st["e"], ahead, dir)
 
 func _make_traffic() -> void:
 	var kinds := ["sedan", "hatch", "taxi", "pickup"]
-	for i in 16:
+	for i in (int(_arg("ncars")) if _arg("ncars") != "" else 34):
 		var c := Vehicle.new()
 		c.setup(kinds[i % 4], 13.0, 1.4, 12.0)
 		c.max_speed = rng.randf_range(62.0, 96.0)
 		c.accel = 220.0
-		var off := length * float(i) / 16.0 + 400.0
-		var lane := 1.0 if i % 2 == 0 else -1.0
-		c.set_meta("lane", lane)
-		c.position = _lane_pos(off, lane)
-		c.heading = _tangent(off).angle() + (0.0 if lane > 0.0 else PI)
+		var s := city.random_lane_spot(rng)
+		c.set_meta("st", {"e": s["e"], "dir": s["dir"], "next": null})
+		c.position = s["pos"]
+		c.heading = city.tangent(s["e"], s["off"]).angle() + (0.0 if s["dir"] > 0 else PI)
 		world.add_child(c)
 		cars.append(c)
 
@@ -413,8 +556,12 @@ func _make_player() -> void:
 	player.max_speed = 175.0 * Run.perks["speed"]
 	player.accel = 330.0
 	player.turn_rate = 3.0
-	player.position = _lane_pos(0.0, 1.0)
-	player.heading = _tangent(0.0).angle()
+	var mid := city.bounds.get_center()
+	var ei := city.nearest_edge(mid)
+	var off: float = city.edges[ei]["len"] * 0.5
+	player.position = city.lane_pos(ei, off, 1)
+	player.heading = city.tangent(ei, off).angle()
+	auto_st = {"e": ei, "dir": 1, "next": null}
 	player.crashed.connect(_on_crash)
 	world.add_child(player)
 	cam = Camera2D.new()
@@ -562,18 +709,18 @@ func _toggle_fullscreen() -> void:
 		var md := DisplayServer.window_get_mode()
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if md == DisplayServer.WINDOW_MODE_FULLSCREEN else DisplayServer.WINDOW_MODE_FULLSCREEN)
 
+var map_edges: Array = []
+
 func _compute_map() -> void:
-	map_pts = curve.tessellate(5, 2.0)
-	var mn := Vector2(1e9, 1e9)
-	var mx := Vector2(-1e9, -1e9)
-	for p in map_pts:
-		mn = Vector2(minf(mn.x, p.x), minf(mn.y, p.y))
-		mx = Vector2(maxf(mx.x, p.x), maxf(mx.y, p.y))
-	var sz := mx - mn
+	var sz := city.bounds.size
 	map_scale = minf(136.0 / sz.x, 78.0 / sz.y)
-	map_origin = mn - Vector2(7.0 + (136.0 / map_scale - sz.x) / 2.0, 6.0 + (78.0 / map_scale - sz.y) / 2.0) / 1.0 * 0.0
-	map_origin = mn
-	map_pts = map_pts
+	map_origin = city.bounds.position - Vector2((136.0 / map_scale - sz.x) / 2.0, (78.0 / map_scale - sz.y) / 2.0)
+	map_edges = []
+	for e in city.edges:
+		var mp := PackedVector2Array()
+		for q in e["pts"]:
+			mp.append(_mp(q))
+		map_edges.append({"pts": mp, "w": 2.0 if e["w"] < 100.0 else 3.0})
 
 func _mp(p: Vector2) -> Vector2:
 	return Vector2(287.0, 15.0) + (p - map_origin) * map_scale
@@ -604,10 +751,8 @@ func _hud_draw() -> void:
 	# minimap: the ring, stops, rivals, cops and you
 	hud.draw_rect(Rect2(280, 8, 150, 90), Color(0.06, 0.04, 0.08, 0.88))
 	hud.draw_rect(Rect2(280, 8, 150, 90), Color("#ffb84a"), false, 1.5)
-	var mpts := PackedVector2Array()
-	for q in map_pts:
-		mpts.append(_mp(q))
-	hud.draw_polyline(mpts, Color("#6a776e"), 3.0)
+	for me in map_edges:
+		hud.draw_polyline(me["pts"], Color("#7a857c"), me["w"])
 	var LET := {"shift": "$", "kitchen": "K", "mechanic": "M", "gas": "G", "cook": "*"}
 	for lot in lots:
 		var lp := _mp(lot["door"])
@@ -694,6 +839,8 @@ func _process(dt: float) -> void:
 	if mode == Mode.ENTER:
 		zt = 1.5
 	cam.zoom = cam.zoom.lerp(Vector2.ONE * zt, (5.0 if mode == Mode.ENTER else 2.0) * dt)
+	if dbg_zoom > 0.0:
+		cam.zoom = Vector2.ONE * dbg_zoom
 	shake = maxf(0.0, shake - 22.0 * dt)
 	cam.offset = Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * shake
 	var fwd := Vector2.RIGHT.rotated(player.heading)
@@ -701,6 +848,8 @@ func _process(dt: float) -> void:
 	dust.emitting = sp > 60.0 and mode == Mode.DRIVE
 	dust.color = Color(1.0, 0.7, 0.3, 0.8) if player.boost > 0.0 else Color(0.9, 0.85, 0.7, 0.6)
 	hud_label.text = "%d fps" % Engine.get_frames_per_second()
+	if perf_log and Engine.get_frames_drawn() % 300 == 0:
+		print("PERF process=%.1fms physics=%.1fms nodes=%d objs=%d phys2d_active=%d" % [Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0, Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.OBJECT_COUNT), Performance.get_monitor(Performance.PHYSICS_2D_ACTIVE_OBJECTS)])
 	for lot in lots:
 		lot["cool"] = maxf(0.0, lot["cool"] - dt)
 	_update_iris(dt)
@@ -754,7 +903,7 @@ func _physics_process(dt: float) -> void:
 	player.max_speed = 175.0 * Run.perks["speed"] * (0.35 if Run.fuel <= 0.0 else 1.0)
 	if Run.fuel <= 0.0 and msg_t <= 0.0:
 		show_msg("OUT OF PETROL! Roll to a gas station.", 2.5)
-	var lot := _in_zone(player.position)
+	var lot := in_zone(player.position)
 	if not lot.is_empty() and player.linear_velocity.length() < 40.0 and not (lot["used"] and lot["type"] != "gas") and lot["cool"] <= 0.0 and not auto:
 		if lot["type"] == "cook" and Run.leg_shifts < 3:
 			if msg_t <= 0.0:
@@ -780,8 +929,7 @@ func _physics_process(dt: float) -> void:
 		v = joy_vec
 	if auto:
 		auto_t += dt
-		var off := curve.get_closest_offset(player.position)
-		var tgt := _lane_pos(fposmod(off + 150.0, length), 1.0)
+		var tgt := _follow(player.position, auto_st, 150.0)
 		v = (tgt - player.position).normalized()
 	player.want_dir = v
 	player.throttle = v.length()
@@ -795,12 +943,7 @@ func _physics_process(dt: float) -> void:
 		if player.linear_velocity.length() > 80.0:
 			nitro = minf(1.0, nitro + 0.05 * dt)
 	for c in cars:
-		var lane: float = c.get_meta("lane")
-		var off := curve.get_closest_offset(c.position)
-		var o2 := fposmod(off + 110.0 * lane, length)
-		var p := curve.sample_baked(o2)
-		var tg := (curve.sample_baked(fposmod(o2 + 6.0, length)) - p).normalized()
-		var target := p + Vector2(-tg.y, tg.x) * LANE * lane
+		var target := _follow(c.position, c.get_meta("st"), 110.0)
 		c.want_dir = target - c.position
 		var fwd := Vector2.RIGHT.rotated(c.heading)
 		var ahead := false
