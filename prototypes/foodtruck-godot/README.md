@@ -15,6 +15,9 @@ Build and run:
 ```
 godot --headless --path prototypes/foodtruck-godot --import
 godot --headless --path prototypes/foodtruck-godot --export-release "Web" build/index.html
-node prototypes/foodtruck-godot/serve.mjs      # http://localhost:8082/
+node prototypes/foodtruck-godot/serve.mjs      # http://localhost:8082/ and https://<lan ip>:8083/
 ```
 Needs the Godot 4.7.2 editor and the web export templates (installed in `~/dev/godot` and `%APPDATA%/Godot/export_templates/4.7.2.stable/` on this machine).
+
+Phone note: Godot's web build needs a secure context, so plain `http://<lan ip>:8082` shows "Secure Context ... use HTTPS". Use the HTTPS port instead and accept the one-time self-signed certificate warning. Make the certificate (not committed) with:
+`openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 365 -subj "/CN=<lan ip>" -addext "subjectAltName=IP:<lan ip>,IP:127.0.0.1,DNS:localhost"`
