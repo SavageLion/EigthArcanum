@@ -30,6 +30,7 @@ try {
     await shot('title', () => { const F = window.__ft; F.goto('title'); });
     await shot('city', () => { const F = window.__ft; F.newRun(0); F.startTrip(); F.auto(true); for (let i = 0; i < 130; i++) F.step(1 / 30); F.auto(false); });
     await shot('cops', () => { const F = window.__ft; const S = F.state(); S.RUN.insp = 75; S.S.city.grace = 0; F.auto(false); F.setKey('r', 1); for (let i = 0; i < 260; i++) F.step(1 / 30); F.setKey('r', 0); });
+    await shot('rival', () => { const F = window.__ft; F.newRun(0); F.startTrip(); const S = F.state(); S.RUN.insp = 0; F.step(1/30); const w = S.S.city; w.grace = 0; w.rivalT = 0; F.step(1/30); const r = w.rivals[0]; if (r) { r.x = S.S.truck.x + 150; r.y = S.S.truck.y - 40; } for (let i = 0; i < 40; i++) F.step(1 / 30); });
     await shot('kitchen', () => { const F = window.__ft; const S = F.state(); S.RUN.cash = 80; F.startShift('stadium'); S.RUN.dishes.push({ k: 'pizza', lv: 2, fl: ['spicy'], recipe: '', cd: 0 }); F.stop('kitchen'); });
     await shot('mechanic', () => { const F = window.__ft; F.state().RUN.cash = 120; F.stop('mechanic'); });
     await shot('gas', () => { const F = window.__ft; F.stop('gas'); });

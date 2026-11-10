@@ -19,3 +19,9 @@ Inside the truck, looking out of the serving window. Customers march up the stre
 
 ## Test
 `node tests/foodtruck-bot.mjs [runs] --shots dir` (Playwright bot, landscape + portrait rotation check). Serve with `node prototypes/foodtruck/serve.mjs` (port 8081).
+
+## Kitchen prep (in the window view)
+Dishes only fire if you have portions. Tap a dish's counter station when the moving marker is in the green zone: yellow centre = PERFECT (+3 portions and the next 2 volleys hit 1.5x), green = +2, outside = BURNT (station locks briefly). Portions trickle back slowly on their own.
+
+## Rival trucks (city)
+Named rivals (Taco Tyrant, Burger Baron, Frosty Freddie, Sour Sue) roam the city, shoot flavoured food (frozen/sour slow you, spicy burns) and ram you. Your truck auto-fires at the nearest rival or cop. Beat one for cash plus a stolen recipe (a free perk/dish/flavour card). Rivals get tougher each leg.
