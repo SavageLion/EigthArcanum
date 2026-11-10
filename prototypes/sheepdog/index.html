@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Sheepdog</title>
+<style>html,body{margin:0;height:100%;background:#0f140f;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}</style>
+</head><body><canvas id="c"></canvas>
+<script>
+/* Sheepdog: real-time flock herding roguelike prototype. You are the dog. Sheep flee from pressure, so move around them
+   to steer the flock through the gate into the pen before time runs out. Bark = burst of pressure. Crouch = steady, calm pressure. */
+(()=>{
+const W=960,H=540,cv=document.getElementById('c'),c=cv.getContext('2d');
+cv.width=W;cv.height=H;
+const TAU=Math.PI*2,rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),pick=a=>a[Math.floor(Math.random()*a.length)];
+const hyp=Math.hypot;
+
+/* ---------------- perks (your build between rounds) ---------------- */
+const PERKS=[
+ {id:'bark',n:'Loud Bark',d:'Bigger bark, shorter cooldown.',ic:'!'},
+ {id:'legs',n:'Fast Paws',d:'+15% running speed.',ic:'>'},
+ {id:'stare',n:'Steady Stare',d:'Crouching calms sheep even more.',ic:'o'},
+ {id:'nose',n:'Collie Nose',d:'Sheep feel you from further away.',ic:'~'},
+ {id:'bell',n:'Bell Wether',d:'The flock sticks together tighter.',ic:'*'},
+ {id:'treats',n:'Pocket Treats',d:'+10 seconds on every round.',ic:'+'},
+ {id:'helper',n:'Second Dog',d:'A helper dog herds stragglers from behind.',ic:'2',max:1},
+];
+/* ---------------- game state ---------------- */
+const G={state:'ready',round:1,perks:{},time:0,limit:0,sheep:[],dog:null,helper:null,pen:null,walls:[],rocks:[],parts:[],texts:[],rings:[],offers:[],
+ score:0,need:0,inPen:0,t:0,bot:false,barkCd:0,msg:'',stars:0,best:0};
+const perk=id=>G.perks[id]||0;
+
+const TYPES={
+ normal:{r:7,zone:120,flee:1,speed:1,col:'#f2efe6',n:'Ewe'},
+ ram:{r:9,zone:62,flee:.55,speed:.8,col:'#d8d0bc',n:'Ram'},
+ panicky:{r:6.5,zone:175,flee:1.5,speed:1.25,col:'#fff6ea',n:'Panicker'},
+ lamb:{r:4.5,zone:105,flee:1,speed:1.1,col:'#fffdf6',n:'Lamb'},
+};
+
+function newRound(){
+ const n=G.round;G.state='play';G.t=0;G.parts=[];G.texts=[];G.rings=[];G.barkCd=0;
+ const count=Math.min(30,8+2*n);
+ G.limit=72+4*n+10*perk('treats');G.time=G.limit;
+ // pen on the right, gate in its left wall at a random height
+ const pw=150,ph=190,px=W-pw-18,py=rnd(70,H-ph-70),gy=py+ph/2+rnd(-40,40),gap=84;
+ G.pen={x:px,y:py,w:pw,h:ph,gy,gap};
+ G.walls=[
+  [px,py,px+pw,py],[px,py+ph,px+pw,py+ph],[px+pw,py,px+pw,py+ph],
+  [px,py,px,gy-gap/2],[px,gy+gap/2,px,py+ph],
+  // wings guiding sheep into the gate
+  [px-70,gy-gap/2-46,px,gy-gap/2],[px-70,gy+gap/2+46,px,gy+gap/2],
+ ];
+ G.rocks=[];
+ const nr=n>=3?Math.min(9,1+n):0;
+ for(let i=0;i<nr;i++){let ok=0;for(let k=0;k<30&&!ok;k++){const r=rnd(16,30),x=rnd(220,px-130),y=rnd(50,H-50);if(Math.abs(x-300)<60&&Math.abs(y-H/2)<80)continue;if(G.rocks.some(o=>hyp(o.x-x,o.y-y)<o.r+r+40))continue;G.rocks.push({x,y,r});ok=1;}}
+ G.dog={x:140,y:H/2,vx:0,vy:0,hx:1,hy:0,tx:140,ty:H/2,crouch:false,stun:0,face:1,run:0};
+ G.helper=perk('helper')?{x:160,y:H/2+40,vx:0,vy:0,face:1,run:0}:null;
+ G.sheep=[];
+ const cx=rnd(300,420),cy=rnd(150,H-150);
+ for(let i=0;i<count;i++){
+  let type='normal',r=Math.random();
+  if(n>=2&&r<.1*n&&r<.45)type='ram';else if(n>=2&&r>.55&&r<.55+.08*n)type='panicky';else if(n>=3&&r>.9)type='lamb';
+  let x,y,k=0;do{const a=rnd(0,TAU),d=rnd(0,95);x=cx+Math.cos(a)*d;y=cy+Math.sin(a)*d;k++;}while(k<20&&G.rocks.some(o=>hyp(o.x-x,o.y-y)<o.r+14));
+  const T=TYPES[type];
+  G.sheep.push({x,y,vx:0,vy:0,type,T,panic:0,inPen:false,wa:rnd(0,TAU),graze:rnd(0,3),face:1,hop:rnd(0,6),flash:0});
+ }
+ G.need=count-Math.floor(count/8);G.inPen=0;G.msg='ROUND '+n;G.msgT=2;
+}
+
+/* ---------------- helpers ---------------- */
+function segPush(o,r,x1,y1,x2,y2,bounce){
+ const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy;let t=l2?((o.x-x1)*dx+(o.y-y1)*dy)/l2:0;t=clamp(t,0,1);
+ const px=x1+dx*t,py=y1+dy*t,ex=o.x-px,ey=o.y-py,d=hyp(ex,ey);
+ if(d<r){const nx=d>1e-4?ex/d:0,ny=d>1e-4?ey/d:-1;o.x=px+nx*r;o.y=py+ny*r;const vn=o.vx*nx+o.vy*ny;if(vn<0){o.vx-=(1+bounce)*vn*nx;o.vy-=(1+bounce)*vn*ny;}}
+}
+function collide(o,r,bounce){
+ for(const w of G.walls)segPush(o,r,w[0],w[1],w[2],w[3],bounce);
+ for(const k of G.rocks){const dx=o.x-k.x,dy=o.y-k.y,d=hyp(dx,dy),m=k.r+r;if(d<m){const nx=dx/(d||1),ny=dy/(d||1);o.x=k.x+nx*m;o.y=k.y+ny*m;const vn=o.vx*nx+o.vy*ny;if(vn<0){o.vx-=(1+bounce)*vn*nx;o.vy-=(1+bounce)*vn*ny;}}}
+ if(o.x<r){o.x=r;o.vx=Math.abs(o.vx)*bounce;}if(o.x>W-r){o.x=W-r;o.vx=-Math.abs(o.vx)*bounce;}
+ if(o.y<r){o.y=r;o.vy=Math.abs(o.vy)*bounce;}if(o.y>H-r){o.y=H-r;o.vy=-Math.abs(o.vy)*bounce;}
+}
+function addText(x,y,s,col){G.texts.push({x,y,s,col,t:1});}
+function dust(x,y,n,col='#cbb98a'){for(let i=0;i<n;i++){const a=rnd(0,TAU),v=rnd(10,40);G.parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-8,t:rnd(.3,.6),max:.6,col,r:rnd(1.5,3)});}}
+
+/* ---------------- the dog ---------------- */
+const barkR=()=>150*(1+.3*perk('bark')), barkCD=()=>2.4*(1-.2*Math.min(2,perk('bark')));
+const dogSpeed=()=>(G.dog.crouch?85:200)*(1+.15*perk('legs'));
+const zoneMult=()=>(G.dog.crouch?1.18:1)*(1+.15*perk('nose'));
+function bark(){
+ const d=G.dog;if(G.barkCd>0||G.state!=='play'||d.stun>0)return;
+ G.barkCd=barkCD();const R=barkR();G.rings.push({x:d.x,y:d.y,r:10,max:R,t:.45});
+ for(const s of G.sheep){if(s.inPen)continue;const dx=s.x-d.x,dy=s.y-d.y,dist=hyp(dx,dy);if(dist<R&&dist>0.1){const f=(1-dist/R),m=s.type==='ram'?.4:1;s.vx+=dx/dist*190*f*m;s.vy+=dy/dist*190*f*m;s.panic=Math.max(s.panic,.9*m);}}
+ dust(d.x,d.y,8);
+}
+function updateDog(dt){
+ const d=G.dog;d.stun=Math.max(0,d.stun-dt);
+ let ax=0,ay=0;
+ if(keys.l||keys.r||keys.u||keys.d){ax=(keys.r?1:0)-(keys.l?1:0);ay=(keys.d?1:0)-(keys.u?1:0);const l=hyp(ax,ay)||1;ax/=l;ay/=l;d.tx=d.x+ax*60;d.ty=d.y+ay*60;}
+ else{const dx=d.tx-d.x,dy=d.ty-d.y,dist=hyp(dx,dy);if(dist>6){ax=dx/dist;ay=dy/dist;const k=Math.min(1,dist/50);ax*=k;ay*=k;}}
+ const sp=dogSpeed()*(d.stun>0?.3:1);
+ d.vx+=(ax*sp-d.vx)*Math.min(1,dt*9);d.vy+=(ay*sp-d.vy)*Math.min(1,dt*9);
+ d.x+=d.vx*dt;d.y+=d.vy*dt;collide(d,6,0);
+ const v=hyp(d.vx,d.vy);if(v>20){d.hx=d.vx/v;d.hy=d.vy/v;if(Math.abs(d.vx)>10)d.face=d.vx>0?1:-1;}
+ d.run+=dt*(v/22);
+ if(v>110&&Math.random()<dt*14)dust(d.x,d.y+5,1);
+ G.barkCd=Math.max(0,G.barkCd-dt);
+}
+function updateHelper(dt){
+ const h=G.helper;if(!h)return;
+ const loose=G.sheep.filter(s=>!s.inPen);if(!loose.length)return;
+ const g={x:G.pen.x,y:G.pen.gy};let far=loose[0],fd=-1;for(const s of loose){const d=hyp(s.x-g.x,s.y-g.y);if(d>fd){fd=d;far=s;}}
+ const ux=(far.x-g.x)/(fd||1),uy=(far.y-g.y)/(fd||1);let tx=far.x+ux*95,ty=far.y+uy*95;
+ // keep clear of the flock when travelling around it
+ const dx=tx-h.x,dy=ty-h.y,dist=hyp(dx,dy);
+ let ax=dx/(dist||1),ay=dy/(dist||1);
+ for(const s of loose){const sx=s.x-h.x,sy=s.y-h.y,sd=hyp(sx,sy);if(sd<80&&sd>1&&hyp(far.x-h.x,far.y-h.y)>110){ax-=sx/sd*(1-sd/80)*1.6;ay-=sy/sd*(1-sd/80)*1.6;}}
+ const l=hyp(ax,ay)||1;ax/=l;ay/=l;const sp=dist<20?40:140;
+ h.vx+=(ax*sp-h.vx)*Math.min(1,dt*6);h.vy+=(ay*sp-h.vy)*Math.min(1,dt*6);h.x+=h.vx*dt;h.y+=h.vy*dt;collide(h,6,0);
+ if(Math.abs(h.vx)>10)h.face=h.vx>0?1:-1;h.run+=dt*hyp(h.vx,h.vy)/22;
+}
+/* ---------------- the flock ---------------- */
+function pressureFrom(s,p,hx,hy,mult,calm,dt){
+ const T=s.T,dx=s.x-p.x,dy=s.y-p.y,dist=hyp(dx,dy),Z=T.zone*mult;
+ if(dist>=Z||dist<0.1)return 0;
+ const t=1-dist/Z,ux=dx/dist,uy=dy/dist;
+ // sheep slide away AND sideways: approaching from behind drives them straight, from the side turns them
+ const side=(hx*uy-hy*ux)>0?1:-1,k=T.flee*(calm?(.5-.18*perk('stare')):1)*(1+s.panic*.8);
+ s.vx+=(ux*t*t*430+(-uy)*side*t*95)*k*dt;s.vy+=(uy*t*t*430+(ux)*side*t*95)*k*dt;
+ return t;
+}
+function updateSheep(dt){
+ const d=G.dog;
+ for(const s of G.sheep){
+  s.flash=Math.max(0,s.flash-dt);s.panic=Math.max(0,s.panic-dt*.55);s.hop+=dt*hyp(s.vx,s.vy)/16;
+  if(s.inPen){ // calm inside the pen: wander but stay put
+   s.wa+=rnd(-1,1)*dt*3;s.vx+=Math.cos(s.wa)*14*dt;s.vy+=Math.sin(s.wa)*14*dt;
+  }else{
+   let pressure=pressureFrom(s,d,d.hx,d.hy,zoneMult(),d.crouch,dt);
+   if(G.helper)pressure+=pressureFrom(s,G.helper,G.helper.vx/(hyp(G.helper.vx,G.helper.vy)||1),G.helper.vy/(hyp(G.helper.vx,G.helper.vy)||1),.85,true,dt);
+   if(pressure>.55&&s.type==='panicky'&&!d.crouch)s.panic=Math.max(s.panic,.8);
+   if(s.type==='ram'&&!s.inPen){const dd=hyp(d.x-s.x,d.y-s.y);if(dd<26&&d.stun<=0&&s.panic<.2){d.stun=.7;d.vx+=(d.x-s.x)/dd*260;d.vy+=(d.y-s.y)/dd*260;addText(d.x,d.y-14,'OOF!','#ffb84a');s.flash=.3;}}
+   // flock: cohesion, alignment, separation among loose sheep
+   let cx=0,cy=0,vx=0,vy=0,n=0,sx=0,sy=0;
+   for(const o of G.sheep){if(o===s||o.inPen)continue;const dx=o.x-s.x,dy=o.y-s.y,dist=hyp(dx,dy);
+    if(dist<130){cx+=o.x;cy+=o.y;vx+=o.vx;vy+=o.vy;n++;}
+    const m=s.T.r+o.T.r+5;if(dist<m&&dist>.1){sx-=dx/dist*(1-dist/m);sy-=dy/dist*(1-dist/m);}}
+   if(n){cx/=n;cy/=n;vx/=n;vy/=n;const coh=(26+16*perk('bell'))*(s.type==='lamb'?2.4:1)*(pressure>0?1.5:1);const dx=cx-s.x,dy=cy-s.y,dist=hyp(dx,dy)||1;
+    if(dist>28){s.vx+=dx/dist*coh*dt;s.vy+=dy/dist*coh*dt;}
+    s.vx+=(vx-s.vx)*.7*dt;s.vy+=(vy-s.vy)*.7*dt;}
+   s.vx+=sx*260*dt;s.vy+=sy*260*dt;
+   if(pressure<.05){ // grazing: slow random drift
+    s.graze-=dt;if(s.graze<=0){s.graze=rnd(1,3.5);s.wa=rnd(0,TAU);s.gs=Math.random()<.55?rnd(6,16):0;}
+    s.vx+=Math.cos(s.wa)*(s.gs||0)*dt*1.4;s.vy+=Math.sin(s.wa)*(s.gs||0)*dt*1.4;}
+   // panic spreads
+   if(s.panic>.5){for(const o of G.sheep)if(o!==s&&!o.inPen&&o.type!=='ram'&&hyp(o.x-s.x,o.y-s.y)<46&&Math.random()<dt*2.2)o.panic=Math.max(o.panic,s.panic*.8);}
+  }
+  const fric=s.inPen?3.2:2.0;s.vx*=Math.exp(-fric*dt);s.vy*=Math.exp(-fric*dt);
+  const cap=(95*s.T.speed)*(1+s.panic*.5),v=hyp(s.vx,s.vy);if(v>cap){s.vx*=cap/v;s.vy*=cap/v;}
+  s.x+=s.vx*dt;s.y+=s.vy*dt;collide(s,s.T.r,.2);
+  if(Math.abs(s.vx)>3)s.face=s.vx>0?1:-1;
+  const P=G.pen;
+  if(!s.inPen&&s.x>P.x+16&&s.x<P.x+P.w-6&&s.y>P.y+6&&s.y<P.y+P.h-6){s.inPen=true;addText(s.x,s.y-12,'+1','#9aff9a');dust(s.x,s.y,6,'#fff6c8');}
+  if(s.inPen){ // the gate swings shut behind them
+   const r=s.T.r;if(s.x<P.x+r+3&&s.vx<0){s.vx=Math.abs(s.vx)*.3;}
+   s.x=clamp(s.x,P.x+r+2,P.x+P.w-r-2);s.y=clamp(s.y,P.y+r+2,P.y+P.h-r-2);}
+ }
+ G.inPen=G.sheep.filter(s=>s.inPen).length;
+}
+/* ---------------- main update ---------------- */
+function update(dt){
+ G.t+=dt;G.msgT=Math.max(0,(G.msgT||0)-dt);
+ for(const p of G.parts){p.t-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;}G.parts=G.parts.filter(p=>p.t>0);
+ for(const t of G.texts){t.t-=dt;t.y-=18*dt;}G.texts=G.texts.filter(t=>t.t>0);
+ for(const r of G.rings){r.t-=dt;r.r+=(r.max-r.r)*Math.min(1,dt*9);}G.rings=G.rings.filter(r=>r.t>0);
+ if(G.state!=='play')return;
+ if(G.bot)botThink(dt);
+ updateDog(dt);updateHelper(dt);updateSheep(dt);
+ G.time-=dt;
+ if(G.inPen>=G.need){win();}
+ else if(G.time<=0){G.time=0;G.state='lost';G.best=Math.max(G.best,G.round);}
+}
+function win(){
+ G.state='won';const left=G.time/G.limit;G.stars=1+(left>.25?1:0)+(left>.5?1:0);G.score+=Math.round(100*G.round+G.time*5+G.inPen*10);
+ const pool=PERKS.filter(p=>!(p.max&&perk(p.id)>=p.max));G.offers=[];while(G.offers.length<3&&pool.length)G.offers.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+ G.best=Math.max(G.best,G.round);
+}
+
+/* ---------------- a bot that herds, for testing ---------------- */
+function botThink(dt){
+ const d=G.dog,loose=G.sheep.filter(s=>!s.inPen);if(!loose.length)return;
+ const g={x:G.pen.x+G.pen.w*.6,y:G.pen.gy};
+ let cx=0,cy=0;for(const s of loose){cx+=s.x;cy+=s.y;}cx/=loose.length;cy/=loose.length;
+ let fr=0;for(const s of loose)fr=Math.max(fr,hyp(s.x-cx,s.y-cy));
+ // the straggler furthest from the gate (relative to the flock centre) is the one to push
+ let tgt=loose[0],best=-1e9;for(const s of loose){const sc=hyp(s.x-g.x,s.y-g.y)+hyp(s.x-cx,s.y-cy)*.6;if(sc>best){best=sc;tgt=s;}}
+ const ux=(tgt.x-g.x),uy=(tgt.y-g.y),ul=hyp(ux,uy)||1;
+ const px=tgt.x+ux/ul*72,py=tgt.y+uy/ul*72;
+ const R=fr+88,da=Math.atan2(d.y-cy,d.x-cx),pa=Math.atan2(py-cy,px-cx);let dA=pa-da;while(dA>Math.PI)dA-=TAU;while(dA<-Math.PI)dA+=TAU;
+ const dd=hyp(d.x-cx,d.y-cy),nearFlock=dd<R+30;
+ d.crouch=hyp(d.x-px,d.y-py)<70&&Math.abs(dA)<.5;
+ if(Math.abs(dA)>.5&&hyp(d.x-px,d.y-py)>60){const a=da+Math.sign(dA)*Math.min(.5,Math.abs(dA));d.tx=cx+Math.cos(a)*Math.max(R,dd);d.ty=cy+Math.sin(a)*Math.max(R,dd);}
+ else{d.tx=px+(tgt.x-px)*(hyp(d.x-px,d.y-py)<40?.5:0);d.ty=py+(tgt.y-py)*(hyp(d.x-px,d.y-py)<40?.5:0);}
+ void nearFlock;
+}
+
+/* ---------------- input ---------------- */
+const keys={l:0,r:0,u:0,d:0};
+let ptr={id:-1},btn={bark:null,crouch:null},holdIds={};
+const BTN_BARK={x:W-130,y:H-120,r:46},BTN_CROUCH={x:W-250,y:H-100,r:40};
+function pt(e){const b=cv.getBoundingClientRect(),sc=Math.min(b.width/W,b.height/H),ox=(b.width-W*sc)/2,oy=(b.height-H*sc)/2;return {x:(e.clientX-b.left-ox)/sc,y:(e.clientY-b.top-oy)/sc};}
+const inBtn=(p,B)=>hyp(p.x-B.x,p.y-B.y)<B.r+8;
+cv.addEventListener('pointerdown',e=>{
+ const p=pt(e);try{cv.setPointerCapture(e.pointerId);}catch(_){}
+ if(G.state==='ready'){newRound();return;}
+ if(G.state==='lost'){G.round=1;G.perks={};G.score=0;newRound();return;}
+ if(G.state==='won'){
+  const ofs=layoutOffers();for(let i=0;i<ofs.length;i++){const o=ofs[i];if(p.x>o.x&&p.x<o.x+o.w&&p.y>o.y&&p.y<o.y+o.h){G.perks[G.offers[i].id]=perk(G.offers[i].id)+1;G.round++;newRound();return;}}return;}
+ if(G.state!=='play')return;
+ if(inBtn(p,BTN_BARK)){bark();holdIds[e.pointerId]='bark';return;}
+ if(inBtn(p,BTN_CROUCH)){G.dog.crouch=true;holdIds[e.pointerId]='crouch';return;}
+ if(ptr.id<0){ptr.id=e.pointerId;G.dog.tx=p.x;G.dog.ty=p.y;}
+});
+cv.addEventListener('pointermove',e=>{if(e.pointerId===ptr.id){const p=pt(e);G.dog.tx=p.x;G.dog.ty=p.y;}});
+const up=e=>{if(e.pointerId===ptr.id)ptr.id=-1;if(holdIds[e.pointerId]==='crouch'&&G.dog)G.dog.crouch=false;delete holdIds[e.pointerId];};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+addEventListener('keydown',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a')keys.l=1;if(k==='ArrowRight'||k==='d')keys.r=1;if(k==='ArrowUp'||k==='w')keys.u=1;if(k==='ArrowDown'||k==='s')keys.d=1;
+ if(k===' '){e.preventDefault();if(G.state==='ready'||G.state==='lost'){if(G.state==='lost'){G.round=1;G.perks={};G.score=0;}newRound();}else bark();}
+ if((k==='c'||k==='Shift')&&G.dog)G.dog.crouch=true;
+ if(G.state==='won'&&'123'.includes(k)&&G.offers[+k-1]){G.perks[G.offers[+k-1].id]=perk(G.offers[+k-1].id)+1;G.round++;newRound();}});
+addEventListener('keyup',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a')keys.l=0;if(k==='ArrowRight'||k==='d')keys.r=0;if(k==='ArrowUp'||k==='w')keys.u=0;if(k==='ArrowDown'||k==='s')keys.d=0;if((k==='c'||k==='Shift')&&G.dog)G.dog.crouch=false;});
+
+/* ---------------- drawing (placeholder vector art; Pixel Lab sprites come next) ---------------- */
+function drawGrass(){
+ c.fillStyle='#5f9a48';c.fillRect(0,0,W,H);
+ for(let y=0;y<H;y+=36)for(let x=0;x<W;x+=36){const a=((x/36+y/36)%2)?'#68a44e':'#5a9444';c.fillStyle=a;c.fillRect(x,y,36,36);}
+ let s=7;const R=()=>(s=(s*16807)%2147483647)/2147483647;
+ for(let i=0;i<220;i++){const x=R()*W,y=R()*H;c.fillStyle=R()<.5?'#4f8a3c':'#79b45c';c.fillRect(x,y,2,4);}
+}
+function drawPen(){
+ const P=G.pen;if(!P)return;c.fillStyle='rgba(120,90,50,.35)';c.fillRect(P.x,P.y,P.w,P.h);
+ c.fillStyle='rgba(255,240,170,.18)';c.fillRect(P.x,P.y,P.w,P.h);
+ // gate marker
+ c.fillStyle='#ffd24a';const pulse=3+Math.sin(G.t*5)*2;c.fillRect(P.x-4,P.gy-P.gap/2,4,P.gap);c.globalAlpha=.5;c.fillRect(P.x-14-pulse,P.gy-3,14,6);c.globalAlpha=1;
+ for(const w of G.walls){c.strokeStyle='#5a3a1c';c.lineWidth=6;c.beginPath();c.moveTo(w[0],w[1]);c.lineTo(w[2],w[3]);c.stroke();c.strokeStyle='#a8743c';c.lineWidth=3;c.stroke();
+  const l=hyp(w[2]-w[0],w[3]-w[1]),n=Math.max(1,Math.floor(l/26));for(let i=0;i<=n;i++){const x=w[0]+(w[2]-w[0])*i/n,y=w[1]+(w[3]-w[1])*i/n;c.fillStyle='#6a4420';c.fillRect(x-3,y-3,6,6);}}
+}
+function drawRocks(){for(const k of G.rocks){c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(k.x+3,k.y+k.r*.7,k.r,k.r*.5,0,0,TAU);c.fill();c.fillStyle='#8a8a92';c.beginPath();c.arc(k.x,k.y,k.r,0,TAU);c.fill();c.fillStyle='#a8a8b0';c.beginPath();c.arc(k.x-k.r*.25,k.y-k.r*.3,k.r*.65,0,TAU);c.fill();}}
+function drawSheep(s){
+ const r=s.T.r,b=Math.abs(Math.sin(s.hop))*-2;
+ c.fillStyle='rgba(0,0,0,.22)';c.beginPath();c.ellipse(s.x,s.y+r*.7,r*1.1,r*.45,0,0,TAU);c.fill();
+ const f=s.face;c.save();c.translate(Math.round(s.x),Math.round(s.y+b));
+ c.fillStyle='#2a2428';c.fillRect(-r*.5,r*.4,2,4);c.fillRect(r*.3,r*.4,2,4);
+ const body=s.flash>0?'#ffe9a8':s.panic>.5?'#ffd8d0':s.T.col;
+ c.fillStyle=body;c.beginPath();c.arc(-r*.35,0,r*.8,0,TAU);c.arc(r*.35,-r*.1,r*.8,0,TAU);c.arc(0,-r*.5,r*.7,0,TAU);c.fill();
+ c.fillStyle='rgba(0,0,0,.08)';c.beginPath();c.arc(0,r*.2,r*.7,0,Math.PI);c.fill();
+ c.fillStyle=s.type==='ram'?'#4a3a2a':'#2a2428';c.beginPath();c.arc(f*r*.95,-r*.1,r*.42,0,TAU);c.fill();
+ if(s.type==='ram'){c.strokeStyle='#d8c8a0';c.lineWidth=2;c.beginPath();c.arc(f*r*.7,-r*.35,r*.35,0,TAU);c.stroke();}
+ c.fillStyle='#fff';c.fillRect(f*r*1.05,-r*.25,1.5,1.5);
+ if(s.panic>.4){c.fillStyle='#ff6a6a';c.fillRect(-1,-r*1.4,2,4);c.fillRect(-1,-r*1.4+5,2,2);}
+ c.restore();
+}
+function drawDog(d,col,crouch){
+ const sq=crouch?.7:1;c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(d.x,d.y+6,11,4,0,0,TAU);c.fill();
+ c.save();c.translate(Math.round(d.x),Math.round(d.y));c.scale(d.face,1);
+ const leg=Math.sin(d.run*2)*3*(crouch?.3:1);
+ c.fillStyle='#1c1816';c.fillRect(-7,3,3,4+leg*.4);c.fillRect(5,3,3,4-leg*.4);c.fillRect(-3,3,3,4-leg*.4);c.fillRect(2,3,3,4+leg*.4);
+ c.fillStyle=col;c.beginPath();c.ellipse(0,-1*sq+(crouch?3:0),9,4.6*sq,0,0,TAU);c.fill();
+ c.fillStyle='#f2efe6';c.beginPath();c.ellipse(3,0+(crouch?3:0),4,3*sq,0,0,TAU);c.fill();
+ c.fillStyle=col;c.beginPath();c.arc(10,-3*sq+(crouch?4:0),4.2,0,TAU);c.fill();
+ c.fillStyle='#f2efe6';c.fillRect(11,-2*sq+(crouch?4:0),3,2.5);c.fillStyle='#1c1816';c.fillRect(13,-4*sq+(crouch?4:0),1.5,1.5);c.fillRect(8,-8*sq+(crouch?4:0),2,4);
+ c.strokeStyle=col;c.lineWidth=2.4;c.beginPath();c.moveTo(-8,-2);c.quadraticCurveTo(-14,-6+Math.sin(G.t*14)*2,-15,-2);c.stroke();c.strokeStyle='#f2efe6';c.beginPath();c.moveTo(-14,-4);c.lineTo(-15,-2);c.stroke();
+ c.restore();
+}
+function btnDraw(B,label,on){c.globalAlpha=on?.9:.6;c.fillStyle=on?'#ffd24a':'#2a1a30';c.beginPath();c.arc(B.x,B.y,B.r,0,TAU);c.fill();c.strokeStyle='#ffb84a';c.lineWidth=3;c.stroke();c.globalAlpha=1;c.fillStyle=on?'#2a1408':'#ffe9c0';c.font='bold 15px monospace';c.textAlign='center';c.fillText(label,B.x,B.y+5);}
+function txt(s,x,y,col='#fff',size=16,al='left'){c.font=`bold ${size}px monospace`;c.textAlign=al;c.fillStyle='rgba(0,0,0,.55)';c.fillText(s,x+1.5,y+1.5);c.fillStyle=col;c.fillText(s,x,y);}
+function layoutOffers(){const n=G.offers.length,w=250,gap=18,x0=(W-(n*w+(n-1)*gap))/2;return G.offers.map((o,i)=>({x:x0+i*(w+gap),y:170,w,h:210}));}
+function render(){
+ drawGrass();drawPen();drawRocks();
+ for(const r of G.rings){c.strokeStyle=`rgba(255,255,255,${clamp(r.t*2.2,0,.7)})`;c.lineWidth=3;c.beginPath();c.arc(r.x,r.y,r.r,0,TAU);c.stroke();}
+ if(G.dog&&G.state!=='ready'){
+  const d=G.dog,Z=120*zoneMult();c.strokeStyle=d.crouch?'rgba(160,220,255,.45)':'rgba(255,255,255,.14)';c.lineWidth=1.5;c.setLineDash([5,6]);c.beginPath();c.arc(d.x,d.y,Z,0,TAU);c.stroke();c.setLineDash([]);
+ }
+ const list=G.sheep.map(s=>({y:s.y,s})).concat(G.dog?[{y:G.dog.y,dog:1}]:[]).concat(G.helper?[{y:G.helper.y,helper:1}]:[]).sort((a,b)=>a.y-b.y);
+ for(const o of list){if(o.s)drawSheep(o.s);else if(o.dog)drawDog(G.dog,'#2a2220',G.dog.crouch);else drawDog(G.helper,'#6a4a2a',false);}
+ for(const p of G.parts){c.globalAlpha=clamp(p.t/p.max*1.5,0,1);c.fillStyle=p.col;c.fillRect(p.x-p.r/2,p.y-p.r/2,p.r,p.r);}c.globalAlpha=1;
+ for(const t of G.texts){c.globalAlpha=clamp(t.t*2,0,1);txt(t.s,t.x,t.y,t.col,13,'center');}c.globalAlpha=1;
+ // hud
+ if(G.state==='play'||G.state==='won'||G.state==='lost'){
+  c.fillStyle='rgba(20,12,26,.78)';c.fillRect(0,0,W,40);
+  txt('ROUND '+G.round,14,26,'#ffd24a',17);
+  txt('TIME '+Math.ceil(G.time),170,26,G.time<15?'#ff8a6a':'#fff',17);
+  txt(`PEN ${G.inPen}/${G.need}  (of ${G.sheep.length})`,300,26,'#9aff9a',17);
+  txt('SCORE '+G.score,560,26,'#ffe9a8',15);
+  const pk=PERKS.filter(p=>perk(p.id));pk.forEach((p,i)=>{c.fillStyle='#ffd24a';c.beginPath();c.arc(W-30-i*26,20,10,0,TAU);c.fill();txt(p.ic,W-30-i*26,25,'#2a1408',13,'center');});
+ }
+ if(G.state==='play'){
+  btnDraw(BTN_BARK,G.barkCd>0?(G.barkCd).toFixed(1):'BARK',G.barkCd<=0);
+  btnDraw(BTN_CROUCH,'CROUCH',G.dog&&G.dog.crouch);
+  if(G.msgT>0){c.globalAlpha=clamp(G.msgT,0,1);txt(G.msg,W/2,110,'#fff',34,'center');c.globalAlpha=1;}
+ }
+ if(G.state==='ready'){c.fillStyle='rgba(10,20,10,.6)';c.fillRect(0,0,W,H);txt('SHEEPDOG',W/2,170,'#fff6c8',60,'center');
+  txt('Sheep run from you. Steer the flock through the gate.',W/2,225,'#e8f0d8',18,'center');
+  txt('Drag to run.  BARK = burst.  CROUCH = calm, steady pressure.',W/2,256,'#e8f0d8',16,'center');
+  txt('Keys: WASD/arrows, Space = bark, C = crouch',W/2,282,'#b8c8a8',14,'center');
+  txt('TAP TO START',W/2,350,'#ffd24a',26,'center');}
+ if(G.state==='won'){c.fillStyle='rgba(10,20,10,.72)';c.fillRect(0,0,W,H);
+  txt('ROUND '+G.round+' CLEARED!',W/2,92,'#ffd24a',38,'center');txt('★'.repeat(G.stars)+'☆'.repeat(3-G.stars)+'   '+Math.ceil(G.time)+'s left',W/2,128,'#fff',20,'center');
+  txt('Pick a perk',W/2,160,'#e8f0d8',16,'center');
+  layoutOffers().forEach((o,i)=>{const p=G.offers[i];c.fillStyle='rgba(30,22,40,.95)';c.fillRect(o.x,o.y,o.w,o.h);c.strokeStyle='#ffb84a';c.lineWidth=3;c.strokeRect(o.x,o.y,o.w,o.h);
+   c.fillStyle='#ffd24a';c.beginPath();c.arc(o.x+o.w/2,o.y+54,28,0,TAU);c.fill();txt(p.ic,o.x+o.w/2,o.y+64,'#2a1408',30,'center');
+   txt(p.n,o.x+o.w/2,o.y+120,'#fff',19,'center');
+   const words=p.d.split(' ');let line='',yy=o.y+148;for(const w of words){if((line+' '+w).length>26){txt(line,o.x+o.w/2,yy,'#d8c8b0',14,'center');yy+=18;line=w;}else line=(line+' '+w).trim();}txt(line,o.x+o.w/2,yy,'#d8c8b0',14,'center');
+   txt(String(i+1),o.x+12,o.y+22,'#9a8a7a',14);});}
+ if(G.state==='lost'){c.fillStyle='rgba(30,10,10,.75)';c.fillRect(0,0,W,H);txt('THE FLOCK SCATTERED',W/2,200,'#ff8a6a',44,'center');
+  txt(`You reached round ${G.round}   Score ${G.score}   Best round ${G.best}`,W/2,246,'#fff',20,'center');txt('TAP TO TRY AGAIN',W/2,320,'#ffd24a',26,'center');}
+}
+/* ---------------- loop ---------------- */
+let last=performance.now(),acc=0;
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+window.__sd={G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>{G.round=1;G.perks={};G.score=0;newRound();},next:i=>{G.perks[G.offers[i||0].id]=perk(G.offers[i||0].id)+1;G.round++;newRound();},bot:v=>{G.bot=v;},bark,render};
+})();
+</script></body></html>
