@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Hot &amp; Hangry - Sunny Town slice</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<style>html,body{margin:0;height:100%;background:#120c14;overflow:hidden;touch-action:none;user-select:none}
+#g{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);image-rendering:pixelated;background:#222}
+#h{position:fixed;left:8px;bottom:6px;color:#fff8;font:11px ui-monospace,monospace}</style></head>
+<body><canvas id="g"></canvas><div id="h">Sunny Town art slice: drag / WASD to drive</div>
+<script>
+(()=>{
+const LW=480,LH=270,SC=2,TAU=Math.PI*2,cvs=document.getElementById('g'),c=cvs.getContext('2d');cvs.width=LW*SC;cvs.height=LH*SC;
+function fit(){const s=Math.min(innerWidth/LW,innerHeight/LH);cvs.style.width=LW*s+'px';cvs.style.height=LH*s+'px';}fit();addEventListener('resize',fit);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v,rnd=(a,b)=>a+Math.random()*(b-a),hash=(a,b)=>{let h=(Math.imul(a|0,374761393)^Math.imul(b|0,668265263))>>>0;h=Math.imul(h^(h>>>13),1274126177)>>>0;return((h^(h>>>16))>>>0)/4294967296;};
+const DIRS=['east','south-east','south','south-west','west','north-west','north','north-east'];
+const IM={};let loaded=0,need=0;
+function load(n,src){need++;const im=new Image();im.onload=()=>{IM[n]=im;loaded++;};im.src=src;}
+['shop_orange','shop_green','tree','terrace'].forEach(n=>load(n,'assets/sl/'+n+'.png'));
+DIRS.forEach(d=>{load('truck_'+d,'assets/sl/truck_'+d+'.png');load('sedan_'+d,'assets/sl/sedan_'+d+'.png');});
+// ---------- the world: one horizontal and one vertical street, shops on the north side, gardens on the south ----------
+const W=1500,H=980,RY=520,RH=92,RX=760,RW=92,SW=34; // road centre lines, road widths, sidewalk width
+const solids=[],dyn=[];
+function shop(x,y,k){const w=128,h=128;dyn.push({k:'shop',img:k,x,y,w,h,by:y+h-4});solids.push({x:x+6,y:y+30,w:w-12,h:h-34});}
+let x0=40;for(const k of ['shop_orange','shop_green','shop_orange','shop_green','shop_orange']){if(x0+128>RX-RW/2-SW-6)break;shop(x0,RY-RH/2-SW-128+6,k);x0+=122;}
+x0=RX+RW/2+SW+10;for(const k of ['shop_green','shop_orange','shop_green','shop_orange']){if(x0+128>W-10)break;shop(x0,RY-RH/2-SW-128+6,k);x0+=122;}
+// second row of shops further north
+x0=30;for(const k of ['shop_green','shop_orange','shop_green','shop_orange','shop_green']){shop(x0,60,k);x0+=132;}x0=RX+RW/2+SW+30;for(const k of ['shop_orange','shop_green']){shop(x0,60,k);x0+=132;}
+// south side: terraces, trees
+const SY=RY+RH/2+SW;
+for(let i=0;i<9;i++){const x=40+i*150+hash(i,1)*30;if(x>RX-RW/2-80&&x<RX+RW/2+20)continue;if(i%3===0)dyn.push({k:'terrace',img:'terrace',x:x,y:SY+20,w:96,h:96,by:SY+20+92});else{dyn.push({k:'tree',img:'tree',x:x+10,y:SY+10+hash(i,2)*30,w:64,h:64,by:0});solids.push({x:x+34,y:SY+10+hash(i,2)*30+44,w:12,h:12});}}
+for(let i=0;i<10;i++){const x=60+i*140+hash(i,5)*50,y=SY+170+hash(i,6)*80;if(Math.abs(x-RX)<RW)continue;dyn.push({k:'tree',img:'tree',x,y,w:64,h:64,by:0});solids.push({x:x+26,y:y+46,w:12,h:12});}
+for(let i=0;i<7;i++){const x=40+i*210+hash(i,9)*40,y=20+hash(i,3)*20;dyn.push({k:'tree',img:'tree',x,y,w:64,h:64,by:0});}
+dyn.forEach(d=>{if(d.k==='tree')d.by=d.y+54;});
+// ---------- baked ground ----------
+const ground=document.createElement('canvas');ground.width=W;ground.height=H;
+function bake(){const q=ground.getContext('2d');
+  q.fillStyle='#6e8a52';q.fillRect(0,0,W,H);for(let i=0;i<2600;i++){q.fillStyle=hash(i,3)>.5?'#7a9a5c':'#5f7a46';q.fillRect(hash(i,1)*W,hash(i,2)*H,2+hash(i,4)*3,2);}
+  const pave=(x,y,w,h)=>{q.fillStyle='#cdbd9f';q.fillRect(x,y,w,h);q.fillStyle='#bba98a';for(let gx=x;gx<x+w;gx+=16)q.fillRect(gx,y,1,h);for(let gy=y;gy<y+h;gy+=16)q.fillRect(x,gy,w,1);for(let i=0;i<w*h/90;i++){q.fillStyle=hash(i,x)>.5?'#d8c9ad':'#b3a183';q.fillRect(x+hash(i,y)*w,y+hash(i,x+9)*h,2,2);}};
+  pave(0,0,W,RY-RH/2-SW);
+  // sidewalks along both streets
+  pave(0,RY-RH/2-SW,W,SW);pave(0,RY+RH/2,W,SW);pave(RX-RW/2-SW,0,SW,RY-RH/2-SW);pave(RX+RW/2,0,SW,RY-RH/2-SW);pave(RX-RW/2-SW,RY+RH/2+SW,SW,H);pave(RX+RW/2,RY+RH/2+SW,SW,H);
+  pave(RX-RW/2-SW,RY-RH/2-SW,RW+2*SW,RH+2*SW);
+  // road
+  const road=(x,y,w,h)=>{q.fillStyle='#6a776e';q.fillRect(x,y,w,h);for(let i=0;i<w*h/70;i++){q.fillStyle=hash(i,x)>.5?'#738177':'#616d65';q.fillRect(x+hash(i,y)*w,y+hash(i,x+4)*h,2,2);}};
+  road(0,RY-RH/2,W,RH);road(RX-RW/2,0,RW,H);
+  // curbs
+  q.fillStyle='#8a8070';q.fillRect(0,RY-RH/2-2,W,2);q.fillRect(0,RY+RH/2,W,2);
+  // lane markings
+  q.fillStyle='#d6d2a0';for(let x=0;x<W;x+=34){if(Math.abs(x-RX)<RW)continue;q.fillRect(x,RY-1,18,3);}for(let y=0;y<H;y+=34){if(Math.abs(y-RY)<RH)continue;q.fillRect(RX-1,y,3,18);}
+  // crosswalks
+  q.fillStyle='#ece8d4';for(let i=0;i<8;i++){q.fillRect(RX-RW/2-SW+4,RY-RH/2+6+i*11,SW-8,6);q.fillRect(RX+RW/2+4,RY-RH/2+6+i*11,SW-8,6);q.fillRect(RX-RW/2+6+i*11,RY-RH/2-SW+4,6,SW-8);q.fillRect(RX-RW/2+6+i*11,RY+RH/2+4,6,SW-8);}
+  // street furniture: bins, hydrants, manholes
+  for(let i=0;i<14;i++){const x=40+i*104,y=RY-RH/2-SW+8+hash(i,1)*10;if(Math.abs(x-RX)<RW+20)continue;q.fillStyle='#4a5048';q.fillRect(x,y,7,9);q.fillStyle='#69706a';q.fillRect(x,y,7,3);}
+  for(let i=0;i<6;i++){const x=100+i*230,y=RY+RH/2+8;if(Math.abs(x-RX)<RW+20)continue;q.fillStyle='#c0392b';q.fillRect(x,y,5,8);q.fillStyle='#e8584a';q.fillRect(x,y,5,2);}
+  for(let i=0;i<5;i++){q.fillStyle='#55605a';q.beginPath();q.arc(120+i*290,RY+14,6,0,TAU);q.fill();q.fillStyle='#6a756e';q.beginPath();q.arc(120+i*290,RY+14,4,0,TAU);q.fill();}
+}
+// ---------- vehicles ----------
+const truck={x:RX-170,y:RY+RH/4,vx:0,vy:0,ang:0};
+const cars=[];for(let i=0;i<6;i++){const hz=i%2===0;cars.push({hz,dir:i%4<2?1:-1,x:hz?rnd(0,W):RX+(i%4<2?-20:20),y:hz?RY+(i%4<2?-20:20):rnd(0,H),spd:rnd(40,70)});}
+// ---------- input ----------
+const K={};addEventListener('keydown',e=>K[e.key.toLowerCase()]=1);addEventListener('keyup',e=>K[e.key.toLowerCase()]=0);
+let J=null;const pt=e=>{const r=cvs.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*LW,y:(e.clientY-r.top)/r.height*LH};};
+cvs.addEventListener('pointerdown',e=>{cvs.setPointerCapture(e.pointerId);const p=pt(e);J={id:e.pointerId,ox:p.x,oy:p.y,x:p.x,y:p.y};});
+cvs.addEventListener('pointermove',e=>{if(J&&e.pointerId===J.id){const p=pt(e);J.x=p.x;J.y=p.y;}});
+const up=e=>{if(J&&e.pointerId===J.id)J=null;};cvs.addEventListener('pointerup',up);cvs.addEventListener('pointercancel',up);
+function stick(){let ax=(K.d||K.arrowright?1:0)-(K.a||K.arrowleft?1:0),ay=(K.s||K.arrowdown?1:0)-(K.w||K.arrowup?1:0);if(J){const dx=J.x-J.ox,dy=J.y-J.oy,l=Math.hypot(dx,dy),k=Math.min(1,l/30);if(l>3){ax+=dx/l*k;ay+=dy/l*k;}}const l=Math.hypot(ax,ay);if(l>1){ax/=l;ay/=l;}return{x:ax,y:ay};}
+// ---------- loop ----------
+let last=0,t=0,cam={x:0,y:0},baked=false;
+function update(dt){const v=stick(),sp=125;truck.vx+=(v.x*sp-truck.vx)*Math.min(1,dt*5);truck.vy+=(v.y*sp-truck.vy)*Math.min(1,dt*5);
+  truck.x=clamp(truck.x+truck.vx*dt,20,W-20);truck.y=clamp(truck.y+truck.vy*dt,20,H-20);
+  for(const s of solids){const l=s.x-12,r=s.x+s.w+12,tp=s.y-12,bt=s.y+s.h+12;if(truck.x>l&&truck.x<r&&truck.y>tp&&truck.y<bt){const dl=truck.x-l,dr=r-truck.x,du=truck.y-tp,dd=bt-truck.y,m=Math.min(dl,dr,du,dd);if(m===dl)truck.x=l;else if(m===dr)truck.x=r;else if(m===du)truck.y=tp;else truck.y=bt;truck.vx*=.3;truck.vy*=.3;}}
+  if(Math.hypot(truck.vx,truck.vy)>14){const ta=Math.atan2(truck.vy,truck.vx);let da=ta-truck.ang;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;truck.ang+=da*Math.min(1,dt*9);}
+  for(const cr of cars){if(cr.hz){cr.x+=cr.dir*cr.spd*dt;if(cr.x>W+30)cr.x=-30;if(cr.x<-30)cr.x=W+30;}else{cr.y+=cr.dir*cr.spd*dt;if(cr.y>H+30)cr.y=-30;if(cr.y<-30)cr.y=H+30;}}
+  cam.x=clamp(truck.x-LW/2,0,W-LW);cam.y=clamp(truck.y-LH/2,0,H-LH);}
+function dirImg(pre,ang){const i=((Math.round(ang/(Math.PI/4))%8)+8)%8;return IM[pre+'_'+DIRS[i]];}
+function shadow(x,y,rx,ry){c.fillStyle='rgba(20,18,30,.3)';c.beginPath();c.ellipse(x,y,rx,ry,0,0,TAU);c.fill();}
+function render(){
+  c.setTransform(SC,0,0,SC,0,0);c.imageSmoothingEnabled=false;c.fillStyle='#222';c.fillRect(0,0,LW,LH);
+  if(loaded<need){c.fillStyle='#fff';c.font='10px monospace';c.fillText('loading...',20,20);return;}
+  if(!baked){bake();baked=true;}
+  const cx=Math.round(cam.x),cy=Math.round(cam.y);c.drawImage(ground,cx,cy,LW,LH,0,0,LW,LH);
+  const items=[];for(const d of dyn)items.push({y:d.by,d});items.push({y:truck.y+18,truck:1});for(const cr of cars)items.push({y:cr.y+12,cr});items.sort((a,b)=>a.y-b.y);
+  for(const it of items){
+    if(it.d){const d=it.d;if(d.x>cx+LW||d.x+d.w<cx||d.y>cy+LH||d.y+d.h<cy)continue;if(d.k==='shop'){c.fillStyle='rgba(20,18,30,.28)';c.fillRect(d.x-cx+10,d.y-cy+d.h-6,d.w-4,10);}else if(d.k==='tree')shadow(d.x+32-cx,d.y+58-cy,22,7);c.drawImage(IM[d.img],d.x-cx,d.y-cy,d.w,d.h);}
+    else if(it.truck){shadow(truck.x-cx,truck.y+14-cy,26,9);const im=dirImg('truck',truck.ang);c.drawImage(im,Math.round(truck.x-cx-32),Math.round(truck.y-cy-40),64,64);}
+    else{const cr=it.cr,ang=cr.hz?(cr.dir>0?0:Math.PI):(cr.dir>0?Math.PI/2:-Math.PI/2);shadow(cr.x-cx,cr.y+9-cy,18,6);c.drawImage(dirImg('sedan',ang),Math.round(cr.x-cx-24),Math.round(cr.y-cy-28),48,48);}
+  }
+  if(J){c.globalAlpha=.35;c.fillStyle='#fff';c.beginPath();c.arc(J.ox,J.oy,26,0,TAU);c.fill();c.globalAlpha=.6;c.beginPath();const dx=J.x-J.ox,dy=J.y-J.oy,l=Math.min(26,Math.hypot(dx,dy)),a=Math.atan2(dy,dx);c.arc(J.ox+Math.cos(a)*l,J.oy+Math.sin(a)*l,11,0,TAU);c.fill();c.globalAlpha=1;}
+}
+function frame(now){const dt=Math.min(.05,(now-last)/1000||0);last=now;t+=dt;try{update(dt);render();}catch(e){console.error(e);}requestAnimationFrame(frame);}requestAnimationFrame(n=>{last=n;frame(n);});
+window.__sl={truck,render};
+})();
+</script></body></html>
