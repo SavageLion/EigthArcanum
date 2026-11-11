@@ -1,0 +1,47 @@
+class_name U
+extends RefCounted
+# small helpers shared by the scripts
+
+static func frames(tex: Texture2D, cell: int, names: Array, nframes: int = 9, fps: float = 10.0) -> SpriteFrames:
+	var sf := SpriteFrames.new()
+	sf.remove_animation("default")
+	for r in names.size():
+		var a: String = "walk_" + String(names[r])
+		sf.add_animation(a)
+		sf.set_animation_speed(a, fps)
+		sf.set_animation_loop(a, true)
+		for i in range(1, nframes):
+			sf.add_frame(a, _at(tex, i * cell, r * cell, cell))
+		var ia: String = "idle_" + String(names[r])
+		sf.add_animation(ia)
+		sf.set_animation_speed(ia, 1.0)
+		sf.set_animation_loop(ia, true)
+		sf.add_frame(ia, _at(tex, 0, r * cell, cell))
+	return sf
+
+static func _at(tex: Texture2D, x: int, y: int, cell: int) -> AtlasTexture:
+	var at := AtlasTexture.new()
+	at.atlas = tex
+	at.region = Rect2(x, y, cell, cell)
+	return at
+
+static func shadow_texture() -> Texture2D:
+	var g := Gradient.new()
+	g.set_color(0, Color(0, 0, 0, 0.42))
+	g.set_color(1, Color(0, 0, 0, 0.0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 64
+	gt.height = 64
+	return gt
+
+static func row_for(v: Vector2, has5: bool) -> String:
+	# which of the sheet rows to show for a velocity: east / north / south / south-east / north-east
+	if absf(v.y) > absf(v.x) * 1.4:
+		if has5:
+			return "north-east" if v.y < 0.0 else "south-east"
+		return "north" if v.y < 0.0 else "south"
+	return "east"
