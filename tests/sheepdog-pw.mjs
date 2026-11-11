@@ -8,6 +8,7 @@ await new Promise(r=>srv.on('listening',r));
 const b=await chromium.launch({channel:'chrome'}),page=await b.newPage({viewport:{width:960,height:540}});const errs=[];
 page.on('pageerror',e=>errs.push(e.message));
 await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTimeout(500);
+await page.evaluate(()=>window.__sd.setExperiments(true));
 const W=await page.evaluate(()=>window.__sd.W());
 await page.mouse.click(W-190-14+95,426+15);await page.waitForTimeout(120);
 const turnBtn=await page.evaluate(()=>({state:window.__sd.G.state,mode:window.__sd.pw.PW.mode}));

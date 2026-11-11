@@ -190,6 +190,7 @@ function actStep(s,dt){
   return true;}
  return false;
 }
+let EXPERIMENTS=false;   // the parked night / chore prototypes: their home-screen test buttons are hidden until we have a night we like
 let NIGHT=false;   // the night mode is parked while we design a new night mini-game; the code stays
 const NIGHTPERKS=['lantern','flare','campfire','fence'];
 const perkPool=()=>PERKS.filter(p=>!(p.max&&perk(p.id)>=p.max)&&(NIGHT||!NIGHTPERKS.includes(p.id)));
@@ -722,9 +723,9 @@ cv.addEventListener('pointerdown',e=>{
  if(G.state==='play'&&G.mode==='night'&&G.allies&&G.allies.length&&inRect(p,FM)){G.form=G.form==='post'?'gate':G.form==='gate'?'chase':'post';return;}
  if(G.state==='ready'){if(p.x>UA.x&&p.x<UA.x+UA.w&&p.y>UA.y&&p.y<UA.y+UA.h){SAVE.unlockAll=!SAVE.unlockAll;if(SAVE.unlockAll)SAVE.bones=Math.max(SAVE.bones||0,999);persist();return;}
   if(inRect(p,RM)){newRun();return;}
-  if(inRect(p,NT)){startPW('turn');return;}
-  if(inRect(p,NT2)){startPW('live');return;}
-  if(p.x>CT.x&&p.x<CT.x+CT.w&&p.y>CT.y&&p.y<CT.y+CT.h){enterChores(['normal','cow','goose','pig','duck','goat'],true);return;}
+  if(EXPERIMENTS&&inRect(p,NT)){startPW('turn');return;}
+  if(EXPERIMENTS&&inRect(p,NT2)){startPW('live');return;}
+  if(EXPERIMENTS&&p.x>CT.x&&p.x<CT.x+CT.w&&p.y>CT.y&&p.y<CT.y+CT.h){enterChores(['normal','cow','goose','pig','duck','goat'],true);return;}
   if(p.x>KB.x&&p.x<KB.x+KB.w&&p.y>KB.y&&p.y<KB.y+KB.h){G.state='kennel';K.sel=SAVE.dog;return;}
   {const o=dogStrip();for(const b of o)if(p.x>b.x&&p.x<b.x+b.w&&p.y>b.y&&p.y<b.y+b.h){setDog(b.id);return;}}for(const m of mapCards())if(p.x>m.x&&p.x<m.x+m.w&&p.y>m.y&&p.y<m.y+m.h){if(MAPS[m.i].ready&&mapUnlocked(m.i))startMap(m.i);return;}return;}
  if(G.state==='lost'||G.state==='victory'||G.state==='dusk'){advance();return;}
@@ -1845,9 +1846,9 @@ function render(){
    if(open){txt('★'.repeat(st)+'☆'.repeat(3-st),m.x+m.w/2,m.y+m.h-44,'#ffd24a',20,'center');txt(SAVE.best[M.id]?'best '+SAVE.best[M.id]:'TAP TO PLAY',m.x+m.w/2,m.y+m.h-16,'#ffe9c0',13,'center');}
    else txt(M.ready?'BEAT MAP '+m.i:'COMING SOON',m.x+m.w/2,m.y+m.h-18,'#8a7f98',13,'center');}
   txt('BONES '+(SAVE.bones||0),W-20,62,'#ffe9a8',17,'right');drawFullBtn();
-  c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT.x,NT.y,NT.w,NT.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT.x,NT.y,NT.w,NT.h);txt('NIGHT: TURN-BASED',NT.x+NT.w/2,NT.y+20,'#d0d8ff',12,'center');
-  c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT2.x,NT2.y,NT2.w,NT2.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT2.x,NT2.y,NT2.w,NT2.h);txt('NIGHT: LIVE + PAUSE',NT2.x+NT2.w/2,NT2.y+20,'#d0d8ff',12,'center');
-  c.fillStyle='rgba(40,60,40,.9)';c.fillRect(CT.x,CT.y,CT.w,CT.h);c.strokeStyle='#9acb8a';c.lineWidth=2;c.strokeRect(CT.x,CT.y,CT.w,CT.h);txt('CHORES (testing)',CT.x+CT.w/2,CT.y+20,'#d8ffd0',12,'center');
+  if(EXPERIMENTS){c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT.x,NT.y,NT.w,NT.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT.x,NT.y,NT.w,NT.h);txt('NIGHT: TURN-BASED',NT.x+NT.w/2,NT.y+20,'#d0d8ff',12,'center');}
+  if(EXPERIMENTS){c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT2.x,NT2.y,NT2.w,NT2.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT2.x,NT2.y,NT2.w,NT2.h);txt('NIGHT: LIVE + PAUSE',NT2.x+NT2.w/2,NT2.y+20,'#d0d8ff',12,'center');}
+  if(EXPERIMENTS){c.fillStyle='rgba(40,60,40,.9)';c.fillRect(CT.x,CT.y,CT.w,CT.h);c.strokeStyle='#9acb8a';c.lineWidth=2;c.strokeRect(CT.x,CT.y,CT.w,CT.h);txt('CHORES (testing)',CT.x+CT.w/2,CT.y+20,'#d8ffd0',12,'center');}
   txt('YOUR DOG',W/2,402,'#ffd24a',14,'center');
   for(const b of dogStrip()){const on=b.id===SAVE.dog;c.fillStyle=on?'rgba(90,70,30,.95)':'rgba(30,26,44,.9)';c.fillRect(b.x,b.y,b.w,b.h);c.strokeStyle=on?'#ffd24a':'#6a6078';c.lineWidth=on?3:2;c.strokeRect(b.x,b.y,b.w,b.h);drawDogIcon(b.id,b.x+b.w/2,b.y+b.h-8,1.0);}
   txt('Left thumb: stick (light push = slow, steady). Right thumb: BARK, hold CALM.',W/2,484,'#b8c8a8',13,'center');
@@ -1885,6 +1886,6 @@ function render(){
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,pw:{PW,start:startPW,place:pwPlace,begin:pwBegin,end:pwEndTurn,tap:pwTap,fire:pwFire,repair:pwRepair,EN,AN,cell:cellXY,toggle:()=>{PW.paused=!PW.paused;}},spawnFox,DEFS,raidP,nite:{NITE,start:startNite,finish:finishNite,tap:niteTap},penInfo:()=>({mode:(G.map.pen||(G.map.center?'center':'edge')),fx:G.pen.x/WX,fy:G.pen.y/WY,dog:[G.dog.x,G.dog.y],world:[WX,WY]}),stam:()=>({stam:G.stam,max:G.stamMax,winded:G.winded}),setSprint:v=>{sprintHeld=!!v;},run:{RUN,RB:()=>RB,new:newRun,enter:enterNode,tap:runTap,startLevel:startRunLevel,EVENTS,reach,applyFx,finish:finishRunLevel,end:endRun2},chores:{enter:enterChores,CS,MINI,start:startChore,down:p=>choreDown(p),move:p=>choreMove(p),up:()=>choreUp(),finish:finishChores,stage},setChores:v=>{CHORES_ON=!!v;},quota,startDay,poolPick,TYPES,spawnFox,spawnBadger,lureZone,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
+window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,setExperiments:v=>{EXPERIMENTS=!!v;},pw:{PW,start:startPW,place:pwPlace,begin:pwBegin,end:pwEndTurn,tap:pwTap,fire:pwFire,repair:pwRepair,EN,AN,cell:cellXY,toggle:()=>{PW.paused=!PW.paused;}},spawnFox,DEFS,raidP,nite:{NITE,start:startNite,finish:finishNite,tap:niteTap},penInfo:()=>({mode:(G.map.pen||(G.map.center?'center':'edge')),fx:G.pen.x/WX,fy:G.pen.y/WY,dog:[G.dog.x,G.dog.y],world:[WX,WY]}),stam:()=>({stam:G.stam,max:G.stamMax,winded:G.winded}),setSprint:v=>{sprintHeld=!!v;},run:{RUN,RB:()=>RB,new:newRun,enter:enterNode,tap:runTap,startLevel:startRunLevel,EVENTS,reach,applyFx,finish:finishRunLevel,end:endRun2},chores:{enter:enterChores,CS,MINI,start:startChore,down:p=>choreDown(p),move:p=>choreMove(p),up:()=>choreUp(),finish:finishChores,stage},setChores:v=>{CHORES_ON=!!v;},quota,startDay,poolPick,TYPES,spawnFox,spawnBadger,lureZone,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
 })();
 </script></body></html>
