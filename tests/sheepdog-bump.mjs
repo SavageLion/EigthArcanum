@@ -2,7 +2,7 @@
 import { chromium } from 'playwright-core';
 import http from 'node:http';import fs from 'node:fs';import path from 'node:path';
 const root=path.resolve('prototypes/sheepdog');
-const srv=http.createServer((q,s)=>{s.setHeader('Content-Type','text/html');s.end(fs.readFileSync(path.join(root,'index.html')));}).listen(0);
+const srv=http.createServer((q,s)=>{const f=path.join(root,q.url.split('?')[0]==='/'?'index.html':q.url.split('?')[0]);try{s.setHeader('Content-Type',{'.html':'text/html','.js':'text/javascript','.png':'image/png'}[path.extname(f)]||'text/plain');s.end(fs.readFileSync(f));}catch(e){s.statusCode=404;s.end('');}}).listen(0);
 await new Promise(r=>srv.on('listening',r));
 const b=await chromium.launch({channel:'chrome'});const page=await b.newPage({viewport:{width:960,height:540}});const errs=[];page.on('pageerror',e=>errs.push(e.message));
 await page.goto('http://localhost:'+srv.address().port+'/');

@@ -4,6 +4,7 @@
 <title>Sheepdog</title>
 <style>html,body{margin:0;height:100%;background:#0f140f;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}canvas{display:block;width:100vw;height:100vh;object-fit:contain;image-rendering:pixelated}</style>
 </head><body><canvas id="c"></canvas>
+<script src="maps.js"></script>
 <script>
 /* Sheepdog: a real-time flock-herding roguelike. You are the dog.
    DAY: sheep run from pressure, so steer the flock through the gate into the pen. The faster you finish, the more lantern oil you earn.
@@ -36,24 +37,23 @@ const G={state:'ready',mode:'day',day:1,perks:{},herd:[],time:0,limit:0,sheep:[]
 const perk=id=>G.perks[id]||0;
 const TYPES={
  normal:{r:7,zone:120,flee:1,speed:1,col:'#f2efe6',n:'Ewe',hp:2},
- ram:{r:9,zone:62,flee:.55,speed:.8,col:'#d8d0bc',n:'Ram',hp:4},
+ ram:{r:9,zone:62,flee:.55,speed:.8,col:'#d8d0bc',n:'Ram',hp:4,heavy:1,barkMul:.4},
  panicky:{r:6.5,zone:175,flee:1.5,speed:1.25,col:'#fff6ea',n:'Panicker',hp:2},
  lamb:{r:4.5,zone:105,flee:1,speed:1.1,col:'#fffdf6',n:'Lamb',hp:1},
  black:{r:7,zone:120,flee:1,speed:1,col:'#3a3438',n:'Black sheep',hp:2},
  goat:{r:7,zone:90,flee:.45,speed:.9,col:'#b8986a',n:'Goat',hp:3},
+ goose:{r:6,zone:150,flee:1.3,speed:1.35,col:'#f4f4f8',n:'Goose',hp:1,coh:.5,barkMul:1.6},
+ duck:{r:5,zone:125,flee:1,speed:1.1,col:'#e8d070',n:'Duck',hp:1,lure:'water',swim:1.4},
+ pig:{r:8,zone:80,flee:.6,speed:.7,col:'#f0b8c0',n:'Pig',hp:3,heavy:1,barkMul:.5,lure:'mud',mud:1},
+ cow:{r:10,zone:70,flee:.45,speed:.6,col:'#c8b8a8',n:'Cow',hp:4,heavy:1,barkMul:.5,coh:1.8},
 };
 
 /* ---------------- seasons: every 3 days, and a new thing gets introduced slowly ---------------- */
 const SEASONS=[{n:'SPRING',gr:['#5f9a48','#68a44e','#5a9444'],mud:2},{n:'SUMMER',gr:['#8aa44a','#94ae54','#809a42'],mud:0},{n:'AUTUMN',gr:['#9a7a3c','#a4843f','#8c6e36'],mud:1},{n:'WINTER',gr:['#dfe8ee','#e8f0f4','#d2dde4'],mud:2}];
-const season=()=>SEASONS[Math.floor((G.day-1)/3)%4];
+const season=()=>SEASONS[Math.floor((G.day-1+((G.map&&G.map.seasonShift)||0))/3)%4];
 const NEWS={2:'Mud slows you and the flock',3:'Black sheep wander. Wolves hunt at night',4:'A stream cuts the field. Eagles take lambs',5:'Goats ignore you until you stare. BEAR NIGHT!',6:'Trees block the way',8:'The gate narrows'};
 /* ---------------- maps and saved progress ---------------- */
-const MAPS=[
- {id:'home',name:'Home Paddock',days:5,ready:true,bear:false,quota:[.4,.6],act:.45,actFrom:3,blurb:'One field. Short and gentle. Learn the ropes.',news:{2:'Mud slows you and the flock',3:'Black sheep wander. Wolves hunt at night',4:'A stream cuts the field. Eagles take lambs',5:'FINAL NIGHT: the alpha pack comes. Goats need a stare'}},
- {id:'hill',name:'Hill Pasture',days:8,ready:true,quota:[.5,.75],wx:2.1,wy:1.7,timeMul:2.3,diff:1,act:1,actFrom:1,blurb:'A wide hillside. Find your flock first.',news:{1:'A wide hillside: find your sheep! Bark to hear them',2:'Sheep may bolt, get stuck, or wander off to hide',3:'Mud and a stream slow you down',4:'Wolves and eagles hunt in the hills',5:'Goats ignore you until you stare',6:'Trees block the way',8:'FINAL NIGHT: bring them all home'}},
- {id:'wood',name:'Wood Edge',days:10,ready:true,quota:[.5,.8],td:true,center:true,dayPred:true,wx:2.2,wy:3.2,timeMul:2.2,diff:2,act:1.1,actFrom:2,blurb:'A pen in the middle, four lanes in. Hold it in waves.',news:{1:'Scouts prowl by day: find your sheep and drive them off!',2:'At dusk spend FEED on fence add-ons and post a dog',3:'Night comes in WAVES down the four lanes',5:'SEND DOG: tap it, then tap where it should go',10:'FINAL NIGHT: hold the pen!'}},
- {id:'river',name:'River Meadow',days:12,blurb:'Mud, a ford, and eagles.'},
- {id:'high',name:'High Pasture',days:15,blurb:'Deep winter. Two bears.'}];
+const MAPS=window.SD_MAPS;   // see maps.js: every map is data
 G.map=MAPS[0];G.runLost=0;
 let SAVE={stars:{},best:{},bones:0,dogs:{},dog:'collie',up:{}};try{SAVE=Object.assign(SAVE,JSON.parse(localStorage.getItem('sheepdog_save')||'{}'));}catch(_){}
 /* ---------------- the kennel: dogs to unlock, and permanent upgrades (paid in bones) ---------------- */
@@ -74,6 +74,7 @@ const UPS=[
  {id:'time',name:'Pocket treats',desc:'+8 s on every day',max:2,cost:[25,50]},
  {id:'oil',name:'Lantern oil',desc:'+20% night oil',max:2,cost:[25,50]},
  {id:'perk',name:'Head start',desc:'Start a run with a random perk',max:2,cost:[50,100]}];
+const upsShown=()=>UPS.filter(u=>NIGHT||!['oil','fence'].includes(u.id));
 const upl=id=>(SAVE.up&&SAVE.up[id])||0;
 function buyDog(id){const d=DOGS.find(x=>x.id===id);if(!d||dogOwned(id)||SAVE.bones<d.price)return false;SAVE.bones-=d.price;SAVE.dogs[id]=true;SAVE.dog=id;persist();return true;}
 function setDog(id){if(dogOwned(id)){SAVE.dog=id;persist();return true;}return false;}
@@ -85,7 +86,8 @@ const UA={x:0,y:0,w:190,h:30},KB={x:14,y:0,w:130,h:30},FM={x:0,y:46,w:150,h:28},
 function startMap(i){if(!MAPS[i]||!MAPS[i].ready)return;G.map=MAPS[i];startGame();}
 function zoneAt(o){for(const z of G.zones||[]){if(z.k==='water'?(o.x>z.x&&o.x<z.x+z.w&&o.y>z.y&&o.y<z.y+z.h):(((o.x-z.x-z.w/2)/(z.w/2))**2+((o.y-z.y-z.h/2)/(z.h/2))**2<1))return z;}return null;}
 /* ---------------- starting a day ---------------- */
-function startGame(){G.failWhy=null;G.runLost=0;G.away=[];G.day=1;G.perks={};G.score=0;G.herd=[];G.lastBones=0;for(let i=0;i<8+upl('flock');i++)G.herd.push({type:'normal'});G.feed=40;G.build={slots:Array(8).fill(null),posts:Array(3).fill(null)};G.form='post';
+function poolPick(day){const pool=(G.map.pool||[{t:'normal',w:1}]).filter(p=>(p.from||1)<=day),tot=pool.reduce((a,p)=>a+p.w,0);let q=Math.random()*tot;for(const p of pool){q-=p.w;if(q<=0)return p.t;}return 'normal';}
+function startGame(){G.failWhy=null;G.runLost=0;G.away=[];G.day=1;G.perks={};G.score=0;G.herd=[];G.lastBones=0;for(let i=0;i<8+upl('flock');i++)G.herd.push({type:poolPick(1)});G.feed=40;G.build={slots:Array(8).fill(null),posts:Array(3).fill(null)};G.form='post';
  for(let i=0;i<upl('perk');i++){const pool=perkPool();if(pool.length){const p=pick(pool);G.perks[p.id]=perk(p.id)+1;}}
  startDay();}
 function mkWall(x1,y1,x2,y2,pen,hp){const w=[x1,y1,x2,y2];w.pen=!!pen;w.max=hp||0;w.hp=hp||0;w.broken=false;w.dig=0;return w;}
@@ -103,18 +105,18 @@ function startDay(){
  const dsx=big?px-240:140,dsy=big?gy:WY/2;       // where the dog starts
  const hx=big?px-300:300,hy=WY/2;                  // (small map) where the flock starts
  G.rocks=[];
- const nr=Math.round((dn>=3?Math.min(9,dn):0)*(big?area*.55:1)),x0=big?260:220;
+ const nr=Math.round((dn>=3?Math.min(9,dn):0)*(big?area*.55:1)*(M.rocks??1)),x0=big?260:220;
  const pcx=px+pw/2,pcy=py+ph/2,xr=()=>center?rnd(120,WX-120):rnd(x0,px-130);
  const clear=(x,y)=>(big?hyp(x-dsx,y-dsy)>150:!(Math.abs(x-hx)<70&&Math.abs(y-hy)<90))&&!(center&&hyp(x-pcx,y-pcy)<260);
  G.lanes=[];
  if(center){const mk=(n,ex,ey,tx,ty)=>{const mx=(ex+tx)/2+rnd(-90,90),my=(ey+ty)/2+rnd(-90,90),pts=[];for(let i=0;i<=60;i++){const t=i/60;pts.push([(1-t)*(1-t)*ex+2*(1-t)*t*mx+t*t*tx,(1-t)*(1-t)*ey+2*(1-t)*t*my+t*t*ty]);}return{n,ex,ey,tx,ty,pts};};
   G.lanes=[mk('WEST',0,gy+rnd(-200,200),px-70,gy),mk('NORTH',pcx+rnd(-250,250),40,pcx,py),mk('EAST',WX,pcy+rnd(-200,200),px+pw,pcy),mk('SOUTH',pcx+rnd(-250,250),WY,pcx,py+ph)];}
  for(let i=0;i<nr;i++){let ok=0;for(let k=0;k<30&&!ok;k++){const r=rnd(16,30),x=xr(),y=rnd(60,WY-50);if(!clear(x,y))continue;if(G.rocks.some(o=>hyp(o.x-x,o.y-y)<o.r+r+40))continue;G.rocks.push({x,y,r});ok=1;}}
- if(dn>=6){const nt=Math.round(Math.min(6,dn-4)*(big?area*.7:1));for(let i=0;i<nt;i++){for(let k=0;k<30;k++){const x=xr(),y=rnd(70,WY-50);if(!clear(x,y))continue;if(G.rocks.some(o=>hyp(o.x-x,o.y-y)<o.r+14+40))continue;G.rocks.push({x,y,r:14,tree:true});break;}}}
+ if(dn>=6){const nt=Math.round(Math.min(6,dn-4)*(big?area*.7:1)*(M.trees??1));for(let i=0;i<nt;i++){for(let k=0;k<30;k++){const x=xr(),y=rnd(70,WY-50);if(!clear(x,y))continue;if(G.rocks.some(o=>hyp(o.x-x,o.y-y)<o.r+14+40))continue;G.rocks.push({x,y,r:14,tree:true});break;}}}
  G.zones=[];G.zid=(G.zid||0)+1;
  const sk=season().n==='WINTER'?'snow':'mud';
- if(dn>=2){const nm=Math.round(Math.min(5,season().mud+Math.floor(dn/3))*(big?area*.7:1));for(let i=0;i<nm;i++)G.zones.push({k:sk,slow:1,x:center?rnd(120,WX-260):rnd(200,px-230),y:rnd(50,WY-120),w:rnd(90,150),h:rnd(60,100)});if(center)G.zones=G.zones.filter(z=>!(z.x<px+pw+40&&z.x+z.w>px-40&&z.y<py+ph+40&&z.y+z.h>py-40));}
- if(dn>=4&&!center){
+ if(dn>=2){const nm=Math.round(Math.min(5,season().mud+Math.floor(dn/3))*(big?area*.7:1)*(M.mud??1));for(let i=0;i<nm;i++)G.zones.push({k:sk,slow:1,x:center?rnd(120,WX-260):rnd(200,px-230),y:rnd(50,WY-120),w:rnd(90,150),h:rnd(60,100)});if(center)G.zones=G.zones.filter(z=>!(z.x<px+pw+40&&z.x+z.w>px-40&&z.y<py+ph+40&&z.y+z.h>py-40));}
+ if(dn>=(M.streamFrom||4)&&!center&&M.stream!==false){
   if(!big){const sx=rnd(440,540),fy=rnd(120,WY-220);G.zones.push({k:'water',x:sx,y:40,w:46,h:fy-40},{k:'water',x:sx,y:fy+100,w:46,h:WY-fy-100});}
   else{const sx=WX*rnd(.42,.5),f1=WY*rnd(.2,.34),f2=WY*rnd(.62,.76);G.zones.push({k:'water',x:sx,y:40,w:46,h:f1-40},{k:'water',x:sx,y:f1+100,w:46,h:f2-f1-100},{k:'water',x:sx,y:f2+100,w:46,h:WY-f2-100});}
  }
@@ -138,7 +140,10 @@ function startDay(){
    const q=pick(cs);let x,y,k=0;do{const a=rnd(0,TAU),d=rnd(0,85);x=q.x+Math.cos(a)*d;y=q.y+Math.sin(a)*d;k++;}while(k<20&&!okSpot(x,y));G.sheep.push(mkSheep(h,clamp(x,20,WX-20),clamp(y,50,WY-20)));
   });
  }
- if(M.dayPred){const k=Math.min(3,1+Math.floor(dn/3));for(let i=0;i<k;i++)G.events.push({t:22+i*48+rnd(0,12),k:i%2?'wolf1':'fox'});}
+ { // enemy scouts through the day, drawn from this map's enemy list
+  const pool=(M.enemies||[{k:'fox',w:1}]).filter(e=>(e.from||1)<=dn),tot=pool.reduce((a,e)=>a+e.w,0),ns=Math.max(1,Math.round((.6+.35*dn)*(M.pressure||1)));
+  for(let i=0;i<ns;i++){let q=Math.random()*tot,pk=pool[0];for(const e of pool){q-=e.w;if(q<=0){pk=e;break;}}G.events.push({t:rnd(14,Math.max(30,G.limit*.8)),k:pk.k,n:Math.min(6,2+Math.floor(dn/4)),alpha:dn>=7&&Math.random()<.3});}
+  G.events.sort((a,b)=>a.t-b.t);}
  updateCam(0,true);
  G.msg='DAY '+n+' · '+season().n;G.msg2=(G.map.news||NEWS)[n]||((n-1)%3===0&&n>1?'A new season begins':'');G.msgT=3.5;G.penned=0;
 }
@@ -225,8 +230,7 @@ function endNight(){
   G.stars=G.runLost===0?3:G.runLost<=3?2:1;G.score+=G.stars*150;G.winInfo={first:!(SAVE.stars[G.map.id]>0),survivors:alive.length,lost:G.runLost};awardBones(G.stars*12+G.day*4+(G.winInfo.first?20:0));
   SAVE.stars[G.map.id]=Math.max(SAVE.stars[G.map.id]||0,G.stars);SAVE.best[G.map.id]=Math.max(SAVE.best[G.map.id]||0,G.score);persist();G.best=Math.max(G.best,G.day);G.state='victory';return;}
  // dawn brings new arrivals
- const dk=G.day+(G.map.diff||0),kinds=['normal'];if(dk>=2)kinds.push('ram','panicky');if(dk>=3)kinds.push('black');if(dk>=5)kinds.push('goat');
- const born=[{type:'lamb'}];born.push({type:Math.random()<.5?pick(kinds):'normal'});if(season().n==='SPRING')born.push({type:'lamb'});
+ const born=[{type:'lamb'}];born.push({type:poolPick(G.day+1)});if(season().n==='SPRING')born.push({type:'lamb'});
  for(const b of born)if(G.herd.length<28)G.herd.push(b);
  G.dawnInfo={survivors:alive.length,lost:lostN,born:born.length,day:G.day};G.stars=lostN===0?3:lostN<=2?2:1;
  const pool=perkPool();G.offers=[];while(G.offers.length<3&&pool.length)G.offers.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
@@ -258,7 +262,7 @@ const zoneMult=()=>(G.dog.crouch?1.18:1)*(1+.15*perk('nose'));
 function bark(){
  const d=G.dog;if(G.barkCd>0||G.state!=='play'||d.stun>0)return;
  G.barkCd=barkCD();const R=barkR();G.rings.push({x:d.x,y:d.y,r:10,max:R,t:.45});
- for(const s of G.sheep){if(s.inPen||s.carried)continue;const dx=s.x-d.x,dy=s.y-d.y,dist=hyp(dx,dy);if(dist<R&&dist>0.1){const f=(1-dist/R),m=s.type==='ram'?.4:1;s.vx+=dx/dist*190*f*m;s.vy+=dy/dist*190*f*m;s.panic=Math.max(s.panic,.9*m);}}
+ for(const s of G.sheep){if(s.inPen||s.carried)continue;const dx=s.x-d.x,dy=s.y-d.y,dist=hyp(dx,dy);if(dist<R&&dist>0.1){const f=(1-dist/R),m=s.T.barkMul||1;s.vx+=dx/dist*190*f*m;s.vy+=dy/dist*190*f*m;s.panic=Math.max(s.panic,.9*m);}}
  for(const p of G.preds){const dist=hyp(p.x-d.x,p.y-d.y);if(dist<R*1.35)scarePred(p,2.8,true);}
  const PR=420+100*perk('nose');
  for(const s of G.sheep){if(s.carried)continue;const dd=hyp(s.x-d.x,s.y-d.y);if(!s.seen&&dd<PR)s.ping=4;if(s.hidden&&dd<150){s.hidden=false;s.seen=true;addText(s.x,s.y-14,'FOUND!','#ffd24a');}if(s.act==='bolt'&&dd<R){s.act=null;s.panic=1;}}
@@ -294,7 +298,7 @@ function bumpSheep(d,dt){
   s.bumpT=Math.max(0,(s.bumpT||0)-dt);
   const dx=s.x-d.x,dy=s.y-d.y,dist=hyp(dx,dy),min=6+s.T.r;
   if(dist>=min||dist<.01)continue;
-  const nx=dx/dist,ny=dy/dist,pen=min-dist,heavy=s.type==='ram';
+  const nx=dx/dist,ny=dy/dist,pen=min-dist,heavy=!!s.T.heavy;
   const impact=Math.max(0,d.vx*nx+d.vy*ny);
   const ks=heavy?.15:.7;s.x+=nx*pen*ks;s.y+=ny*pen*ks;d.x-=nx*pen*(1-ks);d.y-=ny*pen*(1-ks);
   if(impact>0){d.vx-=nx*impact*(heavy?.85:.55);d.vy-=ny*impact*(heavy?.85:.55);}
@@ -338,6 +342,8 @@ function pressureFrom(s,p,hx,hy,mult,calm,dt,zoneBase){
  s.vx+=(ux*t*t*430+(-uy)*side*t*95)*k*dt;s.vy+=(uy*t*t*430+(ux)*side*t*95)*k*dt;
  return t;
 }
+function lureZone(s,k){let best=null,bd=520;for(const z of G.zones||[]){if(z.k!==k)continue;const d0=hyp(z.x+z.w/2-s.x,z.y+z.h/2-s.y);if(d0<bd){bd=d0;best=z;}}return best;}
+function isolation(s){let m=300;for(const o of G.sheep){if(o===s||o.carried)continue;const d0=hyp(o.x-s.x,o.y-s.y);if(d0<m)m=d0;}return m;}
 function updateSheep(dt){
  const d=G.dog,night=G.mode==='night'||G.preds.length>0;
  for(const s of G.sheep){
@@ -358,17 +364,18 @@ function updateSheep(dt){
    for(const o of G.sheep){if(o===s||o.inPen||o.carried)continue;const dx=o.x-s.x,dy=o.y-s.y,dist=hyp(dx,dy);
     if(dist<(huddle?260:130)){cx+=o.x;cy+=o.y;vx+=o.vx;vy+=o.vy;n++;}
     const m=s.T.r+o.T.r+5;if(dist<m&&dist>.1){sx-=dx/dist*(1-dist/m);sy-=dy/dist*(1-dist/m);}}
-   if(n){cx/=n;cy/=n;vx/=n;vy/=n;const coh=(26+16*perk('bell'))*(s.type==='lamb'?2.4:s.type==='black'?.35:1)*(pressure>0?1.5:1)*(huddle?3:1);const dx=cx-s.x,dy=cy-s.y,dist=hyp(dx,dy)||1;
+   if(n){cx/=n;cy/=n;vx/=n;vy/=n;const coh=(26+16*perk('bell'))*(s.type==='lamb'?2.4:s.type==='black'?.35:(s.T.coh||1))*(pressure>0?1.5:1)*(huddle?3:1);const dx=cx-s.x,dy=cy-s.y,dist=hyp(dx,dy)||1;
     if(dist>(huddle?20:28)){s.vx+=dx/dist*coh*dt;s.vy+=dy/dist*coh*dt;}
     s.vx+=(vx-s.vx)*.7*dt;s.vy+=(vy-s.vy)*.7*dt;}
    s.vx+=sx*260*dt;s.vy+=sy*260*dt;
+   if(s.T.lure&&pressure<.05){const z=lureZone(s,s.T.lure);if(z){const dx=z.x+z.w/2-s.x,dy=z.y+z.h/2-s.y,l=hyp(dx,dy)||1;if(l>24){s.vx+=dx/l*24*dt;s.vy+=dy/l*24*dt;}}}
    if(pressure<.05&&!huddle){
     s.graze-=dt;if(s.graze<=0){s.graze=rnd(1,3.5);s.wa=rnd(0,TAU);s.gs=Math.random()<.55?rnd(6,16):0;}
     s.vx+=Math.cos(s.wa)*(s.gs||0)*dt*1.4*(s.type==='black'?2.2:1);s.vy+=Math.sin(s.wa)*(s.gs||0)*dt*1.4*(s.type==='black'?2.2:1);}
    if(s.panic>.5){for(const o of G.sheep)if(o!==s&&!o.inPen&&!o.carried&&o.type!=='ram'&&hyp(o.x-s.x,o.y-s.y)<46&&Math.random()<dt*2.2)o.panic=Math.max(o.panic,s.panic*.8);}
   }
   const fric=s.inPen?3.2:2.0;s.vx*=Math.exp(-fric*dt);s.vy*=Math.exp(-fric*dt);
-  const zn=zoneAt(s),cap=(95*s.T.speed)*(1+s.panic*.5)*(zn?(zn.k==='water'?.5:.7):1),v=hyp(s.vx,s.vy);if(v>cap){s.vx*=cap/v;s.vy*=cap/v;}
+  const zn=zoneAt(s),cap=(95*s.T.speed)*(1+s.panic*.5)*(zn?(zn.k==='water'?(s.T.swim||.5):(s.T.mud||.7)):1),v=hyp(s.vx,s.vy);if(v>cap){s.vx*=cap/v;s.vy*=cap/v;}
   s.x+=s.vx*dt;s.y+=s.vy*dt;collide(s,s.T.r,.2);
   if(Math.abs(s.vx)>3)s.face=s.vx>0?1:-1;
   const P=G.pen;
@@ -410,12 +417,13 @@ function edgePoint(){ // an edge of the world, biased toward where the flock is
  if(side===2)return{x:clamp(tx+rnd(-200,200),20,WX-20),y:50,side};
  return{x:clamp(tx+rnd(-200,200),20,WX-20),y:WY-6,side};
 }
-function spawnFox(){const e=edgePoint();G.preds.push({k:'fox',x:e.x,y:e.y,vx:0,vy:0,st:'approach',tgt:null,wall:null,carry:null,scared:0,hes:0,r:6,face:1,zig:rnd(0,TAU),tt:0,hp:1});G.warns.push({x:clamp(e.x,30,WX-30),y:clamp(e.y,70,WY-30),t:2,k:'fox'});}
+function spawnFox(v){const e=edgePoint();G.preds.push({k:'fox',v:v||'fox',x:e.x,y:e.y,vx:0,vy:0,st:'approach',tgt:null,wall:null,carry:null,scared:0,hes:0,r:6,face:1,zig:rnd(0,TAU),tt:0,hp:1});G.warns.push({x:clamp(e.x,30,WX-30),y:clamp(e.y,70,WY-30),t:2,k:'fox'});}
 function spawnPack(n,alpha){
  const e=edgePoint(),id=++G.packId;G.warns.push({x:clamp(e.x,30,WX-30),y:clamp(e.y,70,WY-30),t:3.5,k:'wolf'});addText(cam.x+W/2,cam.y+120,'AWOOOO!','#ffb0a0');buzzNow(80);
  for(let i=0;i<n;i++){const al=alpha&&i===0;G.preds.push({k:'wolf',pack:id,x:e.x+rnd(-26,26),y:e.y+rnd(-26,26),vx:0,vy:0,st:'circle',t:rnd(6,9),ang:rnd(0,TAU),dirn:Math.random()<.5?1:-1,courage:al?2:1,alpha:al,scared:0,bite:0,tgt:null,wall:null,hes:0,face:1,r:al?9:7,hp:1});}
 }
 function spawnEagle(){const live=G.sheep.filter(s=>!s.carried),ln=(G.waveLane!==null&&G.waveLane!==undefined&&G.lanes&&G.lanes[G.waveLane])?G.lanes[G.waveLane]:null,t=ln?{x:ln.ex,y:ln.ey+340}:(live.length?pick(live):{x:WX/2,y:WY/2}),x=clamp(t.x+rnd(-200,200),60,WX-60),y0=Math.max(30,t.y-340);G.preds.push({k:'eagle',x,y:y0,vx:0,vy:0,tgt:null,carry:null,scared:0,hes:0,r:7,face:1,tt:0,hp:1});G.warns.push({x,y:y0+40,t:2,k:'eagle'});}
+function spawnBadger(){const e=edgePoint();G.warns.push({x:clamp(e.x,30,WX-30),y:clamp(e.y,70,WY-30),t:3,k:'bear'});G.preds.push({k:'bear',v:'badger',x:e.x,y:e.y,vx:0,vy:0,tgt:null,scared:0,hes:0,bite:0,courage:2,r:9,face:1,hp:1});}
 function spawnBear(){const e=edgePoint();G.warns.push({x:clamp(e.x,30,WX-30),y:clamp(e.y,70,WY-30),t:4,k:'bear'});addText(cam.x+W/2,cam.y+120,'GROWL!','#ffb0a0');buzzNow(120);G.preds.push({k:'bear',x:e.x,y:e.y,vx:0,vy:0,tgt:null,scared:0,hes:0,bite:0,courage:4,r:13,face:1,hp:1});}
 function eagleAI(p,dt,dd){
  const d=G.dog;
@@ -430,11 +438,11 @@ function bearAI(p,dt,dd){
  if(p.scared>0){const dx=p.x-d.x,dy=p.y-d.y,l=hyp(dx,dy)||1;moveTo(p,p.x+dx/l*100,p.y+dy/l*100,110,dt,6);return;}
  if(p.hes>0){moveTo(p,p.x,p.y,0,dt,10);return;}
  let t=null,bd=1e9;for(const s of G.sheep){if(!eligible(s))continue;const dd2=hyp(s.x-p.x,s.y-p.y);if(dd2<bd){bd=dd2;t=s;}}
- if(t){moveTo(p,t.x,t.y,85,dt);if(bd<16+t.T.r&&p.bite<=0){p.bite=1.4;t.hp-=3;t.panic=1;addText(t.x,t.y-12,'MAUL','#ff6a6a');dust(t.x,t.y,6,'#ff9a9a');buzzNow(60);if(t.hp<=0)killSheep(t,'wolf');}return;}
+ if(t){moveTo(p,t.x,t.y,85*(p.v==='badger'?.9:1),dt);if(bd<16+t.T.r&&p.bite<=0){p.bite=1.4;t.hp-=(p.v==='badger'?2:3);t.panic=1;addText(t.x,t.y-12,'MAUL','#ff6a6a');dust(t.x,t.y,6,'#ff9a9a');buzzNow(60);if(t.hp<=0)killSheep(t,'wolf');}return;}
  const nw=nearestWall(p);if(nw){moveTo(p,nw.x,nw.y,75,dt);if(nw.d<20){hitWall(p,nw,30,dt);if(Math.random()<dt*10)dust(nw.x,nw.y,1,'#a88858');if(nw.w.hp<=0){nw.w.broken=true;nw.w.hp=0;addText(nw.x,nw.y-12,'SMASHED!','#ff6a6a');buzzNow(100);}}}
 }
 function scarePred(p,t,fromBark){
- if(p.k==='bear'){if(fromBark){p.courage--;p.hes=.9;if(p.courage<=0){p.scared=8;p.courage=4;addText(p.x,p.y-20,'RUNS OFF','#9aff9a');}}else p.scared=Math.max(p.scared,t*.6);return;}
+ if(p.k==='bear'){if(fromBark){p.courage--;p.hes=.9;if(p.courage<=0){p.scared=8;p.courage=p.v==='badger'?2:4;addText(p.x,p.y-20,'RUNS OFF','#9aff9a');}}else p.scared=Math.max(p.scared,t*.6);return;}
  if(p.k==='wolf'){if(fromBark&&p.courage>1){p.courage--;p.hes=.8;return;}p.scared=Math.max(p.scared,t);p.st='flee';if(p.alpha)p.courage=2;}
  else{p.scared=Math.max(p.scared,t*(fromBark?DD().scare:1));if(p.carry)dropCarry(p);}
 }
@@ -524,10 +532,10 @@ function updatePreds(dt){
    p.stk=hyp(p.vx,p.vy)<40?(p.stk||0)+dt:0;
    if(p.stk>.7||(nearEdge(p,46)&&dd<150)){p.exit=true;addText(p.x,p.y-16,'ESCAPES','#cfe8cf');}}
   if(p.k==='fox'){
-   if(p.scared>0||(dd<115&&!d.crouch&&!p.carry)){ // run from the dog
+   if(p.scared>0||(dd<(p.v==='coyote'?170:115)&&!d.crouch&&!p.carry)){ // run from the dog
     if(p.carry&&dd<40)dropCarry(p);
-    if(dd<115&&!d.crouch){p.scared=Math.max(p.scared,1.6);if(p.carry)dropCarry(p);}
-    const dx=p.x-d.x,dy=p.y-d.y,l=hyp(dx,dy)||1;moveTo(p,p.x+dx/l*100,p.y+dy/l*100,165,dt,8);
+    if(dd<(p.v==='coyote'?170:115)&&!d.crouch){p.scared=Math.max(p.scared,1.6);if(p.carry)dropCarry(p);}
+    const dx=p.x-d.x,dy=p.y-d.y,l=hyp(dx,dy)||1;moveTo(p,p.x+dx/l*100,p.y+dy/l*100,165*(p.v==='coyote'?1.2:1),dt,8);
    }else if(p.carry){
     const e=[{x:0,y:p.y},{x:WX,y:p.y},{x:p.x,y:46},{x:p.x,y:WY}].sort((a,b)=>hyp(a.x-p.x,a.y-p.y)-hyp(b.x-p.x,b.y-p.y))[0];
     moveTo(p,e.x,e.y,100,dt);p.carry.x=p.x;p.carry.y=p.y-4;
@@ -536,10 +544,10 @@ function updatePreds(dt){
    else{
     // pick a victim: lambs first, then strays furthest from the dog; no strays: dig under the fence
     p.tt-=dt;
-    if(!p.tgt||p.tgt.carried||!G.sheep.includes(p.tgt)||p.tt<=0){p.tt=1.2;let best=null,bs=-1e9;for(const s of G.sheep){if(!eligible(s))continue;const sc=(s.type==='lamb'?120:0)+hyp(s.x-d.x,s.y-d.y)*.5-(lit(s.x,s.y)?60:0)+(s.inPen?-60:0);if(sc>bs){bs=sc;best=s;}}p.tgt=best;p.wall=null;if(!best){p.wall=nearestWall(p);}}
+    if(!p.tgt||p.tgt.carried||!G.sheep.includes(p.tgt)||p.tt<=0){p.tt=1.2;let best=null,bs=-1e9;for(const s of G.sheep){if(!eligible(s))continue;const sc=(s.type==='lamb'?120:0)+hyp(s.x-d.x,s.y-d.y)*.5-(lit(s.x,s.y)?60:0)+(s.inPen?-60:0)+(p.v==='coyote'?isolation(s)*.8:0);if(sc>bs){bs=sc;best=s;}}p.tgt=best;p.wall=null;if(!best){p.wall=nearestWall(p);}}
     if(p.tgt){
      p.zig+=dt*5;const dx=p.tgt.x-p.x,dy=p.tgt.y-p.y,l=hyp(dx,dy)||1,px=-dy/l,py=dx/l;
-     sp=inLight?55:115;moveTo(p,p.tgt.x+px*Math.sin(p.zig)*14,p.tgt.y+py*Math.sin(p.zig)*14,sp,dt);
+     sp=(inLight?55:115)*(p.v==='coyote'?1.2:1);moveTo(p,p.tgt.x+px*Math.sin(p.zig)*14,p.tgt.y+py*Math.sin(p.zig)*14,sp,dt);
      if(l<10+p.tgt.T.r){p.carry=p.tgt;p.carry.carried=true;p.carry.inPen=false;p.carry.vx=p.carry.vy=0;addText(p.x,p.y-14,'GOT ONE!','#ff9a6a');buzzNow(40);}
     }else if(p.wall){
      const nw=nearestWall(p);if(nw){p.wall=nw;moveTo(p,nw.x,nw.y,inLight?55:100,dt);if(nw.d<10){hitWall(p,nw,11,dt);if(Math.random()<dt*8)dust(nw.x,nw.y,1,'#a88858');if(nw.w.hp<=0){nw.w.broken=true;nw.w.hp=0;addText(nw.x,nw.y-12,'DUG THROUGH!','#ff8a6a');buzzNow(60);}}}
@@ -579,8 +587,8 @@ function update(dt){
  if(G.mode==='day'&&(G.map.act||0)>0&&G.day>=(G.map.actFrom||1)){G.actT-=dt;if(G.actT<=0){G.actT=rnd(20,34)/((G.map.act||1)*(1+.08*G.day));doAct();}}
  if(G.bot)(G.mode==='day'?botDay:botNight)(dt);
  updateDog(dt);updateHelper(dt);
- if(G.mode==='night'||G.map.dayPred){
-  while(G.events.length&&G.events[0].t<=G.t){const e=G.events.shift();if(e.k==='fox')spawnFox();else if(e.k==='eagle')spawnEagle();else if(e.k==='bear')spawnBear();else if(e.k==='wolf1')spawnPack(1,false);else spawnPack(e.n,e.alpha);}
+ {
+  while(G.events.length&&G.events[0].t<=G.t){const e=G.events.shift();if(e.k==='fox')spawnFox();else if(e.k==='coyote')spawnFox('coyote');else if(e.k==='badger')spawnBadger();else if(e.k==='eagle')spawnEagle();else if(e.k==='bear')spawnBear();else if(e.k==='wolf1')spawnPack(1,false);else spawnPack(e.n||2,e.alpha);}
   updatePreds(dt);if(G.mode==='night'&&G.map.td)updateWaves(dt);if(G.mode==='night'){updateAllies(dt);G.oil=Math.max(0,G.oil-dt*(perk('lantern')?.8:1)/DD().oil);}
  }
  updateSheep(dt);
@@ -600,6 +608,7 @@ function botDay(dt){
  const d=G.dog,all=G.sheep.filter(s=>!s.inPen&&!s.carried&&!s.act);let loose=all;
  const stuck=G.sheep.find(s=>s.act==='stuck');if(stuck&&(!all.length||hyp(stuck.x-d.x,stuck.y-d.y)<260)){d.tx=stuck.x-12;d.ty=stuck.y;d.crouch=hyp(d.x-stuck.x,d.y-stuck.y)<60;return;}
  if(!all.length)return;
+ {const thr=G.preds.find(p=>!p.dead&&p.scared<=0&&all.some(s=>hyp(s.x-p.x,s.y-p.y)<260));if(thr){d.tx=thr.x;d.ty=thr.y;d.crouch=false;if(hyp(thr.x-d.x,thr.y-d.y)<135&&G.barkCd<=0)bark();return;}}
  if((G.map.wx||1)>1){const nr=all.reduce((a,q)=>hyp(q.x-d.x,q.y-d.y)<hyp(a.x-d.x,a.y-d.y)?q:a);loose=all.filter(q=>hyp(q.x-nr.x,q.y-nr.y)<230);}
  if(G.time<G.limit*.12&&G.penned>=Math.ceil(G.sheep.length*.7)){endDay('called');return;}
  const g={x:G.pen.x+G.pen.w*.6,y:G.pen.gy};
@@ -890,7 +899,7 @@ const sheetCache={};
 function sheet(name,mul){const im=IM[name+'sheet'];if(!okImg(im))return null;if(!mul)return im;const key=name+mul.join(',');
  if(!sheetCache[key]){const cc=document.createElement('canvas');cc.width=im.naturalWidth;cc.height=im.naturalHeight;const x=cc.getContext('2d');x.drawImage(im,0,0);const d=x.getImageData(0,0,cc.width,cc.height),p=d.data;for(let i=0;i<p.length;i+=4){p[i]=Math.min(255,p[i]*mul[0]);p[i+1]=Math.min(255,p[i+1]*mul[1]);p[i+2]=Math.min(255,p[i+2]*mul[2]);}x.putImageData(d,0,0);sheetCache[key]=cc;}
  return sheetCache[key];}
-const SMUL={ram:[.8,.68,.55],black:[.3,.28,.32],goat:[.88,.7,.45],panicky:[1,.93,.9]};
+const SMUL={ram:[.8,.68,.55],black:[.3,.28,.32],goat:[.88,.7,.45],panicky:[1,.93,.9],goose:[1.1,1.12,1.2],duck:[1.15,1.1,.62],pig:[1.2,.78,.86],cow:[.85,.78,.72]};
 const dirRow=(vx,vy,rows=3)=>Math.abs(vy)>Math.abs(vx)*1.4?(rows>=5?(vy<0?4:3):(vy<0?1:2)):0;
 const CH={dog:{cell:48,rows:5},sheep:{cell:40,rows:3},fox:{cell:52,rows:5},wolf:{cell:76,rows:5},bear:{cell:76,rows:5},eagle:{cell:68,rows:3}};
 function drawSheepBase(s){
@@ -933,7 +942,7 @@ function drawAnimal(name,p,sc,mul,yoff){
 function drawFox(p){
  if(!okImg(IM.foxsheet)){drawFoxVec(p);return;}
  c.fillStyle='rgba(0,0,0,.25)';c.beginPath();c.ellipse(p.x,p.y+5,10,3.6,0,0,TAU);c.fill();
- drawAnimal('fox',p,.62);
+ drawAnimal('fox',p,p.v==='coyote'?.68:.62,p.v==='coyote'?[.78,.82,.86]:null);
  if(p.carry){c.fillStyle='#fffdf6';c.beginPath();c.arc(p.x+3*p.face,p.y-9,4.5,0,TAU);c.fill();c.fillStyle='#2a2428';c.fillRect(p.x+(p.face>0?6:-8),p.y-10,3,3);}
 }
 function drawEagle(p){
@@ -945,8 +954,8 @@ function drawEagle(p){
 function drawBear(p){
  if(!okImg(IM.bearsheet)){drawBearVec(p);return;}
  c.fillStyle='rgba(0,0,0,.3)';c.beginPath();c.ellipse(p.x,p.y+13,18,5,0,0,TAU);c.fill();
- drawAnimal('bear',p,.66);
- c.fillStyle='#3a1a1a';c.fillRect(p.x-16,p.y-34,32,4);c.fillStyle=p.scared>0?'#9aff9a':'#ff6a6a';c.fillRect(p.x-16,p.y-34,32*(p.courage/4),4);
+ drawAnimal('bear',p,p.v==='badger'?.42:.66,p.v==='badger'?[.5,.5,.55]:null);
+ c.fillStyle='#3a1a1a';c.fillRect(p.x-16,p.y-34,32,4);c.fillStyle=p.scared>0?'#9aff9a':'#ff6a6a';c.fillRect(p.x-16,p.y-34,32*(p.courage/(p.v==='badger'?2:4)),4);
  if(p.hes>0||p.scared>0){c.fillStyle='#fff';c.font='bold 12px monospace';c.textAlign='center';c.fillText(p.scared>0?'!':'?',p.x,p.y-39);}
 }
 function drawWolf(p){
@@ -1005,7 +1014,7 @@ const K={sel:'collie'};
 function drawDogIcon(id,x,y,sc){const d=DOGS.find(q=>q.id===id)||DOGS[0],sh=sheet('dog',d.mul);if(!sh)return;const z=sc*(d.sc||1);c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(sh,0,0,48,48,x-24*z,y-40*z,48*z,48*z);}
 const kox=()=>(W-960)/2;
 function kennelRects(){
- const o=kox(),cards=DOGS.map((d,i)=>({id:d.id,x:o+24+(i%4)*160,y:68+Math.floor(i/4)*146,w:150,h:138})),ups=UPS.map((u,i)=>({id:u.id,x:o+686,y:96+i*74,w:250,h:66}));
+ const o=kox(),cards=DOGS.map((d,i)=>({id:d.id,x:o+24+(i%4)*160,y:68+Math.floor(i/4)*146,w:150,h:138})),ups=upsShown().map((u,i)=>({id:u.id,x:o+686,y:96+i*74,w:250,h:66}));
  return{cards,ups,back:{x:o+14,y:12,w:90,h:32},act:{x:o+500,y:436,w:160,h:46}};
 }
 function dogStatsText(d){const e=Object.assign({},DD0,d),o=[],pc=(v,n)=>{if(v!==1)o.push(n+' '+(v>1?'+':'')+Math.round((v-1)*100)+'%');};pc(e.speed,'Speed');pc(e.bark,'Bark range');pc(e.barkCd,'Bark delay');pc(e.crouchSpeed,'Creep');pc(e.light,'Lantern');pc(e.oil,'Oil life');pc(e.repair,'Repair');pc(e.scare,'Scare time');if(e.gentle)o.push('No bump panic');if(e.tough)o.push('Resists knocks');return o.join('   ')||'Balanced';}
@@ -1227,6 +1236,6 @@ function render(){
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,quota,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
+window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,quota,startDay,poolPick,TYPES,spawnFox,spawnBadger,lureZone,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
 })();
 </script></body></html>
