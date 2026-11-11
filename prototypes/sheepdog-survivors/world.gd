@@ -11,6 +11,7 @@ var walls: Array = []
 var rocks: Array = []
 var zones: Array = []
 var dog_start: Vector2 = Vector2.ZERO
+var pads: Array = []
 var ysort: Node2D
 var wind_mat: ShaderMaterial
 var shadow_tex: Texture2D
@@ -91,7 +92,7 @@ func _layout() -> void:
 	var py: float = wy / 2.0 - ph / 2.0
 	gate_x = px + pw / 2.0
 	pen = Rect2(px, py, pw, ph)
-	var hp: float = 90.0
+	var hp: float = 140.0
 	var by: float = py + ph
 	walls = [
 		_wall(Vector2(px, py), Vector2(px + pw, py), true, hp),
@@ -101,6 +102,18 @@ func _layout() -> void:
 		_wall(Vector2(gate_x + gap / 2.0, by), Vector2(px + pw, by), true, hp),
 	]
 	dog_start = Vector2(gate_x, by + 120.0)
+	var spots: Array = [
+		Vector2(px - 18.0, py - 14.0), Vector2(px + pw + 18.0, py - 14.0),
+		Vector2(px - 18.0, by + 14.0), Vector2(px + pw + 18.0, by + 14.0),
+		Vector2(gate_x, py - 24.0), Vector2(px - 26.0, py + ph / 2.0), Vector2(px + pw + 26.0, py + ph / 2.0),
+		Vector2(gate_x - gap / 2.0 - 40.0, by + 24.0), Vector2(gate_x + gap / 2.0 + 40.0, by + 24.0),
+	]
+	for sp in spots:
+		var pd := Pad.new()
+		pd.position = sp
+		pd.z_index = -100
+		add_child(pd)
+		pads.append(pd)
 
 func _wall(a: Vector2, b: Vector2, is_pen: bool, hp: float) -> Dictionary:
 	return {"a": a, "b": b, "pen": is_pen, "hp": hp, "max": hp, "broken": false, "nodes": []}
@@ -235,7 +248,7 @@ func _pen_visuals() -> void:
 	dirt.modulate = Color(1, 1, 1, 0.85)
 	dirt.z_index = -150
 	add_child(dirt)
-	var fence_h: Texture2D = tex("fence")
+	var fence_h: Texture2D = tex("stone_wall")
 	for w in walls:
 		var a: Vector2 = w["a"]
 		var b: Vector2 = w["b"]
@@ -253,8 +266,8 @@ func _pen_visuals() -> void:
 			s.texture = fence_h
 			s.position = a.lerp(b, t)
 			s.rotation = ang
-			s.scale = Vector2(k, k * 1.15)
-			s.offset = Vector2(0, -3)
+			s.scale = Vector2(k * 1.05, k * 0.95)
+			s.offset = Vector2(0, -9)
 			ysort.add_child(s)
 			nodes.append(s)
 		w["nodes"] = nodes

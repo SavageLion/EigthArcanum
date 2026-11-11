@@ -40,6 +40,11 @@ func _draw() -> void:
 	_text("%d in the pen" % main.pen_total, Vector2(18, 52), 12, Color(CREAM, 0.85))
 	# stamina
 	_bar(Rect2(70, 31, 158, 7), main.dog.stam / main.dog.stam_max, Color(0.95, 0.45, 0.35) if main.dog.winded else Color(0.45, 0.75, 0.9))
+	# gold
+	_panel(Rect2(8, 64, 104, 26))
+	draw_circle(Vector2(24, 77), 6.0, Color(0.72, 0.5, 0.1))
+	draw_circle(Vector2(24, 77), 4.5, Color(1.0, 0.82, 0.25))
+	_text("%d gold" % main.gold, Vector2(36, 83), 14, GOLD)
 	# top centre: wave
 	var left: int = int(ceil(main.WAVE_LEN - main.wave_t))
 	_panel(Rect2(v.x / 2.0 - 90, 6, 180, 32))
@@ -50,7 +55,7 @@ func _draw() -> void:
 		if w["pen"]:
 			worst = minf(worst, float(w["hp"]) / float(w["max"]))
 	_panel(Rect2(v.x - 190, 6, 182, 32))
-	_text("FENCE", Vector2(v.x - 182, 28), 13, CREAM)
+	_text("WALLS", Vector2(v.x - 182, 28), 13, CREAM)
 	_bar(Rect2(v.x - 130, 15, 114, 12), worst, Color(0.55, 0.85, 0.4) if worst > 0.5 else (Color(0.95, 0.75, 0.3) if worst > 0.25 else Color(0.95, 0.4, 0.35)))
 	var fr: Rect2 = main.fs_rect()
 	_panel(fr)
@@ -98,7 +103,7 @@ func _draw() -> void:
 			draw_rect(Rect2(th - 10.0, 0, 12.0, v.y), rc)
 			draw_rect(Rect2(v.x - th - 2.0, 0, 12.0, v.y), rc)
 		_panel(Rect2(v.x / 2.0 - 120, 44, 240, 28), Color(0.55, 0.1, 0.08, 0.85 * fade))
-		_text("FENCE UNDER ATTACK!", Vector2(v.x / 2.0 - 120, 64), 16, Color(1, 0.95, 0.85, fade), 240.0, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("WALL UNDER ATTACK!", Vector2(v.x / 2.0 - 120, 64), 16, Color(1, 0.95, 0.85, fade), 240.0, HORIZONTAL_ALIGNMENT_CENTER)
 		var ap: Vector2 = _w2s(main.alarm_pos)
 		var inside: bool = ap.x > 30 and ap.x < v.x - 30 and ap.y > 90 and ap.y < v.y - 30
 		if inside:
@@ -125,6 +130,22 @@ func _draw() -> void:
 	_button(0, "BARK", main.dog.bark_cd > 0.0, 1.0 - main.dog.bark_cd / main.bark_cd(), false)
 	_button(1, "CALM", false, 1.0, main.calm_held or main.dog.crouch)
 	_button(2, "SPRINT", main.dog.winded, 1.0, main.sprint_held)
+	# build menu when standing on a pad
+	if main.near_pad >= 0 and main.state == "play":
+		var pad: Pad = main.world.pads[main.near_pad]
+		for i in main.build_count():
+			var br: Rect2 = main.build_rect(i)
+			var cost: int = main.def_cost(pad, i)
+			var can: bool = cost >= 0 and main.gold >= cost
+			_panel(br, Color(0.2, 0.14, 0.1, 0.92) if can else Color(0.13, 0.09, 0.08, 0.8))
+			var nm: String = ""
+			if pad.kind == "":
+				nm = String(main.DEFS[main.DEF_ORDER[i]]["name"])
+			else:
+				nm = "Upgrade %s" % String(main.DEFS[pad.kind]["name"]) if cost >= 0 else "%s (max)" % String(main.DEFS[pad.kind]["name"])
+			_text(nm, br.position + Vector2(0, 22), 13, CREAM if can else Color(CREAM, 0.5), br.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+			if cost >= 0:
+				_text("%d gold  [%d]" % [cost, i + 1], br.position + Vector2(0, 42), 13, GOLD if can else Color(GOLD, 0.5), br.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	# banner
 	if main.banner_t > 0.0 and main.state == "play":
 		var ba: float = minf(1.0, main.banner_t)
@@ -147,7 +168,7 @@ func _draw() -> void:
 		var rr := Rect2(v.x / 2.0 - 200, v.y / 2.0 - 125, 400, 250)
 		_panel(rr, Color(0.2, 0.14, 0.1, 0.96))
 		var won: bool = String(main.result["why"]) == "won"
-		_text("THE PEN HELD!" if won else "THE FENCE BROKE", rr.position + Vector2(0, 52), 30, GOLD if won else Color(1.0, 0.5, 0.42), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("THE CASTLE HELD!" if won else "THE WALL FELL", rr.position + Vector2(0, 52), 30, GOLD if won else Color(1.0, 0.5, 0.42), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("Reached wave %d  ·  level %d" % [main.result["wave"], main.result["level"]], rr.position + Vector2(0, 98), 17, CREAM, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("%d animals herded  ·  %d raiders shooed" % [main.result["herded"], main.result["defeated"]], rr.position + Vector2(0, 126), 15, Color(CREAM, 0.85), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("tap to play again", rr.position + Vector2(0, 208), 18, GOLD, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)

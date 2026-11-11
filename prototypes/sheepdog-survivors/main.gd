@@ -23,27 +23,41 @@ const TYPES: Dictionary = {
 }
 const STRAY_POOL: Array = ["normal", "normal", "normal", "normal", "lamb", "lamb", "goat", "goose", "ram", "black", "duck", "pig"]
 const PERKS: Array = [
-	{"id": "nip", "name": "Sharper Nip", "desc": "Your swipe hits harder.", "max": 5},
-	{"id": "reach", "name": "Long Reach", "desc": "Your swipe reaches further.", "max": 4},
-	{"id": "paws", "name": "Quick Paws", "desc": "Your swipe is faster.", "max": 5},
-	{"id": "stick", "name": "Stick Toss", "desc": "Throw a boomerang stick at the nearest raider.", "max": 5},
-	{"id": "bark", "name": "Big Bark", "desc": "Bark reaches further and recharges faster.", "max": 4},
-	{"id": "zoom", "name": "Zoomies", "desc": "Sprinting into raiders knocks them silly.", "max": 3},
+	{"id": "bolt", "name": "Magic Bolt", "desc": "Homing violet bolts. More bolts at levels 3 and 5.", "max": 5},
+	{"id": "fire", "name": "Fireball", "desc": "Hurl an exploding fireball at the nearest raider.", "max": 5},
+	{"id": "nova", "name": "Frost Nova", "desc": "A ring of frost that hurts and slows everything near you.", "max": 5},
+	{"id": "zap", "name": "Chain Lightning", "desc": "Lightning jumps from raider to raider.", "max": 5},
+	{"id": "orbit", "name": "Arcane Orbit", "desc": "Glowing orbs circle you and smack anything close.", "max": 5},
+	{"id": "power", "name": "Spell Power", "desc": "All your spells hit harder.", "max": 5},
+	{"id": "haste", "name": "Quick Cast", "desc": "All your spells recharge faster.", "max": 5},
+	{"id": "wide", "name": "Wide Magic", "desc": "Bigger explosions, rings and orbits.", "max": 4},
+	{"id": "bark", "name": "Arcane Howl", "desc": "Your bark reaches further and recharges faster.", "max": 4},
 	{"id": "boots", "name": "Fleet Paws", "desc": "Run faster.", "max": 4},
 	{"id": "lungs", "name": "Deep Lungs", "desc": "More stamina, quicker recovery.", "max": 3},
 	{"id": "charm", "name": "Herder's Charm", "desc": "Every animal you pen gives more XP.", "max": 3},
-	{"id": "posts", "name": "Stout Posts", "desc": "Fence gets stronger and mends a little.", "max": 4},
-	{"id": "moss", "name": "Mending Moss", "desc": "The fence slowly heals itself.", "max": 3},
-	{"id": "paw2", "name": "Busy Paws", "desc": "Mend the fence faster while you crouch beside it.", "max": 3},
+	{"id": "posts", "name": "Castle Walls", "desc": "Walls get stronger and mend a little.", "max": 4},
+	{"id": "moss", "name": "Mending Moss", "desc": "The walls slowly heal themselves.", "max": 3},
+	{"id": "paw2", "name": "Busy Paws", "desc": "Mend walls faster while you crouch beside them.", "max": 3},
 ]
+const DEFS: Dictionary = {
+	"archer": {"name": "Archer Tower", "cost": 20, "tex": "tower", "sc": 1.5},
+	"brazier": {"name": "Fire Brazier", "cost": 30, "tex": "brazier", "sc": 1.7},
+	"frost": {"name": "Frost Totem", "cost": 25, "tex": "totem", "sc": 1.9},
+}
+const DEF_ORDER: Array = ["archer", "brazier", "frost"]
 
 var world: World
 var ysort: Node2D
 var dog: Dog
 var sheep: Array = []
 var foxes: Array = []
-var berries: Array = []
-var sticks: Array = []
+var coins: Array = []
+var orbs: Array = []
+var orbit_nodes: Array = []
+var orbit_ang: float = 0.0
+var gold: int = 0
+var near_pad: int = -1
+var hat: Hat
 var cam: Camera2D
 var hud: Hud
 var dog_frames: SpriteFrames
@@ -65,7 +79,7 @@ var level: int = 1
 var xp: float = 0.0
 var xp_need: float = 30.0
 var pending: int = 0
-var perk_lv: Dictionary = {"stick": 1}
+var perk_lv: Dictionary = {"bolt": 1}
 var choices: Array = []
 var result: Dictionary = {}
 var banner: String = ""
@@ -73,8 +87,10 @@ var banner_t: float = 0.0
 var popups: Array = []
 var shake: float = 0.0
 var cloud_mat: ShaderMaterial
-var swipe_t: float = 0.5
-var stick_t: float = 1.0
+var bolt_t: float = 0.5
+var fire_t: float = 1.5
+var nova_t: float = 3.0
+var zap_t: float = 2.0
 var thump_t: float = 5.0
 var honk_t: float = 7.0
 var pen_counts: Dictionary = {}
@@ -83,6 +99,7 @@ var cam_pos: Vector2 = Vector2.ZERO
 var cam_look: Vector2 = Vector2.ZERO
 var cam_init: bool = false
 var smoke: bool = false
+var demo: bool = false
 var alarm: float = 0.0
 var alarm_pos: Vector2 = Vector2.ZERO
 var smoke_n: int = 0
@@ -115,6 +132,8 @@ func pl(id: String) -> int:
 func _ready() -> void:
 	randomize()
 	smoke = OS.get_cmdline_user_args().has("smoke")
+	if OS.has_feature("web"):
+		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
 	shadow_tex = U.shadow_texture()
 	var names: Array = ["east", "north", "south", "south-east", "north-east"]
 	dog_frames = U.frames(load("res://art/chars/dog.png") as Texture2D, 48, names)
@@ -134,11 +153,43 @@ func _ready() -> void:
 	ysort.add_child(dog)
 	dog.setup(dog_frames, shadow_tex)
 	dog.position = world.dog_start
+	hat = Hat.new()
+	hat.z_index = 2
+	dog.add_child(hat)
+	var spark := CPUParticles2D.new()
+	spark.amount = 18
+	spark.lifetime = 0.8
+	spark.local_coords = false
+	spark.direction = Vector2(0, -1)
+	spark.spread = 70.0
+	spark.initial_velocity_min = 6.0
+	spark.initial_velocity_max = 22.0
+	spark.gravity = Vector2(0, 14)
+	spark.scale_amount_min = 1.2
+	spark.scale_amount_max = 2.4
+	spark.color = Color(0.85, 0.7, 1.0, 0.9)
+	spark.position = Vector2(0, -12)
+	spark.name = "Spark"
+	dog.add_child(spark)
 	for i in 18:
 		spawn_stray(true)
 	_setup_camera()
 	_setup_layers()
 	start_wave(1)
+	if demo or smoke:
+		gold = 600
+		perk_lv = {"bolt": 3, "fire": 2, "nova": 2, "zap": 2, "orbit": 2}
+		for i in 4:
+			near_pad = i
+			world.pads[i].position = world.pads[i].position
+			try_build(i % 3)
+		near_pad = 5
+		try_build(1)
+		try_build(0)
+		near_pad = -1
+		if demo:
+			for i in 6:
+				spawn_enemy("fox" if i % 2 == 0 else "wolf")
 
 func _setup_camera() -> void:
 	cam = Camera2D.new()
@@ -239,6 +290,12 @@ func _input(event: InputEvent) -> void:
 					pick_perk(1)
 				elif ke.keycode == KEY_3:
 					pick_perk(2)
+			elif ke.keycode == KEY_1 and near_pad >= 0:
+				try_build(0)
+			elif ke.keycode == KEY_2 and near_pad >= 0 and build_count() > 1:
+				try_build(1)
+			elif ke.keycode == KEY_3 and near_pad >= 0 and build_count() > 1:
+				try_build(2)
 			elif ke.keycode == KEY_SPACE:
 				do_bark()
 			elif ke.keycode == KEY_F:
@@ -251,7 +308,58 @@ func toggle_fullscreen() -> void:
 	var w: Window = get_window()
 	w.mode = Window.MODE_WINDOWED if w.mode == Window.MODE_FULLSCREEN or w.mode == Window.MODE_EXCLUSIVE_FULLSCREEN else Window.MODE_FULLSCREEN
 
+func build_rect(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	if near_pad >= 0 and (world.pads[near_pad] as Pad).kind != "":
+		return Rect2(v.x / 2.0 - 110.0, 116.0, 220.0, 54.0)
+	return Rect2(v.x / 2.0 - 192.0 + float(i) * 130.0, 116.0, 124.0, 54.0)
+
+func build_count() -> int:
+	if near_pad < 0:
+		return 0
+	return 1 if (world.pads[near_pad] as Pad).kind != "" else 3
+
+func def_cost(p: Pad, i: int) -> int:
+	if p.kind == "":
+		return int(DEFS[DEF_ORDER[i]]["cost"])
+	if p.lv >= 4:
+		return -1
+	return int(DEFS[p.kind]["cost"]) * p.lv
+
+func try_build(i: int) -> void:
+	if near_pad < 0 or state != "play":
+		return
+	var p: Pad = world.pads[near_pad]
+	var c: int = def_cost(p, i)
+	if c < 0 or gold < c:
+		add_popup("NOT ENOUGH GOLD" if c > 0 else "MAX LEVEL", p.position + Vector2(0, -34), Color(1.0, 0.5, 0.4))
+		return
+	gold -= c
+	if p.kind == "":
+		p.kind = DEF_ORDER[i]
+		p.lv = 1
+		var def: Dictionary = DEFS[p.kind]
+		var t: Texture2D = world.tex(String(def["tex"]))
+		var sprt := Sprite2D.new()
+		sprt.texture = t
+		sprt.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprt.offset = Vector2(0, -t.get_height() * 0.5 + 3.0)
+		sprt.position = p.position + Vector2(0, 8.0)
+		ysort.add_child(sprt)
+		p.sprite = sprt
+	else:
+		p.lv += 1
+	var base: float = float(DEFS[p.kind]["sc"])
+	p.sprite.scale = Vector2.ONE * base * (1.0 + 0.1 * float(p.lv - 1))
+	add_popup("BUILT!" if p.lv == 1 else "LEVEL %d!" % p.lv, p.position + Vector2(0, -40), Color(1.0, 0.9, 0.4))
+	ring(p.position, 46.0, Color(1.0, 0.85, 0.4), 0.5, 4.0)
+
 func _press(p: Vector2, id: int) -> void:
+	if state == "play" and near_pad >= 0:
+		for i in build_count():
+			if build_rect(i).has_point(p):
+				try_build(i)
+				return
 	if state != "result" and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
 		return
@@ -318,13 +426,13 @@ func move_input() -> Vector2:
 	return v.normalized() if v.length() > 0.0 else v
 
 # ---------------------------------------------------------------- stats from perks
-func swipe_dmg() -> float:
-	return 2.0 + float(pl("nip"))
-func swipe_r() -> float:
-	return 52.0 * (1.0 + 0.2 * float(pl("reach")))
-func swipe_cd() -> float:
+func sp() -> float:
+	return 1.0 + 0.25 * float(pl("power"))
+func cdm() -> float:
 	var goats: int = int(pen_counts.get("goat", 0))
-	return 0.5 * pow(0.87, float(pl("paws"))) * (1.0 - minf(0.3, 0.03 * float(goats)))
+	return pow(0.88, float(pl("haste"))) * (1.0 - minf(0.3, 0.03 * float(goats)))
+func am() -> float:
+	return 1.0 + 0.15 * float(pl("wide"))
 func bark_r() -> float:
 	return 150.0 * (1.0 + 0.2 * float(pl("bark")))
 func bark_cd() -> float:
@@ -340,10 +448,6 @@ func fence_regen() -> float:
 	return 0.12 * float(sheepish) + 0.7 * float(pl("moss"))
 func repair_rate() -> float:
 	return 5.0 * (1.0 + 0.6 * float(pl("paw2")))
-func stick_cd() -> float:
-	return 1.5 * pow(0.9, float(pl("stick") - 1))
-func stick_dmg() -> float:
-	return 3.0 + float(pl("stick"))
 
 # ---------------------------------------------------------------- waves
 func start_wave(n: int) -> void:
@@ -410,7 +514,7 @@ func spawn_enemy(k: String) -> void:
 	f.position = edge_point(k == "fox")
 	foxes.append(f)
 	if k == "bear":
-		banner = "A BEAR COMES FOR THE FENCE!"
+		banner = "A BEAR COMES FOR THE WALLS!"
 		banner_t = 2.8
 		Input.vibrate_handheld(60)
 
@@ -465,7 +569,7 @@ func _physics_process(delta: float) -> void:
 	update_enemies(dt)
 	update_weapons(dt)
 	update_pen_bonus(dt)
-	update_berries(dt)
+	update_coins(dt)
 	run_events()
 	stray_t -= dt
 	if stray_t <= 0.0:
@@ -496,6 +600,9 @@ func count_pen() -> void:
 
 func _process(delta: float) -> void:
 	dog.animate(delta)
+	hat.position = Vector2(float(dog.face) * 1.5, -17.0 + (5.0 if dog.crouch else 0.0))
+	hat.rotation = 0.14 * float(dog.face)
+	(dog.get_node("Spark") as CPUParticles2D).emitting = dog.vel.length() > 40.0
 	for s in sheep:
 		(s as Sheep).animate(delta)
 	for f in foxes:
@@ -597,15 +704,18 @@ func update_dog(dt: float) -> void:
 	var v: float = dog.vel.length()
 	if v > 20.0:
 		dog.heading = dog.vel / v
-	# sprinting into raiders (Zoomies)
-	if sprinting and pl("zoom") > 0:
-		for f in foxes:
-			var fx: Fox = f
-			if fx.fleeing:
-				continue
-			if fx.position.distance_to(dog.position) < 14.0 + fx.r and fx.hit_cd <= 0.0:
-				fx.hit_cd = 0.5
-				hurt(fx, 1.0 + float(pl("zoom")), dog.position, 220.0, 0.5)
+	# which build pad am I standing on?
+	near_pad = -1
+	var bd: float = 38.0
+	for i in world.pads.size():
+		var pd: Pad = world.pads[i]
+		var d: float = pd.position.distance_to(dog.position)
+		pd.near = false
+		if d < bd:
+			bd = d
+			near_pad = i
+	if near_pad >= 0:
+		(world.pads[near_pad] as Pad).near = true
 	# crouching beside a damaged fence mends it
 	if dog.crouch:
 		for w in world.walls:
@@ -683,7 +793,7 @@ func do_bark() -> void:
 		if fx.fleeing:
 			continue
 		if fx.position.distance_to(dog.position) < R * 1.1:
-			hurt(fx, 1.0, dog.position, 260.0, 1.0)
+			hurt(fx, 2.0 * sp(), dog.position, 260.0, 1.0)
 
 func add_popup(text: String, pos: Vector2, col: Color) -> void:
 	popups.append({"s": text, "pos": pos, "t": 1.0, "col": col})
@@ -702,78 +812,232 @@ func nearest_enemy(p: Vector2, maxd: float) -> Fox:
 			best = fx
 	return best
 
-func update_weapons(dt: float) -> void:
+func random_enemy(p: Vector2, maxd: float) -> Fox:
+	var pool: Array = []
 	for f in foxes:
-		(f as Fox).hit_cd = maxf(0.0, (f as Fox).hit_cd - dt)
-	swipe_t -= dt
-	if swipe_t <= 0.0:
-		var R: float = swipe_r()
-		var any: bool = false
+		var fx: Fox = f
+		if not fx.fleeing and fx.position.distance_to(p) < maxd:
+			pool.append(fx)
+	if pool.is_empty():
+		return null
+	return pool[randi() % pool.size()]
+
+func launch(kind: String, tgt: Fox, dmg: float, area: float) -> void:
+	var o := Orb.new()
+	o.kind = kind
+	o.tgt = tgt
+	o.dmg = dmg
+	o.area = area
+	o.speed = 400.0 if kind == "bolt" else 300.0
+	o.position = dog.position + Vector2(0, -4)
+	o.z_index = 30
+	add_child(o)
+	orbs.append(o)
+
+func zig(a: Vector2, b: Vector2) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	pts.append(a)
+	var d: Vector2 = b - a
+	var n: Vector2 = Vector2(-d.y, d.x).normalized()
+	for i in range(1, 5):
+		pts.append(a + d * (float(i) / 5.0) + n * randf_range(-9.0, 9.0))
+	pts.append(b)
+	return pts
+
+func streak(pts: PackedVector2Array, col: Color, dur: float, w: float) -> void:
+	var l := LineFx.new()
+	l.pts = pts
+	l.col = col
+	l.dur = dur
+	l.width = w
+	l.z_index = 30
+	add_child(l)
+
+func impact(o: Orb) -> void:
+	if o.kind == "fire":
+		ring(o.position, o.area, Color(1.0, 0.6, 0.2), 0.4, 6.0)
 		for f in foxes.duplicate():
 			var fx: Fox = f
-			if fx.fleeing:
-				continue
-			if fx.position.distance_to(dog.position) < R + fx.r:
+			if not fx.fleeing and fx.position.distance_to(o.position) < o.area + fx.r:
+				hurt(fx, o.dmg, o.position, 200.0, 0.25)
+	else:
+		ring(o.position, 14.0, Color(0.8, 0.6, 1.0), 0.25, 3.0)
+		if is_instance_valid(o.tgt) and not o.tgt.fleeing:
+			hurt(o.tgt, o.dmg, o.position, 110.0, 0.1)
+	orbs.erase(o)
+	o.queue_free()
+
+func update_weapons(dt: float) -> void:
+	for f in foxes:
+		var fz: Fox = f
+		fz.hit_cd = maxf(0.0, fz.hit_cd - dt)
+		fz.slow = maxf(0.0, fz.slow - dt)
+	var cm: float = cdm()
+	var pw: float = sp()
+	var wd: float = am()
+	# magic bolt
+	bolt_t -= dt
+	var lb: int = pl("bolt")
+	if lb > 0 and bolt_t <= 0.0:
+		var tg: Fox = nearest_enemy(dog.position, 320.0)
+		if tg != null:
+			bolt_t = 0.75 * pow(0.9, float(lb - 1)) * cm
+			var n: int = 1 + (1 if lb >= 3 else 0) + (1 if lb >= 5 else 0)
+			for i in n:
+				var t2: Fox = tg if i == 0 else random_enemy(dog.position, 320.0)
+				launch("bolt", t2 if t2 != null else tg, (2.0 + 0.5 * float(lb)) * pw, 0.0)
+		else:
+			bolt_t = 0.15
+	# fireball
+	fire_t -= dt
+	var lf: int = pl("fire")
+	if lf > 0 and fire_t <= 0.0:
+		var tf: Fox = nearest_enemy(dog.position, 340.0)
+		if tf != null:
+			fire_t = 2.6 * pow(0.9, float(lf - 1)) * cm
+			launch("fire", tf, (4.0 + 2.0 * float(lf)) * pw, (46.0 + 6.0 * float(lf)) * wd)
+		else:
+			fire_t = 0.2
+	# frost nova
+	nova_t -= dt
+	var ln: int = pl("nova")
+	if ln > 0 and nova_t <= 0.0:
+		var R: float = (95.0 + 12.0 * float(ln)) * wd
+		var any: bool = false
+		for f in foxes:
+			var fa: Fox = f
+			if not fa.fleeing and fa.position.distance_to(dog.position) < R * 0.8:
 				any = true
 		if any:
-			swipe_t = swipe_cd()
-			var sl := Slash.new()
-			sl.position = dog.position + Vector2(0, -4)
-			sl.ang = dog.heading.angle()
-			sl.rad = R
-			sl.z_index = 30
-			add_child(sl)
-			dog.squash = 0.6
+			nova_t = 4.5 * pow(0.92, float(ln - 1)) * cm
+			ring(dog.position, R, Color(0.55, 0.85, 1.0), 0.55, 7.0)
 			for f in foxes.duplicate():
-				var fx2: Fox = f
-				if fx2.fleeing:
-					continue
-				if fx2.position.distance_to(dog.position) < R + fx2.r:
-					hurt(fx2, swipe_dmg(), dog.position, 150.0, 0.0)
+				var fb: Fox = f
+				if not fb.fleeing and fb.position.distance_to(dog.position) < R + fb.r:
+					fb.slow = 3.0
+					hurt(fb, (2.0 + float(ln)) * pw, dog.position, 150.0, 0.5)
 		else:
-			swipe_t = 0.1
-	if pl("stick") > 0:
-		stick_t -= dt
-		if stick_t <= 0.0:
-			var tgt: Fox = nearest_enemy(dog.position, 330.0)
-			if tgt != null:
-				stick_t = stick_cd()
-				throw_stick(tgt.position)
-				if pl("stick") >= 4:
-					throw_stick(tgt.position + Vector2(0, 40.0))
-			else:
-				stick_t = 0.2
-	for st in sticks.duplicate():
-		var node: StickFx = st
-		node.t += dt
-		if not node.back:
-			node.position += node.vel * dt
-			if node.t > 0.55:
-				node.back = true
-				node.hit.clear()
+			nova_t = 0.2
+	# chain lightning
+	zap_t -= dt
+	var lz: int = pl("zap")
+	if lz > 0 and zap_t <= 0.0:
+		var tz: Fox = nearest_enemy(dog.position, 330.0)
+		if tz != null:
+			zap_t = 2.4 * pow(0.9, float(lz - 1)) * cm
+			var hit: Array = [tz]
+			var cur: Fox = tz
+			var from: Vector2 = dog.position + Vector2(0, -12.0)
+			for k in 2 + lz:
+				streak(zig(from, cur.position + Vector2(0, -8.0)), Color(0.7, 0.85, 1.0), 0.22, 3.0)
+				hurt(cur, (3.0 + float(lz)) * pw, from, 100.0, 0.15)
+				from = cur.position + Vector2(0, -8.0)
+				var nxt: Fox = null
+				var bd: float = 130.0 * wd
+				for f in foxes:
+					var fc: Fox = f
+					if fc.fleeing or hit.has(fc):
+						continue
+					var dd: float = fc.position.distance_to(cur.position)
+					if dd < bd:
+						bd = dd
+						nxt = fc
+				if nxt == null:
+					break
+				hit.append(nxt)
+				cur = nxt
 		else:
-			var d: Vector2 = dog.position - node.position
-			if d.length() < 14.0:
-				sticks.erase(node)
-				node.queue_free()
+			zap_t = 0.2
+	# arcane orbit
+	var lo: int = pl("orbit")
+	var want: int = (lo + 1) if lo > 0 else 0
+	while orbit_nodes.size() < want:
+		var on := Orb.new()
+		on.kind = "bolt"
+		on.z_index = 30
+		add_child(on)
+		orbit_nodes.append(on)
+	orbit_ang += 3.4 * dt
+	for i in orbit_nodes.size():
+		var ob: Orb = orbit_nodes[i]
+		var rr: float = (40.0 + 4.0 * float(lo)) * wd
+		ob.position = dog.position + Vector2.from_angle(orbit_ang + TAU * float(i) / float(maxi(1, orbit_nodes.size()))) * rr
+		for f in foxes:
+			var fo: Fox = f
+			if fo.fleeing or fo.hit_cd > 0.0:
 				continue
-			node.position += d.normalized() * 440.0 * dt
-		for f in foxes.duplicate():
-			var fx3: Fox = f
-			if fx3.fleeing or node.hit.has(fx3):
+			if fo.position.distance_to(ob.position) < 13.0 + fo.r:
+				fo.hit_cd = 0.5
+				hurt(fo, (2.0 + 0.5 * float(lo)) * pw, ob.position, 130.0, 0.0)
+	# spell projectiles
+	for o in orbs.duplicate():
+		var pr: Orb = o
+		pr.life -= dt
+		if pr.life <= 0.0:
+			orbs.erase(pr)
+			pr.queue_free()
+			continue
+		if pr.tgt == null or not is_instance_valid(pr.tgt) or pr.tgt.fleeing:
+			pr.tgt = nearest_enemy(pr.position, 260.0)
+			if pr.tgt == null:
+				orbs.erase(pr)
+				pr.queue_free()
 				continue
-			if fx3.position.distance_to(node.position) < 16.0 + fx3.r:
-				node.hit.append(fx3)
-				hurt(fx3, stick_dmg(), node.position, 140.0, 0.2)
+		var dv: Vector2 = pr.tgt.position - pr.position
+		var dl: float = maxf(dv.length(), 0.001)
+		var step: float = pr.speed * dt
+		if dl <= step + pr.tgt.r + 3.0:
+			impact(pr)
+		else:
+			pr.position += dv / dl * step
+	update_defenses(dt)
 
-func throw_stick(at: Vector2) -> void:
-	var n := StickFx.new()
-	n.position = dog.position
-	var d: Vector2 = (at - dog.position).normalized()
-	n.vel = d * 430.0
-	n.z_index = 20
-	add_child(n)
-	sticks.append(n)
+func update_defenses(dt: float) -> void:
+	for pp in world.pads:
+		var p: Pad = pp
+		if p.kind == "":
+			continue
+		p.cd -= dt
+		var origin: Vector2 = p.position + Vector2(0, -26.0)
+		if p.kind == "archer":
+			if p.cd <= 0.0:
+				var tg: Fox = nearest_enemy(p.position, 250.0 + 14.0 * float(p.lv))
+				if tg != null:
+					p.cd = 1.1 * pow(0.88, float(p.lv - 1))
+					streak(PackedVector2Array([origin, tg.position + Vector2(0, -8.0)]), Color(1.0, 0.9, 0.55), 0.14, 2.0)
+					hurt(tg, 2.0 + float(p.lv), p.position, 60.0, 0.0)
+				else:
+					p.cd = 0.15
+		elif p.kind == "brazier":
+			if p.cd <= 0.0:
+				var R: float = 82.0 + 8.0 * float(p.lv)
+				var any: bool = false
+				for f in foxes:
+					var fx: Fox = f
+					if not fx.fleeing and fx.position.distance_to(p.position) < R + fx.r:
+						any = true
+				if any:
+					p.cd = 1.5
+					ring(p.position, R, Color(1.0, 0.55, 0.2), 0.45, 5.0)
+					for f in foxes.duplicate():
+						var fy: Fox = f
+						if not fy.fleeing and fy.position.distance_to(p.position) < R + fy.r:
+							hurt(fy, 1.0 + float(p.lv), p.position, 120.0, 0.0)
+				else:
+					p.cd = 0.2
+		else:
+			var R2: float = 120.0 + 10.0 * float(p.lv)
+			var any2: bool = false
+			for f in foxes:
+				var fz: Fox = f
+				if not fz.fleeing and fz.position.distance_to(p.position) < R2:
+					fz.slow = 0.35
+					any2 = true
+			if any2 and p.cd <= 0.0:
+				p.cd = 2.0
+				ring(p.position, R2, Color(0.6, 0.88, 1.0), 0.6, 3.0)
+
+
 
 func hurt(f: Fox, dmg: float, from: Vector2, power: float, stun: float) -> void:
 	if f.fleeing:
@@ -797,17 +1061,19 @@ func defeat(f: Fox) -> void:
 	add_popup("SHOO!", f.position + Vector2(0, -16), Color(1.0, 0.85, 0.4))
 	ring(f.position, 34.0, Color(1.0, 1.0, 1.0), 0.4, 3.0)
 	var nb: int = 1
+	var val: int = 3
 	if f.kind == "wolf":
 		nb = 2
+		val = 4
 	elif f.kind == "bear":
 		nb = 5
-	if f.kind == "fox" and randf() < 0.4:
-		nb = 0
+		val = 8
 	for i in nb:
-		var b := Berry.new()
+		var b := Coin.new()
+		b.value = val
 		b.position = f.position + Vector2(randf_range(-18, 18), randf_range(-12, 12))
 		ysort.add_child(b)
-		berries.append(b)
+		coins.append(b)
 
 func drop_carry(f: Fox) -> void:
 	var s: Sheep = f.carry
@@ -819,28 +1085,22 @@ func drop_carry(f: Fox) -> void:
 	f.carry = null
 	add_popup("SAVED!", s.position + Vector2(0, -14), Color(0.6, 1.0, 0.6))
 
-func update_berries(dt: float) -> void:
-	for b in berries.duplicate():
-		var bn: Berry = b
+func update_coins(dt: float) -> void:
+	for b in coins.duplicate():
+		var bn: Coin = b
 		if bn.life <= 0.0:
-			berries.erase(bn)
+			coins.erase(bn)
 			bn.queue_free()
 			continue
-		if bn.position.distance_to(dog.position) < 24.0:
-			var worst: Dictionary = {}
-			var wf: float = 2.0
-			for w in world.walls:
-				if not w["pen"] or w["broken"]:
-					continue
-				var fr: float = float(w["hp"]) / float(w["max"])
-				if fr < wf:
-					wf = fr
-					worst = w
-			if not worst.is_empty():
-				set_wall_hp(worst, float(worst["hp"]) + 18.0)
-			dog.stam = minf(dog.stam_max, dog.stam + 25.0)
-			add_popup("YUM", bn.position + Vector2(0, -12), Color(1.0, 0.6, 0.65))
-			berries.erase(bn)
+		var d: float = bn.position.distance_to(dog.position)
+		if d < 70.0:
+			bn.fly = true
+		if bn.fly:
+			bn.position += (dog.position - bn.position).normalized() * 300.0 * dt
+		if d < 12.0:
+			gold += bn.value
+			add_popup("+%d" % bn.value, bn.position + Vector2(0, -12), Color(1.0, 0.85, 0.3))
+			coins.erase(bn)
 			bn.queue_free()
 
 # ---------------------------------------------------------------- animals in the pen give side bonuses
@@ -1056,7 +1316,7 @@ func gnaw(f: Fox, dt: float) -> void:
 	move_to(f, nw["p"], f.base_speed, dt, 6.0)
 	if float(nw["d"]) < f.r + 7.0:
 		var w: Dictionary = world.walls[int(nw["i"])]
-		set_wall_hp(w, float(w["hp"]) - f.fence_dps * dt)
+		set_wall_hp(w, float(w["hp"]) - f.fence_dps * dt * (0.6 if f.slow > 0.0 else 1.0))
 		alarm = 0.6
 		alarm_pos = nw["p"]
 		if float(w["hp"]) <= 0.0:
@@ -1139,7 +1399,7 @@ func update_enemies(dt: float) -> void:
 					gnaw(fx, dt)
 		else:
 			gnaw(fx, dt)
-		fx.position += (fx.vel + fx.kb) * dt
+		fx.position += (fx.vel * (0.5 if fx.slow > 0.0 else 1.0) + fx.kb) * dt
 		collide(fx, fx.r, 0.0)
 
 # ---------------------------------------------------------------- the end

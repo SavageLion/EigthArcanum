@@ -12,6 +12,7 @@ var kb: Vector2 = Vector2.ZERO
 var stun: float = 0.0
 var fleeing: bool = false
 var hit_cd: float = 0.0
+var slow: float = 0.0
 var tgt: Sheep = null
 var carry: Sheep = null
 var tt: float = 0.0
