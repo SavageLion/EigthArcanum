@@ -83,6 +83,8 @@ var cam_pos: Vector2 = Vector2.ZERO
 var cam_look: Vector2 = Vector2.ZERO
 var cam_init: bool = false
 var smoke: bool = false
+var alarm: float = 0.0
+var alarm_pos: Vector2 = Vector2.ZERO
 var smoke_n: int = 0
 # input
 var stick_on: bool = false
@@ -455,6 +457,7 @@ func _physics_process(delta: float) -> void:
 	var dt: float = minf(delta, 0.05)
 	clock += dt
 	wave_t += dt
+	alarm = maxf(0.0, alarm - dt)
 	banner_t = maxf(0.0, banner_t - dt)
 	count_pen()
 	update_dog(dt)
@@ -1054,6 +1057,8 @@ func gnaw(f: Fox, dt: float) -> void:
 	if float(nw["d"]) < f.r + 7.0:
 		var w: Dictionary = world.walls[int(nw["i"])]
 		set_wall_hp(w, float(w["hp"]) - f.fence_dps * dt)
+		alarm = 0.6
+		alarm_pos = nw["p"]
 		if float(w["hp"]) <= 0.0:
 			w["broken"] = true
 			for n in (w["nodes"] as Array):

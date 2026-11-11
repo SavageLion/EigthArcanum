@@ -85,6 +85,30 @@ func _draw() -> void:
 		var q2: Vector2 = cen + d * k
 		var a: float = d.angle()
 		draw_colored_polygon(PackedVector2Array([q2 + Vector2.from_angle(a) * 10.0, q2 + Vector2.from_angle(a + 2.5) * 9.0, q2 + Vector2.from_angle(a - 2.5) * 9.0]), Color(1.0, 0.45, 0.35, 0.9))
+	# the fence is under attack: red edges pulse, a warning and an arrow to the spot
+	if main.alarm > 0.0 and main.state == "play":
+		var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.012)
+		var fade: float = minf(1.0, main.alarm * 3.0)
+		for i in 6:
+			var th: float = 10.0 + float(i) * 12.0
+			var al: float = (0.34 - float(i) * 0.05) * (0.45 + 0.55 * pulse) * fade
+			var rc := Color(0.95, 0.15, 0.1, maxf(al, 0.0))
+			draw_rect(Rect2(0, v.y - th, v.x, 12.0), rc)
+			draw_rect(Rect2(0, th - 10.0, v.x, 12.0), rc)
+			draw_rect(Rect2(th - 10.0, 0, 12.0, v.y), rc)
+			draw_rect(Rect2(v.x - th - 2.0, 0, 12.0, v.y), rc)
+		_panel(Rect2(v.x / 2.0 - 120, 44, 240, 28), Color(0.55, 0.1, 0.08, 0.85 * fade))
+		_text("FENCE UNDER ATTACK!", Vector2(v.x / 2.0 - 120, 64), 16, Color(1, 0.95, 0.85, fade), 240.0, HORIZONTAL_ALIGNMENT_CENTER)
+		var ap: Vector2 = _w2s(main.alarm_pos)
+		var inside: bool = ap.x > 30 and ap.x < v.x - 30 and ap.y > 90 and ap.y < v.y - 30
+		if inside:
+			draw_arc(ap, 16.0 + pulse * 6.0, 0.0, TAU, 28, Color(1.0, 0.3, 0.2, 0.9 * fade), 3.0, true)
+		else:
+			var dd: Vector2 = ap - v / 2.0
+			var kk: float = minf((v.x / 2.0 - 40.0) / maxf(absf(dd.x), 1.0), (v.y / 2.0 - 44.0) / maxf(absf(dd.y), 1.0))
+			var qq: Vector2 = v / 2.0 + dd * kk
+			var aa: float = dd.angle()
+			draw_colored_polygon(PackedVector2Array([qq + Vector2.from_angle(aa) * 16.0, qq + Vector2.from_angle(aa + 2.4) * 14.0, qq + Vector2.from_angle(aa - 2.4) * 14.0]), Color(1.0, 0.3, 0.2, 0.95 * fade))
 	# popups
 	for pu in main.popups:
 		var sp2: Vector2 = _w2s(pu["pos"])
