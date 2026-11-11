@@ -8,6 +8,7 @@ const b=await chromium.launch({channel:'chrome'}),page=await b.newPage({viewport
 page.on('pageerror',e=>errs.push(e.message));
 await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTimeout(500);
 const W=await page.evaluate(()=>window.__sd.W());
+await page.evaluate(()=>window.__sd.setChores(true));
 const pen=n=>page.evaluate(n=>{const G=window.__sd.G;G.sheep.slice(0,n).forEach(s=>{s.inPen=true;});window.__sd.step(1);return {need:window.__sd.quota(),total:G.sheep.length};},n);
 // 1. below the quota when time is up: the run ends
 await page.evaluate(()=>{window.__sd.startMap(0);window.__sd.G.actT=1e9;});

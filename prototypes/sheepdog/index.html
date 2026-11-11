@@ -1109,7 +1109,7 @@ function drawFixture(f){
  else{c.strokeStyle='#6a4a22';c.lineWidth=3;c.beginPath();c.moveTo(f.x,f.y+2);c.lineTo(f.x,f.y-26);c.moveTo(f.x-12,f.y-18);c.lineTo(f.x+12,f.y-18);c.stroke();c.fillStyle='#d8b878';c.beginPath();c.arc(f.x,f.y-30,6,0,TAU);c.fill();c.fillStyle='#8a5a2a';c.fillRect(f.x-8,f.y-37,16,3);c.fillRect(f.x-4,f.y-42,8,6);}
 }
 /* ================= night chores: a few farm-job mini-games (prototype) ================= */
-let CHORES_ON=true;
+let CHORES_ON=false;   // parked: the chore board felt like a different game
 const stage=()=>({x:Math.round((W-700)/2),y:84,w:700,h:372});
 const CHORE_LIST=[
  {id:'shear',name:'SHEARING',needs:['normal','ram','black','panicky','lamb'],col:'#f2efe6',ic:'S',desc:'Clip the wool. Go slow, mind the skin.',unit:'wool'},
