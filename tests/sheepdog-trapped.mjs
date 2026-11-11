@@ -6,7 +6,7 @@ const srv=http.createServer((q,s)=>{const f=path.join(root,q.url.split('?')[0]==
 await new Promise(r=>srv.on('listening',r));
 const b=await chromium.launch({channel:'chrome'}),page=await b.newPage({viewport:{width:960,height:540}});const errs=[];
 page.on('pageerror',e=>errs.push(e.message));
-await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTimeout(500);
+await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTimeout(500);await page.evaluate(()=>window.__sd.setNight(true));
 const res=await page.evaluate(()=>{
   const S=window.__sd,G=S.G,o={};
   const inPen=q=>{const P=G.pen;return q.x>P.x&&q.x<P.x+P.w&&q.y>P.y&&q.y<P.y+P.h;};

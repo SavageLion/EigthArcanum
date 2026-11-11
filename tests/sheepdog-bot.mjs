@@ -12,13 +12,12 @@ await page.evaluate(()=>{window.__sd.start();window.__sd.bot(true);});
 const run=()=>page.evaluate(()=>{const S=window.__sd;let g=0;while(S.G.state==='play'&&g++<60*200)S.step(1);return {state:S.G.state,mode:S.G.mode,day:S.G.day,left:Math.round(S.G.time),penned:S.G.penned,n:S.G.sheep.length,lost:S.G.lost,herd:S.G.herd.length,score:S.G.score};});
 for(let d=1;d<=DAYS;d++){
   let r=await run();console.log('day',d,'ends',JSON.stringify(r));
-  if(shots){await page.evaluate(()=>window.__sd.render());await page.screenshot({path:`${shots}/sd_d${d}_dusk.png`});}
-  if(r.state!=='dusk')break;
-  await page.evaluate(()=>window.__sd.cont());
-  if(shots){await page.evaluate(()=>window.__sd.step(60*20));await page.screenshot({path:`${shots}/sd_d${d}_night.png`});}
-  r=await run();console.log('night',d,'ends',JSON.stringify(r));
-  if(shots){await page.evaluate(()=>window.__sd.render());await page.screenshot({path:`${shots}/sd_d${d}_dawn.png`});}
-  if(r.state!=='dawn')break;
+  if(shots){await page.evaluate(()=>window.__sd.render());await page.screenshot({path:`${shots}/sd_d${d}_end.png`});}
+  if(r.state==='dusk'){                                   // night mode on: play the night as well
+    await page.evaluate(()=>window.__sd.cont());
+    r=await run();console.log('night',d,'ends',JSON.stringify(r));
+  }
+  if(r.state!=='dawn')break;                              // victory / lost
   await page.evaluate(()=>window.__sd.next(0));
 }
 console.log('errors',errs.length?errs.join(' | '):'none');await b.close();srv.close();
