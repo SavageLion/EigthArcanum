@@ -13,7 +13,7 @@ const T=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts});
 const S=()=>page.evaluate(()=>{const G=window.__sd.G;return {state:G.state,dog:[Math.round(G.dog&&G.dog.x),Math.round(G.dog&&G.dog.y)],crouch:G.dog&&G.dog.crouch,walk:G.dog&&G.dog.walk,cd:+G.barkCd.toFixed(2)};});
 // logical canvas is 960x540 scaled to 844x390 (letterboxed): helper to place touches by world coords
 const WW=await page.evaluate(()=>window.__sd.W()),sc=Math.min(844/WW,390/540),ox=(844-WW*sc)/2,oy=(390-540*sc)/2,P=(x,y,id=0)=>({x:ox+x*sc,y:oy+y*sc,id});
-await T('touchStart',[P(480,270)]);await T('touchEnd',[]);await page.waitForTimeout(200);console.log('after start tap',JSON.stringify(await S()));
+await T('touchStart',[P(WW/2-300,280)]);await T('touchEnd',[]);await page.waitForTimeout(200);console.log('after start tap',JSON.stringify(await S()));
 const s0=await S();
 // full push to the right with the left thumb (stick origin at (200,420) in world px, drag 80px right)
 await T('touchStart',[P(200,420,1)]);await page.waitForTimeout(60);await T('touchMove',[P(280,420,1)]);await page.waitForTimeout(900);

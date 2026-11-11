@@ -46,9 +46,21 @@ const TYPES={
 const SEASONS=[{n:'SPRING',gr:['#5f9a48','#68a44e','#5a9444'],mud:2},{n:'SUMMER',gr:['#8aa44a','#94ae54','#809a42'],mud:0},{n:'AUTUMN',gr:['#9a7a3c','#a4843f','#8c6e36'],mud:1},{n:'WINTER',gr:['#dfe8ee','#e8f0f4','#d2dde4'],mud:2}];
 const season=()=>SEASONS[Math.floor((G.day-1)/3)%4];
 const NEWS={2:'Mud slows you and the flock',3:'Black sheep wander. Wolves hunt at night',4:'A stream cuts the field. Eagles take lambs',5:'Goats ignore you until you stare. BEAR NIGHT!',6:'Trees block the way',8:'The gate narrows'};
+/* ---------------- maps and saved progress ---------------- */
+const MAPS=[
+ {id:'home',name:'Home Paddock',days:5,ready:true,bear:false,blurb:'One field. Short and gentle. Learn the ropes.',news:{2:'Mud slows you and the flock',3:'Black sheep wander. Wolves hunt at night',4:'A stream cuts the field. Eagles take lambs',5:'FINAL NIGHT: the alpha pack comes. Goats need a stare'}},
+ {id:'hill',name:'Hill Pasture',days:8,blurb:'A wide hillside with a stream.'},
+ {id:'wood',name:'Wood Edge',days:10,blurb:'Dark trees, more wolves, a bear.'},
+ {id:'river',name:'River Meadow',days:12,blurb:'Mud, a ford, and eagles.'},
+ {id:'high',name:'High Pasture',days:15,blurb:'Deep winter. Two bears.'}];
+G.map=MAPS[0];G.runLost=0;
+let SAVE={stars:{},best:{}};try{SAVE=Object.assign(SAVE,JSON.parse(localStorage.getItem('sheepdog_save')||'{}'));}catch(_){}
+function persist(){try{localStorage.setItem('sheepdog_save',JSON.stringify(SAVE));}catch(_){}}
+const mapUnlocked=i=>i===0||(SAVE.stars[MAPS[i-1].id]||0)>0;
+function startMap(i){if(!MAPS[i]||!MAPS[i].ready)return;G.map=MAPS[i];startGame();}
 function zoneAt(o){for(const z of G.zones||[]){if(z.k==='water'?(o.x>z.x&&o.x<z.x+z.w&&o.y>z.y&&o.y<z.y+z.h):(((o.x-z.x-z.w/2)/(z.w/2))**2+((o.y-z.y-z.h/2)/(z.h/2))**2<1))return z;}return null;}
 /* ---------------- starting a day ---------------- */
-function startGame(){G.day=1;G.perks={};G.score=0;G.herd=[];for(let i=0;i<8;i++)G.herd.push({type:'normal'});startDay();}
+function startGame(){G.runLost=0;G.day=1;G.perks={};G.score=0;G.herd=[];for(let i=0;i<8;i++)G.herd.push({type:'normal'});startDay();}
 function mkWall(x1,y1,x2,y2,pen,hp){const w=[x1,y1,x2,y2];w.pen=!!pen;w.max=hp||0;w.hp=hp||0;w.broken=false;w.dig=0;return w;}
 function fenceHp(){return 70*(1+.5*perk('fence'));}
 function startDay(){
@@ -76,7 +88,7 @@ function startDay(){
   const T=TYPES[h.type];
   G.sheep.push({x,y,vx:0,vy:0,type:h.type,T,hp:T.hp,panic:0,inPen:false,wa:rnd(0,TAU),graze:rnd(0,3),face:1,hop:rnd(0,6),flash:0,carried:false,bumpT:0});
  }
- G.msg='DAY '+n+' · '+season().n;G.msg2=NEWS[n]||((n-1)%3===0&&n>1?'A new season begins':'');G.msgT=3.5;G.penned=0;
+ G.msg='DAY '+n+' · '+season().n;G.msg2=(G.map.news||NEWS)[n]||((n-1)%3===0&&n>1?'A new season begins':'');G.msgT=3.5;G.penned=0;
 }
 function endDay(why){
  if(G.state!=='play'||G.mode!=='day')return;
@@ -92,22 +104,25 @@ function startNight(){
  G.mode='night';G.state='play';G.t=0;G.parts=[];G.texts=[];G.rings=[];G.preds=[];G.warns=[];G.flare=null;G.flareCd=0;G.lost=0;G.packId=0;
  const n=G.day,P=G.pen,hp=fenceHp();
  const gw=mkWall(P.x,P.gy-P.gap/2,P.x,P.gy+P.gap/2,1,hp);gw.gate=true;G.walls.push(gw);       // the gate swings shut
- G.limit=Math.round(Math.min(110,46+6*n)*({SUMMER:.75,WINTER:1.25}[season().n]||1));G.time=G.limit;G.fireOn=!!perk('campfire');G.msg2=n===5||n%5===0?'A BEAR is coming':'';
+ G.limit=Math.round(Math.min(110,46+6*n)*({SUMMER:.75,WINTER:1.25}[season().n]||1));G.time=G.limit;G.fireOn=!!perk('campfire');G.msg2=n>=G.map.days?'Hold out until dawn':(n%5===0&&G.map.bear!==false?'A BEAR is coming':'');
  // who comes when: foxes sneak in from the start, wolf packs arrive later and louder
  G.events=[];
  const sn=season().n;const foxes=Math.min(6,1+Math.floor(n/2)+(sn==='SUMMER'?1:0));for(let i=0;i<foxes;i++)G.events.push({t:6+i*Math.max(9,G.limit/(foxes+1)),k:'fox'});
  if(n>=3){const packs=Math.min(3,Math.ceil((n-2)/2));for(let i=0;i<packs;i++)G.events.push({t:16+i*Math.max(16,G.limit/(packs+1)),k:'pack',n:Math.min(7,2+Math.floor((n-1)/2)+(sn==='WINTER'?1:0)),alpha:n>=5&&i===packs-1});}
  if(n>=4){const eg=Math.min(3,Math.floor((n-2)/2));for(let i=0;i<eg;i++)G.events.push({t:12+i*Math.max(14,G.limit/(eg+1)),k:'eagle'});}
- if(n%5===0)G.events.push({t:Math.round(G.limit*.3),k:'bear'});
+ if(n%5===0&&G.map.bear!==false)G.events.push({t:Math.round(G.limit*.3),k:'bear'});
  G.events.sort((a,b)=>a.t-b.t);
- G.msg='NIGHT '+n;G.msgT=2.2;G.dog.crouch=false;
+ G.msg=n>=G.map.days?'FINAL NIGHT':'NIGHT '+n;G.msgT=2.6;G.dog.crouch=false;
 }
 function endNight(){
  if(G.state!=='play'||G.mode!=='night')return;
  const alive=G.sheep.filter(s=>!s.carried);
  G.herd=alive.map(s=>({type:s.type==='lamb'?'normal':s.type}));
- const lostN=G.lost;G.score+=Math.round(40*G.day+alive.length*12+(lostN===0?100:0));
+ const lostN=G.lost;G.runLost=(G.runLost||0)+lostN;G.score+=Math.round(40*G.day+alive.length*12+(lostN===0?100:0));
  if(!G.herd.length){G.state='lost';G.best=Math.max(G.best,G.day);return;}
+ if(G.day>=G.map.days){ // the map is won
+  G.stars=G.runLost===0?3:G.runLost<=3?2:1;G.score+=G.stars*150;G.winInfo={first:!(SAVE.stars[G.map.id]>0),survivors:alive.length,lost:G.runLost};
+  SAVE.stars[G.map.id]=Math.max(SAVE.stars[G.map.id]||0,G.stars);SAVE.best[G.map.id]=Math.max(SAVE.best[G.map.id]||0,G.score);persist();G.best=Math.max(G.best,G.day);G.state='victory';return;}
  // dawn brings new arrivals
  const kinds=['normal'];if(G.day>=2)kinds.push('ram','panicky');if(G.day>=3)kinds.push('black');if(G.day>=5)kinds.push('goat');
  const born=[{type:'lamb'}];born.push({type:Math.random()<.5?pick(kinds):'normal'});if(season().n==='SPRING')born.push({type:'lamb'});
@@ -445,15 +460,18 @@ function skipStage(){ // jump straight to dawn (the reward pick) with the flock 
  if(G.state!=='play'&&G.state!=='dusk')return;
  G.state='play';G.mode='night';G.lost=0;G.preds=[];endNight();
 }
+function mapCards(){const n=MAPS.length,gap=12,w=Math.min(170,(W-60-(n-1)*gap)/n),x0=(W-(n*w+(n-1)*gap))/2;return MAPS.map((m,i)=>({x:x0+i*(w+gap),y:172,w,h:214,i}));}
 function advance(){ // tap-to-continue on the cards
- if(G.state==='ready'||G.state==='lost'){startGame();}
+ if(G.state==='ready'){startMap(0);}
+ else if(G.state==='lost'||G.state==='victory'){G.state='ready';}
  else if(G.state==='dusk'){startNight();}
 }
 cv.addEventListener('pointerdown',e=>{
  const p=pt(e);try{cv.setPointerCapture(e.pointerId);}catch(_){}
  if(p.x>FS.x&&p.y<FS.y+FS.h&&p.y>FS.y-6){goFull();return;}
  if((G.state==='play'||G.state==='dusk')&&p.x>NX.x-8&&p.x<NX.x+NX.w+8&&p.y>NX.y-8&&p.y<NX.y+NX.h+8){skipStage();return;}
- if(G.state==='ready'||G.state==='lost'||G.state==='dusk'){advance();return;}
+ if(G.state==='ready'){for(const m of mapCards())if(p.x>m.x&&p.x<m.x+m.w&&p.y>m.y&&p.y<m.y+m.h){startMap(m.i);return;}return;}
+ if(G.state==='lost'||G.state==='victory'||G.state==='dusk'){advance();return;}
  if(G.state==='dawn'){const ofs=layoutOffers();for(let i=0;i<ofs.length;i++){const o=ofs[i];if(p.x>o.x&&p.x<o.x+o.w&&p.y>o.y&&p.y<o.y+o.h){pickOffer(i);return;}}return;}
  if(G.state!=='play')return;
  if(G.mode==='day'&&G.penned>=Math.ceil(G.sheep.length*.6)&&p.x>BTN_DUSK.x&&p.x<BTN_DUSK.x+BTN_DUSK.w&&p.y<BTN_DUSK.y+BTN_DUSK.h+8){endDay('called');return;}
@@ -466,7 +484,7 @@ cv.addEventListener('pointermove',e=>{if(stick.on&&e.pointerId===stick.id)stickM
 const up=e=>{if(e.pointerId===stick.id){stick.on=false;stick.id=-1;stick.vx=stick.vy=0;}if(e.pointerId===calmId){calmHeld=false;calmId=-1;}delete holdIds[e.pointerId];};
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);cv.addEventListener('lostpointercapture',up);
 addEventListener('keydown',e=>{const k=e.key;if(k==='ArrowLeft'||k==='a')keys.l=1;if(k==='ArrowRight'||k==='d')keys.r=1;if(k==='ArrowUp'||k==='w')keys.u=1;if(k==='ArrowDown'||k==='s')keys.d=1;
- if(k===' '){e.preventDefault();if(G.state==='ready'||G.state==='lost'||G.state==='dusk')advance();else bark();}
+ if(k===' '){e.preventDefault();if(G.state==='ready'||G.state==='lost'||G.state==='victory'||G.state==='dusk')advance();else bark();}
  if(k==='c'||k==='Shift')calmHeld=true;
  if(k==='f')goFull();
  if(k==='e')useFlare();
@@ -802,7 +820,7 @@ function render(){
  if(G.state==='play'||G.state==='dusk'||G.state==='dawn'||G.state==='lost'){
   c.fillStyle='rgba(20,12,26,.62)';c.fillRect(0,0,W,40);
   if(G.mode==='day'){
-   txt('DAY '+G.day+' '+season().n.slice(0,3),14,26,'#ffd24a',16);txt('TIME '+Math.ceil(G.time),130,26,G.time<15?'#ff8a6a':'#fff',17);
+   txt('DAY '+G.day+'/'+G.map.days+' '+season().n.slice(0,3),14,26,'#ffd24a',16);txt('TIME '+Math.ceil(G.time),130,26,G.time<15?'#ff8a6a':'#fff',17);
    txt(`PEN ${G.penned}/${G.sheep.length}`,260,26,'#9aff9a',17);txt('SCORE '+G.score,W-330,26,'#ffe9a8',15);
    if(G.state==='play'&&G.penned>=Math.ceil(G.sheep.length*.6)){c.fillStyle='rgba(60,30,90,.95)';c.fillRect(BTN_DUSK.x,BTN_DUSK.y,BTN_DUSK.w,BTN_DUSK.h);c.strokeStyle='#c8a0ff';c.lineWidth=2;c.strokeRect(BTN_DUSK.x,BTN_DUSK.y,BTN_DUSK.w,BTN_DUSK.h);txt('CALL DUSK >',BTN_DUSK.x+BTN_DUSK.w/2,BTN_DUSK.y+21,'#e8d8ff',14,'center');}
   }else{
@@ -825,12 +843,19 @@ function render(){
   c.fillStyle='rgba(20,12,26,.7)';c.fillRect(NX.x,NX.y,NX.w,NX.h);c.strokeStyle='#ffb84a';c.lineWidth=2;c.strokeRect(NX.x,NX.y,NX.w,NX.h);txt('NEXT >>',NX.x+NX.w/2,NX.y+19,'#ffe9c0',13,'center');
  if(G.msgT>0){c.globalAlpha=clamp(G.msgT,0,1);txt(G.msg,W/2,110,'#fff',34,'center');if(G.msg2)txt(G.msg2,W/2,140,'#ffd24a',18,'center');c.globalAlpha=1;}
  }
- if(G.state==='ready'){c.fillStyle='rgba(10,20,10,.62)';c.fillRect(0,0,W,H);txt('SHEEPDOG',W/2,150,'#fff6c8',60,'center');
-  txt('By day: steer the flock through the gate into the pen.',W/2,200,'#e8f0d8',18,'center');
-  txt('By night: foxes and wolves come for them. Light, bark, stare, mend the fence.',W/2,226,'#e8f0d8',18,'center');
-  txt('Left thumb: stick (light push = slow, steady). Right thumb: BARK, hold CALM.',W/2,266,'#e8f0d8',16,'center');
-  txt('Keys: WASD/arrows, Space bark, C calm, E flare, N call dusk, F fullscreen',W/2,292,'#b8c8a8',14,'center');
-  txt('TAP TO START',W/2,370,'#ffd24a',26,'center');}
+ if(G.state==='ready'){c.fillStyle='rgba(10,20,10,.7)';c.fillRect(0,0,W,H);txt('SHEEPDOG',W/2,84,'#fff6c8',54,'center');
+  txt('Herd the flock home by day. Defend it by night.',W/2,118,'#e8f0d8',17,'center');
+  txt('CHOOSE A MAP',W/2,152,'#ffd24a',18,'center');
+  for(const m of mapCards()){const M=MAPS[m.i],open=M.ready&&mapUnlocked(m.i),st=SAVE.stars[M.id]||0;
+   c.fillStyle=open?'rgba(30,26,44,.95)':'rgba(24,22,32,.8)';c.fillRect(m.x,m.y,m.w,m.h);c.strokeStyle=open?'#ffb84a':'#5a5066';c.lineWidth=open?3:2;c.strokeRect(m.x,m.y,m.w,m.h);
+   txt(String(m.i+1),m.x+10,m.y+22,open?'#ffd24a':'#7a7088',16);
+   txt(M.name,m.x+m.w/2,m.y+54,open?'#fff':'#9a90a8',16,'center');
+   txt(M.days+' days',m.x+m.w/2,m.y+76,open?'#9aff9a':'#7a7088',14,'center');
+   const words=M.blurb.split(' ');let line='',yy=m.y+104;for(const w of words){if((line+' '+w).length>17){txt(line,m.x+m.w/2,yy,open?'#d8c8b0':'#7a7088',12,'center');yy+=16;line=w;}else line=(line+' '+w).trim();}txt(line,m.x+m.w/2,yy,open?'#d8c8b0':'#7a7088',12,'center');
+   if(open){txt('★'.repeat(st)+'☆'.repeat(3-st),m.x+m.w/2,m.y+m.h-44,'#ffd24a',20,'center');txt(SAVE.best[M.id]?'best '+SAVE.best[M.id]:'TAP TO PLAY',m.x+m.w/2,m.y+m.h-16,'#ffe9c0',13,'center');}
+   else txt(M.ready?'LOCKED':'COMING SOON',m.x+m.w/2,m.y+m.h-18,'#8a7f98',13,'center');}
+  txt('Left thumb: stick (light push = slow, steady). Right thumb: BARK, hold CALM.',W/2,424,'#b8c8a8',14,'center');
+  txt('Keys: WASD/arrows, Space bark, C calm, E flare, N call dusk, F fullscreen',W/2,446,'#98a888',13,'center');}
  if(G.state==='dusk'){const I=G.duskInfo;c.fillStyle='rgba(18,10,50,.82)';c.fillRect(0,0,W,H);
   txt('NIGHT FALLS',W/2,130,'#b8c8ff',52,'center');
   txt(`${I.penned} sheep are safe in the pen`,W/2,200,'#9aff9a',22,'center');
@@ -848,13 +873,20 @@ function render(){
    txt(p.n,o.x+o.w/2,o.y+104,'#fff',19,'center');
    const words=p.d.split(' ');let line='',yy=o.y+130;for(const w of words){if((line+' '+w).length>27){txt(line,o.x+o.w/2,yy,'#d8c8b0',14,'center');yy+=18;line=w;}else line=(line+' '+w).trim();}txt(line,o.x+o.w/2,yy,'#d8c8b0',14,'center');
    txt(String(i+1),o.x+12,o.y+22,'#9a8a7a',14);});}
+ if(G.state==='victory'){const I=G.winInfo||{};c.fillStyle='rgba(20,40,20,.84)';c.fillRect(0,0,W,H);
+  txt('MAP COMPLETE',W/2,120,'#ffd24a',50,'center');txt(G.map.name,W/2,158,'#e8f0d8',22,'center');
+  txt('★'.repeat(G.stars)+'☆'.repeat(3-G.stars),W/2,222,'#ffd24a',60,'center');
+  txt(I.lost?I.lost+' sheep lost along the way':'Not a single sheep lost!',W/2,262,I.lost?'#ffb8a0':'#9aff9a',20,'center');
+  txt('Flock at the end: '+(I.survivors||0)+'    Score '+G.score,W/2,292,'#fff',20,'center');
+  txt(I.first?'New: the next map is unlocked (coming soon)':'Best on this map: '+(SAVE.best[G.map.id]||G.score),W/2,326,'#c8e8c8',16,'center');
+  txt('TAP FOR MAP SELECT',W/2,396,'#ffd24a',26,'center');}
  if(G.state==='lost'){c.fillStyle='rgba(30,10,10,.78)';c.fillRect(0,0,W,H);txt('THE FLOCK IS GONE',W/2,200,'#ff8a6a',44,'center');
-  txt(`You lasted ${G.day} day${G.day>1?'s':''}   Score ${G.score}   Best day ${G.best}`,W/2,246,'#fff',20,'center');txt('TAP TO TRY AGAIN',W/2,320,'#ffd24a',26,'center');}
+  txt(`You lasted ${G.day} day${G.day>1?'s':''}   Score ${G.score}   Best day ${G.best}`,W/2,246,'#fff',20,'center');txt('TAP FOR MAP SELECT',W/2,320,'#ffd24a',26,'center');}
 }
 /* ---------------- loop ---------------- */
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage};
+window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,maps:MAPS,save:SAVE,startMap};
 })();
 </script></body></html>
