@@ -57,7 +57,6 @@ var orbit_nodes: Array = []
 var orbit_ang: float = 0.0
 var gold: int = 0
 var near_pad: int = -1
-var hat: Hat
 var cam: Camera2D
 var hud: Hud
 var dog_frames: SpriteFrames
@@ -136,7 +135,7 @@ func _ready() -> void:
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
 	shadow_tex = U.shadow_texture()
 	var names: Array = ["east", "north", "south", "south-east", "north-east"]
-	dog_frames = U.frames(load("res://art/chars/dog.png") as Texture2D, 48, names)
+	dog_frames = U.raven_frames()
 	sheep_frames = U.frames(load("res://art/chars/sheep.png") as Texture2D, 40, ["east", "north", "south"])
 	fox_frames = U.frames(load("res://art/chars/fox.png") as Texture2D, 52, names)
 	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
@@ -153,9 +152,6 @@ func _ready() -> void:
 	ysort.add_child(dog)
 	dog.setup(dog_frames, shadow_tex)
 	dog.position = world.dog_start
-	hat = Hat.new()
-	hat.z_index = 2
-	dog.add_child(hat)
 	var spark := CPUParticles2D.new()
 	spark.amount = 18
 	spark.lifetime = 0.8
@@ -600,8 +596,6 @@ func count_pen() -> void:
 
 func _process(delta: float) -> void:
 	dog.animate(delta)
-	hat.position = Vector2(float(dog.face) * 1.5, -17.0 + (5.0 if dog.crouch else 0.0))
-	hat.rotation = 0.14 * float(dog.face)
 	(dog.get_node("Spark") as CPUParticles2D).emitting = dog.vel.length() > 40.0
 	for s in sheep:
 		(s as Sheep).animate(delta)
@@ -773,6 +767,7 @@ func do_bark() -> void:
 	if state != "play" or dog.bark_cd > 0.0 or dog.stun > 0.0:
 		return
 	dog.bark_cd = bark_cd()
+	dog.cast_t = 0.4
 	dog.squash = 1.0
 	shake = 1.0
 	var R: float = bark_r()
@@ -831,6 +826,7 @@ func launch(kind: String, tgt: Fox, dmg: float, area: float) -> void:
 	o.speed = 400.0 if kind == "bolt" else 300.0
 	o.position = dog.position + Vector2(0, -4)
 	o.z_index = 30
+	dog.cast_t = 0.35
 	add_child(o)
 	orbs.append(o)
 
@@ -910,6 +906,7 @@ func update_weapons(dt: float) -> void:
 				any = true
 		if any:
 			nova_t = 4.5 * pow(0.92, float(ln - 1)) * cm
+			dog.cast_t = 0.4
 			ring(dog.position, R, Color(0.55, 0.85, 1.0), 0.55, 7.0)
 			for f in foxes.duplicate():
 				var fb: Fox = f
@@ -925,6 +922,7 @@ func update_weapons(dt: float) -> void:
 		var tz: Fox = nearest_enemy(dog.position, 330.0)
 		if tz != null:
 			zap_t = 2.4 * pow(0.9, float(lz - 1)) * cm
+			dog.cast_t = 0.4
 			var hit: Array = [tz]
 			var cur: Fox = tz
 			var from: Vector2 = dog.position + Vector2(0, -12.0)

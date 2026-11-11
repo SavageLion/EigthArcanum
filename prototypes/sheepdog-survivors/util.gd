@@ -45,3 +45,26 @@ static func row_for(v: Vector2, has5: bool) -> String:
 			return "north-east" if v.y < 0.0 else "south-east"
 		return "north" if v.y < 0.0 else "south"
 	return "east"
+
+static func raven_frames() -> SpriteFrames:
+	# the Raven Astrologer: 8 directions of idle, walk and cast, one PNG per frame
+	var sf := SpriteFrames.new()
+	sf.remove_animation("default")
+	var dirs: Array = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
+	var clips: Dictionary = {"idle": [6.0, true], "walk": [12.0, true], "cast": [16.0, false]}
+	for clip in clips.keys():
+		for d in dirs:
+			var an: String = String(clip) + "_" + String(d)
+			sf.add_animation(an)
+			sf.set_animation_speed(an, float((clips[clip] as Array)[0]))
+			sf.set_animation_loop(an, bool((clips[clip] as Array)[1]))
+			var i: int = 0
+			while ResourceLoader.exists("res://art/raven/%s/%s/%d.png" % [clip, d, i]):
+				sf.add_frame(an, load("res://art/raven/%s/%s/%d.png" % [clip, d, i]) as Texture2D)
+				i += 1
+	return sf
+
+static func dir8(h: Vector2) -> String:
+	var dirs: Array = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
+	var idx: int = int(round(h.angle() / (PI / 4.0)))
+	return String(dirs[posmod(idx, 8)])

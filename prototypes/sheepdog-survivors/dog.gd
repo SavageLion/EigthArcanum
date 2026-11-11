@@ -14,6 +14,8 @@ var spr: AnimatedSprite2D
 var shadow: Sprite2D
 var dust: CPUParticles2D
 var squash: float = 0.0
+var cast_t: float = 0.0
+const SC: float = 0.85
 
 func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	shadow = Sprite2D.new()
@@ -24,8 +26,8 @@ func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	spr = AnimatedSprite2D.new()
 	spr.sprite_frames = frames
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	spr.scale = Vector2(0.74, 0.74)
-	spr.offset = Vector2(0, -14)
+	spr.scale = Vector2(SC, SC)
+	spr.offset = Vector2(0, -26)
 	spr.play("idle_east")
 	add_child(spr)
 	dust = CPUParticles2D.new()
@@ -45,18 +47,20 @@ func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 
 func animate(dt: float) -> void:
 	var speed: float = vel.length()
-	var row: String = U.row_for(vel, true)
-	if absf(vel.x) > 10.0:
-		face = 1 if vel.x > 0.0 else -1
 	var moving: bool = speed > 14.0
-	var a: String = ("walk_" if moving else "idle_") + row
+	cast_t = maxf(0.0, cast_t - dt)
+	var dir: String = U.dir8(heading)
+	var clip: String = "cast" if cast_t > 0.0 else ("walk" if moving else "idle")
+	var a: String = clip + "_" + dir
 	if spr.animation != a:
+		var keep: int = spr.frame if (clip != "cast" and spr.animation.begins_with(clip)) else 0
 		spr.play(a)
-	spr.flip_h = (face < 0 and (row == "east" or row.ends_with("east")))
-	spr.speed_scale = clampf(speed / 120.0, 0.6, 2.2)
-	var lowered: float = 0.82 if crouch else 1.0
+		spr.frame = keep
+	spr.speed_scale = clampf(speed / 150.0, 0.7, 2.0) if clip == "walk" else 1.0
+	var lowered: float = 0.9 if crouch else 1.0
 	squash = move_toward(squash, 0.0, dt * 4.0)
-	var sq: float = 1.0 + squash * 0.2
-	spr.scale = Vector2(0.74 / sq, 0.74 * lowered * sq)
+	var sq: float = 1.0 + squash * 0.15
+	spr.scale = Vector2(SC / sq, SC * lowered * sq)
+	spr.modulate = Color(0.75, 0.85, 1.0) if winded else Color(1, 1, 1)
 	dust.emitting = speed > 140.0
 	dust.position = Vector2(-face * 6.0, 0)
