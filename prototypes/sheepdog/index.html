@@ -86,7 +86,7 @@ function buyUp(id){const u=UPS.find(x=>x.id===id);if(!u)return false;const l=upl
 function awardBones(n){n=Math.round(n);SAVE.bones=(SAVE.bones||0)+n;G.lastBones=n;persist();}
 function persist(){try{localStorage.setItem('sheepdog_save',JSON.stringify(SAVE));}catch(_){}}
 const mapUnlocked=i=>i===0||SAVE.unlockAll||(SAVE.stars[MAPS[i-1].id]||0)>0;
-const UA={x:0,y:0,w:190,h:30},CT={x:0,y:0,w:190,h:30},RM={x:0,y:0,w:210,h:30},KB={x:14,y:0,w:130,h:30},FM={x:0,y:46,w:150,h:28},ER={x:0,y:78,w:72,h:28},SB={x:0,y:78,w:150,h:28};   // test button on the map select screen (position set in fit)
+const UA={x:0,y:0,w:190,h:30},CT={x:0,y:0,w:190,h:30},NT={x:0,y:0,w:190,h:30},RM={x:0,y:0,w:210,h:30},KB={x:14,y:0,w:130,h:30},FM={x:0,y:46,w:150,h:28},ER={x:0,y:78,w:72,h:28},SB={x:0,y:78,w:150,h:28};   // test button on the map select screen (position set in fit)
 function startMap(i){if(!MAPS[i]||!MAPS[i].ready)return;G.map=MAPS[i];startGame();}
 function zoneAt(o){for(const z of G.zones||[]){if(z.k==='water'?(o.x>z.x&&o.x<z.x+z.w&&o.y>z.y&&o.y<z.y+z.h):(((o.x-z.x-z.w/2)/(z.w/2))**2+((o.y-z.y-z.h/2)/(z.h/2))**2<1))return z;}return null;}
 /* ---------------- starting a day ---------------- */
@@ -153,7 +153,7 @@ function startDay(){
  }
  { // enemy scouts through the day, drawn from this map's enemy list
   const pool=(M.enemies||[{k:'fox',w:1}]).filter(e=>(e.from||1)<=dn),tot=pool.reduce((a,e)=>a+e.w,0),ns=Math.max(1,Math.round((.6+.35*dn)*(M.pressure||1)));
-  for(let i=0;i<ns;i++){let q=Math.random()*tot,pk=pool[0];for(const e of pool){q-=e.w;if(q<=0){pk=e;break;}}G.events.push({t:rnd(14,Math.max(30,G.limit*.8)),k:pk.k,n:Math.min(6,2+Math.floor(dn/4)),alpha:dn>=7&&Math.random()<.3});}
+  for(let i=0;i<(pool.length?ns:0);i++){let q=Math.random()*tot,pk=pool[0];for(const e of pool){q-=e.w;if(q<=0){pk=e;break;}}G.events.push({t:rnd(14,Math.max(30,G.limit*.8)),k:pk.k,n:Math.min(6,2+Math.floor(dn/4)),alpha:dn>=7&&Math.random()<.3});}
   G.events.sort((a,b)=>a.t-b.t);}
  updateCam(0,true);
  G.msg=(M.run?'FLOOR '+(RUN.level?RUN.level.f:1):'DAY '+n)+' · '+season().n;G.msg2=(G.map.news||NEWS)[n]||((n-1)%3===0&&n>1?'A new season begins':'');G.msgT=3.5;G.penned=0;
@@ -559,13 +559,13 @@ function updatePreds(dt){
    p.stk=hyp(p.vx,p.vy)<40?(p.stk||0)+dt:0;
    if(p.stk>.7||(nearEdge(p,46)&&dd<150)){p.exit=true;addText(p.x,p.y-16,'ESCAPES','#cfe8cf');}}
   if(p.k==='fox'){
-   if(p.scared>0||(dd<(p.v==='coyote'?170:115)&&!d.crouch&&!p.carry)){ // run from the dog
-    if(p.carry&&dd<40)dropCarry(p);
-    if(dd<(p.v==='coyote'?170:115)&&!d.crouch){p.scared=Math.max(p.scared,1.6);if(p.carry)dropCarry(p);}
+   if(p.scared>0||(dd<(p.v==='coyote'?170:p.v==='thief'?60:115)&&!d.crouch&&!p.carry)){ // run from the dog
+    if(p.carry&&dd<40&&p.v!=='thief')dropCarry(p);
+    if(dd<(p.v==='coyote'?170:p.v==='thief'?60:115)&&!d.crouch){p.scared=Math.max(p.scared,1.6);if(p.carry&&p.v!=='thief')dropCarry(p);}
     const dx=p.x-d.x,dy=p.y-d.y,l=hyp(dx,dy)||1;moveTo(p,p.x+dx/l*100,p.y+dy/l*100,165*(p.v==='coyote'?1.2:1),dt,8);
    }else if(p.carry){
     const e=[{x:0,y:p.y},{x:WX,y:p.y},{x:p.x,y:46},{x:p.x,y:WY}].sort((a,b)=>hyp(a.x-p.x,a.y-p.y)-hyp(b.x-p.x,b.y-p.y))[0];
-    moveTo(p,e.x,e.y,100,dt);p.carry.x=p.x;p.carry.y=p.y-4;
+    {const th=p.v==='thief';let tx=e.x,ty=e.y,spd=100;if(th){const ex=e.x-p.x,ey=e.y-p.y,l=hyp(ex,ey)||1,w=Math.sin(G.t*3+p.x*.01)*120;tx+=-ey/l*w;ty+=ex/l*w;spd=dd<170?195:140;}moveTo(p,tx,ty,spd,dt);}p.carry.x=p.x;p.carry.y=p.y-4;
     if(p.x<5||p.x>WX-5||p.y<48||p.y>WY-5){killSheep(p.carry,'fox');p.carry=null;p.dead=true;}
    }else if(p.hes>0){moveTo(p,p.x,p.y,0,dt,10);}
    else{
@@ -620,6 +620,7 @@ function update(dt){
   updatePreds(dt);if(G.mode==='night'&&G.map.td)updateWaves(dt);if(G.mode==='night'){updateAllies(dt);G.oil=Math.max(0,G.oil-dt*(perk('lantern')?.8:1)/DD().oil);}
  }
  updateSheep(dt);
+ if(NITE.on){updateNite(dt);return;}
  G.time-=dt;
  if(G.mode==='day'){
   if(G.penned>=G.sheep.length&&G.sheep.length)endDay('all');
@@ -673,17 +674,19 @@ const buzz=buzzNow;
 function pt(e){const b=cv.getBoundingClientRect(),sc=Math.min(b.width/W,b.height/H),ox=(b.width-W*sc)/2,oy=(b.height-H*sc)/2;return {x:(e.clientX-b.left-ox)/sc,y:(e.clientY-b.top-oy)/sc};}
 const inBtn=(p,B)=>hyp(p.x-B.x,p.y-B.y)<B.r+14;
 function stickMove(p){const dx=p.x-stick.ox,dy=p.y-stick.oy,l=hyp(dx,dy),k=Math.min(1,l/stick.R);stick.x=stick.ox+(l?dx/l:0)*Math.min(l,stick.R);stick.y=stick.oy+(l?dy/l:0)*Math.min(l,stick.R);stick.vx=l?dx/l*k:0;stick.vy=l?dy/l*k:0;}
-function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-70;BTN_CALM.x=W-196;BTN_SPRINT.x=W-322;BTN_FLARE.x=W-196;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;UA.x=W-UA.w-14;UA.y=H-UA.h-12;CT.x=UA.x;CT.y=UA.y-36;RM.x=W/2-105;RM.y=H-42;KB.y=H-KB.h-12;FM.x=W-240;ER.x=W-80;SB.x=W-240;}
+function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-70;BTN_CALM.x=W-196;BTN_SPRINT.x=W-322;BTN_FLARE.x=W-196;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;UA.x=W-UA.w-14;UA.y=H-UA.h-12;CT.x=UA.x;CT.y=UA.y-36;NT.x=UA.x;NT.y=CT.y-36;RM.x=W/2-105;RM.y=H-42;KB.y=H-KB.h-12;FM.x=W-240;ER.x=W-80;SB.x=W-240;}
 fit();
 function goFull(){try{const d=document;if(!d.fullscreenElement){const r=d.documentElement.requestFullscreen();if(r&&r.then)r.then(()=>{try{const lp=screen.orientation.lock('landscape');if(lp&&lp.catch)lp.catch(()=>{});}catch(_){}}).catch(()=>{});}else d.exitFullscreen();}catch(_){}}
 function endRun(){ // testing: end the run now, keep the bones, back to map select
  if(G.state!=='play'&&G.state!=='dusk'&&G.state!=='build'&&G.state!=='dawn')return;
+ if(NITE.on){NITE.on=false;G.map=MAPS[0];G.mode='day';G.state='ready';return;}
  if(G.map.run){RUN.on=false;G.map=MAPS[0];}
  awardBones(G.day*3);G.preds=[];G.mode='day';G.state='ready';stick.on=false;stick.vx=stick.vy=0;calmHeld=false;
 }
 function drawFullBtn(){c.fillStyle='rgba(20,12,26,.7)';c.fillRect(FS.x,FS.y,FS.w,FS.h);c.strokeStyle='#ffb84a';c.lineWidth=2;c.strokeRect(FS.x,FS.y,FS.w,FS.h);txt('FULL',FS.x+FS.w/2,FS.y+19,'#ffe9c0',12,'center');}
 function drawEndBtn(){c.fillStyle='rgba(60,20,20,.8)';c.fillRect(ER.x,ER.y,ER.w,ER.h);c.strokeStyle='#ff8a6a';c.lineWidth=2;c.strokeRect(ER.x,ER.y,ER.w,ER.h);txt('END RUN',ER.x+ER.w/2,ER.y+19,'#ffd0c0',12,'center');}
-function skipStage(){ // NEXT: day -> straight to the night (or its build screen); night -> straight to the dawn reward pick
+function skipStage(){
+ if(NITE.on&&G.state==='play'){finishNite();return;} // NEXT: day -> straight to the night (or its build screen); night -> straight to the dawn reward pick
  if(G.state==='play'&&G.mode==='day'){if(!NIGHT)for(const q of G.sheep)q.inPen=true;endDay('skipped');if(G.state==='chores'){CS.test=false;finishAfterChores();return;}if(G.state==='dusk'){if(G.map.td)enterBuild();else startNight();}return;}
  if(G.state==='dusk'){if(G.map.td)enterBuild();else startNight();return;}
  if(G.state!=='play')return;
@@ -706,10 +709,12 @@ cv.addEventListener('pointerdown',e=>{
  if(G.state==='build'){buildTap(p);return;}
  if(G.state==='chores'){choreDown(p);return;}
  if(G.state.startsWith('run_')){runTap(p);return;}
+ if(G.state==='nite_pick'||G.state==='nite_res'){niteTap(p);return;}
  if(G.state==='play'&&G.mode==='night'&&G.allies&&G.allies.length&&inRect(p,SB)){G.sendMode=!G.sendMode;return;}
  if(G.state==='play'&&G.mode==='night'&&G.allies&&G.allies.length&&inRect(p,FM)){G.form=G.form==='post'?'gate':G.form==='gate'?'chase':'post';return;}
  if(G.state==='ready'){if(p.x>UA.x&&p.x<UA.x+UA.w&&p.y>UA.y&&p.y<UA.y+UA.h){SAVE.unlockAll=!SAVE.unlockAll;if(SAVE.unlockAll)SAVE.bones=Math.max(SAVE.bones||0,999);persist();return;}
   if(inRect(p,RM)){newRun();return;}
+  if(inRect(p,NT)){G.state='nite_pick';return;}
   if(p.x>CT.x&&p.x<CT.x+CT.w&&p.y>CT.y&&p.y<CT.y+CT.h){enterChores(['normal','cow','goose','pig','duck','goat'],true);return;}
   if(p.x>KB.x&&p.x<KB.x+KB.w&&p.y>KB.y&&p.y<KB.y+KB.h){G.state='kennel';K.sel=SAVE.dog;return;}
   {const o=dogStrip();for(const b of o)if(p.x>b.x&&p.x<b.x+b.w&&p.y>b.y&&p.y<b.y+b.h){setDog(b.id);return;}}for(const m of mapCards())if(p.x>m.x&&p.x<m.x+m.w&&p.y>m.y&&p.y<m.y+m.h){if(MAPS[m.i].ready&&mapUnlocked(m.i))startMap(m.i);return;}return;}
@@ -1445,6 +1450,64 @@ function runTap(p){
   if(st==='run_perk'&&id.startsWith('perk:')){const o=G.offers[+id.slice(5)];RUN.perks[o.id]=(RUN.perks[o.id]||0)+1;G.state='run_map';return;}
  }
 }
+/* ================= NIGHT ENCOUNTERS: you are still the dog, in the dark =================
+   LAMB RESCUE: lambs are lost in the dark. Follow their bleats, find them with your lantern, bring them home.
+   FOX HUNT: three foxes sneak in for the flock. Scare them off; if one grabs a lamb, chase it down, bark or tackle it. */
+const NITE={on:false,kind:null,t:0,total:0,spawned:0,res:null,fox:false,limit:110};
+function startNite(kind){
+ G.map=Object.assign({},MAPS[1],{id:'nite',run:false,days:1,quota:[0,0],pressure:0,enemies:[],act:0,wx:2,wy:1.6,timeMul:1,diff:0,mud:.4,rocks:.9,trees:.9,stream:false,pen:'edge',center:false,td:false,pool:[{t:'normal',w:1}],news:{}});
+ G.day=1;G.score=0;G.lost=0;G.away=[];G.cared=0;G.failWhy=null;
+ G.herd=kind==='lamb'?Array.from({length:5},()=>({type:'lamb'})):[{type:'normal'},{type:'normal'},{type:'normal'},{type:'lamb'},{type:'lamb'},{type:'lamb'}];
+ startDay();
+ G.mode='night';G.state='play';G.events=[];G.preds=[];G.fixtures=[];G.allies=[];G.oilMax=G.oil=9999;G.limit=G.time=99999;G.msgT=0;
+ if(kind==='fox'){const P=G.pen;G.sheep.forEach((q,i)=>{q.x=P.x-240+Math.cos(i*1.05)*50;q.y=P.gy+Math.sin(i*1.05)*50;q.seen=true;q.hidden=false;q.vx=q.vy=0;});}
+ Object.assign(NITE,{on:true,kind,t:0,total:G.sheep.length,spawned:0,res:null,fox:false});
+ G.msg=kind==='lamb'?'LAMB RESCUE':'FOX HUNT';G.msg2=kind==='lamb'?'Follow the bleats. Bring every lamb home.':'Scare them off. If one grabs a lamb, chase it down!';G.msgT=3.2;
+}
+function updateNite(dt){
+ NITE.t+=dt;
+ if(NITE.kind==='lamb'){
+  for(const q of G.sheep){if(q.inPen)continue;q.bleat=(q.bleat===undefined?rnd(.5,3):q.bleat)-dt;if(q.bleat<=0){q.bleat=rnd(3.2,5.5);q.ping=2.4;G.rings.push({x:q.x,y:q.y,r:6,max:60,t:.5});}}
+  if(!NITE.fox&&NITE.t>28){NITE.fox=true;spawnFox();G.msg='A FOX IS ABOUT';G.msg2='Keep your lantern near the lambs';G.msgT=2.4;}
+  if(!G.sheep.length||G.sheep.every(q=>q.inPen)||NITE.t>NITE.limit)finishNite();
+ }else{
+  const at=[4,30,56];while(NITE.spawned<at.length&&NITE.t>=at[NITE.spawned]){spawnFox('thief');NITE.spawned++;G.msg='A FOX!';G.msgT=1.6;}
+  const alive=G.preds.filter(p=>!p.dead&&!p.exit).length;
+  if((NITE.spawned>=at.length&&alive===0&&NITE.t>60)||NITE.t>NITE.limit||!G.sheep.length)finishNite();
+ }
+}
+function finishNite(){
+ const total=NITE.total,kind=NITE.kind,pen=G.sheep.filter(q=>q.inPen).length,alive=G.sheep.length;
+ NITE.res=kind==='lamb'?{title:pen===total?'ALL HOME':pen?'SOME HOME':'LOST IN THE DARK',n:pen,total,line:pen+' of '+total+' lambs were brought home'}
+  :{title:alive===total?'NOT ONE TAKEN':alive?'THE FOXES GOT SOME':'THE FLOCK IS GONE',n:alive,total,line:alive+' of '+total+' animals are safe'};
+ NITE.on=false;G.map=MAPS[0];G.mode='day';G.preds=[];G.state='nite_res';
+}
+function drawNiteHud(){
+ txt(NITE.kind==='lamb'?'LAMB RESCUE':'FOX HUNT',14,26,'#9ab8ff',17);
+ if(NITE.kind==='lamb'){const pen=G.sheep.filter(q=>q.inPen).length;txt('HOME '+pen+'/'+NITE.total,230,26,'#9aff9a',17);txt('LOST '+(NITE.total-G.sheep.length),380,26,'#ff9a8a',17);txt('TIME '+Math.max(0,Math.ceil(NITE.limit-NITE.t)),520,26,'#fff',17);}
+ else{txt('SAFE '+G.sheep.length+'/'+NITE.total,230,26,'#9aff9a',17);txt('FOXES '+NITE.spawned+'/3',380,26,'#ffb878',17);txt('TIME '+Math.max(0,Math.ceil(NITE.limit-NITE.t)),520,26,'#fff',17);}
+}
+function drawNiteScreen(){
+ RB=[];c.fillStyle='rgba(10,14,36,.97)';c.fillRect(0,0,W,H);
+ for(const q of STARS){c.fillStyle='rgba(255,255,230,.7)';c.fillRect(q.x*W/960,q.y,q.r+.6,q.r+.6);}
+ if(G.state==='nite_pick'){
+  txt('NIGHT ENCOUNTERS',W/2,80,'#9ab8ff',34,'center');txt('You are still the dog, with your lantern, in the dark.',W/2,112,'#d0d8f0',15,'center');
+  rbtn('lamb',W/2-330,170,310,190,'LAMB RESCUE',true,'');rbtn('fox',W/2+20,170,310,190,'FOX HUNT',true,'');
+  const w=(t,x,y)=>{const words=t.split(' ');let line='',yy=y;for(const q of words){if((line+' '+q).length>34){txt(line,x,yy,'#d8c8b0',14,'center');yy+=19;line=q;}else line=(line+' '+q).trim();}txt(line,x,yy,'#d8c8b0',14,'center');};
+  w('Five lambs are lost in the dark. Follow their bleats (arrows and the minimap), find them in your lantern light and herd them to the pen. A fox appears later.',W/2-175,260);
+  w('Three foxes sneak in for the flock. Scare them off, but if one grabs a lamb it ignores you: chase it down, then bark or tackle it. Sprint, but mind your stamina.',W/2+175,260);
+  rbtn('back',W/2-90,410,180,48,'BACK',true);return;}
+ const R=NITE.res||{};
+ txt(R.title||'NIGHT OVER',W/2,130,'#ffd24a',42,'center');txt(R.line||'',W/2,196,'#fff',22,'center');
+ txt(R.n===R.total?'A perfect night!':'Try again to do better.',W/2,236,'#d8e8d0',16,'center');
+ rbtn('again',W/2-250,310,230,52,'PLAY AGAIN',true);rbtn('menu',W/2+20,310,230,52,'BACK TO MENU',true);
+}
+function niteTap(p){
+ for(const b of RB){if(!inRect(p,b))continue;
+  if(b.id==='lamb'){startNite('lamb');return;}if(b.id==='fox'){startNite('fox');return;}
+  if(b.id==='back'||b.id==='menu'){G.state='ready';return;}
+  if(b.id==='again'){startNite(NITE.kind);return;}}
+}
 function btnDraw(B,label,on){c.globalAlpha=on?.9:.6;c.fillStyle=on?'#ffd24a':'#2a1a30';c.beginPath();c.arc(B.x,B.y,B.r,0,TAU);c.fill();c.strokeStyle='#ffb84a';c.lineWidth=3;c.stroke();c.globalAlpha=1;c.fillStyle=on?'#2a1408':'#ffe9c0';c.font='bold 17px monospace';c.textAlign='center';c.fillText(label,B.x,B.y+6);}
 function txt(s,x,y,col='#fff',size=16,al='left'){c.font=`bold ${size}px monospace`;c.textAlign=al;c.fillStyle='rgba(0,0,0,.55)';c.fillText(s,x+1.5,y+1.5);c.fillStyle=col;c.fillText(s,x,y);}
 function layoutOffers(){const n=G.offers.length,w=250,gap=18,x0=(W-(n*w+(n-1)*gap))/2;return G.offers.map((o,i)=>({x:x0+i*(w+gap),y:200,w,h:200}));}
@@ -1534,6 +1597,8 @@ function render(){
  if(G.state==='build'){drawBuild();drawEndBtn();drawFullBtn();}
  if(G.state==='chores'){drawChores();drawFullBtn();}
  if(G.state.startsWith('run_')){drawRun();drawFullBtn();}
+ if(G.state==='nite_pick'||G.state==='nite_res'){drawNiteScreen();drawFullBtn();}
+ if(NITE.on&&G.state==='play'){c.fillStyle='#140c1a';c.fillRect(0,0,W-92,40);drawNiteHud();}
  if(G.state==='ready'){c.fillStyle='rgba(10,20,10,.7)';c.fillRect(0,0,W,H);txt('SHEEPDOG',W/2,84,'#fff6c8',54,'center');
   txt('Herd the flock home by day. Defend it by night.',W/2,118,'#e8f0d8',17,'center');
   txt('CHOOSE A MAP',W/2,152,'#ffd24a',18,'center');
@@ -1546,6 +1611,7 @@ function render(){
    if(open){txt('★'.repeat(st)+'☆'.repeat(3-st),m.x+m.w/2,m.y+m.h-44,'#ffd24a',20,'center');txt(SAVE.best[M.id]?'best '+SAVE.best[M.id]:'TAP TO PLAY',m.x+m.w/2,m.y+m.h-16,'#ffe9c0',13,'center');}
    else txt(M.ready?'BEAT MAP '+m.i:'COMING SOON',m.x+m.w/2,m.y+m.h-18,'#8a7f98',13,'center');}
   txt('BONES '+(SAVE.bones||0),W-20,62,'#ffe9a8',17,'right');drawFullBtn();
+  c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT.x,NT.y,NT.w,NT.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT.x,NT.y,NT.w,NT.h);txt('NIGHT (testing)',NT.x+NT.w/2,NT.y+20,'#d0d8ff',12,'center');
   c.fillStyle='rgba(40,60,40,.9)';c.fillRect(CT.x,CT.y,CT.w,CT.h);c.strokeStyle='#9acb8a';c.lineWidth=2;c.strokeRect(CT.x,CT.y,CT.w,CT.h);txt('CHORES (testing)',CT.x+CT.w/2,CT.y+20,'#d8ffd0',12,'center');
   txt('YOUR DOG',W/2,402,'#ffd24a',14,'center');
   for(const b of dogStrip()){const on=b.id===SAVE.dog;c.fillStyle=on?'rgba(90,70,30,.95)':'rgba(30,26,44,.9)';c.fillRect(b.x,b.y,b.w,b.h);c.strokeStyle=on?'#ffd24a':'#6a6078';c.lineWidth=on?3:2;c.strokeRect(b.x,b.y,b.w,b.h);drawDogIcon(b.id,b.x+b.w/2,b.y+b.h-8,1.0);}
@@ -1584,6 +1650,6 @@ function render(){
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,penInfo:()=>({mode:(G.map.pen||(G.map.center?'center':'edge')),fx:G.pen.x/WX,fy:G.pen.y/WY,dog:[G.dog.x,G.dog.y],world:[WX,WY]}),stam:()=>({stam:G.stam,max:G.stamMax,winded:G.winded}),setSprint:v=>{sprintHeld=!!v;},run:{RUN,RB:()=>RB,new:newRun,enter:enterNode,tap:runTap,startLevel:startRunLevel,EVENTS,reach,applyFx,finish:finishRunLevel,end:endRun2},chores:{enter:enterChores,CS,MINI,start:startChore,down:p=>choreDown(p),move:p=>choreMove(p),up:()=>choreUp(),finish:finishChores,stage},setChores:v=>{CHORES_ON=!!v;},quota,startDay,poolPick,TYPES,spawnFox,spawnBadger,lureZone,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
+window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,nite:{NITE,start:startNite,finish:finishNite,tap:niteTap},penInfo:()=>({mode:(G.map.pen||(G.map.center?'center':'edge')),fx:G.pen.x/WX,fy:G.pen.y/WY,dog:[G.dog.x,G.dog.y],world:[WX,WY]}),stam:()=>({stam:G.stam,max:G.stamMax,winded:G.winded}),setSprint:v=>{sprintHeld=!!v;},run:{RUN,RB:()=>RB,new:newRun,enter:enterNode,tap:runTap,startLevel:startRunLevel,EVENTS,reach,applyFx,finish:finishRunLevel,end:endRun2},chores:{enter:enterChores,CS,MINI,start:startChore,down:p=>choreDown(p),move:p=>choreMove(p),up:()=>choreUp(),finish:finishChores,stage},setChores:v=>{CHORES_ON=!!v;},quota,startDay,poolPick,TYPES,spawnFox,spawnBadger,lureZone,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
 })();
 </script></body></html>
