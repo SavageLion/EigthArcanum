@@ -81,7 +81,7 @@ function buyUp(id){const u=UPS.find(x=>x.id===id);if(!u)return false;const l=upl
 function awardBones(n){n=Math.round(n);SAVE.bones=(SAVE.bones||0)+n;G.lastBones=n;persist();}
 function persist(){try{localStorage.setItem('sheepdog_save',JSON.stringify(SAVE));}catch(_){}}
 const mapUnlocked=i=>i===0||SAVE.unlockAll||(SAVE.stars[MAPS[i-1].id]||0)>0;
-const UA={x:0,y:0,w:190,h:30},KB={x:14,y:0,w:130,h:30},FM={x:0,y:46,w:150,h:28};   // test button on the map select screen (position set in fit)
+const UA={x:0,y:0,w:190,h:30},KB={x:14,y:0,w:130,h:30},FM={x:0,y:46,w:150,h:28},ER={x:0,y:78,w:72,h:28};   // test button on the map select screen (position set in fit)
 function startMap(i){if(!MAPS[i]||!MAPS[i].ready)return;G.map=MAPS[i];startGame();}
 function zoneAt(o){for(const z of G.zones||[]){if(z.k==='water'?(o.x>z.x&&o.x<z.x+z.w&&o.y>z.y&&o.y<z.y+z.h):(((o.x-z.x-z.w/2)/(z.w/2))**2+((o.y-z.y-z.h/2)/(z.h/2))**2<1))return z;}return null;}
 /* ---------------- starting a day ---------------- */
@@ -589,9 +589,15 @@ const buzz=buzzNow;
 function pt(e){const b=cv.getBoundingClientRect(),sc=Math.min(b.width/W,b.height/H),ox=(b.width-W*sc)/2,oy=(b.height-H*sc)/2;return {x:(e.clientX-b.left-ox)/sc,y:(e.clientY-b.top-oy)/sc};}
 const inBtn=(p,B)=>hyp(p.x-B.x,p.y-B.y)<B.r+14;
 function stickMove(p){const dx=p.x-stick.ox,dy=p.y-stick.oy,l=hyp(dx,dy),k=Math.min(1,l/stick.R);stick.x=stick.ox+(l?dx/l:0)*Math.min(l,stick.R);stick.y=stick.oy+(l?dy/l:0)*Math.min(l,stick.R);stick.vx=l?dx/l*k:0;stick.vy=l?dy/l*k:0;}
-function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-96;BTN_CALM.x=W-236;BTN_FLARE.x=W-176;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;UA.x=W-UA.w-14;UA.y=H-UA.h-12;KB.y=H-KB.h-12;FM.x=W-240;}
+function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-96;BTN_CALM.x=W-236;BTN_FLARE.x=W-176;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;UA.x=W-UA.w-14;UA.y=H-UA.h-12;KB.y=H-KB.h-12;FM.x=W-240;ER.x=W-80;}
 fit();
-function goFull(){try{const d=document;if(!d.fullscreenElement){const r=d.documentElement.requestFullscreen();if(r&&r.then)r.then(()=>{try{screen.orientation.lock('landscape');}catch(_){}}).catch(()=>{});}else d.exitFullscreen();}catch(_){}}
+function goFull(){try{const d=document;if(!d.fullscreenElement){const r=d.documentElement.requestFullscreen();if(r&&r.then)r.then(()=>{try{const lp=screen.orientation.lock('landscape');if(lp&&lp.catch)lp.catch(()=>{});}catch(_){}}).catch(()=>{});}else d.exitFullscreen();}catch(_){}}
+function endRun(){ // testing: end the run now, keep the bones, back to map select
+ if(G.state!=='play'&&G.state!=='dusk'&&G.state!=='build'&&G.state!=='dawn')return;
+ awardBones(G.day*3);G.preds=[];G.mode='day';G.state='ready';stick.on=false;stick.vx=stick.vy=0;calmHeld=false;
+}
+function drawFullBtn(){c.fillStyle='rgba(20,12,26,.7)';c.fillRect(FS.x,FS.y,FS.w,FS.h);c.strokeStyle='#ffb84a';c.lineWidth=2;c.strokeRect(FS.x,FS.y,FS.w,FS.h);txt('FULL',FS.x+FS.w/2,FS.y+19,'#ffe9c0',12,'center');}
+function drawEndBtn(){c.fillStyle='rgba(60,20,20,.8)';c.fillRect(ER.x,ER.y,ER.w,ER.h);c.strokeStyle='#ff8a6a';c.lineWidth=2;c.strokeRect(ER.x,ER.y,ER.w,ER.h);txt('END RUN',ER.x+ER.w/2,ER.y+19,'#ffd0c0',12,'center');}
 function skipStage(){ // jump straight to dawn (the reward pick) with the flock as it is
  if(G.state!=='play'&&G.state!=='dusk')return;
  G.state='play';G.mode='night';G.lost=0;G.preds=[];endNight();
@@ -607,6 +613,7 @@ function advance(){ // tap-to-continue on the cards
 cv.addEventListener('pointerdown',e=>{
  const p=pt(e);try{cv.setPointerCapture(e.pointerId);}catch(_){}
  if(p.x>FS.x&&p.y<FS.y+FS.h&&p.y>FS.y-6){goFull();return;}
+ if((G.state==='play'||G.state==='dusk'||G.state==='build'||G.state==='dawn')&&p.x>ER.x-8&&p.x<ER.x+ER.w+8&&p.y>ER.y-8&&p.y<ER.y+ER.h+8){endRun();return;}
  if((G.state==='play'||G.state==='dusk')&&p.x>NX.x-8&&p.x<NX.x+NX.w+8&&p.y>NX.y-8&&p.y<NX.y+NX.h+8){skipStage();return;}
  if(G.state==='kennel'){kennelTap(p);return;}
  if(G.state==='build'){buildTap(p);return;}
@@ -1111,11 +1118,12 @@ function render(){
   btnDraw(BTN_CALM,G.mode==='night'?'STARE/FIX':'CALM',calmHeld||(G.dog&&G.dog.crouch));
   if(G.mode==='night'&&perk('flare'))btnDraw(BTN_FLARE,G.flareCd>0?Math.ceil(G.flareCd)+'':'FLARE',G.flareCd<=0);
   if(G.mode==='night'&&G.allies&&G.allies.length){c.fillStyle='rgba(20,12,26,.7)';c.fillRect(FM.x,FM.y,FM.w,FM.h);c.strokeStyle='#8fd0ff';c.lineWidth=2;c.strokeRect(FM.x,FM.y,FM.w,FM.h);txt('FORM: '+({post:'HOLD POSTS',gate:'GUARD GATE',chase:'CHASE'}[G.form]),FM.x+FM.w/2,FM.y+19,'#cfe8ff',12,'center');}
+ drawEndBtn();
  c.fillStyle='rgba(20,12,26,.7)';c.fillRect(NX.x,NX.y,NX.w,NX.h);c.strokeStyle='#ffb84a';c.lineWidth=2;c.strokeRect(NX.x,NX.y,NX.w,NX.h);txt('NEXT >>',NX.x+NX.w/2,NX.y+19,'#ffe9c0',13,'center');
  if(G.msgT>0){c.globalAlpha=clamp(G.msgT,0,1);txt(G.msg,W/2,110,'#fff',34,'center');if(G.msg2)txt(G.msg2,W/2,140,'#ffd24a',18,'center');c.globalAlpha=1;}
  }
- if(G.state==='kennel')drawKennel();
- if(G.state==='build')drawBuild();
+ if(G.state==='kennel'){drawKennel();drawFullBtn();}
+ if(G.state==='build'){drawBuild();drawEndBtn();drawFullBtn();}
  if(G.state==='ready'){c.fillStyle='rgba(10,20,10,.7)';c.fillRect(0,0,W,H);txt('SHEEPDOG',W/2,84,'#fff6c8',54,'center');
   txt('Herd the flock home by day. Defend it by night.',W/2,118,'#e8f0d8',17,'center');
   txt('CHOOSE A MAP',W/2,152,'#ffd24a',18,'center');
@@ -1127,7 +1135,7 @@ function render(){
    const words=M.blurb.split(' ');let line='',yy=m.y+104;for(const w of words){if((line+' '+w).length>17){txt(line,m.x+m.w/2,yy,open?'#d8c8b0':'#7a7088',12,'center');yy+=16;line=w;}else line=(line+' '+w).trim();}txt(line,m.x+m.w/2,yy,open?'#d8c8b0':'#7a7088',12,'center');
    if(open){txt('★'.repeat(st)+'☆'.repeat(3-st),m.x+m.w/2,m.y+m.h-44,'#ffd24a',20,'center');txt(SAVE.best[M.id]?'best '+SAVE.best[M.id]:'TAP TO PLAY',m.x+m.w/2,m.y+m.h-16,'#ffe9c0',13,'center');}
    else txt(M.ready?'BEAT MAP '+m.i:'COMING SOON',m.x+m.w/2,m.y+m.h-18,'#8a7f98',13,'center');}
-  txt('BONES '+(SAVE.bones||0),W-20,50,'#ffe9a8',17,'right');
+  txt('BONES '+(SAVE.bones||0),W-20,62,'#ffe9a8',17,'right');drawFullBtn();
   txt('YOUR DOG',W/2,402,'#ffd24a',14,'center');
   for(const b of dogStrip()){const on=b.id===SAVE.dog;c.fillStyle=on?'rgba(90,70,30,.95)':'rgba(30,26,44,.9)';c.fillRect(b.x,b.y,b.w,b.h);c.strokeStyle=on?'#ffd24a':'#6a6078';c.lineWidth=on?3:2;c.strokeRect(b.x,b.y,b.w,b.h);drawDogIcon(b.id,b.x+b.w/2,b.y+b.h-8,1.0);}
   txt('Left thumb: stick (light push = slow, steady). Right thumb: BARK, hold CALM.',W/2,500,'#b8c8a8',13,'center');
@@ -1164,6 +1172,6 @@ function render(){
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
+window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
 })();
 </script></body></html>
