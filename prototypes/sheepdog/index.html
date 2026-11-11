@@ -184,6 +184,7 @@ function startNight(){
  const n=G.day+(G.map.diff||0),P=G.pen,hp=fenceHp();
  const gw=mkWall(P.x,P.gy-P.gap/2,P.x,P.gy+P.gap/2,1,hp);gw.gate=true;G.walls.push(gw);       // the gate swings shut
  G.fixtures=[];G.allies=[];
+ for(const q of [G.dog,G.helper]){if(q&&q.x>P.x-8&&q.x<P.x+P.w+8&&q.y>P.y-8&&q.y<P.y+P.h+8){q.x=P.x-40;q.y=P.gy;q.vx=q.vy=0;dust(q.x,q.y,8);addText(q.x,q.y-16,'OUT YOU GO','#ffe9a8');}}   // never lock a dog in the pen
  if(G.map.td&&G.build){const sl=buildSlots();G.build.slots.forEach((it,i)=>{if(!it)return;const q=sl[i],w=G.walls[q.wi];if(it==='thorn')w.thorn=true;else if(it==='bell')w.bell=true;else if(it==='reinf'){w.max*=1.8;w.hp=w.max;w.reinf=true;}else G.fixtures.push({k:it,x:q.sx,y:q.sy});});
   const ps=buildPosts();G.build.posts.forEach((id,i)=>{if(!id||i>=postsAllowed())return;G.allies.push({def:allyDef(id),post:i,x:ps[i].x,y:ps[i].y,vx:0,vy:0,face:1,run:0,cd:0});});}
  G.limit=Math.round(Math.min(110,46+6*n)*({SUMMER:.75,WINTER:1.25}[season().n]||1));G.time=G.limit;G.fireOn=!!perk('campfire');G.msg2=G.day>=G.map.days?'Hold out until dawn':(n%5===0&&G.map.bear!==false?'A BEAR is coming':'');
@@ -223,8 +224,8 @@ function segPush(o,r,x1,y1,x2,y2,bounce){
  const px=x1+dx*t,py=y1+dy*t,ex=o.x-px,ey=o.y-py,d=hyp(ex,ey);
  if(d<r){const nx=d>1e-4?ex/d:0,ny=d>1e-4?ey/d:-1;o.x=px+nx*r;o.y=py+ny*r;const vn=o.vx*nx+o.vy*ny;if(vn<0){o.vx-=(1+bounce)*vn*nx;o.vy-=(1+bounce)*vn*ny;}}
 }
-function collide(o,r,bounce){
- for(const w of G.walls){if(w.broken)continue;segPush(o,r,w[0],w[1],w[2],w[3],bounce);}
+function collide(o,r,bounce,dog){
+ for(const w of G.walls){if(w.broken||(dog&&w.gate))continue;segPush(o,r,w[0],w[1],w[2],w[3],bounce);}
  for(const k of G.rocks){const dx=o.x-k.x,dy=o.y-k.y,d=hyp(dx,dy),m=k.r+r;if(d<m){const nx=dx/(d||1),ny=dy/(d||1);o.x=k.x+nx*m;o.y=k.y+ny*m;const vn=o.vx*nx+o.vy*ny;if(vn<0){o.vx-=(1+bounce)*vn*nx;o.vy-=(1+bounce)*vn*ny;}}}
  if(o.x<r){o.x=r;o.vx=Math.abs(o.vx)*bounce;}if(o.x>WX-r){o.x=WX-r;o.vx=-Math.abs(o.vx)*bounce;}
  if(o.y<r){o.y=r;o.vy=Math.abs(o.vy)*bounce;}if(o.y>WY-r){o.y=WY-r;o.vy=-Math.abs(o.vy)*bounce;}
@@ -261,7 +262,7 @@ function updateDog(dt){
  const speedK=G.bot?mag:(d.crouch?Math.max(.55,mag):(mag<.12?0:.62+.38*Math.min(1,(mag-.12)/.5)));
  const zn0=zoneAt(d),sp=dogSpeed()*(d.stun>0?.3:1)*speedK*(zn0?(zn0.k==='water'?.45:.65):1);
  d.vx+=(ax*sp-d.vx)*Math.min(1,dt*9);d.vy+=(ay*sp-d.vy)*Math.min(1,dt*9);
- d.x+=d.vx*dt;d.y+=d.vy*dt;collide(d,6,0);
+ d.x+=d.vx*dt;d.y+=d.vy*dt;collide(d,6,0,true);
  bumpSheep(d,dt);bumpPreds(d);
  const v=hyp(d.vx,d.vy);if(v>20){d.hx=d.vx/v;d.hy=d.vy/v;if(Math.abs(d.vx)>10)d.face=d.vx>0?1:-1;}
  d.run+=dt*(v/22);
@@ -309,7 +310,7 @@ function updateHelper(dt){
   for(const s of loose){const sx=s.x-h.x,sy=s.y-h.y,sd=hyp(sx,sy);if(sd<80&&sd>1&&hyp(far.x-h.x,far.y-h.y)>110){ax-=sx/sd*(1-sd/80)*1.6;ay-=sy/sd*(1-sd/80)*1.6;}}
   const l=hyp(ax,ay)||1;ax/=l;ay/=l;sp=dist<20?40:140;
  }
- h.vx+=(ax*sp-h.vx)*Math.min(1,dt*6);h.vy+=(ay*sp-h.vy)*Math.min(1,dt*6);h.x+=h.vx*dt;h.y+=h.vy*dt;collide(h,6,0);
+ h.vx+=(ax*sp-h.vx)*Math.min(1,dt*6);h.vy+=(ay*sp-h.vy)*Math.min(1,dt*6);h.x+=h.vx*dt;h.y+=h.vy*dt;collide(h,6,0,true);
  if(Math.abs(h.vx)>10)h.face=h.vx>0?1:-1;h.run+=dt*hyp(h.vx,h.vy)/22;
 }
 /* ---------------- the flock ---------------- */
@@ -598,9 +599,11 @@ function endRun(){ // testing: end the run now, keep the bones, back to map sele
 }
 function drawFullBtn(){c.fillStyle='rgba(20,12,26,.7)';c.fillRect(FS.x,FS.y,FS.w,FS.h);c.strokeStyle='#ffb84a';c.lineWidth=2;c.strokeRect(FS.x,FS.y,FS.w,FS.h);txt('FULL',FS.x+FS.w/2,FS.y+19,'#ffe9c0',12,'center');}
 function drawEndBtn(){c.fillStyle='rgba(60,20,20,.8)';c.fillRect(ER.x,ER.y,ER.w,ER.h);c.strokeStyle='#ff8a6a';c.lineWidth=2;c.strokeRect(ER.x,ER.y,ER.w,ER.h);txt('END RUN',ER.x+ER.w/2,ER.y+19,'#ffd0c0',12,'center');}
-function skipStage(){ // jump straight to dawn (the reward pick) with the flock as it is
- if(G.state!=='play'&&G.state!=='dusk')return;
- G.state='play';G.mode='night';G.lost=0;G.preds=[];endNight();
+function skipStage(){ // NEXT: day -> straight to the night (or its build screen); night -> straight to the dawn reward pick
+ if(G.state==='play'&&G.mode==='day'){endDay('skipped');if(G.state==='dusk'){if(G.map.td)enterBuild();else startNight();}return;}
+ if(G.state==='dusk'){if(G.map.td)enterBuild();else startNight();return;}
+ if(G.state!=='play')return;
+ G.mode='night';G.lost=0;G.preds=[];endNight();
 }
 function dogStrip(){const own=DOGS.filter(d=>dogOwned(d.id)),w=54,gap=8,x0=(W-(own.length*w+(own.length-1)*gap))/2;return own.map((d,i)=>({id:d.id,x:x0+i*(w+gap),y:408,w,h:60}));}
 function mapCards(){const n=MAPS.length,gap=12,w=Math.min(170,(W-60-(n-1)*gap)/n),x0=(W-(n*w+(n-1)*gap))/2;return MAPS.map((m,i)=>({x:x0+i*(w+gap),y:168,w,h:222,i}));}

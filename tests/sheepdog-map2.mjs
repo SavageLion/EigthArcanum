@@ -31,7 +31,7 @@ const out=await page.evaluate(()=>{
   for(let i=0;i<60*4;i++){G.actT=1e9;G.dog.x=st.x-20;G.dog.y=st.y;G.dog.vx=G.dog.vy=0;S.step(1);}
   res.stuckFreed=st.act===null;
   // dawn: the runaway is back in the flock
-  const herd0=G.sheep.length+1;S.skip();res.dawn=G.state;res.backAtDawn=G.herd.length>=herd0;
+  const herd0=G.sheep.length+1;S.skip();S.skip();res.dawn=G.state;res.backAtDawn=G.herd.length>=herd0;
   return res;
 });
 console.log(JSON.stringify(out));
