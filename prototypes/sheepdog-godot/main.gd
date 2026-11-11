@@ -345,7 +345,7 @@ func _process(delta: float) -> void:
 	shake = maxf(0.0, shake - delta * 3.0)
 	cam.offset = dog.vel * 0.28 + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * 4.0
 	cam.position = dog.position
-	var target_zoom: float = 1.3 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.3
+	var target_zoom: float = 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	cloud_mat.set_shader_parameter("cam", cam.get_screen_center_position())
@@ -538,7 +538,7 @@ func add_popup(text: String, pos: Vector2, col: Color) -> void:
 
 # ---------------------------------------------------------------- the flock
 func zone_mult() -> float:
-	return 1.18 if dog.crouch else 1.3
+	return 1.18 if dog.crouch else 1.6
 
 func pressure_from(s: Sheep, p: Vector2, h: Vector2, mult: float, calm: bool, dt: float, zone_base: float) -> float:
 	var zb: float = zone_base if zone_base > 0.0 else s.zone

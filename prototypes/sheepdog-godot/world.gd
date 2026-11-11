@@ -67,6 +67,7 @@ func _ground() -> void:
 			s.rotation = float(o & 3) * PI / 2.0
 			s.flip_h = (o & 4) != 0
 			s.z_index = -190
+			s.modulate = Color(1, 1, 1, 0.32)
 			add_child(s)
 			gx += 176.0
 		gy += 176.0
@@ -267,21 +268,21 @@ func _obstacles() -> void:
 			if _blocked(p, 14.0):
 				continue
 			rocks.append({"pos": p, "r": 14.0})
-			_tree(tr, p, 0.7)
+			_tree(tr, p, 1.25)
 			break
 	# a ring of big trees around the edges
 	var edge_a: Texture2D = tex("tree_big_a")
 	var xs: float = -10.0
 	while xs < wx - 30.0:
-		_tree(edge_a if randf() < 0.5 else tr, Vector2(xs, 96.0 + randf() * 12.0), 0.85)
-		xs += 105.0 + randf() * 60.0
+		_tree(edge_a if randf() < 0.5 else tr, Vector2(xs, 96.0 + randf() * 12.0), 1.7)
+		xs += 120.0 + randf() * 60.0
 	xs = 10.0
 	while xs < wx - 40.0:
-		_tree(edge_a if randf() < 0.5 else tr, Vector2(xs, wy + 82.0 + randf() * 12.0), 0.85)
+		_tree(edge_a if randf() < 0.5 else tr, Vector2(xs, wy + 82.0 + randf() * 12.0), 1.7)
 		xs += 115.0 + randf() * 60.0
 	var ys: float = 200.0
 	while ys < wy - 110.0:
-		_tree(edge_a if randf() < 0.5 else tr, Vector2(-30.0 + randf() * 12.0, ys), 0.85)
+		_tree(edge_a if randf() < 0.5 else tr, Vector2(-30.0 + randf() * 12.0, ys), 1.7)
 		ys += 150.0 + randf() * 40.0
 
 func _blob_shadow(p: Vector2, sx: float, sy: float) -> Sprite2D:
@@ -307,9 +308,9 @@ func _deco() -> void:
 	var tuft: Texture2D = tex("tuft")
 	var fa: Texture2D = tex("flowers_a")
 	var fb: Texture2D = tex("flowers_b")
-	for i in 70:
+	for i in 30:
 		var c := Vector2(randf_range(0.0, wx), randf_range(60.0, wy))
-		for j in (3 + randi() % 4):
+		for j in (2 + randi() % 3):
 			var p := c + Vector2(randf_range(-30.0, 30.0), randf_range(-15.0, 15.0))
 			if p.x < 0.0 or p.x > wx or p.y < 50.0 or p.y > wy or in_zone(p, 10.0) or pen.grow(10.0).has_point(p):
 				continue
@@ -337,7 +338,7 @@ func _deco() -> void:
 			add_child(s)
 	var sh: Texture2D = tex("shrub_big")
 	var bu: Texture2D = tex("bush")
-	for i in 7:
+	for i in 16:
 		var p := Vector2(randf_range(80.0, wx - 80.0), randf_range(100.0, wy - 50.0))
 		if _blocked(p, 30.0):
 			continue
@@ -345,7 +346,7 @@ func _deco() -> void:
 		var s := Sprite2D.new()
 		s.texture = sh if big else bu
 		s.position = p
-		s.scale = Vector2.ONE * (0.95 if big else 1.0)
+		s.scale = Vector2.ONE * (1.7 if big else 1.3)
 		s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 4.0)
 		s.material = wind_mat
 		ysort.add_child(s)
@@ -358,7 +359,6 @@ func _pen_visuals() -> void:
 	dirt.z_index = -150
 	add_child(dirt)
 	var fence_h: Texture2D = tex("fence")
-	var fence_v: Texture2D = tex("fence_v")
 	for w in walls:
 		var a: Vector2 = w["a"]
 		var b: Vector2 = w["b"]
@@ -366,30 +366,18 @@ func _pen_visuals() -> void:
 		if l < 2.0:
 			continue
 		var nodes: Array = []
-		var vertical: bool = absf(b.x - a.x) < absf(b.y - a.y) * 0.25
-		if vertical:
-			var n: int = maxi(1, roundi(l / 60.0))
-			var shh: float = l / float(n)
-			for i in n:
-				var s := Sprite2D.new()
-				s.texture = fence_v
-				s.position = Vector2(a.x, minf(a.y, b.y) + shh * (float(i) + 0.5))
-				s.scale = Vector2(1.7, shh / float(fence_v.get_height()) + 0.02)
-				ysort.add_child(s)
-				nodes.append(s)
-		else:
-			var ang: float = atan2(b.y - a.y, b.x - a.x)
-			var n2: int = maxi(1, roundi(l / 88.0))
-			var sw: float = l / float(n2)
-			var hh: float = sw * float(fence_h.get_height()) / float(fence_h.get_width())
-			for i in n2:
-				var t: float = (float(i) + 0.5) / float(n2)
-				var s := Sprite2D.new()
-				s.texture = fence_h
-				s.position = a.lerp(b, t) + Vector2(0, hh * 0.35)
-				s.rotation = ang
-				var k: float = sw / float(fence_h.get_width()) + 0.01
-				s.scale = Vector2(k, k)
-				ysort.add_child(s)
-				nodes.append(s)
+		var ang: float = atan2(b.y - a.y, b.x - a.x)
+		var n2: int = maxi(1, roundi(l / 80.0))
+		var sw: float = l / float(n2)
+		var k: float = sw / float(fence_h.get_width()) + 0.01
+		for i in n2:
+			var t: float = (float(i) + 0.5) / float(n2)
+			var s := Sprite2D.new()
+			s.texture = fence_h
+			s.position = a.lerp(b, t)
+			s.rotation = ang
+			s.scale = Vector2(k, k * 1.15)
+			s.offset = Vector2(0, -3)
+			ysort.add_child(s)
+			nodes.append(s)
 		w["nodes"] = nodes
