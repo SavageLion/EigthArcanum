@@ -52,6 +52,13 @@ func _draw() -> void:
 	_panel(Rect2(v.x - 190, 6, 182, 32))
 	_text("FENCE", Vector2(v.x - 182, 28), 13, CREAM)
 	_bar(Rect2(v.x - 130, 15, 114, 12), worst, Color(0.55, 0.85, 0.4) if worst > 0.5 else (Color(0.95, 0.75, 0.3) if worst > 0.25 else Color(0.95, 0.4, 0.35)))
+	var fr: Rect2 = main.fs_rect()
+	_panel(fr)
+	draw_rect(fr.grow(-9.0), Color(CREAM, 0.0), false)
+	for c in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		var cc: Vector2 = fr.get_center() + (c as Vector2) * 8.0
+		draw_line(cc, cc - Vector2((c as Vector2).x * 5.0, 0), CREAM, 2.0)
+		draw_line(cc, cc - Vector2(0, (c as Vector2).y * 5.0), CREAM, 2.0)
 	# fence bars over damaged pieces
 	for w in main.world.walls:
 		if not w["pen"] or float(w["hp"]) >= float(w["max"]) - 0.5:

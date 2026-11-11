@@ -6,7 +6,7 @@ var wx: float = 1800.0
 var wy: float = 1200.0
 var pen: Rect2
 var gate_x: float = 0.0
-var gap: float = 80.0
+var gap: float = 100.0
 var walls: Array = []
 var rocks: Array = []
 var zones: Array = []
@@ -99,8 +99,6 @@ func _layout() -> void:
 		_wall(Vector2(px + pw, py), Vector2(px + pw, by), true, hp),
 		_wall(Vector2(px, by), Vector2(gate_x - gap / 2.0, by), true, hp),
 		_wall(Vector2(gate_x + gap / 2.0, by), Vector2(px + pw, by), true, hp),
-		_wall(Vector2(gate_x - gap / 2.0 - 56.0, by + 62.0), Vector2(gate_x - gap / 2.0, by), false, 0.0),
-		_wall(Vector2(gate_x + gap / 2.0 + 56.0, by + 62.0), Vector2(gate_x + gap / 2.0, by), false, 0.0),
 	]
 	dog_start = Vector2(gate_x, by + 120.0)
 

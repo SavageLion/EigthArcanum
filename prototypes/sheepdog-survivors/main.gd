@@ -10,7 +10,7 @@ const YMAX: float = 1166.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
 const LAST_WAVE: int = 10
-const BASE_ZOOM: float = 1.45
+const BASE_ZOOM: float = 1.8
 const TYPES: Dictionary = {
 	"normal": {"r": 7.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10},
 	"lamb": {"r": 4.5, "zone": 105.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 8},
@@ -240,10 +240,19 @@ func _input(event: InputEvent) -> void:
 			elif ke.keycode == KEY_SPACE:
 				do_bark()
 			elif ke.keycode == KEY_F:
-				var w: Window = get_window()
-				w.mode = Window.MODE_WINDOWED if w.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+				toggle_fullscreen()
+
+func fs_rect() -> Rect2:
+	return Rect2(vp().x - 46.0, 44.0, 38.0, 34.0)
+
+func toggle_fullscreen() -> void:
+	var w: Window = get_window()
+	w.mode = Window.MODE_WINDOWED if w.mode == Window.MODE_FULLSCREEN or w.mode == Window.MODE_EXCLUSIVE_FULLSCREEN else Window.MODE_FULLSCREEN
 
 func _press(p: Vector2, id: int) -> void:
+	if state != "result" and fs_rect().grow(6.0).has_point(p):
+		toggle_fullscreen()
+		return
 	if state == "result":
 		get_tree().reload_current_scene()
 		return
@@ -654,7 +663,7 @@ func do_bark() -> void:
 	dog.squash = 1.0
 	shake = 1.0
 	var R: float = bark_r()
-	ring(dog.position, R, Color(1.0, 0.95, 0.75), 0.5, 3.0)
+	ring(dog.position, R, Color(1.0, 0.95, 0.75), 0.55, 6.0)
 	for s in sheep:
 		var sh: Sheep = s
 		if sh.carried or sh.in_pen:
@@ -705,7 +714,12 @@ func update_weapons(dt: float) -> void:
 				any = true
 		if any:
 			swipe_t = swipe_cd()
-			ring(dog.position, R, Color(1.0, 0.85, 0.6), 0.25, 2.0)
+			var sl := Slash.new()
+			sl.position = dog.position + Vector2(0, -4)
+			sl.ang = dog.heading.angle()
+			sl.rad = R
+			sl.z_index = 30
+			add_child(sl)
 			dog.squash = 0.6
 			for f in foxes.duplicate():
 				var fx2: Fox = f
@@ -762,7 +776,9 @@ func hurt(f: Fox, dmg: float, from: Vector2, power: float, stun: float) -> void:
 	if f.fleeing:
 		return
 	f.hp -= dmg
-	f.flash = 0.14
+	f.flash = 0.22
+	add_popup(str(int(dmg)), f.position + Vector2(randf_range(-8, 8), -22), Color(1.0, 0.95, 0.6))
+	ring(f.position, 22.0, Color(1.0, 1.0, 0.9), 0.25, 3.0)
 	var resist: float = 0.25 if f.kind == "bear" else (0.6 if f.kind == "wolf" else 1.0)
 	f.kb += (f.position - from).normalized() * power * resist
 	f.stun = maxf(f.stun, stun * resist)
