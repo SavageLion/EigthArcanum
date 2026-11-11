@@ -86,7 +86,7 @@ function buyUp(id){const u=UPS.find(x=>x.id===id);if(!u)return false;const l=upl
 function awardBones(n){n=Math.round(n);SAVE.bones=(SAVE.bones||0)+n;G.lastBones=n;persist();}
 function persist(){try{localStorage.setItem('sheepdog_save',JSON.stringify(SAVE));}catch(_){}}
 const mapUnlocked=i=>i===0||SAVE.unlockAll||(SAVE.stars[MAPS[i-1].id]||0)>0;
-const UA={x:0,y:0,w:190,h:30},CT={x:0,y:0,w:190,h:30},NT={x:0,y:0,w:190,h:30},RM={x:0,y:0,w:210,h:30},KB={x:14,y:0,w:130,h:30},FM={x:0,y:46,w:150,h:28},ER={x:0,y:78,w:72,h:28},SB={x:0,y:78,w:150,h:28};   // test button on the map select screen (position set in fit)
+const UA={x:0,y:0,w:190,h:30},CT={x:0,y:0,w:190,h:30},NT={x:0,y:0,w:190,h:30},NT2={x:0,y:0,w:190,h:30},RM={x:0,y:0,w:210,h:30},KB={x:14,y:0,w:130,h:30},FM={x:0,y:46,w:150,h:28},ER={x:0,y:78,w:72,h:28},SB={x:0,y:78,w:150,h:28};   // test button on the map select screen (position set in fit)
 function startMap(i){if(!MAPS[i]||!MAPS[i].ready)return;G.map=MAPS[i];startGame();}
 function zoneAt(o){for(const z of G.zones||[]){if(z.k==='water'?(o.x>z.x&&o.x<z.x+z.w&&o.y>z.y&&o.y<z.y+z.h):(((o.x-z.x-z.w/2)/(z.w/2))**2+((o.y-z.y-z.h/2)/(z.h/2))**2<1))return z;}return null;}
 /* ---------------- starting a day ---------------- */
@@ -615,6 +615,7 @@ function update(dt){
  for(const w of G.warns)w.t-=dt;windParts(dt);G.warns=G.warns.filter(w=>w.t>0);
  if(G.flare){G.flare.t-=dt;if(G.flare.t<=0)G.flare=null;}
  if(G.state==='chores'){choreUpdate(dt);return;}
+ if(G.state==='pw'){pwUpdate(dt);return;}
  updateCam(dt);
  if(G.state!=='play')return;
  if(G.mode==='day'&&(G.map.act||0)>0&&G.day>=(G.map.actFrom||1)){G.actT-=dt;if(G.actT<=0){G.actT=rnd(20,34)/((G.map.act||1)*(1+.08*G.day));doAct();}}
@@ -680,7 +681,7 @@ const buzz=buzzNow;
 function pt(e){const b=cv.getBoundingClientRect(),sc=Math.min(b.width/W,b.height/H),ox=(b.width-W*sc)/2,oy=(b.height-H*sc)/2;return {x:(e.clientX-b.left-ox)/sc,y:(e.clientY-b.top-oy)/sc};}
 const inBtn=(p,B)=>hyp(p.x-B.x,p.y-B.y)<B.r+14;
 function stickMove(p){const dx=p.x-stick.ox,dy=p.y-stick.oy,l=hyp(dx,dy),k=Math.min(1,l/stick.R);stick.x=stick.ox+(l?dx/l:0)*Math.min(l,stick.R);stick.y=stick.oy+(l?dy/l:0)*Math.min(l,stick.R);stick.vx=l?dx/l*k:0;stick.vy=l?dy/l*k:0;}
-function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-70;BTN_CALM.x=W-196;BTN_SPRINT.x=W-322;BTN_FLARE.x=W-196;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;UA.x=W-UA.w-14;UA.y=H-UA.h-12;CT.x=UA.x;CT.y=UA.y-36;NT.x=UA.x;NT.y=CT.y-36;RM.x=W/2-105;RM.y=H-42;KB.y=H-KB.h-12;FM.x=W-240;ER.x=W-80;SB.x=W-240;}
+function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-70;BTN_CALM.x=W-196;BTN_SPRINT.x=W-322;BTN_FLARE.x=W-196;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;UA.x=W-UA.w-14;UA.y=H-UA.h-12;CT.x=UA.x;CT.y=UA.y-36;NT.x=UA.x;NT.y=CT.y-36;NT2.x=UA.x;NT2.y=NT.y-36;RM.x=W/2-105;RM.y=H-42;KB.y=H-KB.h-12;FM.x=W-240;ER.x=W-80;SB.x=W-240;}
 fit();
 function goFull(){try{const d=document;if(!d.fullscreenElement){const r=d.documentElement.requestFullscreen();if(r&&r.then)r.then(()=>{try{const lp=screen.orientation.lock('landscape');if(lp&&lp.catch)lp.catch(()=>{});}catch(_){}}).catch(()=>{});}else d.exitFullscreen();}catch(_){}}
 function endRun(){ // testing: end the run now, keep the bones, back to map select
@@ -716,11 +717,13 @@ cv.addEventListener('pointerdown',e=>{
  if(G.state==='chores'){choreDown(p);return;}
  if(G.state.startsWith('run_')){runTap(p);return;}
  if(G.state==='nite_pick'||G.state==='nite_res'){niteTap(p);return;}
+ if(G.state==='pw'){pwTap(p);return;}
  if(G.state==='play'&&G.mode==='night'&&G.allies&&G.allies.length&&inRect(p,SB)){G.sendMode=!G.sendMode;return;}
  if(G.state==='play'&&G.mode==='night'&&G.allies&&G.allies.length&&inRect(p,FM)){G.form=G.form==='post'?'gate':G.form==='gate'?'chase':'post';return;}
  if(G.state==='ready'){if(p.x>UA.x&&p.x<UA.x+UA.w&&p.y>UA.y&&p.y<UA.y+UA.h){SAVE.unlockAll=!SAVE.unlockAll;if(SAVE.unlockAll)SAVE.bones=Math.max(SAVE.bones||0,999);persist();return;}
   if(inRect(p,RM)){newRun();return;}
-  if(inRect(p,NT)){G.state='nite_pick';return;}
+  if(inRect(p,NT)){startPW('turn');return;}
+  if(inRect(p,NT2)){startPW('live');return;}
   if(p.x>CT.x&&p.x<CT.x+CT.w&&p.y>CT.y&&p.y<CT.y+CT.h){enterChores(['normal','cow','goose','pig','duck','goat'],true);return;}
   if(p.x>KB.x&&p.x<KB.x+KB.w&&p.y>KB.y&&p.y<KB.y+KB.h){G.state='kennel';K.sel=SAVE.dog;return;}
   {const o=dogStrip();for(const b of o)if(p.x>b.x&&p.x<b.x+b.w&&p.y>b.y&&p.y<b.y+b.h){setDog(b.id);return;}}for(const m of mapCards())if(p.x>m.x&&p.x<m.x+m.w&&p.y>m.y&&p.y<m.y+m.h){if(MAPS[m.i].ready&&mapUnlocked(m.i))startMap(m.i);return;}return;}
@@ -1535,6 +1538,207 @@ function niteTap(p){
   if(b.id==='back'||b.id==='menu'){G.state='ready';return;}
   if(b.id==='again'){startNite(NITE.kind);return;}}
 }
+/* ================= PEN WATCH: the night as a strategy puzzle (two prototypes: turn-based, and live with pause) =================
+   The pen from above. Before the night you PLACE your livestock inside and your defenses around it. Enemies come in telegraphed waves
+   from four sides; you spend a few action points per turn on timing: ring the bell, light the torch, mend the fence.  */
+const PWC=15,PWR=11,PWT=36,PC0=5,PC1=9,PR0=3,PR1=7;
+const PW={on:false,mode:'turn',phase:'place',animals:[],defs:[],enemies:[],fence:{},inv:null,sel:null,ap:2,apMax:2,turn:0,waves:[],log:[],paused:true,acc:0,res:null,total:10,repair:false,kills:0,lastT:0,apT:0};
+const AN={normal:{hp:2,n:'Sheep'},lamb:{hp:1,n:'Lamb'},ram:{hp:4,n:'Ram'},goat:{hp:3,n:'Goat'},goose:{hp:1,n:'Goose'},duck:{hp:1,n:'Duck'},pig:{hp:4,n:'Pig'},cow:{hp:6,n:'Cow'},black:{hp:2,n:'Black sheep'},panicky:{hp:2,n:'Panicker'}};
+const EN={fox:{hp:1,spd:2,dmg:1,fdmg:1,flee:1,n:'Fox'},coyote:{hp:2,spd:2,dmg:1,fdmg:1,flee:1,n:'Coyote'},wolf:{hp:2,spd:1,dmg:2,fdmg:1,n:'Wolf'},badger:{hp:3,spd:1,dmg:2,fdmg:2,n:'Badger'},bear:{hp:5,spd:1,dmg:3,fdmg:3,n:'Bear'},eagle:{hp:1,spd:3,dmg:1,fdmg:0,fly:1,flee:1,n:'Eagle'}};
+const DEFN={torch:{n:'Torch',ic:'F',col:'#ff9a3a',out:1,desc:'Scares foxes and eagles within 3. Cooldown 3.'},bell:{n:'Bell',ic:'B',col:'#ffd24a',out:1,desc:'Stalls enemies within 3 for a turn. Cooldown 3.'},snare:{n:'Snare',ic:'S',col:'#c8a050',out:1,desc:'Holds the first enemy that steps on it.'},guard:{n:'Guard dog',ic:'G',col:'#8fd0ff',out:1,desc:'Bites any enemy next to it every turn.'},thorn:{n:'Thorn',ic:'T',col:'#5fae4a',fence:1,desc:'On a fence cell: attackers get pricked.'},reinf:{n:'Reinforce',ic:'R',col:'#9aa4b0',fence:1,desc:'On a fence cell: +2 strength.'}};
+const man=(a,b)=>Math.abs(a.c-b.c)+Math.abs(a.r-b.r);
+const isFenceCell=(c,r)=>((c===PC0-1||c===PC1+1)&&r>=PR0-1&&r<=PR1+1)||((r===PR0-1||r===PR1+1)&&c>=PC0-1&&c<=PC1+1);
+const isInterior=(c,r)=>c>=PC0&&c<=PC1&&r>=PR0&&r<=PR1;
+const fenceAt=(c,r)=>PW.fence[c+','+r];
+const pwBX=()=>Math.round((W-PWC*PWT)/2),pwBY=46;
+function cellXY(c,r){return{x:pwBX()+c*PWT+PWT/2,y:pwBY+r*PWT+PWT/2};}
+function startPW(mode){
+ Object.assign(PW,{on:true,mode,phase:'place',animals:[],defs:[],enemies:[],fence:{},sel:null,ap:mode==='live'?3:2,apMax:mode==='live'?3:2,turn:0,paused:true,acc:0,res:null,log:[],repair:false,kills:0,apT:0});
+ PW.inv={animals:{normal:3,lamb:2,ram:1,goat:1,pig:1,cow:1,goose:1},defs:{torch:2,bell:1,snare:2,guard:1,thorn:3,reinf:3}};PW.total=10;
+ for(let r=PR0-1;r<=PR1+1;r++)for(let c=PC0-1;c<=PC1+1;c++)if(isFenceCell(c,r))PW.fence[c+','+r]={hp:3,max:3,thorn:false,reinf:false};
+ PW.waves=[{t:1,k:'fox',n:1,side:'W'},{t:2,k:'fox',n:1,side:'N'},{t:3,k:'coyote',n:1,side:'S'},{t:4,k:'wolf',n:2,side:'W'},{t:6,k:'eagle',n:1,side:'E'},{t:7,k:'badger',n:1,side:'N'},{t:9,k:'wolf',n:3,side:'S'},{t:11,k:'bear',n:1,side:'W'}];
+ G.state='pw';G.mode='day';
+}
+function pwFree(c,r){return c>=0&&c<PWC&&r>=0&&r<PWR&&!PW.animals.some(a=>a.c===c&&a.r===r)&&!PW.defs.some(d=>d.c===c&&d.r===r&&!d.fenceItem)&&!PW.enemies.some(e=>!e.dead&&e.c===c&&e.r===r);}
+function pwPlace(kind,type,c,r){ // kind: 'animal' | 'def'
+ if(PW.phase!=='place')return false;
+ if(kind==='animal'){if(!isInterior(c,r)||!pwFree(c,r)||!(PW.inv.animals[type]>0))return false;PW.inv.animals[type]--;PW.animals.push({type,c,r,hp:AN[type].hp,max:AN[type].hp});return true;}
+ const D=DEFN[type];if(!D||!(PW.inv.defs[type]>0))return false;
+ if(D.fence){const f=fenceAt(c,r);if(!f)return false;if(type==='thorn'){if(f.thorn)return false;f.thorn=true;}else{if(f.reinf)return false;f.reinf=true;f.max+=2;f.hp+=2;}PW.inv.defs[type]--;return true;}
+ if(isInterior(c,r)||isFenceCell(c,r)||!pwFree(c,r)||c<PC0-4||c>PC1+4||r<PR0-4||r>PR1+4)return false;
+ PW.inv.defs[type]--;PW.defs.push({k:type,c,r,cd:0,used:false});return true;
+}
+function pwRemove(c,r){
+ const a=PW.animals.findIndex(q=>q.c===c&&q.r===r);if(a>=0){PW.inv.animals[PW.animals[a].type]++;PW.animals.splice(a,1);return true;}
+ const d=PW.defs.findIndex(q=>q.c===c&&q.r===r);if(d>=0){PW.inv.defs[PW.defs[d].k]++;PW.defs.splice(d,1);return true;}
+ const f=fenceAt(c,r);if(f){if(f.thorn){f.thorn=false;PW.inv.defs.thorn++;return true;}if(f.reinf){f.reinf=false;f.max-=2;f.hp=Math.min(f.hp,f.max);PW.inv.defs.reinf++;return true;}}
+ return false;
+}
+function pwBegin(){if(PW.phase!=='place'||!PW.animals.length)return;PW.phase='play';PW.turn=0;PW.paused=PW.mode==='live'?false:true;PW.ap=PW.apMax;PW.log=['The night begins.'];PW.total=PW.animals.length;PW.apT=0;PW.acc=0;}
+const pwAlive=()=>PW.enemies.filter(e=>!e.dead);
+function pwLog(t){PW.log.unshift(t);if(PW.log.length>6)PW.log.pop();}
+function spawnEnemy(k,side){
+ for(let t=0;t<30;t++){let c,r;if(side==='W'){c=0;r=2+Math.floor(Math.random()*7);}else if(side==='E'){c=PWC-1;r=2+Math.floor(Math.random()*7);}else if(side==='N'){r=0;c=3+Math.floor(Math.random()*9);}else{r=PWR-1;c=3+Math.floor(Math.random()*9);}
+  if(PW.enemies.some(e=>!e.dead&&e.c===c&&e.r===r))continue;
+  const E=EN[k],fc=Object.keys(PW.fence).map(q=>{const [fc,fr]=q.split(',').map(Number);return{c:fc,r:fr};}).filter(q=>PW.fence[q.c+','+q.r].hp>0&&!(q.c===PC0-1&&q.r===PR0+2)).sort((a,b)=>man(a,{c,r})-man(b,{c,r})+(Math.random()-.5)*3)[0];
+  PW.enemies.push({k,c,r,hp:E.hp,max:E.hp,tgt:fc?{c:fc.c,r:fc.r}:null,stun:0,scared:0,stuck:0,dead:false,life:0});pwLog(E.n+' appears from the '+({W:'west',E:'east',N:'north',S:'south'}[side])+'!');return;}
+}
+function hitEnemy(e,d,why){e.hp-=d;if(e.hp<=0&&!e.dead){e.dead=true;PW.kills++;pwLog(EN[e.k].n+' '+why);}}
+function passable(e,c,r){
+ if(c<0||c>=PWC||r<0||r>=PWR)return false;
+ const f=fenceAt(c,r);if(f&&f.hp>0&&!EN[e.k].fly)return false;
+ if(PW.animals.some(a=>a.c===c&&a.r===r))return false;
+ if(PW.defs.some(d=>d.k==='guard'&&d.c===c&&d.r===r))return false;
+ if(PW.enemies.some(o=>o!==e&&!o.dead&&o.c===c&&o.r===r))return false;
+ return true;
+}
+function nextSteps(e,goalFn,max){ // breadth-first search toward any goal cell; returns the first cell of the path (or null)
+ const q=[{c:e.c,r:e.r,p:null}],seen=new Set([e.c+','+e.r]);
+ while(q.length){const n=q.shift();if(goalFn(n.c,n.r)&&(n.c!==e.c||n.r!==e.r)||goalFn(e.c,e.r)&&0){let p=n;const path=[];while(p.p){path.unshift(p);p=p.p;}return path.slice(0,max);}
+  for(const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]){const c=n.c+dc,r=n.r+dr,k=c+','+r;if(seen.has(k)||!passable(e,c,r))continue;seen.add(k);q.push({c,r,p:n});}}
+ return null;
+}
+const cowAura=a=>PW.animals.some(o=>o!==a&&o.type==='cow'&&man(o,a)===1);
+function pwEnemyPhase(){
+ PW.turn++;
+ for(const w of PW.waves)if(w.t===PW.turn)for(let i=0;i<w.n;i++)spawnEnemy(w.k,w.side);
+ // things that act by themselves
+ for(const d of PW.defs)if(d.k==='guard')for(const e of pwAlive())if(man(e,d)===1)hitEnemy(e,1,'is bitten by the guard dog');
+ for(const a of PW.animals){if(a.type==='ram')for(const e of pwAlive())if(man(e,a)<=2)hitEnemy(e,1,'is butted by the ram');
+  if(a.type==='pig')for(const [dc,dr] of [[1,0],[-1,0],[0,1],[0,-1]]){const f=fenceAt(a.c+dc,a.r+dr);if(f&&f.hp>0&&f.hp<f.max)f.hp++;}}
+ // the enemies
+ for(const e of pwAlive()){
+  const E=EN[e.k];e.life++;
+  if(e.stuck>0){e.stuck--;continue;}
+  if(e.stun>0){e.stun--;continue;}
+  if(e.scared>0){e.scared--;for(let s=0;s<E.spd;s++){const ed=[{c:e.c,r:e.r,d:e.c},{c:e.c,r:e.r,d:PWC-1-e.c},{c:e.c,r:e.r,d:e.r},{c:e.c,r:e.r,d:PWR-1-e.r}].sort((a,b)=>a.d-b.d)[0];let nc=e.c,nr=e.r;if(ed.d===e.c)nc--;else if(ed.d===PWC-1-e.c)nc++;else if(ed.d===e.r)nr--;else nr++;if(passable(e,nc,nr)){e.c=nc;e.r=nr;}}
+   if(e.c<=0||e.c>=PWC-1||e.r<=0||e.r>=PWR-1){e.dead=true;pwLog(E.n+' runs off into the dark');}continue;}
+  // pick a target: the fence cell it was aiming at; once that is through, the nearest animal
+  let tgtA=null,tgtF=null;
+  const breach=Object.values(PW.fence).some(f=>f.hp<=0);
+  if(E.fly||breach&&e.tgt&&fenceAt(e.tgt.c,e.tgt.r)&&fenceAt(e.tgt.c,e.tgt.r).hp<=0||e.inside){
+   const pri=PW.animals.filter(a=>a.type==='lamb'||a.type==='goose'),pool=E.fly&&pri.length?pri:PW.animals;
+   tgtA=pool.slice().sort((a,b)=>man(a,e)-man(b,e))[0]||null;
+  }
+  if(!tgtA){if(!e.tgt||!fenceAt(e.tgt.c,e.tgt.r)||fenceAt(e.tgt.c,e.tgt.r).hp<=0){const fc=Object.keys(PW.fence).map(q=>{const [c,r]=q.split(',').map(Number);return{c,r};}).filter(q=>PW.fence[q.c+','+q.r].hp>0).sort((a,b)=>man(a,e)-man(b,e))[0];e.tgt=fc||null;}if(e.tgt)tgtF=e.tgt;}
+  const goal=tgtA?tgtA:tgtF;if(!goal)continue;
+  // attack if next to the goal, otherwise move
+  const attackIf=()=>{if(man(e,goal)!==1)return false;
+   if(tgtA){const dmg=Math.max(0,E.dmg-(cowAura(tgtA)?1:0));tgtA.hp-=dmg;pwLog(E.n+' hits the '+AN[tgtA.type].n.toLowerCase()+(dmg?'':' (the cow shields it)'));if(tgtA.hp<=0){PW.animals=PW.animals.filter(a=>a!==tgtA);pwLog('The '+AN[tgtA.type].n.toLowerCase()+' is lost!');}}
+   else{const f=fenceAt(goal.c,goal.r);f.hp-=E.fdmg;if(f.thorn){hitEnemy(e,1,'is pricked by the thorns and dies');}if(f.hp<=0){f.hp=0;pwLog(E.n+' breaks through the fence!');}}
+   return true;};
+  if(attackIf())continue;
+  for(let s=0;s<E.spd;s++){
+   const steps=nextSteps(e,(c,r)=>Math.abs(c-goal.c)+Math.abs(r-goal.r)===1&&passable(e,c,r),1);
+   if(!steps||!steps.length)break;const st=steps[0];e.c=st.c;e.r=st.r;if(isInterior(e.c,e.r))e.inside=true;
+   const sn=PW.defs.find(d=>d.k==='snare'&&!d.used&&d.c===e.c&&d.r===e.r);if(sn){sn.used=true;e.stuck=2;pwLog(E.n+' is caught in a snare!');break;}
+   if(attackIf())break;
+  }
+ }
+ PW.enemies=PW.enemies.filter(e=>!e.dead||e.keep);PW.defs=PW.defs.filter(d=>!d.used);
+ for(const d of PW.defs)d.cd=Math.max(0,d.cd-1);
+ if(PW.mode==='turn')PW.ap=PW.apMax;
+ if(!PW.animals.length){pwFinish();return;}
+ const lastWave=Math.max(...PW.waves.map(w=>w.t));
+ if(PW.turn>=lastWave+1&&!pwAlive().length)pwFinish();
+ else if(PW.turn>lastWave+8){for(const e of pwAlive())e.dead=true;pwFinish();}
+}
+function pwFinish(){PW.phase='done';const left=PW.animals.length;PW.res={left,total:PW.total,kills:PW.kills,title:left===PW.total?'THE PEN HELD':left?'THE PEN HELD, BARELY':'THE PEN FELL',turns:PW.turn};}
+function pwEndTurn(){if(PW.phase==='play'&&PW.mode==='turn')pwEnemyPhase();}
+function pwFire(d){ // use a torch or a bell
+ if(PW.phase!=='play'||PW.ap<1||d.cd>0||(d.k!=='torch'&&d.k!=='bell'))return false;
+ PW.ap--;d.cd=3;
+ if(d.k==='torch'){let n=0;for(const e of pwAlive())if(EN[e.k].flee&&man(e,d)<=3){e.scared=2;n++;}pwLog(n?'The torch scares '+n+' away':'You wave the torch (nothing near)');}
+ else{let n=0;for(const e of pwAlive())if(man(e,d)<=3){e.stun=1;n++;}pwLog(n?'The bell stalls '+n+' enemies':'You ring the bell (nothing near)');}
+ return true;
+}
+function pwRepair(c,r){const f=fenceAt(c,r);if(PW.phase!=='play'||PW.ap<1||!f||f.hp>=f.max)return false;PW.ap--;f.hp=Math.min(f.max,f.hp+2);pwLog('You mend the fence');return true;}
+function pwUpdate(dt){
+ if(PW.phase!=='play'||PW.mode!=='live'||PW.paused)return;
+ PW.apT+=dt;if(PW.apT>=2.4){PW.apT=0;PW.ap=Math.min(PW.apMax,PW.ap+1);}
+ PW.acc+=dt;if(PW.acc>=1.4){PW.acc=0;pwEnemyPhase();}
+}
+function pwTap(p){
+ for(const b of RB){if(!inRect(p,b)||b.on===false)continue;const id=b.id;
+  if(id==='menu'){PW.on=false;G.state='ready';return;}
+  if(id==='again'||id==='switch'){startPW(id==='switch'?(PW.mode==='turn'?'live':'turn'):PW.mode);return;}
+  if(id==='begin'){pwBegin();return;}
+  if(id==='end'){pwEndTurn();return;}
+  if(id==='pause'){PW.paused=!PW.paused;return;}
+  if(id==='repair'){PW.repair=!PW.repair;PW.sel=null;return;}
+  if(id.startsWith('a:')){PW.sel={kind:'animal',type:id.slice(2)};PW.repair=false;return;}
+  if(id.startsWith('d:')){PW.sel={kind:'def',type:id.slice(2)};PW.repair=false;return;}}
+ const bx=pwBX(),c=Math.floor((p.x-bx)/PWT),r=Math.floor((p.y-pwBY)/PWT);if(c<0||c>=PWC||r<0||r>=PWR)return;
+ if(PW.phase==='place'){
+  if(PW.sel&&pwPlace(PW.sel.kind,PW.sel.type,c,r)){const left=PW.sel.kind==='animal'?PW.inv.animals[PW.sel.type]:PW.inv.defs[PW.sel.type];if(!left)PW.sel=null;return;}
+  pwRemove(c,r);return;}
+ if(PW.phase==='play'){
+  const d=PW.defs.find(q=>q.c===c&&q.r===r);if(d&&pwFire(d))return;
+  if(PW.repair||fenceAt(c,r))pwRepair(c,r);
+ }
+}
+function drawEnemyIcon(k,x,y,z){const nm=k==='coyote'?'fox':k==='badger'?'bear':k,m=CH[nm],mul=k==='coyote'?[.78,.82,.86]:k==='badger'?[.5,.5,.55]:null,sh=sheet(nm,mul);if(!sh)return;const sc=({fox:.62,coyote:.66,wolf:.5,badger:.42,bear:.5,eagle:.5}[k]||.5)*z,d=m.cell*sc;c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(sh,0,0,m.cell,m.cell,x-d/2,y-d*.62,d,d);}
+function drawPW(){
+ RB=[];c.fillStyle='#10161c';c.fillRect(0,0,W,H);
+ const bx=pwBX(),by=pwBY;
+ // the board
+ for(let r=0;r<PWR;r++)for(let q=0;q<PWC;q++){const x=bx+q*PWT,y=by+r*PWT,inn=isInterior(q,r);c.fillStyle=inn?'#8a6a3e':((q+r)%2?'#3a5a34':'#40623a');c.fillRect(x,y,PWT,PWT);}
+ c.strokeStyle='rgba(0,0,0,.18)';c.lineWidth=1;for(let q=0;q<=PWC;q++){c.beginPath();c.moveTo(bx+q*PWT,by);c.lineTo(bx+q*PWT,by+PWR*PWT);c.stroke();}for(let r=0;r<=PWR;r++){c.beginPath();c.moveTo(bx,by+r*PWT);c.lineTo(bx+PWC*PWT,by+r*PWT);c.stroke();}
+ for(const k of Object.keys(PW.fence)){const [q,r]=k.split(',').map(Number),f=PW.fence[k],x=bx+q*PWT,y=by+r*PWT;
+  if(f.hp<=0){c.fillStyle='rgba(120,40,30,.55)';c.fillRect(x+4,y+4,PWT-8,PWT-8);continue;}
+  c.fillStyle=f.reinf?'#7a8590':'#8a5a2a';c.fillRect(x+3,y+3,PWT-6,PWT-6);c.fillStyle='#b8844a';c.fillRect(x+3,y+3,PWT-6,5);
+  if(q===PC0-1&&r===PR0+2){c.fillStyle='#ffd24a';c.fillRect(x+PWT/2-3,y+6,6,PWT-12);}   // the gate
+  if(f.thorn){c.fillStyle='#4f9a44';for(let i=0;i<3;i++){c.beginPath();c.arc(x+8+i*10,y+PWT-7,3.5,0,TAU);c.fill();}}
+  for(let i=0;i<f.max;i++){c.fillStyle=i<f.hp?(f.hp<=1?'#ff6a4a':'#9aff9a'):'#2a2a2a';c.fillRect(x+5+i*7,y+PWT-6-(f.thorn?7:0),5,4);}}
+ // defenses
+ for(const d of PW.defs){const {x,y}=cellXY(d.c,d.r),D=DEFN[d.k];
+  if(d.k==='torch'){c.fillStyle='#5a3a1c';c.fillRect(x-2,y-6,4,16);c.fillStyle=d.cd?'#7a5a3a':'#ff8a2a';c.beginPath();c.moveTo(x-6,y-6);c.quadraticCurveTo(x,y-20+Math.sin(G.t*12)*2,x+6,y-6);c.fill();}
+  else if(d.k==='bell'){c.fillStyle=d.cd?'#8a7a30':'#ffd24a';c.beginPath();c.arc(x,y,9,Math.PI,0);c.lineTo(x+9,y+6);c.lineTo(x-9,y+6);c.fill();c.fillStyle='#4a3a10';c.fillRect(x-1,y+6,2,5);}
+  else if(d.k==='snare'){c.strokeStyle='#c8a050';c.lineWidth=3;c.beginPath();c.arc(x,y,11,0,TAU);c.stroke();}
+  else if(d.k==='guard'){drawDogIcon2('farm',x,y+14);}
+  if(d.cd>0)txt(String(d.cd),x+12,y-8,'#fff',12,'center');
+  if(PW.phase==='play'&&(d.k==='torch'||d.k==='bell')&&!d.cd&&PW.ap>0){c.strokeStyle='rgba(255,255,160,.7)';c.lineWidth=2;c.beginPath();c.arc(x,y,16,0,TAU);c.stroke();}}
+ // animals
+ for(const a of PW.animals){const {x,y}=cellXY(a.c,a.r);drawAnimalIcon(a.type,x,y+10,.95);for(let i=0;i<a.max;i++){c.fillStyle=i<a.hp?'#ff6a6a':'#2a2a2a';c.fillRect(x-a.max*3+i*6,y-14,5,3);}}
+ // enemies and what they are about to do
+ const goose=PW.animals.some(a=>a.type==='goose');
+ for(const e of pwAlive()){const {x,y}=cellXY(e.c,e.r);
+  if(PW.phase==='play'&&e.tgt&&fenceAt(e.tgt.c,e.tgt.r)&&fenceAt(e.tgt.c,e.tgt.r).hp>0){const t=cellXY(e.tgt.c,e.tgt.r);c.strokeStyle='rgba(255,90,70,.7)';c.lineWidth=2;c.setLineDash([5,4]);c.beginPath();c.moveTo(x,y);c.lineTo(t.x,t.y);c.stroke();c.setLineDash([]);if(goose)txt(String(Math.max(1,Math.ceil((man(e,e.tgt)-1)/EN[e.k].spd))),(x+t.x)/2,(y+t.y)/2-4,'#ffd0c0',13,'center');}
+  drawEnemyIcon(e.k,x,y+8,1);for(let i=0;i<e.max;i++){c.fillStyle=i<e.hp?'#ff9a4a':'#2a2a2a';c.fillRect(x-e.max*3+i*6,y-15,5,3);}
+  if(e.stun>0)txt('zz',x,y-18,'#ffe9a8',13,'center');if(e.scared>0)txt('!',x,y-18,'#9aff9a',16,'center');if(e.stuck>0)txt('x',x,y-18,'#c8a050',16,'center');}
+ // HUD
+ c.fillStyle='rgba(20,12,26,.9)';c.fillRect(0,0,W,40);txt('PEN WATCH  ('+(PW.mode==='turn'?'turn-based':'live + pause')+')',14,27,'#ffd24a',16);
+ if(PW.phase==='play'||PW.phase==='done'){txt('TURN '+PW.turn,360,27,'#fff',16);txt('ACTIONS '+PW.ap+'/'+PW.apMax,470,27,'#9ab8ff',16);txt('SAFE '+PW.animals.length+'/'+PW.total,620,27,'#9aff9a',16);}
+ else txt('Place your livestock inside the pen and your defenses around it.',360,27,'#e8f0d8',14);
+ // left panel: log and wave preview
+ const lx=10,lw=bx-20;c.fillStyle='rgba(20,24,30,.9)';c.fillRect(lx,50,lw,PWR*PWT);
+ txt('WATCH',lx+8,70,'#ffd24a',14);
+ const nxt=PW.waves.filter(w=>w.t>=Math.max(1,PW.turn+(PW.phase==='play'?1:0))).slice(0,3);
+ nxt.forEach((w,i)=>txt('T'+w.t+': '+w.n+' '+EN[w.k].n.toLowerCase()+(w.n>1?'s':'')+' from '+({W:'W',E:'E',N:'N',S:'S'}[w.side]),lx+8,92+i*18,'#ffd0c0',11));
+ PW.log.slice(0,6).forEach((t,i)=>txt(t,lx+8,170+i*34,i?'#9aa4b0':'#fff',11));
+ // right panel: tray or actions
+ const rx=bx+PWC*PWT+10,rw=W-rx-10;c.fillStyle='rgba(20,24,30,.9)';c.fillRect(rx,50,rw,PWR*PWT);
+ if(PW.phase==='place'){
+  txt('LIVESTOCK',rx+8,70,'#ffd24a',13);let y=78;
+  for(const t of Object.keys(PW.inv.animals)){const n=PW.inv.animals[t];if(!n&&!(PW.sel&&PW.sel.kind==='animal'&&PW.sel.type===t))continue;rbtn('a:'+t,rx+6,y,rw-12,24,AN[t].n+'  x'+n,n>0);if(PW.sel&&PW.sel.kind==='animal'&&PW.sel.type===t){c.strokeStyle='#ffd24a';c.lineWidth=3;c.strokeRect(rx+6,y,rw-12,24);}y+=27;}
+  txt('DEFENSES',rx+8,y+14,'#ffd24a',13);y+=22;
+  for(const t of Object.keys(PW.inv.defs)){const n=PW.inv.defs[t];rbtn('d:'+t,rx+6,y,rw-12,24,DEFN[t].n+'  x'+n,n>0);if(PW.sel&&PW.sel.kind==='def'&&PW.sel.type===t){c.strokeStyle='#ffd24a';c.lineWidth=3;c.strokeRect(rx+6,y,rw-12,24);}y+=27;}
+  if(PW.sel){const dsc=PW.sel.kind==='def'?DEFN[PW.sel.type].desc:({ram:'Butts enemies within 2.',cow:'Shields neighbours from 1 damage.',pig:'Mends the fence next to it.',goose:'Shows how long each enemy needs.',lamb:'Fragile, but eagles love lambs.'}[PW.sel.type]||'A sturdy animal.');
+   const words=dsc.split(' ');let line='',yy=y+10;for(const w of words){if((line+' '+w).length>20){txt(line,rx+8,yy,'#c8d4e0',11);yy+=14;line=w;}else line=(line+' '+w).trim();}txt(line,rx+8,yy,'#c8d4e0',11);}
+  rbtn('begin',lx,H-76,lw,48,'START THE NIGHT',PW.animals.length>0);
+ }else if(PW.phase==='play'){
+  txt('ACTIONS',rx+8,70,'#ffd24a',13);
+  rbtn('repair',rx+6,80,rw-12,36,PW.repair?'REPAIR: tap fence':'REPAIR (1)',PW.ap>0);
+  txt('Tap a torch or bell to use it.',rx+8,136,'#c8d4e0',11);txt('Tap a damaged fence to mend.',rx+8,152,'#c8d4e0',11);
+  if(PW.mode==='turn')rbtn('end',rx+6,H-130,rw-12,56,'END TURN >',true);
+  else{rbtn('pause',rx+6,H-130,rw-12,56,PW.paused?'PLAY >':'PAUSE ||',true);txt(PW.paused?'paused: plan your actions':'live: 1 turn / 1.4 s',rx+8,H-62,'#c8d4e0',11);}
+ }else{
+  txt(PW.res.title,W/2,200,'#ffd24a',34,'center');c.fillStyle='rgba(10,14,20,.94)';c.fillRect(W/2-250,215,500,150);c.strokeStyle='#ffb84a';c.lineWidth=3;c.strokeRect(W/2-250,215,500,150);
+  txt(PW.res.title,W/2,252,'#ffd24a',28,'center');txt(PW.res.left+' of '+PW.res.total+' animals survived',W/2,288,'#fff',20,'center');txt(PW.res.kills+' enemies driven off, '+PW.res.turns+' turns',W/2,316,'#d8e8d0',15,'center');
+  rbtn('again',W/2-340,390,210,48,'PLAY AGAIN',true);rbtn('switch',W/2-105,390,210,48,PW.mode==='turn'?'TRY LIVE + PAUSE':'TRY TURN-BASED',true);rbtn('menu',W/2+130,390,210,48,'BACK TO MENU',true);
+ }
+ if(PW.phase!=='done')rbtn('menu',W-152,4,92,32,'EXIT',true);
+}
 function btnDraw(B,label,on){c.globalAlpha=on?.9:.6;c.fillStyle=on?'#ffd24a':'#2a1a30';c.beginPath();c.arc(B.x,B.y,B.r,0,TAU);c.fill();c.strokeStyle='#ffb84a';c.lineWidth=3;c.stroke();c.globalAlpha=1;c.fillStyle=on?'#2a1408':'#ffe9c0';c.font='bold 17px monospace';c.textAlign='center';c.fillText(label,B.x,B.y+6);}
 function txt(s,x,y,col='#fff',size=16,al='left'){c.font=`bold ${size}px monospace`;c.textAlign=al;c.fillStyle='rgba(0,0,0,.55)';c.fillText(s,x+1.5,y+1.5);c.fillStyle=col;c.fillText(s,x,y);}
 function layoutOffers(){const n=G.offers.length,w=250,gap=18,x0=(W-(n*w+(n-1)*gap))/2;return G.offers.map((o,i)=>({x:x0+i*(w+gap),y:200,w,h:200}));}
@@ -1627,6 +1831,7 @@ function render(){
  if(G.state==='chores'){drawChores();drawFullBtn();}
  if(G.state.startsWith('run_')){drawRun();drawFullBtn();}
  if(G.state==='nite_pick'||G.state==='nite_res'){drawNiteScreen();drawFullBtn();}
+ if(G.state==='pw'){drawPW();drawFullBtn();}
  if(NITE.on&&G.state==='play'){c.fillStyle='#140c1a';c.fillRect(0,0,W-92,40);drawNiteHud();}
  if(G.state==='ready'){c.fillStyle='rgba(10,20,10,.7)';c.fillRect(0,0,W,H);txt('SHEEPDOG',W/2,84,'#fff6c8',54,'center');
   txt('Herd the flock home by day. Defend it by night.',W/2,118,'#e8f0d8',17,'center');
@@ -1640,7 +1845,8 @@ function render(){
    if(open){txt('★'.repeat(st)+'☆'.repeat(3-st),m.x+m.w/2,m.y+m.h-44,'#ffd24a',20,'center');txt(SAVE.best[M.id]?'best '+SAVE.best[M.id]:'TAP TO PLAY',m.x+m.w/2,m.y+m.h-16,'#ffe9c0',13,'center');}
    else txt(M.ready?'BEAT MAP '+m.i:'COMING SOON',m.x+m.w/2,m.y+m.h-18,'#8a7f98',13,'center');}
   txt('BONES '+(SAVE.bones||0),W-20,62,'#ffe9a8',17,'right');drawFullBtn();
-  c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT.x,NT.y,NT.w,NT.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT.x,NT.y,NT.w,NT.h);txt('NIGHT (testing)',NT.x+NT.w/2,NT.y+20,'#d0d8ff',12,'center');
+  c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT.x,NT.y,NT.w,NT.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT.x,NT.y,NT.w,NT.h);txt('NIGHT: TURN-BASED',NT.x+NT.w/2,NT.y+20,'#d0d8ff',12,'center');
+  c.fillStyle='rgba(30,36,80,.92)';c.fillRect(NT2.x,NT2.y,NT2.w,NT2.h);c.strokeStyle='#8fa0ff';c.lineWidth=2;c.strokeRect(NT2.x,NT2.y,NT2.w,NT2.h);txt('NIGHT: LIVE + PAUSE',NT2.x+NT2.w/2,NT2.y+20,'#d0d8ff',12,'center');
   c.fillStyle='rgba(40,60,40,.9)';c.fillRect(CT.x,CT.y,CT.w,CT.h);c.strokeStyle='#9acb8a';c.lineWidth=2;c.strokeRect(CT.x,CT.y,CT.w,CT.h);txt('CHORES (testing)',CT.x+CT.w/2,CT.y+20,'#d8ffd0',12,'center');
   txt('YOUR DOG',W/2,402,'#ffd24a',14,'center');
   for(const b of dogStrip()){const on=b.id===SAVE.dog;c.fillStyle=on?'rgba(90,70,30,.95)':'rgba(30,26,44,.9)';c.fillRect(b.x,b.y,b.w,b.h);c.strokeStyle=on?'#ffd24a':'#6a6078';c.lineWidth=on?3:2;c.strokeRect(b.x,b.y,b.w,b.h);drawDogIcon(b.id,b.x+b.w/2,b.y+b.h-8,1.0);}
@@ -1679,6 +1885,6 @@ function render(){
 let last=performance.now(),acc=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;acc+=dt;while(acc>=1/60){update(1/60);acc-=1/60;}render();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
-window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,spawnFox,DEFS,raidP,nite:{NITE,start:startNite,finish:finishNite,tap:niteTap},penInfo:()=>({mode:(G.map.pen||(G.map.center?'center':'edge')),fx:G.pen.x/WX,fy:G.pen.y/WY,dog:[G.dog.x,G.dog.y],world:[WX,WY]}),stam:()=>({stam:G.stam,max:G.stamMax,winded:G.winded}),setSprint:v=>{sprintHeld=!!v;},run:{RUN,RB:()=>RB,new:newRun,enter:enterNode,tap:runTap,startLevel:startRunLevel,EVENTS,reach,applyFx,finish:finishRunLevel,end:endRun2},chores:{enter:enterChores,CS,MINI,start:startChore,down:p=>choreDown(p),move:p=>choreMove(p),up:()=>choreUp(),finish:finishChores,stage},setChores:v=>{CHORES_ON=!!v;},quota,startDay,poolPick,TYPES,spawnFox,spawnBadger,lureZone,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
+window.__sd={W:()=>W,keys,G,step:n=>{for(let i=0;i<n;i++)update(1/60);render();},start:()=>startGame(),cont:()=>advance(),next:i=>pickOffer(i||0),bot:v=>{G.bot=v;},bark,useFlare,render,endDay,skip:skipStage,pw:{PW,start:startPW,place:pwPlace,begin:pwBegin,end:pwEndTurn,tap:pwTap,fire:pwFire,repair:pwRepair,EN,AN,cell:cellXY,toggle:()=>{PW.paused=!PW.paused;}},spawnFox,DEFS,raidP,nite:{NITE,start:startNite,finish:finishNite,tap:niteTap},penInfo:()=>({mode:(G.map.pen||(G.map.center?'center':'edge')),fx:G.pen.x/WX,fy:G.pen.y/WY,dog:[G.dog.x,G.dog.y],world:[WX,WY]}),stam:()=>({stam:G.stam,max:G.stamMax,winded:G.winded}),setSprint:v=>{sprintHeld=!!v;},run:{RUN,RB:()=>RB,new:newRun,enter:enterNode,tap:runTap,startLevel:startRunLevel,EVENTS,reach,applyFx,finish:finishRunLevel,end:endRun2},chores:{enter:enterChores,CS,MINI,start:startChore,down:p=>choreDown(p),move:p=>choreMove(p),up:()=>choreUp(),finish:finishChores,stage},setChores:v=>{CHORES_ON=!!v;},quota,startDay,poolPick,TYPES,spawnFox,spawnBadger,lureZone,setNight:v=>{NIGHT=!!v;},updateWaves,endRun,buildSlots,buildPosts,placeItem,cyclePost,BU,enterBuild,startNight,maps:MAPS,save:SAVE,startMap,dogs:DOGS,ups:UPS,buyDog,buyUp,setDog,stats:()=>({speed:dogSpeed(),bark:barkR(),cd:barkCD(),light:lightR()}),doAct,cam,world:()=>[WX,WY]};
 })();
 </script></body></html>

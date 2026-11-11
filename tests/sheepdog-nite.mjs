@@ -9,7 +9,7 @@ const b=await chromium.launch({channel:'chrome'}),page=await b.newPage({viewport
 page.on('pageerror',e=>errs.push(e.message));
 await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTimeout(500);
 const W=await page.evaluate(()=>window.__sd.W());
-await page.mouse.click(W-190-14+95,426+15);await page.waitForTimeout(150);          // the NIGHT (testing) button
+await page.evaluate(()=>{window.__sd.G.state='nite_pick';});
 const picker=await page.evaluate(()=>window.__sd.G.state);
 await page.evaluate(()=>window.__sd.render());
 const click=id=>page.evaluate(id=>{const S=window.__sd;S.render();});
