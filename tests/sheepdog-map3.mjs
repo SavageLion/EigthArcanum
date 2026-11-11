@@ -22,15 +22,19 @@ const res=await page.evaluate(()=>{
   S.BU.item='erase';S.placeItem(1);o.sold=G.build.slots[1]===null;
   S.cyclePost(0);o.postDog=G.build.posts[0];
   S.cyclePost(2);o.lockedPost=G.build.posts[2]===null;      // only 1 post is open on day 1
-  // night: the thorn is on the wall and the dog is posted
-  S.cont();o.night=G.state+'/'+G.mode;o.thorn=!!G.walls[0].thorn;o.allies=G.allies.length;
+  // the pen is in the middle of the world and four lanes lead to it
+  {const [WX,WY]=S.world(),P=G.pen;o.centred=Math.abs(P.x+P.w/2-WX/2)<2&&Math.abs(P.y+P.h/2-WY/2)<2;o.lanes=G.lanes.length;}
+  // night: the thorn is on the wall and the dog is posted; the night is a series of waves
+  S.cont();o.night=G.state+'/'+G.mode;o.thorn=!!G.walls[0].thorn;o.allies=G.allies.length;o.waves=G.waves.length;
+  // SEND DOG: the dog goes where it is told
+  G.sendMode=true;G.allies[0].cmd={x:G.pen.x-200,y:G.pen.y-100,t:9};
   // run the night with the bot; the allied dog must move toward a predator and nothing may break
-  S.bot(true);let g=0;while(G.state==='play'&&g++<60*200)S.step(1);
-  o.end=G.state;
+  S.bot(true);let g=0;while(G.state==='play'&&g++<60*320)S.step(1);
+  o.end=G.state;o.wavesDone=G.waveIdx===G.waves.length;o.fearSeen=typeof G.fear==='number';
   return o;
 });
 console.log(JSON.stringify(res));
-const ok=res.map==='wood'&&res.scoutsScheduled&&res.dayFox&&res.dusk==='dusk'&&res.build==='build'&&res.thornPlaced&&res.torchPlaced&&res.sold&&res.postDog==='farm'&&res.lockedPost&&res.night==='play/night'&&res.thorn&&res.allies===1&&(res.end==='dawn'||res.end==='lost');
+const ok=res.map==='wood'&&res.scoutsScheduled&&res.dayFox&&res.dusk==='dusk'&&res.build==='build'&&res.thornPlaced&&res.torchPlaced&&res.sold&&res.postDog==='farm'&&res.lockedPost&&res.night==='play/night'&&res.thorn&&res.allies===1&&res.centred&&res.lanes===4&&res.waves>=3&&res.wavesDone&&(res.end==='dawn'||res.end==='lost');
 console.log(ok?'PASS: map 3 build phase, allied dogs and day scouts work':'FAIL','errors:',errs.length?errs.join('|'):'none');
 if(shots){await page.evaluate(()=>{const S=window.__sd,G=S.G;S.startMap(2);G.feed=200;G.dog.x=G.pen.x-200;S.step(2);S.endDay('called');S.cont();S.BU.item='torch';S.placeItem(0);S.BU.item='thorn';S.placeItem(3);S.cyclePost(0);S.step(30);});await page.screenshot({path:shots+'/build.png'});}
 await b.close();srv.close();process.exit(ok&&!errs.length?0:1);
