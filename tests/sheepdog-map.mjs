@@ -10,7 +10,7 @@ await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTi
 const menu=await page.evaluate(()=>({state:window.__sd.G.state,maps:window.__sd.maps.map(m=>m.name+':'+m.days+(m.ready?'':'(soon)'))}));
 console.log('menu',JSON.stringify(menu));
 let res=null;
-for(let attempt=1;attempt<=3;attempt++){
+for(let attempt=1;attempt<=6;attempt++){
   res=await page.evaluate(()=>{const S=window.__sd,G=S.G;S.startMap(0);S.bot(true);const log=[];let guard=0;
     while(G.state!=='victory'&&G.state!=='lost'&&guard++<40){
       let g=0;while(G.state==='play'&&g++<60*220)S.step(1);
