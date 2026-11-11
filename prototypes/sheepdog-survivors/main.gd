@@ -65,7 +65,7 @@ var level: int = 1
 var xp: float = 0.0
 var xp_need: float = 30.0
 var pending: int = 0
-var perk_lv: Dictionary = {}
+var perk_lv: Dictionary = {"stick": 1}
 var choices: Array = []
 var result: Dictionary = {}
 var banner: String = ""
@@ -132,7 +132,7 @@ func _ready() -> void:
 	ysort.add_child(dog)
 	dog.setup(dog_frames, shadow_tex)
 	dog.position = world.dog_start
-	for i in 7:
+	for i in 18:
 		spawn_stray(true)
 	_setup_camera()
 	_setup_layers()
@@ -317,12 +317,12 @@ func move_input() -> Vector2:
 
 # ---------------------------------------------------------------- stats from perks
 func swipe_dmg() -> float:
-	return 1.0 + float(pl("nip"))
+	return 2.0 + float(pl("nip"))
 func swipe_r() -> float:
-	return 40.0 * (1.0 + 0.2 * float(pl("reach")))
+	return 52.0 * (1.0 + 0.2 * float(pl("reach")))
 func swipe_cd() -> float:
 	var goats: int = int(pen_counts.get("goat", 0))
-	return 0.9 * pow(0.87, float(pl("paws"))) * (1.0 - minf(0.3, 0.03 * float(goats)))
+	return 0.5 * pow(0.87, float(pl("paws"))) * (1.0 - minf(0.3, 0.03 * float(goats)))
 func bark_r() -> float:
 	return 150.0 * (1.0 + 0.2 * float(pl("bark")))
 func bark_cd() -> float:
@@ -339,19 +339,19 @@ func fence_regen() -> float:
 func repair_rate() -> float:
 	return 5.0 * (1.0 + 0.6 * float(pl("paw2")))
 func stick_cd() -> float:
-	return 2.4 * pow(0.9, float(pl("stick") - 1))
+	return 1.5 * pow(0.9, float(pl("stick") - 1))
 func stick_dmg() -> float:
-	return 2.0 + float(pl("stick"))
+	return 3.0 + float(pl("stick"))
 
 # ---------------------------------------------------------------- waves
 func start_wave(n: int) -> void:
 	wave = n
 	wave_t = 0.0
 	events.clear()
-	var fox_n: int = 2 + n + n / 2
-	var wolf_n: int = maxi(0, n - 2)
+	var fox_n: int = 5 + 2 * n
+	var wolf_n: int = n - 1
 	for i in fox_n:
-		events.append({"t": randf_range(1.0, 50.0), "k": "fox"})
+		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
 	for i in wolf_n:
 		events.append({"t": randf_range(4.0, 52.0), "k": "wolf"})
 	if n == 5:
@@ -404,7 +404,7 @@ func spawn_enemy(k: String) -> void:
 		fr = wolf_frames
 	elif k == "bear":
 		fr = bear_frames
-	f.setup(k, fr, shadow_tex, 1.0 + 0.12 * float(wave - 1))
+	f.setup(k, fr, shadow_tex, 1.0 + 0.1 * float(wave - 1))
 	f.position = edge_point(k == "fox")
 	foxes.append(f)
 	if k == "bear":
@@ -466,12 +466,12 @@ func _physics_process(delta: float) -> void:
 	run_events()
 	stray_t -= dt
 	if stray_t <= 0.0:
-		stray_t = maxf(2.2, 6.0 - float(wave) * 0.3)
+		stray_t = maxf(1.2, 2.6 - float(wave) * 0.12)
 		var loose: int = 0
 		for s in sheep:
 			if not (s as Sheep).in_pen:
 				loose += 1
-		if loose < 11:
+		if loose < 26:
 			spawn_stray(false)
 	for pu in popups:
 		pu["t"] = float(pu["t"]) - dt
