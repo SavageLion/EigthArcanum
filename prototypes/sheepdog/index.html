@@ -57,7 +57,8 @@ const MAPS=[
 G.map=MAPS[0];G.runLost=0;
 let SAVE={stars:{},best:{}};try{SAVE=Object.assign(SAVE,JSON.parse(localStorage.getItem('sheepdog_save')||'{}'));}catch(_){}
 function persist(){try{localStorage.setItem('sheepdog_save',JSON.stringify(SAVE));}catch(_){}}
-const mapUnlocked=i=>i===0||(SAVE.stars[MAPS[i-1].id]||0)>0;
+const mapUnlocked=i=>i===0||SAVE.unlockAll||(SAVE.stars[MAPS[i-1].id]||0)>0;
+const UA={x:0,y:0,w:190,h:30};   // test button on the map select screen (position set in fit)
 function startMap(i){if(!MAPS[i]||!MAPS[i].ready)return;G.map=MAPS[i];startGame();}
 function zoneAt(o){for(const z of G.zones||[]){if(z.k==='water'?(o.x>z.x&&o.x<z.x+z.w&&o.y>z.y&&o.y<z.y+z.h):(((o.x-z.x-z.w/2)/(z.w/2))**2+((o.y-z.y-z.h/2)/(z.h/2))**2<1))return z;}return null;}
 /* ---------------- starting a day ---------------- */
@@ -524,7 +525,7 @@ const buzz=buzzNow;
 function pt(e){const b=cv.getBoundingClientRect(),sc=Math.min(b.width/W,b.height/H),ox=(b.width-W*sc)/2,oy=(b.height-H*sc)/2;return {x:(e.clientX-b.left-ox)/sc,y:(e.clientY-b.top-oy)/sc};}
 const inBtn=(p,B)=>hyp(p.x-B.x,p.y-B.y)<B.r+14;
 function stickMove(p){const dx=p.x-stick.ox,dy=p.y-stick.oy,l=hyp(dx,dy),k=Math.min(1,l/stick.R);stick.x=stick.ox+(l?dx/l:0)*Math.min(l,stick.R);stick.y=stick.oy+(l?dy/l:0)*Math.min(l,stick.R);stick.vx=l?dx/l*k:0;stick.vy=l?dy/l*k:0;}
-function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-96;BTN_CALM.x=W-236;BTN_FLARE.x=W-176;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;}
+function fit(){const nw=clamp(Math.round(H*innerWidth/Math.max(1,innerHeight)),900,1180);W=nw;if(!(G.map&&G.map.wx>1)){WX=W;WY=H;}cv.width=W;cv.height=H;BTN_BARK.x=W-96;BTN_CALM.x=W-236;BTN_FLARE.x=W-176;BTN_DUSK.x=W/2-70;FS.x=W-50;NX.x=W-80;UA.x=W-UA.w-14;UA.y=H-UA.h-12;}
 fit();
 function goFull(){try{const d=document;if(!d.fullscreenElement){const r=d.documentElement.requestFullscreen();if(r&&r.then)r.then(()=>{try{screen.orientation.lock('landscape');}catch(_){}}).catch(()=>{});}else d.exitFullscreen();}catch(_){}}
 function skipStage(){ // jump straight to dawn (the reward pick) with the flock as it is
@@ -541,7 +542,7 @@ cv.addEventListener('pointerdown',e=>{
  const p=pt(e);try{cv.setPointerCapture(e.pointerId);}catch(_){}
  if(p.x>FS.x&&p.y<FS.y+FS.h&&p.y>FS.y-6){goFull();return;}
  if((G.state==='play'||G.state==='dusk')&&p.x>NX.x-8&&p.x<NX.x+NX.w+8&&p.y>NX.y-8&&p.y<NX.y+NX.h+8){skipStage();return;}
- if(G.state==='ready'){for(const m of mapCards())if(p.x>m.x&&p.x<m.x+m.w&&p.y>m.y&&p.y<m.y+m.h){if(MAPS[m.i].ready&&mapUnlocked(m.i))startMap(m.i);return;}return;}
+ if(G.state==='ready'){if(p.x>UA.x&&p.x<UA.x+UA.w&&p.y>UA.y&&p.y<UA.y+UA.h){SAVE.unlockAll=!SAVE.unlockAll;persist();return;}for(const m of mapCards())if(p.x>m.x&&p.x<m.x+m.w&&p.y>m.y&&p.y<m.y+m.h){if(MAPS[m.i].ready&&mapUnlocked(m.i))startMap(m.i);return;}return;}
  if(G.state==='lost'||G.state==='victory'||G.state==='dusk'){advance();return;}
  if(G.state==='dawn'){const ofs=layoutOffers();for(let i=0;i<ofs.length;i++){const o=ofs[i];if(p.x>o.x&&p.x<o.x+o.w&&p.y>o.y&&p.y<o.y+o.h){pickOffer(i);return;}}return;}
  if(G.state!=='play')return;
@@ -958,7 +959,8 @@ function render(){
    if(open){txt('★'.repeat(st)+'☆'.repeat(3-st),m.x+m.w/2,m.y+m.h-44,'#ffd24a',20,'center');txt(SAVE.best[M.id]?'best '+SAVE.best[M.id]:'TAP TO PLAY',m.x+m.w/2,m.y+m.h-16,'#ffe9c0',13,'center');}
    else txt(M.ready?'BEAT MAP '+m.i:'COMING SOON',m.x+m.w/2,m.y+m.h-18,'#8a7f98',13,'center');}
   txt('Left thumb: stick (light push = slow, steady). Right thumb: BARK, hold CALM.',W/2,424,'#b8c8a8',14,'center');
-  txt('Keys: WASD/arrows, Space bark, C calm, E flare, N call dusk, F fullscreen',W/2,446,'#98a888',13,'center');}
+  txt('Keys: WASD/arrows, Space bark, C calm, E flare, N call dusk, F fullscreen',W/2,446,'#98a888',13,'center');
+  c.fillStyle=SAVE.unlockAll?'rgba(60,110,50,.9)':'rgba(40,30,60,.9)';c.fillRect(UA.x,UA.y,UA.w,UA.h);c.strokeStyle=SAVE.unlockAll?'#9aff9a':'#8a7f98';c.lineWidth=2;c.strokeRect(UA.x,UA.y,UA.w,UA.h);txt(SAVE.unlockAll?'ALL UNLOCKED (tap: off)':'UNLOCK ALL (testing)',UA.x+UA.w/2,UA.y+20,SAVE.unlockAll?'#d8ffd8':'#c8bcd8',12,'center');}
  if(G.state==='dusk'){const I=G.duskInfo;c.fillStyle='rgba(18,10,50,.82)';c.fillRect(0,0,W,H);
   txt('NIGHT FALLS',W/2,130,'#b8c8ff',52,'center');
   txt(`${I.penned} sheep are safe in the pen`,W/2,200,'#9aff9a',22,'center');
