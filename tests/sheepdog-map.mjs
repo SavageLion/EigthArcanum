@@ -14,7 +14,7 @@ for(let attempt=1;attempt<=3;attempt++){
   res=await page.evaluate(()=>{const S=window.__sd,G=S.G;S.startMap(0);S.bot(true);const log=[];let guard=0;
     while(G.state!=='victory'&&G.state!=='lost'&&guard++<40){
       let g=0;while(G.state==='play'&&g++<60*220)S.step(1);
-      if(G.state==='dusk')S.cont();else if(G.state==='dawn')S.next(0);}
+      if(G.state==='chores')S.chores.finish();else if(G.state==='dusk')S.cont();else if(G.state==='dawn')S.next(0);}
     return{state:G.state,day:G.day,days:G.map.days,stars:G.stars,saved:S.save.stars.home||0,runLost:G.runLost};});
   console.log('attempt',attempt,JSON.stringify(res));
   if(res.state==='victory')break;

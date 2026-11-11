@@ -9,10 +9,11 @@ const b=await chromium.launch({channel:'chrome'});const page=await b.newPage({vi
 page.on('pageerror',e=>errs.push(e.message));page.on('console',m=>{if(m.type()==='error')errs.push(m.text());});
 await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTimeout(500);
 await page.evaluate(()=>{window.__sd.start();window.__sd.bot(true);});
-const run=()=>page.evaluate(()=>{const S=window.__sd;let g=0;while(S.G.state==='play'&&g++<60*200)S.step(1);return {state:S.G.state,mode:S.G.mode,day:S.G.day,left:Math.round(S.G.time),penned:S.G.penned,n:S.G.sheep.length,lost:S.G.lost,herd:S.G.herd.length,score:S.G.score};});
+const run=()=>page.evaluate(()=>{const S=window.__sd;let g=0;while(S.G.state==='play'&&g++<60*200)S.step(1);if(S.G.state==='chores'){return {state:'chores'};}return {state:S.G.state,mode:S.G.mode,day:S.G.day,left:Math.round(S.G.time),penned:S.G.penned,n:S.G.sheep.length,lost:S.G.lost,herd:S.G.herd.length,score:S.G.score};});
 for(let d=1;d<=DAYS;d++){
   let r=await run();console.log('day',d,'ends',JSON.stringify(r));
   if(shots){await page.evaluate(()=>window.__sd.render());await page.screenshot({path:`${shots}/sd_d${d}_end.png`});}
+  if(r.state==='chores'){await page.evaluate(()=>window.__sd.chores.finish());r=await run();}
   if(r.state==='dusk'){                                   // night mode on: play the night as well
     await page.evaluate(()=>window.__sd.cont());
     r=await run();console.log('night',d,'ends',JSON.stringify(r));
