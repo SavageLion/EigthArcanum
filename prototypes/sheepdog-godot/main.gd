@@ -145,8 +145,6 @@ func _add_rustle(s: Sheep) -> void:
 
 func _setup_camera() -> void:
 	cam = Camera2D.new()
-	cam.position_smoothing_enabled = true
-	cam.position_smoothing_speed = 5.5
 	cam.limit_left = 0
 	cam.limit_top = 0
 	cam.limit_right = int(WX)
@@ -311,6 +309,7 @@ func move_input() -> Vector2:
 
 # ---------------------------------------------------------------- the loop
 func _physics_process(delta: float) -> void:
+	update_camera(delta)
 	if state != "play":
 		return
 	var dt: float = minf(delta, 0.05)
@@ -335,6 +334,20 @@ func _physics_process(delta: float) -> void:
 		t_left = 0.0
 		finish_day("time")
 
+var cam_pos: Vector2 = Vector2.ZERO
+var cam_look: Vector2 = Vector2.ZERO
+var cam_init: bool = false
+
+func update_camera(delta: float) -> void:
+	if not cam_init:
+		cam_pos = dog.position
+		cam_init = true
+	cam_look = cam_look.lerp(dog.vel * 0.16, 1.0 - exp(-2.5 * delta))
+	cam_pos = cam_pos.lerp(dog.position, 1.0 - exp(-5.0 * delta))
+	shake = maxf(0.0, shake - delta * 2.5)
+	var sh: Vector2 = Vector2(sin(clock * 63.0), cos(clock * 71.0)) * shake * shake * 3.0
+	cam.position = cam_pos + cam_look + sh
+
 func _process(delta: float) -> void:
 	dog.animate(delta)
 	for s in sheep:
@@ -342,9 +355,6 @@ func _process(delta: float) -> void:
 	for f in foxes:
 		(f as Fox).animate(delta)
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	shake = maxf(0.0, shake - delta * 3.0)
-	cam.offset = dog.vel * 0.28 + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * 4.0
-	cam.position = dog.position
 	var target_zoom: float = 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
