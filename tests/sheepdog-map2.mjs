@@ -10,23 +10,25 @@ await page.goto('http://localhost:'+srv.address().port+'/');await page.waitForTi
 const out=await page.evaluate(()=>{
   const S=window.__sd,G=S.G,res={};
   S.startMap(1);const [WX,WY]=S.world(),W=S.W();
-  res.world=[WX,WY,W];res.bigger=WX>W*1.8&&WY>540*1.5;
-  const n=G.sheep.length;res.sheep=n;res.hidden=G.sheep.filter(s=>s.hidden).length;res.unseenAtStart=G.sheep.filter(s=>!s.seen).length;
-  // camera follows the dog
-  const cx0=S.cam.x;G.dog.x=500;G.dog.y=700;S.step(120);res.camMoved=Math.abs(S.cam.x-cx0)>100;
-  // bark pings sheep we haven't seen
-  const far=G.sheep.find(s=>!s.hidden&&!s.seen);
-  if(far){G.dog.x=far.x-340;G.dog.y=far.y;G.dog.vx=G.dog.vy=0;G.barkCd=0;S.bark();res.pinged=far.ping>0;}else res.pinged='no unseen sheep';
+  res.bigger=WX>W*1.8&&WY>540*1.5;
+  const n=G.sheep.length,hid=G.sheep.find(s=>s.hidden),farS=G.sheep.find(s=>!s.hidden&&!s.seen);
+  res.hidden=G.sheep.filter(s=>s.hidden).length;res.unseenAtStart=G.sheep.filter(s=>!s.seen).length;
+  const quiet=()=>{G.actT=1e9;};quiet();      // no random events while we test one by one
+  // bark pings a sheep we haven't seen
+  G.dog.x=farS.x-340;G.dog.y=farS.y;G.dog.vx=G.dog.vy=0;G.barkCd=0;S.bark();res.pinged=farS.ping>0;
   // hidden sheep are found by walking up to them
-  const h=G.sheep.find(s=>s.hidden);if(h){G.dog.x=h.x-30;G.dog.y=h.y;S.step(3);res.hiddenFound=!h.hidden;}else res.hiddenFound='none hidden';
+  G.dog.x=hid.x-30;G.dog.y=hid.y;G.dog.vx=G.dog.vy=0;S.step(3);res.hiddenFound=!hid.hidden;
+  // the camera follows the dog
+  const cx0=S.cam.x;G.dog.x=Math.max(60,cx0-700)+0;G.dog.y=700;S.step(120);res.camMoved=Math.abs(S.cam.x-cx0)>100;
   // a bolter that is not headed off runs off the map and comes back at dawn
-  const b0=G.sheep.find(s=>!s.hidden&&!s.act&&!s.inPen);G.dog.x=G.pen.x-300;G.dog.y=G.pen.gy;
-  const before=G.sheep.length,type=b0.type;b0.act='bolt';b0.warn=0;b0.bx=-30;b0.by=b0.y;b0.actT=0;
-  for(let i=0;i<60*20&&G.sheep.includes(b0);i++)S.step(1);
+  quiet();const b0=G.sheep.find(s=>!s.hidden&&!s.act&&!s.inPen&&s!==hid);G.dog.x=G.pen.x-300;G.dog.y=G.pen.gy;G.dog.vx=G.dog.vy=0;
+  const before=G.sheep.length;b0.act='bolt';b0.warn=0;b0.bx=-30;b0.by=b0.y;b0.actT=0;
+  for(let i=0;i<60*25&&G.sheep.includes(b0);i++){G.actT=1e9;S.step(1);}
   res.boltGone=!G.sheep.includes(b0)&&G.sheep.length===before-1&&G.away.length===1;
   // a stuck sheep is freed by standing next to it
-  const st=G.sheep.find(s=>!s.hidden&&!s.act&&!s.inPen);st.act='stuck';st.free=0;G.dog.x=st.x-20;G.dog.y=st.y;G.dog.vx=G.dog.vy=0;
-  for(let i=0;i<60*4;i++){G.dog.x=st.x-20;G.dog.y=st.y;G.dog.vx=G.dog.vy=0;S.step(1);}
+  const st=G.sheep.find(s=>!s.hidden&&!s.act&&!s.inPen&&!G.rocks.some(o=>Math.hypot(o.x-s.x,o.y-s.y)<o.r+70)&&!G.zones.some(z=>s.x>z.x-30&&s.x<z.x+z.w+30&&s.y>z.y-30&&s.y<z.y+z.h+30));
+  st.act='stuck';st.free=0;
+  for(let i=0;i<60*4;i++){G.actT=1e9;G.dog.x=st.x-20;G.dog.y=st.y;G.dog.vx=G.dog.vy=0;S.step(1);}
   res.stuckFreed=st.act===null;
   // dawn: the runaway is back in the flock
   const herd0=G.sheep.length+1;S.skip();res.dawn=G.state;res.backAtDawn=G.herd.length>=herd0;
