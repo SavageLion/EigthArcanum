@@ -327,7 +327,20 @@ func _tiles() -> void:
 		var base := ColorRect.new()
 		base.position = Vector2.ZERO
 		base.size = Vector2(wx, wy)
-		base.color = Color(0.52, 0.65, 0.27)
+		var gm := ShaderMaterial.new()
+		gm.shader = load("res://shaders/grass.gdshader") as Shader
+		gm.set_shader_parameter("world_size", Vector2(wx, wy))
+		var gfn := FastNoiseLite.new()
+		gfn.seed = randi()
+		gfn.frequency = 0.012
+		gfn.fractal_octaves = 3
+		var gnt := NoiseTexture2D.new()
+		gnt.noise = gfn
+		gnt.seamless = true
+		gnt.width = 512
+		gnt.height = 512
+		gm.set_shader_parameter("noise_tex", gnt)
+		base.material = gm
 		base.z_index = -201
 		base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(base)
@@ -521,8 +534,8 @@ func _blob_shadow(p: Vector2, sx: float, sy: float) -> Sprite2D:
 		var e := Sprite2D.new()
 		e.texture = ell_tex
 		e.position = p
-		e.scale = Vector2(sx * 1.25, sy * 1.2)
-		e.modulate = Color(0.16, 0.34, 0.14, 0.5)
+		e.scale = Vector2(sx * 1.7, sy * 1.5)
+		e.modulate = Color(0.06, 0.2, 0.08, 0.42)
 		e.z_index = -60
 		return e
 	var s := Sprite2D.new()
@@ -732,7 +745,7 @@ func _ribbons() -> void:
 			_ribbon(sm, 48.0, ptex, Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190, true)
 
 func _ground_patches() -> void:
-	if flat:
+	if flat or refst:
 		return
 	var g := ColorRect.new()
 	g.position = Vector2.ZERO
@@ -794,20 +807,8 @@ func _decals() -> void:
 	if flat:
 		return
 	if refst:
-		var fa0: Texture2D = tex("flowers_a")
-		var fb0: Texture2D = tex("flowers_b")
-		var tf0: Texture2D = tex("tuft")
-		for i in 110:
-			var c0 := Vector2(rngw.randf_range(30.0, wx - 30.0), rngw.randf_range(30.0, wy - 30.0))
-			if not _on_open_grass(c0):
-				continue
-			for j in (2 + rngw.randi() % 3):
-				var p0: Vector2 = c0 + Vector2(rngw.randf_range(-24.0, 24.0), rngw.randf_range(-12.0, 12.0))
-				var pk: float = rngw.randf()
-				if pk < 0.7:
-					_decal(fa0 if pk < 0.35 else fb0, p0, 0.9, -119, true, false)
-				else:
-					_decal(tf0, p0, rngw.randf_range(0.5, 0.8), -120, true, false)
+		_meadow_patches()
+		_dirt_patches()
 		return
 	var tuft: Texture2D = _decal_tex("tuft", "tuft")
 	var tuft_old: Texture2D = tex("tuft")
@@ -847,3 +848,80 @@ func _decals() -> void:
 					_decal(reeds, rp, rngw.randf_range(1.0, 1.5), 0, true, true)
 		if rngw.randf() < 0.22 and not bridge_rect.grow(40.0).has_point(q2):
 			_decal(lily, q2 + nrm * rngw.randf_range(-26.0, 26.0), rngw.randf_range(1.0, 1.4), -92, false, false)
+
+# ---------------------------------------------------------------- the REF style's flower patches and worn dirt
+func _meadow_tex(n: String) -> Texture2D:
+	var p: String = "res://art/meadow/%s.png" % n
+	if ResourceLoader.exists(p):
+		return load(p) as Texture2D
+	return null
+
+func _meadow_patches() -> void:
+	var lav: Texture2D = _meadow_tex("lavender")
+	var pop: Texture2D = _meadow_tex("poppy")
+	var fa: Texture2D = tex("flowers_a")
+	var fb: Texture2D = tex("flowers_b")
+	var center: Vector2 = pen.get_center()
+	for i in 22:
+		var c := Vector2(rngw.randf_range(260.0, wx - 260.0), rngw.randf_range(260.0, wy - 260.0))
+		if c.distance_to(center) < 380.0 or not _on_open_grass(c):
+			continue
+		var kind: int = rngw.randi() % 3
+		var rad: float = rngw.randf_range(70.0, 150.0)
+		var n: int = 10 + rngw.randi() % 9
+		for j in n:
+			var a: float = rngw.randf() * TAU
+			var d: float = sqrt(rngw.randf()) * rad
+			var p: Vector2 = c + Vector2(cos(a) * d, sin(a) * d * 0.7)
+			if not _on_open_grass(p):
+				continue
+			var t: Texture2D = null
+			var roll: float = rngw.randf()
+			if lav != null and pop != null:
+				if kind == 0:
+					t = lav if roll < 0.8 else pop
+				elif kind == 1:
+					t = pop if roll < 0.8 else lav
+				else:
+					t = lav if roll < 0.5 else pop
+			else:
+				t = fa if roll < 0.5 else fb
+			_decal(t, p, rngw.randf_range(0.75, 1.1) if t.get_width() > 40 else 0.9, 0, true, true)
+	for i in 50:
+		var c2 := Vector2(rngw.randf_range(30.0, wx - 30.0), rngw.randf_range(30.0, wy - 30.0))
+		if not _on_open_grass(c2):
+			continue
+		for j in 2:
+			_decal(fa if rngw.randf() < 0.5 else fb, c2 + Vector2(rngw.randf_range(-16.0, 16.0), rngw.randf_range(-8.0, 8.0)), 0.85, -119, true, false)
+
+func _dirt_patches() -> void:
+	var t: Texture2D = load("res://art/tiles/path_tex.png") as Texture2D
+	var center: Vector2 = pen.get_center()
+	var made: int = 0
+	for tries in 60:
+		if made >= 9:
+			break
+		var c := Vector2(rngw.randf_range(200.0, wx - 200.0), rngw.randf_range(200.0, wy - 200.0))
+		if c.distance_to(center) < 360.0 or not _on_open_grass(c):
+			continue
+		made += 1
+		var rx: float = rngw.randf_range(26.0, 54.0)
+		var ry: float = rx * rngw.randf_range(0.55, 0.8)
+		var pts := PackedVector2Array()
+		var uvs := PackedVector2Array()
+		var sd: float = rngw.randf() * 10.0
+		for i in 24:
+			var a: float = float(i) / 24.0 * TAU
+			var k: float = 1.0 + sin(a * 3.0 + sd) * 0.18 + sin(a * 5.0 + sd * 2.0) * 0.1
+			var pt := Vector2(c.x + cos(a) * rx * k, c.y + sin(a) * ry * k)
+			pts.append(pt)
+			uvs.append(pt / 1.5)
+		var poly := Polygon2D.new()
+		poly.polygon = pts
+		poly.uv = uvs
+		poly.texture = t
+		poly.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		poly.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		poly.color = Color(1.0, 0.88, 0.7)
+		poly.z_index = -190
+		add_child(poly)
