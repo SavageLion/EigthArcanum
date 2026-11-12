@@ -33,7 +33,7 @@ const PERKS: Array = [
 	{"id": "wide", "name": "Wide Magic", "desc": "Bigger explosions, rings and orbits.", "max": 4},
 	{"id": "bark", "name": "Arcane Howl", "desc": "Your bark reaches further and recharges faster.", "max": 4},
 	{"id": "boots", "name": "Fleet Paws", "desc": "Run faster.", "max": 4},
-	{"id": "lungs", "name": "Deep Lungs", "desc": "More stamina, quicker recovery.", "max": 3},
+	{"id": "lungs", "name": "Deep Lungs", "desc": "A longer sprint bar that refills faster.", "max": 3},
 	{"id": "charm", "name": "Shepherd's Purse", "desc": "Every animal you pen pays more gold.", "max": 3},
 	{"id": "posts", "name": "Castle Walls", "desc": "Walls get stronger and mend a little.", "max": 4},
 	{"id": "moss", "name": "Mending Moss", "desc": "The walls slowly heal themselves.", "max": 3},
@@ -62,6 +62,7 @@ var hud: Hud
 var dog_frames: SpriteFrames
 var sheep_frames: SpriteFrames
 var fox_frames: SpriteFrames
+var imp_frames: SpriteFrames
 var wolf_frames: SpriteFrames
 var bear_frames: SpriteFrames
 var shadow_tex: Texture2D
@@ -138,6 +139,7 @@ func _ready() -> void:
 	dog_frames = U.raven_frames()
 	sheep_frames = U.sheep8_frames()
 	fox_frames = U.set8("fox8", 12.0)
+	imp_frames = U.set8("imp8", 12.0)
 	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
 	bear_frames = U.frames(load("res://art/chars/bear.png") as Texture2D, 76, names)
 	world = World.new()
@@ -185,7 +187,7 @@ func _ready() -> void:
 		near_pad = -1
 		if demo:
 			perk_lv = {}
-			var kinds: Array = ["fox", "fox", "wolf", "bear"]
+			var kinds: Array = ["fox", "imp", "wolf", "bear"]
 			for i in 4:
 				spawn_enemy(String(kinds[i]))
 				foxes[foxes.size() - 1].position = dog.position + Vector2(-120.0 + 80.0 * float(i), 60.0 + 20.0 * float(i % 2))
@@ -459,6 +461,9 @@ func start_wave(n: int) -> void:
 	events.clear()
 	var fox_n: int = 5 + 2 * n
 	var wolf_n: int = n - 1
+	var imp_n: int = (1 + n / 2) if n >= 2 else 0
+	for i in imp_n:
+		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
 	for i in fox_n:
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
 	for i in wolf_n:
@@ -513,6 +518,8 @@ func spawn_enemy(k: String) -> void:
 		fr = wolf_frames
 	elif k == "bear":
 		fr = bear_frames
+	elif k == "imp":
+		fr = imp_frames
 	f.setup(k, fr, shadow_tex, 1.0 + 0.15 * float(wave - 1))
 	f.position = edge_point(k == "fox")
 	foxes.append(f)
@@ -557,8 +564,20 @@ func _physics_process(delta: float) -> void:
 			pick_perk(0)
 		elif smoke_n % 90 == 0 and state == "play":
 			gain_xp(40.0)
+		if smoke_n == 300:
+			damage_dog(30.0, dog.position + Vector2(10.0, 0.0))
+			print("after hit hp=", dog.hp)
+		if smoke_n == 900:
+			dog.invuln = 0.0
+			damage_dog(500.0, dog.position + Vector2(10.0, 0.0))
+			print("ko=", dog.ko_t)
+		if smoke_n == 1200:
+			print("respawn hp=", dog.hp, " ko=", dog.ko_t, " pos=", dog.position)
+		if smoke_n == 200 or smoke_n == 1500:
+			spawn_enemy("imp")
+			foxes[foxes.size() - 1].position = dog.position + Vector2(160.0, 0.0)
 		if smoke_n % 600 == 0:
-			print("smoke t=", smoke_n, " state=", state, " wave=", wave, " foxes=", foxes.size(), " sheep=", sheep.size(), " lvl=", level, " perks=", perk_lv)
+			print("smoke hp=", dog.hp, " ko=", dog.ko_t, " t=", smoke_n, " state=", state, " wave=", wave, " foxes=", foxes.size(), " sheep=", sheep.size(), " lvl=", level, " perks=", perk_lv)
 	if state != "play":
 		return
 	var dt: float = minf(delta, 0.05)
@@ -662,7 +681,40 @@ func collide(e: Mover, r: float, bounce: float) -> void:
 		e.vel.y = -absf(e.vel.y) * bounce
 
 # ---------------------------------------------------------------- the dog
+func damage_dog(amount: float, from: Vector2) -> void:
+	if dog.invuln > 0.0 or dog.ko_t > 0.0:
+		return
+	dog.hp -= amount
+	dog.hurt_t = 0.3
+	dog.regen_t = 4.0
+	dog.invuln = 0.35
+	dog.stun = maxf(dog.stun, 0.2)
+	dog.vel += (dog.position - from).normalized() * 260.0
+	shake = 1.0
+	add_popup("-%d" % int(amount), dog.position + Vector2(0, -34), Color(1.0, 0.4, 0.4))
+	if dog.hp <= 0.0:
+		dog.hp = 0.0
+		dog.ko_t = 3.0
+		dog.vel = Vector2.ZERO
+		add_popup("KNOCKED OUT!", dog.position + Vector2(0, -44), Color(1.0, 0.5, 0.4))
+		ring(dog.position, 60.0, Color(1.0, 0.4, 0.35), 0.5, 5.0)
+
 func update_dog(dt: float) -> void:
+	dog.invuln = maxf(0.0, dog.invuln - dt)
+	dog.hurt_t = maxf(0.0, dog.hurt_t - dt)
+	dog.regen_t = maxf(0.0, dog.regen_t - dt)
+	if dog.regen_t <= 0.0 and dog.hp < dog.hp_max:
+		dog.hp = minf(dog.hp_max, dog.hp + 4.0 * dt)
+	if dog.ko_t > 0.0:
+		dog.ko_t -= dt
+		dog.vel = Vector2.ZERO
+		if dog.ko_t <= 0.0:
+			dog.position = world.dog_start
+			dog.hp = dog.hp_max
+			dog.invuln = 1.5
+			dog.stam = dog.stam_max
+			ring(dog.position, 70.0, Color(0.7, 0.85, 1.0), 0.6, 4.0)
+		return
 	var inp: Vector2 = move_input()
 	var mag: float = minf(1.0, inp.length())
 	var dir: Vector2 = inp.normalized() if mag > 0.02 else Vector2.ZERO
@@ -679,19 +731,14 @@ func update_dog(dt: float) -> void:
 		speedk = 0.0
 	else:
 		speedk = 0.62 + 0.38 * minf(1.0, (mag - 0.12) / 0.5)
-	var run: bool = (not dog.crouch) and mag > 0.62
-	if dog.winded and dog.stam > dog.stam_max * 0.25:
+	if dog.winded and dog.stam > dog.stam_max * 0.3:
 		dog.winded = false
 	var sprinting: bool = want_sprint and (not dog.winded) and dog.stam > 0.0 and mag > 0.12 and not dog.crouch
-	var regen: float = 1.0 + 0.25 * float(pl("lungs"))
+	var regen: float = 1.0 + 0.3 * float(pl("lungs"))
 	if sprinting:
-		dog.stam -= 24.0 * dt
-	elif run:
-		dog.stam -= 5.0 * dt
-	elif dog.crouch:
-		dog.stam += 26.0 * regen * dt
+		dog.stam -= 28.0 * dt
 	else:
-		dog.stam += (11.0 if mag < 0.12 else 6.0) * regen * dt
+		dog.stam += 18.0 * regen * dt
 	if dog.stam <= 0.0:
 		dog.stam = 0.0
 		dog.winded = true
@@ -875,6 +922,9 @@ func update_weapons(dt: float) -> void:
 		var fz: Fox = f
 		fz.hit_cd = maxf(0.0, fz.hit_cd - dt)
 		fz.slow = maxf(0.0, fz.slow - dt)
+	if dog.ko_t > 0.0:
+		update_defenses(dt)
+		return
 	var cm: float = cdm()
 	var pw: float = sp()
 	var wd: float = am()
@@ -1356,6 +1406,43 @@ func nearest_wall(pos: Vector2) -> Dictionary:
 			best = {"i": i, "p": p, "d": d}
 	return best
 
+func imp_ai(f: Fox, dt: float) -> void:
+	if dog.ko_t > 0.0:
+		gnaw(f, dt)
+		return
+	var dd: Vector2 = dog.position - f.position
+	var dist: float = dd.length()
+	f.atk_cd = maxf(0.0, f.atk_cd - dt)
+	if f.mode == "chase":
+		move_to(f, dog.position, f.base_speed, dt, 5.0)
+		if dist < 120.0 and f.atk_cd <= 0.0:
+			f.mode = "wind"
+			f.tt = 0.45
+	elif f.mode == "wind":
+		f.vel *= exp(-9.0 * dt)
+		f.flash = 0.12
+		f.tt -= dt
+		if f.tt <= 0.0:
+			f.mode = "dash"
+			f.tt = 0.38
+			f.dash_dir = dd.normalized()
+			f.hit_done = false
+	elif f.mode == "dash":
+		f.vel = f.dash_dir * 400.0
+		f.tt -= dt
+		if dist < f.r + 10.0 and not f.hit_done:
+			f.hit_done = true
+			damage_dog(10.0, f.position)
+		if f.tt <= 0.0:
+			f.mode = "rest"
+			f.tt = 0.7
+			f.atk_cd = 1.0
+	else:
+		f.vel *= exp(-6.0 * dt)
+		f.tt -= dt
+		if f.tt <= 0.0:
+			f.mode = "chase"
+
 func gnaw(f: Fox, dt: float) -> void:
 	var nw: Dictionary = nearest_wall(f.position)
 	if nw.is_empty():
@@ -1405,6 +1492,8 @@ func update_enemies(dt: float) -> void:
 			continue
 		if fx.stun > 0.0:
 			fx.vel *= exp(-8.0 * dt)
+		elif fx.kind == "imp":
+			imp_ai(fx, dt)
 		elif fx.kind == "fox":
 			fx.tt -= dt
 			if fx.tgt == null or fx.tgt.in_pen or not sheep.has(fx.tgt) or fx.tt <= 0.0:

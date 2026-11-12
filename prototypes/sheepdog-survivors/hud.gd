@@ -34,17 +34,20 @@ func _draw() -> void:
 		return
 	var v: Vector2 = main.vp()
 	# top left: level and xp
-	_panel(Rect2(8, 6, 230, 54))
+	_panel(Rect2(8, 6, 230, 70))
 	_text("LV %d" % main.level, Vector2(18, 28), 17, GOLD)
 	_bar(Rect2(70, 15, 158, 10), main.xp / main.xp_need, Color(0.55, 0.85, 0.4))
-	_text("%d in the pen" % main.pen_total, Vector2(18, 52), 12, Color(CREAM, 0.85))
+	_text("%d in the pen" % main.pen_total, Vector2(18, 69), 12, Color(CREAM, 0.85))
 	# stamina
-	_bar(Rect2(70, 31, 158, 7), main.dog.stam / main.dog.stam_max, Color(0.95, 0.45, 0.35) if main.dog.winded else Color(0.45, 0.75, 0.9))
+	_text("SPRINT", Vector2(18, 38), 10, Color(CREAM, 0.8))
+	_bar(Rect2(70, 30, 158, 7), main.dog.stam / main.dog.stam_max, Color(0.95, 0.45, 0.35) if main.dog.winded else Color(0.45, 0.75, 0.9))
+	_text("HP", Vector2(18, 52), 10, Color(CREAM, 0.8))
+	_bar(Rect2(70, 43, 158, 8), main.dog.hp / main.dog.hp_max, Color(0.9, 0.3, 0.3))
 	# gold
-	_panel(Rect2(8, 64, 104, 26))
-	draw_circle(Vector2(24, 77), 6.0, Color(0.72, 0.5, 0.1))
-	draw_circle(Vector2(24, 77), 4.5, Color(1.0, 0.82, 0.25))
-	_text("%d gold" % main.gold, Vector2(36, 83), 14, GOLD)
+	_panel(Rect2(8, 82, 104, 26))
+	draw_circle(Vector2(24, 95), 6.0, Color(0.72, 0.5, 0.1))
+	draw_circle(Vector2(24, 95), 4.5, Color(1.0, 0.82, 0.25))
+	_text("%d gold" % main.gold, Vector2(36, 101), 14, GOLD)
 	_minimap(v)
 	# top centre: wave
 	var left: int = int(ceil(main.WAVE_LEN - main.wave_t))
@@ -227,8 +230,8 @@ func _minimap(v: Vector2) -> void:
 		var fx: Fox = f
 		if fx.fleeing:
 			continue
-		var rr: float = 2.4 if fx.kind == "fox" else (3.2 if fx.kind == "wolf" else 4.6)
-		draw_circle(o + fx.position * sc, rr, Color(0.95, 0.25, 0.2))
+		var rr: float = 2.4 if fx.kind == "fox" else (3.2 if fx.kind == "wolf" else (2.8 if fx.kind == "imp" else 4.6))
+		draw_circle(o + fx.position * sc, rr, Color(0.8, 0.3, 0.95) if fx.kind == "imp" else Color(0.95, 0.25, 0.2))
 	# the view and the wizard
 	var vs: Vector2 = v / main.cam.zoom.x
 	var cc: Vector2 = main.cam.get_screen_center_position()

@@ -14,6 +14,10 @@ var stun: float = 0.0
 var fleeing: bool = false
 var hit_cd: float = 0.0
 var bite_cd: float = 0.0
+var atk_cd: float = 0.0
+var mode: String = "chase"
+var dash_dir: Vector2 = Vector2.ZERO
+var hit_done: bool = false
 var slow: float = 0.0
 var tgt: Sheep = null
 var carry: Sheep = null
@@ -25,6 +29,7 @@ var shadow: Sprite2D
 
 const KINDS: Dictionary = {
 	"fox": {"cell": 64, "off": 22.0, "scale": 1.2, "r": 11.0, "hp": 6.0, "spd": 125.0, "dps": 4.0, "sh": 0.7},
+	"imp": {"cell": 64, "off": 22.0, "scale": 1.1, "r": 10.0, "hp": 10.0, "spd": 140.0, "dps": 0.0, "sh": 0.7},
 	"wolf": {"cell": 76, "off": 20.5, "scale": 0.75, "r": 12.0, "hp": 16.0, "spd": 108.0, "dps": 11.0, "sh": 0.8},
 	"bear": {"cell": 76, "off": 20.5, "scale": 1.1, "r": 19.0, "hp": 80.0, "spd": 58.0, "dps": 26.0, "sh": 1.3},
 }
@@ -55,7 +60,7 @@ func setup(k: String, frames: SpriteFrames, shadow_tex: Texture2D, hp_mult: floa
 func animate(dt: float) -> void:
 	var speed: float = vel.length() + kb.length() * 0.3
 	var a: String = ""
-	if kind == "fox":
+	if kind == "fox" or kind == "imp":
 		if vel.length() > 8.0:
 			heading = vel.normalized()
 		a = ("walk_" if speed > 8.0 else "idle_") + U.dir8(heading)

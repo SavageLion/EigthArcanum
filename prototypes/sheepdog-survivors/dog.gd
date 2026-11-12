@@ -15,6 +15,12 @@ var shadow: Sprite2D
 var dust: CPUParticles2D
 var squash: float = 0.0
 var cast_t: float = 0.0
+var hp: float = 100.0
+var hp_max: float = 100.0
+var ko_t: float = 0.0
+var invuln: float = 0.0
+var hurt_t: float = 0.0
+var regen_t: float = 0.0
 const SC: float = 1.2
 
 func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
@@ -61,6 +67,13 @@ func animate(dt: float) -> void:
 	squash = move_toward(squash, 0.0, dt * 4.0)
 	var sq: float = 1.0 + squash * 0.15
 	spr.scale = Vector2(SC / sq, SC * lowered * sq)
-	spr.modulate = Color(0.75, 0.85, 1.0) if winded else Color(1, 1, 1)
+	var tone: Color = Color(0.8, 0.88, 1.0) if winded else Color(1, 1, 1)
+	if hurt_t > 0.0:
+		tone = Color(1.5, 0.5, 0.5)
+	if invuln > 0.0 and int(invuln * 14.0) % 2 == 0:
+		tone.a = 0.6
+	if ko_t > 0.0:
+		tone = Color(0.6, 0.6, 0.8, 0.4)
+	spr.modulate = tone
 	dust.emitting = speed > 140.0
 	dust.position = Vector2(-face * 6.0, 0)
