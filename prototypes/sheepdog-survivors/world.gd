@@ -55,6 +55,7 @@ var n4: FastNoiseLite
 var river_pts: Array = []
 var flat: bool = false
 var refst: bool = false
+var grass_mat: ShaderMaterial
 var ell_tex: Texture2D
 var path_pts: Array = []
 var rngw := RandomNumberGenerator.new()
@@ -71,6 +72,10 @@ func generate(ysort_node: Node2D) -> void:
 	shadow_tex = U.shadow_texture()
 	wind_mat = ShaderMaterial.new()
 	wind_mat.shader = load("res://shaders/wind.gdshader") as Shader
+	var far := PackedVector2Array()
+	for i in 8:
+		far.append(Vector2(-9999.0, -9999.0))
+	wind_mat.set_shader_parameter("actors", far)
 	n1 = FastNoiseLite.new()
 	n1.seed = randi()
 	n1.frequency = 0.004
@@ -341,6 +346,7 @@ func _tiles() -> void:
 		gnt.height = 512
 		gm.set_shader_parameter("noise_tex", gnt)
 		base.material = gm
+		grass_mat = gm
 		base.z_index = -201
 		base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(base)

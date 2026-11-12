@@ -706,7 +706,39 @@ func count_pen() -> void:
 			pen_total += 1
 			pen_counts[sh.type] = int(pen_counts.get(sh.type, 0)) + 1
 
+func update_grass_actors() -> void:
+	var acts := PackedVector2Array()
+	for i in 8:
+		acts.append(Vector2(-9999.0, -9999.0))
+	var n: int = 0
+	acts[n] = dog.position
+	n += 1
+	if pup != null:
+		acts[n] = pup.position
+		n += 1
+	var near: Array = []
+	for s in sheep:
+		var sp: Vector2 = (s as Sheep).position
+		var d: float = sp.distance_to(dog.position)
+		if d < 520.0:
+			near.append([d, sp])
+	for f in foxes:
+		var fp: Vector2 = (f as Fox).position
+		var d2: float = fp.distance_to(dog.position)
+		if d2 < 520.0:
+			near.append([d2, fp])
+	near.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	for e in near:
+		if n >= 8:
+			break
+		acts[n] = e[1]
+		n += 1
+	world.wind_mat.set_shader_parameter("actors", acts)
+	if world.grass_mat != null:
+		world.grass_mat.set_shader_parameter("actors", acts)
+
 func _process(delta: float) -> void:
+	update_grass_actors()
 	dog.animate(delta)
 	if pup != null:
 		pup.animate(delta)
