@@ -59,8 +59,8 @@ static func raven_frames() -> SpriteFrames:
 			sf.set_animation_speed(an, float((clips[clip] as Array)[0]))
 			sf.set_animation_loop(an, bool((clips[clip] as Array)[1]))
 			var i: int = 0
-			while ResourceLoader.exists("res://art/raven/%s/%s/%d.png" % [clip, d, i]):
-				sf.add_frame(an, load("res://art/raven/%s/%s/%d.png" % [clip, d, i]) as Texture2D)
+			while ResourceLoader.exists("res://art/wiz/%s/%s/%d.png" % [clip, d, i]):
+				sf.add_frame(an, load("res://art/wiz/%s/%s/%d.png" % [clip, d, i]) as Texture2D)
 				i += 1
 	return sf
 

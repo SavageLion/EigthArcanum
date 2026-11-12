@@ -15,7 +15,7 @@ var shadow: Sprite2D
 var dust: CPUParticles2D
 var squash: float = 0.0
 var cast_t: float = 0.0
-const SC: float = 0.85
+const SC: float = 1.2
 
 func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	shadow = Sprite2D.new()
@@ -27,7 +27,7 @@ func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	spr.sprite_frames = frames
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	spr.scale = Vector2(SC, SC)
-	spr.offset = Vector2(0, -26)
+	spr.offset = Vector2(0, -22)
 	spr.play("idle_east")
 	add_child(spr)
 	dust = CPUParticles2D.new()
