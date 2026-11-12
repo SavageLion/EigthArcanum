@@ -178,6 +178,10 @@ func _ready() -> void:
 	ysort.add_child(dog)
 	dog.setup(dog_frames, shadow_tex)
 	dog.position = world.dog_start
+	if OS.has_feature("web"):
+		var srch: String = str(JavaScriptBridge.eval("window.location.search"))
+		if srch.contains("startx="):
+			dog.position = Vector2(float(srch.substr(srch.find("startx=") + 7).to_int()), float(srch.substr(srch.find("starty=") + 7).to_int()))
 	if pup_frames != null:
 		pup = Pup.new()
 		ysort.add_child(pup)

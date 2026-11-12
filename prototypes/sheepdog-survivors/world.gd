@@ -56,6 +56,7 @@ var river_pts: Array = []
 var flat: bool = false
 var refst: bool = false
 var grass_mat: ShaderMaterial
+var forest_d: PackedFloat32Array = PackedFloat32Array()
 var trail_dots: Array = []
 var ell_tex: Texture2D
 var path_pts: Array = []
@@ -178,7 +179,7 @@ func _terrain() -> void:
 			var p := Vector2(float(vx) * CELL, float(vy) * CELL)
 			var t: int = T_GRASS
 			var edge: float = minf(minf(p.x, wx - p.x), minf(p.y, wy - p.y))
-			var thick: float = 125.0 + 75.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)
+			var thick: float = (190.0 + 100.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)) if refst else (125.0 + 75.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5))
 			var forest: bool = edge < thick
 			if p.distance_to(center) < 480.0:
 				forest = false
@@ -348,6 +349,7 @@ func _tiles() -> void:
 		gm.set_shader_parameter("noise_tex", gnt)
 		base.material = gm
 		grass_mat = gm
+		_forest_mask(gm)
 		base.z_index = -201
 		base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(base)
@@ -402,7 +404,7 @@ func _tiles() -> void:
 			for v in c:
 				if int(v) == T_FIELD or int(v) == T_FOREST:
 					special = int(v)
-			if refst and special == T_GRASS:
+			if refst and (special == T_GRASS or special == T_FOREST):
 				continue
 			var si: int = 0
 			var alt: int = 0
@@ -457,6 +459,9 @@ func rocks_near(p: Vector2) -> Array:
 	return out
 
 func _trees() -> void:
+	if refst:
+		_trees_ref()
+		return
 	var ta: Texture2D = tex("tree_big_a")
 	var tb: Texture2D = tex("tree_big_b")
 	var rng := RandomNumberGenerator.new()
@@ -483,7 +488,7 @@ func _forest_wall() -> void:
 			for v in cell_corners(cx, cy):
 				if int(v) == T_FOREST:
 					forest += 1
-			if forest >= 2:
+			if forest >= (3 if refst else 2):
 				rock_add(Vector2((float(cx) + 0.5) * CELL, (float(cy) + 0.5) * CELL), 36.0)
 
 func _blocked(p: Vector2, r: float) -> bool:
@@ -979,3 +984,81 @@ func _setup_trail(gm: ShaderMaterial) -> void:
 func update_trail(acts: PackedVector2Array) -> void:
 	for i in trail_dots.size():
 		(trail_dots[i] as Sprite2D).position = acts[i]
+
+# ---------------------------------------------------------------- REF style border: grass flows into the trees
+func _forest_mask(gm: ShaderMaterial) -> void:
+	var n: int = (GW + 1) * (GH + 1)
+	var a := PackedFloat32Array()
+	a.resize(n)
+	for i in n:
+		a[i] = 1.0 if terr[i] == T_FOREST else 0.0
+	for pass_i in 5:
+		var b: PackedFloat32Array = a.duplicate()
+		for y in GH + 1:
+			for x in GW + 1:
+				var s: float = 0.0
+				var c: int = 0
+				for dy in range(-1, 2):
+					for dx in range(-1, 2):
+						var nx: int = clampi(x + dx, 0, GW)
+						var ny: int = clampi(y + dy, 0, GH)
+						s += a[vidx(nx, ny)]
+						c += 1
+				b[vidx(x, y)] = s / float(c)
+		a = b
+	forest_d = a
+	var img := Image.create(GW + 1, GH + 1, false, Image.FORMAT_RGBA8)
+	for y in GH + 1:
+		for x in GW + 1:
+			var v: float = a[vidx(x, y)]
+			img.set_pixel(x, y, Color(v, v, v, 1.0))
+	gm.set_shader_parameter("forest_tex", ImageTexture.create_from_image(img))
+	gm.set_shader_parameter("fgrid", Vector2(float(GW + 1), float(GH + 1)))
+	gm.set_shader_parameter("fcell", CELL)
+
+func forest_at(p: Vector2) -> float:
+	var fx: float = clampf(p.x / CELL, 0.0, float(GW))
+	var fy: float = clampf(p.y / CELL, 0.0, float(GH))
+	var x0: int = mini(int(floor(fx)), GW - 1)
+	var y0: int = mini(int(floor(fy)), GH - 1)
+	var tx: float = fx - float(x0)
+	var ty: float = fy - float(y0)
+	var top: float = lerpf(forest_d[vidx(x0, y0)], forest_d[vidx(x0 + 1, y0)], tx)
+	var bot: float = lerpf(forest_d[vidx(x0, y0 + 1)], forest_d[vidx(x0 + 1, y0 + 1)], tx)
+	return lerpf(top, bot, ty)
+
+func _border_tex(n: String) -> Texture2D:
+	var p: String = "res://art/border/%s.png" % n
+	if ResourceLoader.exists(p):
+		return load(p) as Texture2D
+	return null
+
+func _trees_ref() -> void:
+	var trees: Array = []
+	for n in ["tree_a", "tree_b", "tree_c"]:
+		var t: Texture2D = _border_tex(n)
+		if t != null:
+			trees.append(t)
+	if trees.is_empty():
+		trees = [tex("tree_big_a"), tex("tree_big_b")]
+	var shrub: Texture2D = _border_tex("shrub")
+	if shrub == null:
+		shrub = tex("shrub_big")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = randi()
+	var step: float = 44.0
+	var y: float = 0.0
+	while y < wy + 60.0:
+		var x: float = 0.0
+		while x < wx + 60.0:
+			var p := Vector2(x + rng.randf_range(-16.0, 16.0), y + rng.randf_range(-16.0, 16.0))
+			var d: float = forest_at(p)
+			var prob: float = clampf((d - 0.12) / 0.55, 0.0, 1.0)
+			if rng.randf() < prob * prob + (0.02 if d > 0.1 else 0.0):
+				var sc: float = rng.randf_range(0.82, 1.12) * (0.78 + 0.3 * d)
+				_tree(trees[rng.randi() % trees.size()], p, sc, true)
+				rock_add(p, 17.0)
+			elif d > 0.05 and d < 0.6 and rng.randf() < 0.05:
+				_decal(shrub, p, rng.randf_range(0.5, 0.7), 0, true, true)
+			x += step
+		y += step

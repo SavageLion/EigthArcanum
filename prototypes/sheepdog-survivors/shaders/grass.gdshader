@@ -8,6 +8,9 @@ uniform vec3 c_light : source_color = vec3(0.42, 0.70, 0.26);
 uniform vec3 c_tip : source_color = vec3(0.62, 0.82, 0.36);
 uniform float px = 3.0;
 uniform vec2 actors[8];
+uniform sampler2D forest_tex : filter_linear;
+uniform vec2 fgrid = vec2(51.0, 35.0);
+uniform float fcell = 48.0;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -20,6 +23,10 @@ void fragment() {
 	float tone = clamp(n * 0.65 + n2 * 0.35, 0.0, 1.0);
 	vec3 base = mix(c_dark, c_mid, smoothstep(0.28, 0.46, tone));
 	base = mix(base, c_light, smoothstep(0.50, 0.70, tone));
+	// the soft edge of the forest: the grass keeps going but gets deeper, darker and thicker
+	float fm = texture(forest_tex, (wp / fcell + 0.5) / fgrid).r;
+	float shade = smoothstep(0.1, 0.85, fm);
+	base = mix(base, base * vec3(0.52, 0.72, 0.5), shade * 0.9);
 	vec2 cell = floor(wp / px);
 	vec3 col = base;
 	// the fading trampled-grass map
@@ -41,9 +48,9 @@ void fragment() {
 		vec2 root = cell + vec2(-lean, float(k));
 		float h = hash(root);
 		float len = 1.0 + floor(hash(root + 5.7) * 3.4);
-		if (h > 0.86 + tr * 0.13 && float(k) < len - tr * 1.6) {
+		if (h > 0.86 - shade * 0.14 + tr * 0.13 && float(k) < len - tr * 1.6) {
 			float t = float(k) / max(len - 1.0, 1.0);
-			vec3 stroke = mix(c_dark * 0.92, c_tip, 0.3 + 0.7 * t);
+			vec3 stroke = mix(c_dark * 0.92, c_tip, (0.3 + 0.7 * t) * (1.0 - shade * 0.5));
 			col = mix(stroke, base, 0.42);
 		}
 	}
