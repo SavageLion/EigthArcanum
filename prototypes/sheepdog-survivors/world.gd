@@ -54,10 +54,14 @@ var n3: FastNoiseLite
 var n4: FastNoiseLite
 var river_pts: Array = []
 var flat: bool = false
+var refst: bool = false
+var ell_tex: Texture2D
 var path_pts: Array = []
 var rngw := RandomNumberGenerator.new()
 
 func tex(tname: String) -> Texture2D:
+	if refst and tname == "stone_wall":
+		return load("res://art/fence.png") as Texture2D
 	if flat and ResourceLoader.exists("res://art/flat/" + tname + ".png"):
 		return load("res://art/flat/" + tname + ".png") as Texture2D
 	return load("res://art/" + tname + ".png") as Texture2D
@@ -318,6 +322,22 @@ func _tiles() -> void:
 	if flat:
 		_tiles_flat()
 		return
+	if refst:
+		var base := ColorRect.new()
+		base.position = Vector2.ZERO
+		base.size = Vector2(wx, wy)
+		base.color = Color(0.52, 0.65, 0.27)
+		base.z_index = -201
+		base.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(base)
+		var im := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+		for yy in 64:
+			for xx in 64:
+				var dx: float = (float(xx) - 31.5) / 32.0
+				var dy: float = (float(yy) - 31.5) / 32.0
+				if dx * dx + dy * dy <= 1.0:
+					im.set_pixel(xx, yy, Color(1, 1, 1, 1))
+		ell_tex = ImageTexture.create_from_image(im)
 	var f := FileAccess.open("res://art/tiles/tiles.json", FileAccess.READ)
 	var data: Dictionary = JSON.parse_string(f.get_as_text())
 	var order: Array = ["water", "path", "field", "forest"]
@@ -361,6 +381,8 @@ func _tiles() -> void:
 			for v in c:
 				if int(v) == T_FIELD or int(v) == T_FOREST:
 					special = int(v)
+			if refst and special == T_GRASS:
+				continue
 			var si: int = 0
 			var alt: int = 0
 			var key: String = ""
@@ -484,6 +506,14 @@ func _obstacles() -> void:
 		ysort.add_child(s2)
 
 func _blob_shadow(p: Vector2, sx: float, sy: float) -> Sprite2D:
+	if refst:
+		var e := Sprite2D.new()
+		e.texture = ell_tex
+		e.position = p
+		e.scale = Vector2(sx * 1.25, sy * 1.2)
+		e.modulate = Color(0.16, 0.34, 0.14, 0.5)
+		e.z_index = -60
+		return e
 	var s := Sprite2D.new()
 	s.texture = shadow_tex
 	s.position = p
@@ -502,6 +532,8 @@ func _tree(t: Texture2D, p: Vector2, sc: float, shadow: bool) -> void:
 	ysort.add_child(s)
 	if shadow:
 		add_child(_blob_shadow(p + Vector2(18.0 * sc, 12.0 * sc), 0.9 * sc, 0.32 * sc))
+	elif refst:
+		add_child(_blob_shadow(p + Vector2(26.0 * sc, 14.0 * sc), 0.9 * sc, 0.45 * sc))
 
 # ---------------------------------------------------------------- bridge and castle visuals
 func _bridge() -> void:
@@ -705,6 +737,7 @@ func _ground_patches() -> void:
 	nt.width = 512
 	nt.height = 512
 	m.set_shader_parameter("noise_tex", nt)
+	m.set_shader_parameter("amt", 0.3 if refst else 1.0)
 	g.material = m
 	add_child(g)
 
@@ -744,6 +777,22 @@ func _decal(t: Texture2D, p: Vector2, sc: float, z: int, sway: bool, in_ysort: b
 
 func _decals() -> void:
 	if flat:
+		return
+	if refst:
+		var fa0: Texture2D = tex("flowers_a")
+		var fb0: Texture2D = tex("flowers_b")
+		var tf0: Texture2D = tex("tuft")
+		for i in 110:
+			var c0 := Vector2(rngw.randf_range(30.0, wx - 30.0), rngw.randf_range(30.0, wy - 30.0))
+			if not _on_open_grass(c0):
+				continue
+			for j in (2 + rngw.randi() % 3):
+				var p0: Vector2 = c0 + Vector2(rngw.randf_range(-24.0, 24.0), rngw.randf_range(-12.0, 12.0))
+				var pk: float = rngw.randf()
+				if pk < 0.7:
+					_decal(fa0 if pk < 0.35 else fb0, p0, 0.9, -119, true, false)
+				else:
+					_decal(tf0, p0, rngw.randf_range(0.5, 0.8), -120, true, false)
 		return
 	var tuft: Texture2D = _decal_tex("tuft", "tuft")
 	var tuft_old: Texture2D = tex("tuft")

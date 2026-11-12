@@ -63,7 +63,7 @@ func _draw() -> void:
 	_bar(Rect2(v.x - 130, 15, 114, 12), worst, Color(0.55, 0.85, 0.4) if worst > 0.5 else (Color(0.95, 0.75, 0.3) if worst > 0.25 else Color(0.95, 0.4, 0.35)))
 	var sr: Rect2 = main.style_rect()
 	_panel(sr)
-	_text("FLAT" if not main.style_flat else "PAINT", sr.position + Vector2(0, 21), 10, CREAM, sr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(String(main.style_name).to_upper().substr(0, 5), sr.position + Vector2(0, 21), 10, CREAM, sr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var fr: Rect2 = main.fs_rect()
 	_panel(fr)
 	draw_rect(fr.grow(-9.0), Color(CREAM, 0.0), false)

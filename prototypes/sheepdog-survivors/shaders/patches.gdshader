@@ -1,6 +1,7 @@
 shader_type canvas_item;
 // Big soft patches of lighter and darker meadow over the ground tiles, from smooth noise snapped to a coarse pixel grid.
 uniform vec2 world_size = vec2(2400.0, 1632.0);
+uniform float amt = 1.0;
 uniform sampler2D noise_tex : repeat_enable, filter_linear;
 
 void fragment() {
@@ -11,5 +12,5 @@ void fragment() {
 	float dark = max(smoothstep(0.45, 0.33, a), smoothstep(0.58, 0.70, b));
 	vec3 col = mix(vec3(0.98, 0.92, 0.5), vec3(0.08, 0.22, 0.08), step(light, dark));
 	float al = max(light * 0.10, dark * 0.13);
-	COLOR = vec4(col, al);
+	COLOR = vec4(col, al * amt);
 }

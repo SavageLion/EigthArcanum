@@ -103,6 +103,7 @@ var demo: bool = false
 var overview: bool = false
 var look_mode: int = 0
 var style_flat: bool = false
+var style_name: String = "flat"
 var alarm: float = 0.0
 var alarm_pos: Vector2 = Vector2.ZERO
 var smoke_n: int = 0
@@ -138,8 +139,9 @@ func _ready() -> void:
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
 		randomize()
-	style_flat = not search.contains("style=painted")
-	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else 6
+	style_name = "ref" if search.contains("style=ref") else ("painted" if search.contains("style=painted") else "flat")
+	style_flat = style_name == "flat"
+	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else (0 if style_name == "ref" else 6)
 	smoke = OS.get_cmdline_user_args().has("smoke")
 	if OS.has_feature("web"):
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
@@ -156,6 +158,7 @@ func _ready() -> void:
 	world.wx = WX
 	world.wy = WY
 	world.flat = style_flat
+	world.refst = style_name == "ref"
 	add_child(world)
 	ysort = Node2D.new()
 	ysort.y_sort_enabled = true
@@ -368,8 +371,9 @@ func style_rect() -> Rect2:
 func toggle_style() -> void:
 	if not OS.has_feature("web"):
 		return
-	var to_style: String = "painted" if style_flat else "flat"
-	var to_look: int = 0 if style_flat else 6
+	var order: Array = ["flat", "painted", "ref"]
+	var to_style: String = String(order[(order.find(style_name) + 1) % order.size()])
+	var to_look: int = 6 if to_style == "flat" else 0
 	JavaScriptBridge.eval("(function(){var u=new URL(window.location.href);u.searchParams.set('style','%s');u.searchParams.set('look','%d');window.location.href=u.toString();})()" % [to_style, to_look])
 
 func fs_rect() -> Rect2:
