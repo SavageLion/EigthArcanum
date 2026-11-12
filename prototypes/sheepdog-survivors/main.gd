@@ -359,6 +359,18 @@ func _input(event: InputEvent) -> void:
 				do_bark()
 			elif ke.keycode == KEY_F:
 				toggle_fullscreen()
+			elif ke.keycode == KEY_T:
+				toggle_style()
+
+func style_rect() -> Rect2:
+	return Rect2(vp().x - 92.0, 44.0, 38.0, 34.0)
+
+func toggle_style() -> void:
+	if not OS.has_feature("web"):
+		return
+	var to_style: String = "painted" if style_flat else "flat"
+	var to_look: int = 0 if style_flat else 6
+	JavaScriptBridge.eval("(function(){var u=new URL(window.location.href);u.searchParams.set('style','%s');u.searchParams.set('look','%d');window.location.href=u.toString();})()" % [to_style, to_look])
 
 func fs_rect() -> Rect2:
 	return Rect2(vp().x - 46.0, 44.0, 38.0, 34.0)
@@ -421,6 +433,9 @@ func _press(p: Vector2, id: int) -> void:
 				return
 	if state != "result" and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
+		return
+	if state != "result" and style_rect().grow(6.0).has_point(p):
+		toggle_style()
 		return
 	if state == "result":
 		get_tree().reload_current_scene()
