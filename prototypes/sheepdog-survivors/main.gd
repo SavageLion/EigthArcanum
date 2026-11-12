@@ -65,6 +65,8 @@ var sheep_frames: SpriteFrames
 var fox_frames: SpriteFrames
 var imp_frames: SpriteFrames
 var cow_frames: SpriteFrames
+var wolf8: bool = false
+var bear8: bool = false
 var pup_frames: SpriteFrames
 var pup: Pup
 var wolf_frames: SpriteFrames
@@ -165,6 +167,12 @@ func _ready() -> void:
 	imp_frames = U.set8("imp8", 12.0)
 	if style_name == "ref" and ResourceLoader.exists("res://art/sheep_ref/walk/south/0.png"):
 		sheep_frames = U.set8("sheep_ref", 12.0)
+	if ResourceLoader.exists("res://art/wolf8/walk/south/0.png"):
+		wolf_frames = U.set8("wolf8", 12.0)
+		wolf8 = true
+	if ResourceLoader.exists("res://art/bear8/walk/south/0.png"):
+		bear_frames = U.set8("bear8", 10.0)
+		bear8 = true
 	if ResourceLoader.exists("res://art/cow8/walk/south/0.png"):
 		cow_frames = U.set8("cow8", 11.0)
 	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
@@ -447,7 +455,7 @@ func try_build(i: int) -> void:
 		p.sprite = sprt
 	else:
 		p.lv += 1
-	var base: float = float(DEFS[p.kind]["sc"]) * (1.4 if world.flat else 1.0)
+	var base: float = float(DEFS[p.kind]["sc"]) * (1.4 if world.flat else (1.0 if (not world.refst or p.kind == "archer") else 1.5))
 	p.sprite.scale = Vector2.ONE * base * (1.0 + 0.1 * float(p.lv - 1))
 	add_popup("BUILT!" if p.lv == 1 else "LEVEL %d!" % p.lv, p.position + Vector2(0, -40), Color(1.0, 0.9, 0.4))
 	ring(p.position, 46.0, Color(1.0, 0.85, 0.4), 0.5, 4.0)
@@ -612,6 +620,8 @@ func spawn_enemy(k: String) -> void:
 	elif k == "imp":
 		fr = imp_frames
 	f.setup(k, fr, shadow_tex, 1.0 + 0.15 * float(wave - 1))
+	if (k == "wolf" and wolf8) or (k == "bear" and bear8):
+		f.apply_eight()
 	f.position = edge_point(k == "fox")
 	foxes.append(f)
 	if k == "bear":

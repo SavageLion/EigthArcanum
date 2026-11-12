@@ -63,6 +63,8 @@ var path_pts: Array = []
 var rngw := RandomNumberGenerator.new()
 
 func tex(tname: String) -> Texture2D:
+	if refst and (tname == "tower" or tname == "brazier" or tname == "totem") and ResourceLoader.exists("res://art/meadow/%s.png" % tname):
+		return load("res://art/meadow/%s.png" % tname) as Texture2D
 	if refst and tname == "stone_wall":
 		return load("res://art/fence.png") as Texture2D
 	if flat and ResourceLoader.exists("res://art/flat/" + tname + ".png"):
@@ -540,13 +542,20 @@ func _obstacles() -> void:
 		_tree(ta if randf() < 0.5 else tb, p2, 1.3, true)
 	var sh: Texture2D = tex("shrub_big")
 	var bu: Texture2D = tex("bush")
+	if refst:
+		var sb: Texture2D = _border_tex("shrub")
+		var fb: Texture2D = _meadow_tex("bush_flowers")
+		if sb != null:
+			sh = sb
+		if fb != null:
+			bu = fb
 	for i in 45:
 		var p3: Vector2 = random_open_point(16.0)
 		var big: bool = randf() < 0.6
 		var s2 := Sprite2D.new()
 		s2.texture = sh if big else bu
 		s2.position = p3
-		s2.scale = Vector2.ONE * ((2.1 if big else 1.7) if flat else (1.7 if big else 1.3))
+		s2.scale = Vector2.ONE * (0.5 if refst else ((2.1 if big else 1.7) if flat else (1.7 if big else 1.3)))
 		s2.offset = Vector2(0, -s2.texture.get_height() * 0.5 + 4.0)
 		s2.material = wind_mat
 		ysort.add_child(s2)
@@ -591,7 +600,7 @@ func _bridge() -> void:
 	add_child(b)
 
 func _pen_visuals() -> void:
-	if flat:
+	if flat or refst:
 		var fl := Sprite2D.new()
 		fl.texture = load("res://art/flat/path_tex.png") as Texture2D
 		fl.region_enabled = true
@@ -608,7 +617,7 @@ func _pen_visuals() -> void:
 	dirt.scale = Vector2(1.3, 1.1)
 	dirt.modulate = Color(1, 1, 1, 0.85)
 	dirt.z_index = -150
-	if not flat:
+	if not (flat or refst):
 		add_child(dirt)
 	var fence_h: Texture2D = tex("stone_wall")
 	for w in walls:

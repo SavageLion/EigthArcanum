@@ -3,6 +3,7 @@ extends Mover
 # Any wild attacker: fox (steals sheep), wolf (gnaws the fence), bear (big, slow, gnaws hard).
 
 var kind: String = "fox"
+var eight: bool = false
 var heading: Vector2 = Vector2.RIGHT
 var hp: float = 2.0
 var maxhp: float = 2.0
@@ -60,7 +61,7 @@ func setup(k: String, frames: SpriteFrames, shadow_tex: Texture2D, hp_mult: floa
 func animate(dt: float) -> void:
 	var speed: float = vel.length() + kb.length() * 0.3
 	var a: String = ""
-	if kind == "fox" or kind == "imp":
+	if kind == "fox" or kind == "imp" or eight:
 		if vel.length() > 8.0:
 			heading = vel.normalized()
 		a = ("walk_" if speed > 8.0 else "idle_") + U.dir8(heading)
@@ -77,3 +78,13 @@ func animate(dt: float) -> void:
 	flash = maxf(0.0, flash - dt)
 	var fl: float = 1.0 + flash * 7.0
 	spr.self_modulate = Color(fl, fl, fl, 0.7 if fleeing else 1.0)
+
+func apply_eight() -> void:
+	# the newer 8-direction wolf and bear art
+	eight = true
+	if kind == "wolf":
+		spr.scale = Vector2(1.15, 1.15)
+		spr.offset = Vector2(0, -20)
+	elif kind == "bear":
+		spr.scale = Vector2(1.05, 1.05)
+		spr.offset = Vector2(0, -30)
