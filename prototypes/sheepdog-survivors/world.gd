@@ -13,10 +13,10 @@ const T_FIELD: int = 3
 const T_FOREST: int = 4
 const RIVER0: Array = [Vector2(380, -80), Vector2(430, 300), Vector2(330, 620), Vector2(410, 880), Vector2(380, 1250), Vector2(450, 1720)]
 const PATHS0: Array = [
-	[Vector2(1200, 960), Vector2(900, 930), Vector2(700, 905), Vector2(560, 880), Vector2(410, 872), Vector2(250, 850), Vector2(-80, 810)],
-	[Vector2(1200, 960), Vector2(1500, 1010), Vector2(1850, 940), Vector2(2100, 1000), Vector2(2480, 960)],
-	[Vector2(1200, 960), Vector2(1240, 1250), Vector2(1320, 1450), Vector2(1330, 1720)],
-	[Vector2(1700, 985), Vector2(1780, 700), Vector2(1760, 300), Vector2(1800, -80)],
+	[Vector2(1200, 960), Vector2(900, 930), Vector2(700, 905), Vector2(540, 880), Vector2(430, 872)],
+	[Vector2(1200, 960), Vector2(1500, 1010), Vector2(1850, 940), Vector2(2010, 985)],
+	[Vector2(1200, 960), Vector2(1240, 1250), Vector2(1300, 1390)],
+	[Vector2(1700, 985), Vector2(1780, 700), Vector2(1765, 430)],
 ]
 const FIELDS0: Array = [Rect2(1900, 220, 330, 270), Rect2(1650, 1190, 330, 270)]
 const GAPS0: Array = [Vector2(60, 810), Vector2(2340, 960), Vector2(1330, 1570), Vector2(1800, 60), Vector2(700, 60), Vector2(1900, 1570), Vector2(60, 300)]
@@ -82,8 +82,6 @@ func generate(ysort_node: Node2D) -> void:
 # ---------------------------------------------------------------- layout of the castle
 func _scale_layout() -> void:
 	var sv := Vector2(wx / 2400.0, wy / 1632.0)
-	for p in RIVER0:
-		river_ctrl.append((p as Vector2) * sv)
 	for pl in PATHS0:
 		var a: Array = []
 		for p in pl:
@@ -92,10 +90,12 @@ func _scale_layout() -> void:
 	for r in FIELDS0:
 		var rr: Rect2 = r
 		fields_r.append(Rect2(rr.position * sv, rr.size * sv))
-	for g in GAPS0:
-		gap_ctrl.append((g as Vector2) * sv)
-	var bc: Vector2 = (bridge_rect.position + bridge_rect.size / 2.0) * sv
-	bridge_rect = Rect2(bc - bridge_rect.size / 2.0, bridge_rect.size)
+	for i in 14:
+		var ang: float = TAU * float(i) / 14.0
+		var ctr := Vector2(wx / 2.0, wy / 2.0)
+		var rad := Vector2(wx / 2.0 - 300.0, wy / 2.0 - 300.0)
+		gap_ctrl.append(ctr + Vector2(cos(ang) * rad.x, sin(ang) * rad.y))
+	bridge_rect = Rect2(-500, -500, 1, 1)
 
 func _layout() -> void:
 	var pw: float = 210.0
@@ -152,7 +152,7 @@ func _terrain() -> void:
 			var p := Vector2(float(vx) * CELL, float(vy) * CELL)
 			var t: int = T_GRASS
 			var edge: float = minf(minf(p.x, wx - p.x), minf(p.y, wy - p.y))
-			var thick: float = 250.0 + 190.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)
+			var thick: float = 125.0 + 75.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)
 			var forest: bool = edge < thick
 			if p.distance_to(center) < 480.0:
 				forest = false
@@ -366,7 +366,7 @@ func _obstacles() -> void:
 		ysort.add_child(s)
 	var ta: Texture2D = tex("tree_big_a")
 	var tb: Texture2D = tex("tree_big_b")
-	for i in 20:
+	for i in 0:
 		var p2: Vector2 = random_open_point(30.0)
 		rock_add(p2, 16.0)
 		_tree(ta if randf() < 0.5 else tb, p2, 1.3, true)
@@ -405,6 +405,7 @@ func _tree(t: Texture2D, p: Vector2, sc: float, shadow: bool) -> void:
 
 # ---------------------------------------------------------------- bridge and castle visuals
 func _bridge() -> void:
+	return
 	var b := Bridge.new()
 	b.size = bridge_rect.size
 	b.position = bridge_rect.position
@@ -524,7 +525,7 @@ func _smooth(pts: Array, seg: int) -> Array:
 	out.append(pts[pts.size() - 1])
 	return out
 
-func _ribbon(pts: Array, width: float, tex_path: String, tint: Color, edge_col: Color, edge_w: float, fringe: float, flow: float, sparkle: float, z: int) -> void:
+func _ribbon(pts: Array, width: float, tex_path: String, tint: Color, edge_col: Color, edge_w: float, fringe: float, flow: float, sparkle: float, z: int, taper: bool = false) -> void:
 	var white := Image.create(4, 4, false, Image.FORMAT_RGBA8)
 	white.fill(Color(1, 1, 1, 1))
 	var l := Line2D.new()
@@ -538,7 +539,10 @@ func _ribbon(pts: Array, width: float, tex_path: String, tint: Color, edge_col: 
 	l.z_index = z
 	var c := Curve.new()
 	for i in 9:
-		c.add_point(Vector2(float(i) / 8.0, rngw.randf_range(0.84, 1.16)))
+		var k: float = 1.0
+		if taper and i >= 6:
+			k = [0.75, 0.5, 0.28][i - 6]
+		c.add_point(Vector2(float(i) / 8.0, rngw.randf_range(0.86, 1.14) * k))
 	l.width_curve = c
 	var m := ShaderMaterial.new()
 	m.shader = load("res://shaders/ribbon.gdshader") as Shader
@@ -554,15 +558,18 @@ func _ribbon(pts: Array, width: float, tex_path: String, tint: Color, edge_col: 
 	add_child(l)
 
 func _ribbons() -> void:
-	river_pts = _smooth(_meander(river_ctrl, 22.0), 10)
+	if river_ctrl.size() > 1:
+		river_pts = _smooth(_meander(river_ctrl, 22.0), 10)
 	# muddy bank under the water, then the water itself
-	_ribbon(river_pts, 150.0, "res://art/tiles/path_tex.png", Color(0.5, 0.42, 0.28), Color(0.3, 0.24, 0.14), 0.0, 0.34, 0.0, 0.0, -193)
-	_ribbon(river_pts, 104.0, "res://art/tiles/water_tex.png", Color(1, 1, 1), Color(0.16, 0.3, 0.3), 0.16, 0.12, 1.0, 1.0, -192)
+	if river_pts.size() > 1:
+		_ribbon(river_pts, 150.0, "res://art/tiles/path_tex.png", Color(0.5, 0.42, 0.28), Color(0.3, 0.24, 0.14), 0.0, 0.34, 0.0, 0.0, -193)
+	if river_pts.size() > 1:
+		_ribbon(river_pts, 104.0, "res://art/tiles/water_tex.png", Color(1, 1, 1), Color(0.16, 0.3, 0.3), 0.16, 0.12, 1.0, 1.0, -192)
 	for pl in paths_ctrl:
 		var sm: Array = _smooth(_meander(pl, 12.0), 8)
 		path_pts.append(sm)
-		_ribbon(sm, 60.0, "res://art/tiles/path_tex.png", Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191)
-		_ribbon(sm, 48.0, "res://art/tiles/path_tex.png", Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190)
+		_ribbon(sm, 60.0, "res://art/tiles/path_tex.png", Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191, true)
+		_ribbon(sm, 48.0, "res://art/tiles/path_tex.png", Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190, true)
 
 func _ground_patches() -> void:
 	var g := ColorRect.new()
