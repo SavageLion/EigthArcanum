@@ -154,7 +154,7 @@ func _ready() -> void:
 		autowalk = str(JavaScriptBridge.eval("window.location.search")).contains("autowalk")
 	shadow_tex = U.shadow_texture()
 	var names: Array = ["east", "north", "south", "south-east", "north-east"]
-	dog_frames = U.raven_frames("wiz_ref" if style_name == "ref" else "wiz")
+	dog_frames = U.raven_frames("wiz_ref")
 	sheep_frames = U.sheep8_frames()
 	fox_frames = U.set8("fox8", 12.0)
 	imp_frames = U.set8("imp8", 12.0)
