@@ -11,6 +11,10 @@ const T_WATER: int = 1
 const T_PATH: int = 2
 const T_FIELD: int = 3
 const T_FOREST: int = 4
+const T_DRY: int = 5
+const T_LUSH: int = 6
+const T_FLOWER: int = 7
+const T_DIRT: int = 8
 const RIVER0: Array = [Vector2(380, -80), Vector2(430, 300), Vector2(330, 620), Vector2(410, 880), Vector2(380, 1250), Vector2(450, 1720)]
 const PATHS0: Array = [
 	[Vector2(1200, 960), Vector2(900, 930), Vector2(700, 905), Vector2(540, 880), Vector2(430, 872)],
@@ -46,6 +50,8 @@ var bridge_rect: Rect2 = Rect2(315, 840, 190, 60)
 var minimap_tex: ImageTexture
 var n1: FastNoiseLite
 var n2: FastNoiseLite
+var n3: FastNoiseLite
+var n4: FastNoiseLite
 var river_pts: Array = []
 var flat: bool = false
 var path_pts: Array = []
@@ -67,6 +73,12 @@ func generate(ysort_node: Node2D) -> void:
 	n2 = FastNoiseLite.new()
 	n2.seed = randi()
 	n2.frequency = 0.0035
+	n3 = FastNoiseLite.new()
+	n3.seed = randi()
+	n3.frequency = 0.0012
+	n4 = FastNoiseLite.new()
+	n4.seed = randi()
+	n4.frequency = 0.0015
 	_scale_layout()
 	_layout()
 	_terrain()
@@ -184,9 +196,20 @@ func _terrain() -> void:
 				t = T_WATER
 			if p.distance_to(center) < 300.0 and t != T_PATH:
 				t = T_GRASS
+			if flat and t == T_GRASS and p.distance_to(center) > 420.0 and dpath > 70.0:
+				var a3: float = n3.get_noise_2d(p.x, p.y)
+				var a4: float = n4.get_noise_2d(p.x, p.y)
+				if a3 > 0.2:
+					t = T_DRY
+				elif a3 < -0.36:
+					t = T_LUSH
+				elif a4 > 0.26:
+					t = T_FLOWER
+				elif a4 < -0.47:
+					t = T_DIRT
 			terr[vidx(vx, vy)] = t
 	# two different non-grass terrains must never share a tile: the weaker one gives way
-	var rank: Dictionary = {0: 0, 1: 4, 2: 1, 3: 3, 4: 2}
+	var rank: Dictionary = {0: 0, 1: 4, 2: 1, 3: 9, 4: 8, 5: 5, 6: 6, 7: 7, 8: 3}
 	var out: PackedInt32Array = terr.duplicate()
 	for vy in GH + 1:
 		for vx in GW + 1:
@@ -211,6 +234,13 @@ func terr_at(p: Vector2) -> int:
 
 func cell_corners(cx: int, cy: int) -> Array:
 	return [terr[vidx(cx, cy)], terr[vidx(cx + 1, cy)], terr[vidx(cx, cy + 1)], terr[vidx(cx + 1, cy + 1)]]
+
+func cell_open(cx: int, cy: int) -> bool:
+	for v in cell_corners(cx, cy):
+		var t: int = int(v)
+		if t != T_GRASS and t < T_DRY:
+			return false
+	return true
 
 func cell_all(cx: int, cy: int, t: int) -> bool:
 	var c: Array = cell_corners(cx, cy)
@@ -238,21 +268,29 @@ func _tiles_flat() -> void:
 		td.flip_h = (a & 2) != 0
 		td.flip_v = (a & 4) != 0
 	ts.add_source(src, 0)
-	var wheat: Dictionary = {}
-	if FileAccess.file_exists("res://art/flat/field.json"):
-		var f2 := FileAccess.open("res://art/flat/field.json", FileAccess.READ)
+	# terrain id -> {source id, key table}
+	var sets: Dictionary = {}
+	var names: Array = [[T_FIELD, "field"], [T_DRY, "dry"], [T_LUSH, "lush"], [T_FLOWER, "flower"], [T_DIRT, "dirt"]]
+	for i in names.size():
+		var tid: int = int(names[i][0])
+		var nm: String = String(names[i][1])
+		if not FileAccess.file_exists("res://art/flat/%s.json" % nm):
+			continue
+		var f2 := FileAccess.open("res://art/flat/%s.json" % nm, FileAccess.READ)
 		var fd: Dictionary = JSON.parse_string(f2.get_as_text())
-		var src2 := TileSetAtlasSource.new()
-		src2.texture = load("res://art/flat/field.png") as Texture2D
-		src2.texture_region_size = Vector2i(32, 32)
+		var s2 := TileSetAtlasSource.new()
+		s2.texture = load("res://art/flat/%s.png" % nm) as Texture2D
+		s2.texture_region_size = Vector2i(32, 32)
 		var tl: Dictionary = fd["tiles"]
+		var table: Dictionary = {}
 		for k in tl.keys():
 			var xy: Array = tl[k]
 			var c2 := Vector2i(int(xy[0]), int(xy[1]))
-			if src2.get_tile_at_coords(c2) == Vector2i(-1, -1):
-				src2.create_tile(c2)
-			wheat[String(k)] = c2
-		ts.add_source(src2, 1)
+			if s2.get_tile_at_coords(c2) == Vector2i(-1, -1):
+				s2.create_tile(c2)
+			table[String(k)] = c2
+		ts.add_source(s2, i + 1)
+		sets[tid] = {"sid": i + 1, "table": table}
 	var layer := TileMapLayer.new()
 	layer.tile_set = ts
 	layer.scale = Vector2(1.5, 1.5)
@@ -262,16 +300,17 @@ func _tiles_flat() -> void:
 	for cy in GH:
 		for cx in GW:
 			var cc: Array = cell_corners(cx, cy)
-			var has_field: bool = false
+			var special: int = T_GRASS
 			for v in cc:
-				if int(v) == T_FIELD:
-					has_field = true
-			if has_field and not wheat.is_empty():
+				if sets.has(int(v)):
+					special = int(v)
+			if special != T_GRASS:
 				var key: String = ""
 				for v in cc:
-					key += "u" if int(v) == T_FIELD else "l"
-				if wheat.has(key):
-					layer.set_cell(Vector2i(cx, cy), 1, wheat[key])
+					key += "u" if int(v) == special else "l"
+				var tb: Dictionary = (sets[special] as Dictionary)["table"]
+				if tb.has(key):
+					layer.set_cell(Vector2i(cx, cy), int((sets[special] as Dictionary)["sid"]), tb[key])
 					continue
 			layer.set_cell(Vector2i(cx, cy), 0, ac, rngw.randi() % 8)
 
@@ -343,8 +382,8 @@ func _tiles() -> void:
 
 func _minimap() -> void:
 	var img := Image.create(GW, GH, false, Image.FORMAT_RGBA8)
-	var cols: Dictionary = {0: Color(0.5, 0.64, 0.28), 1: Color(0.22, 0.5, 0.62), 2: Color(0.76, 0.62, 0.4), 3: Color(0.9, 0.74, 0.2), 4: Color(0.14, 0.3, 0.15)}
-	var rk: Dictionary = {0: 0, 1: 4, 2: 1, 3: 3, 4: 2}
+	var cols: Dictionary = {0: Color(0.5, 0.64, 0.28), 1: Color(0.22, 0.5, 0.62), 2: Color(0.76, 0.62, 0.4), 3: Color(0.9, 0.74, 0.2), 4: Color(0.14, 0.3, 0.15), 5: Color(0.72, 0.68, 0.32), 6: Color(0.3, 0.52, 0.22), 7: Color(0.58, 0.68, 0.36), 8: Color(0.74, 0.6, 0.42)}
+	var rk: Dictionary = {0: 0, 1: 4, 2: 1, 3: 9, 4: 8, 5: 5, 6: 6, 7: 7, 8: 3}
 	for cy in GH:
 		for cx in GW:
 			var best: int = T_GRASS
@@ -397,7 +436,7 @@ func _trees() -> void:
 func _blocked(p: Vector2, r: float) -> bool:
 	if pen.grow(150.0).has_point(p) or p.distance_to(dog_start) < 120.0:
 		return true
-	if not cell_all(clampi(int(p.x / CELL), 0, GW - 1), clampi(int(p.y / CELL), 0, GH - 1), T_GRASS):
+	if not cell_open(clampi(int(p.x / CELL), 0, GW - 1), clampi(int(p.y / CELL), 0, GH - 1)):
 		return true
 	for k in rocks_near(p):
 		var kp: Vector2 = k["pos"]
@@ -679,7 +718,7 @@ func _decal_tex(name: String, fallback: String) -> Texture2D:
 func _on_open_grass(p: Vector2) -> bool:
 	if p.x < 20.0 or p.y < 20.0 or p.x > wx - 20.0 or p.y > wy - 20.0:
 		return false
-	if not cell_all(int(p.x / CELL), int(p.y / CELL), T_GRASS):
+	if not cell_open(int(p.x / CELL), int(p.y / CELL)):
 		return false
 	if pen.grow(30.0).has_point(p) or dist_poly(p, river_pts) < 84.0:
 		return false
