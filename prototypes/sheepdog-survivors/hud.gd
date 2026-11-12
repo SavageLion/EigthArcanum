@@ -77,6 +77,12 @@ func _draw() -> void:
 		if fx.maxhp > 3.0 and not fx.fleeing and fx.hp < fx.maxhp:
 			var q: Vector2 = _w2s(fx.position) + Vector2(0, -34)
 			_bar(Rect2(q - Vector2(16, 0), Vector2(32, 4)), fx.hp / fx.maxhp, Color(0.9, 0.4, 0.35))
+	# hurt animals
+	for s in main.sheep:
+		var hs: Sheep = s
+		if hs.hp < hs.maxhp - 0.1:
+			var hq: Vector2 = _w2s(hs.position) + Vector2(0, -44)
+			_bar(Rect2(hq - Vector2(14, 0), Vector2(28, 4)), hs.hp / hs.maxhp, Color(0.95, 0.4, 0.35))
 	# off-screen raider arrows
 	var cen: Vector2 = v / 2.0
 	for f in main.foxes:

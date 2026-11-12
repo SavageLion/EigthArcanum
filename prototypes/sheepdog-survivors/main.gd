@@ -1059,12 +1059,49 @@ func hurt(f: Fox, dmg: float, from: Vector2, power: float, stun: float) -> void:
 	if f.hp <= 0.0:
 		defeat(f)
 
+func bite(f: Fox, s: Sheep, dmg: float) -> void:
+	s.hp -= dmg
+	s.panic = 1.0
+	s.squash = 1.0
+	s.vel += (s.position - f.position).normalized() * 70.0
+	add_popup("-%d" % int(dmg), s.position + Vector2(randf_range(-6, 6), -20), Color(1.0, 0.45, 0.4))
+	ring(s.position, 14.0, Color(1.0, 0.4, 0.35), 0.2, 2.0)
+	if s.hp <= 0.0:
+		f.tgt = null
+		kill_sheep(s)
+
 func defeat(f: Fox) -> void:
 	f.fleeing = true
 	defeated += 1
 	drop_carry(f)
-	add_popup("SHOO!", f.position + Vector2(0, -16), Color(1.0, 0.85, 0.4))
-	ring(f.position, 34.0, Color(1.0, 1.0, 1.0), 0.4, 3.0)
+	foxes.erase(f)
+	f.vel = Vector2.ZERO
+	add_popup("POOF!", f.position + Vector2(0, -22), Color(1.0, 0.85, 0.4))
+	ring(f.position, 40.0, Color(1.0, 1.0, 1.0), 0.4, 4.0)
+	var puff := CPUParticles2D.new()
+	puff.position = f.position
+	puff.one_shot = true
+	puff.emitting = true
+	puff.amount = 14
+	puff.lifetime = 0.6
+	puff.explosiveness = 1.0
+	puff.direction = Vector2(0, -1)
+	puff.spread = 180.0
+	puff.initial_velocity_min = 30.0
+	puff.initial_velocity_max = 90.0
+	puff.gravity = Vector2.ZERO
+	puff.scale_amount_min = 2.0
+	puff.scale_amount_max = 4.5
+	puff.color = Color(1.0, 0.95, 0.85, 0.9)
+	puff.z_index = 25
+	add_child(puff)
+	get_tree().create_timer(1.0).timeout.connect(puff.queue_free)
+	f.spr.self_modulate = Color(3, 3, 3, 1)
+	var tw: Tween = f.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(f, "modulate:a", 0.0, 0.4)
+	tw.tween_property(f.spr, "scale", f.spr.scale * 1.3, 0.4)
+	tw.chain().tween_callback(f.queue_free)
 	var nb: int = 1
 	var val: int = 6
 	if f.kind == "wolf":
@@ -1111,6 +1148,10 @@ func update_coins(dt: float) -> void:
 
 # ---------------------------------------------------------------- animals in the pen give side bonuses
 func update_pen_bonus(dt: float) -> void:
+	for s in sheep:
+		var hs: Sheep = s
+		if hs.hp < hs.maxhp:
+			hs.hp = minf(hs.maxhp, hs.hp + (1.5 if hs.in_pen else 0.2) * dt)
 	var rg: float = fence_regen()
 	if rg > 0.0:
 		for w in world.walls:
@@ -1365,44 +1406,34 @@ func update_enemies(dt: float) -> void:
 		if fx.stun > 0.0:
 			fx.vel *= exp(-8.0 * dt)
 		elif fx.kind == "fox":
-			if fx.carry != null:
-				move_to(fx, nearest_edge(fx.position), 105.0, dt, 6.0)
-				fx.carry.position = fx.position + Vector2(0, -4)
-				if fx.position.x < XMIN + 4.0 or fx.position.x > XMAX - 4.0 or fx.position.y < YMIN + 4.0 or fx.position.y > YMAX - 4.0:
-					var cs: Sheep = fx.carry
-					fx.carry = null
-					kill_sheep(cs)
-					foxes.erase(fx)
-					fx.queue_free()
-					continue
+			fx.tt -= dt
+			if fx.tgt == null or fx.tgt.in_pen or not sheep.has(fx.tgt) or fx.tt <= 0.0:
+				fx.tt = 1.0
+				var best: Sheep = null
+				var bs: float = 1.0e9
+				for s in sheep:
+					var sh: Sheep = s
+					if sh.in_pen:
+						continue
+					var sc: float = sh.position.distance_to(fx.position) + (-120.0 if sh.type == "lamb" else 0.0)
+					if sc < bs:
+						bs = sc
+						best = sh
+				fx.tgt = best
+			if fx.tgt != null:
+				fx.zig += dt * 5.0
+				var dv: Vector2 = fx.tgt.position - fx.position
+				var l: float = maxf(dv.length(), 0.001)
+				var pv := Vector2(-dv.y, dv.x) / l
+				var wob: float = 14.0 if l > 60.0 else 0.0
+				move_to(fx, fx.tgt.position + pv * sin(fx.zig) * wob, fx.base_speed, dt, 6.0)
+				if l < fx.r + fx.tgt.r + 8.0:
+					fx.bite_cd -= dt
+					if fx.bite_cd <= 0.0:
+						fx.bite_cd = 0.7
+						bite(fx, fx.tgt, 2.0)
 			else:
-				fx.tt -= dt
-				if fx.tgt == null or fx.tgt.carried or fx.tgt.in_pen or not sheep.has(fx.tgt) or fx.tt <= 0.0:
-					fx.tt = 1.2
-					var best: Sheep = null
-					var bs: float = 1.0e9
-					for s in sheep:
-						var sh: Sheep = s
-						if sh.carried or sh.in_pen:
-							continue
-						var sc: float = sh.position.distance_to(fx.position) + (-120.0 if sh.type == "lamb" else 0.0)
-						if sc < bs:
-							bs = sc
-							best = sh
-					fx.tgt = best
-				if fx.tgt != null:
-					fx.zig += dt * 5.0
-					var dv: Vector2 = fx.tgt.position - fx.position
-					var l: float = maxf(dv.length(), 0.001)
-					var pv := Vector2(-dv.y, dv.x) / l
-					move_to(fx, fx.tgt.position + pv * sin(fx.zig) * 14.0, fx.base_speed, dt, 6.0)
-					if l < 10.0 + fx.tgt.r:
-						fx.carry = fx.tgt
-						fx.carry.carried = true
-						fx.carry.vel = Vector2.ZERO
-						add_popup("GOT ONE!", fx.position + Vector2(0, -14), Color(1.0, 0.6, 0.4))
-				else:
-					gnaw(fx, dt)
+				gnaw(fx, dt)
 		else:
 			gnaw(fx, dt)
 		fx.position += (fx.vel * (0.5 if fx.slow > 0.0 else 1.0) + fx.kb) * dt
