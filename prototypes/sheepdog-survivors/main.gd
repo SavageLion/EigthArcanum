@@ -136,7 +136,7 @@ func _ready() -> void:
 	shadow_tex = U.shadow_texture()
 	var names: Array = ["east", "north", "south", "south-east", "north-east"]
 	dog_frames = U.raven_frames()
-	sheep_frames = U.frames(load("res://art/chars/sheep.png") as Texture2D, 40, ["east", "north", "south"])
+	sheep_frames = U.sheep8_frames()
 	fox_frames = U.frames(load("res://art/chars/fox.png") as Texture2D, 52, names)
 	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
 	bear_frames = U.frames(load("res://art/chars/bear.png") as Texture2D, 76, names)

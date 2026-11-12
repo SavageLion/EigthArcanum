@@ -28,6 +28,7 @@ var spr: AnimatedSprite2D
 var shadow: Sprite2D
 var base_scale: float = 0.64
 var squash: float = 0.0
+var heading: Vector2 = Vector2.RIGHT
 
 func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	type = t
@@ -54,21 +55,20 @@ func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture
 	spr.sprite_frames = frames
 	spr.modulate = def["tint"]
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	base_scale = 0.64 * r / 7.0 * (1.2 if t == "lamb" else 1.0)
+	base_scale = 0.85 * r / 7.0 * (1.2 if t == "lamb" else 1.0)
 	spr.scale = Vector2(base_scale, base_scale)
-	spr.offset = Vector2(0, -12)
+	spr.offset = Vector2(0, -13)
 	spr.play("idle_east")
 	add_child(spr)
 
 func animate(dt: float) -> void:
 	var speed: float = vel.length()
-	var row: String = U.row_for(vel, false)
-	if absf(vel.x) > 3.0:
-		face = 1 if vel.x > 0.0 else -1
+	if speed > 6.0:
+		heading = vel / speed
+	var row: String = U.dir8(heading)
 	var a: String = ("walk_" if speed > 8.0 else "idle_") + row
 	if spr.animation != a:
 		spr.play(a)
-	spr.flip_h = (face < 0 and row == "east")
 	spr.speed_scale = clampf(speed / 40.0, 0.5, 2.4)
 	# a little hop with each step and a squash when startled
 	hop += dt * speed / 16.0

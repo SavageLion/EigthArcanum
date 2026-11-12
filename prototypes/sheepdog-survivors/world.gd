@@ -62,7 +62,7 @@ func _ground() -> void:
 			s.rotation = float(o & 3) * PI / 2.0
 			s.flip_h = (o & 4) != 0
 			s.z_index = -190
-			s.modulate = Color(1, 1, 1, 0.32)
+			s.modulate = Color(1.0, 0.88, 0.45, 0.30)
 			add_child(s)
 			gx += 176.0
 		gy += 176.0

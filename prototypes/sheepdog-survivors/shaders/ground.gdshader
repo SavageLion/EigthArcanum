@@ -1,10 +1,10 @@
 shader_type canvas_item;
 // Calm painted meadow: soft patches of light and dark, banded like pixel art.
 uniform vec2 world_size = vec2(2100.0, 960.0);
-uniform vec3 c_dark : source_color = vec3(0.30, 0.55, 0.24);
-uniform vec3 c_mid : source_color = vec3(0.34, 0.60, 0.26);
-uniform vec3 c_light : source_color = vec3(0.38, 0.64, 0.28);
-uniform vec3 c_hi : source_color = vec3(0.43, 0.68, 0.30);
+uniform vec3 c_dark : source_color = vec3(0.45, 0.47, 0.20);
+uniform vec3 c_mid : source_color = vec3(0.50, 0.51, 0.21);
+uniform vec3 c_light : source_color = vec3(0.58, 0.55, 0.23);
+uniform vec3 c_hi : source_color = vec3(0.65, 0.60, 0.27);
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
 	vec2 i = floor(p);
