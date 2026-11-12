@@ -1,12 +1,12 @@
 extends Node2D
 # Sheepdog Survivors: herd animals into the pen for XP, shoo off waves of raiders, hold the fence for ten waves.
 
-const WX: float = 1800.0
-const WY: float = 1200.0
+const WX: float = 2400.0
+const WY: float = 1632.0
 const XMIN: float = 36.0
-const XMAX: float = 1764.0
-const YMIN: float = 56.0
-const YMAX: float = 1166.0
+const XMAX: float = 2364.0
+const YMIN: float = 36.0
+const YMAX: float = 1596.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
 const LAST_WAVE: int = 10
@@ -100,6 +100,7 @@ var cam_look: Vector2 = Vector2.ZERO
 var cam_init: bool = false
 var smoke: bool = false
 var demo: bool = false
+var overview: bool = false
 var alarm: float = 0.0
 var alarm_pos: Vector2 = Vector2.ZERO
 var smoke_n: int = 0
@@ -134,6 +135,7 @@ func _ready() -> void:
 	smoke = OS.get_cmdline_user_args().has("smoke")
 	if OS.has_feature("web"):
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
+		overview = str(JavaScriptBridge.eval("window.location.search")).contains("overview")
 	shadow_tex = U.shadow_texture()
 	var names: Array = ["east", "north", "south", "south-east", "north-east"]
 	dog_frames = U.raven_frames()
@@ -196,10 +198,10 @@ func _ready() -> void:
 
 func _setup_camera() -> void:
 	cam = Camera2D.new()
-	cam.limit_left = -60
-	cam.limit_top = -60
-	cam.limit_right = int(WX + 60.0)
-	cam.limit_bottom = int(WY + 70.0)
+	cam.limit_left = 0
+	cam.limit_top = 0
+	cam.limit_right = int(WX)
+	cam.limit_bottom = int(WY)
 	cam.zoom = Vector2(BASE_ZOOM, BASE_ZOOM)
 	add_child(cam)
 	cam.position = dog.position
@@ -488,27 +490,21 @@ func clamp_pt(p: Vector2) -> Vector2:
 	return Vector2(clampf(p.x, XMIN, XMAX), clampf(p.y, YMIN, YMAX))
 
 func edge_point(near_loose: bool) -> Vector2:
-	var t := Vector2(randf_range(XMIN, XMAX), randf_range(YMIN, YMAX))
+	var pool: Array = world.gaps if randf() < 0.5 else world.inner_pts
+	if pool.is_empty():
+		pool = world.gaps
+	var best: Vector2 = pool[randi() % pool.size()]
 	if near_loose:
 		var loose: Array = sheep.filter(func(q: Sheep) -> bool: return not q.carried and not q.in_pen)
 		if loose.size() > 0:
-			t = (loose[randi() % loose.size()] as Sheep).position
-	var ds: Array = [t.x - XMIN, XMAX - t.x, t.y - YMIN, YMAX - t.y]
-	var m: float = 1.0e9
-	var side: int = 0
-	for i in 4:
-		if float(ds[i]) < m:
-			m = float(ds[i])
-			side = i
-	if not near_loose or randf() < 0.3:
-		side = randi() % 4
-	if side == 0:
-		return clamp_pt(Vector2(XMIN, t.y + randf_range(-150, 150)))
-	if side == 1:
-		return clamp_pt(Vector2(XMAX, t.y + randf_range(-150, 150)))
-	if side == 2:
-		return clamp_pt(Vector2(t.x + randf_range(-200, 200), YMIN))
-	return clamp_pt(Vector2(t.x + randf_range(-200, 200), YMAX))
+			var t: Vector2 = (loose[randi() % loose.size()] as Sheep).position
+			var bd: float = best.distance_to(t)
+			for i in 5:
+				var c: Vector2 = pool[randi() % pool.size()]
+				if c.distance_to(t) < bd:
+					bd = c.distance_to(t)
+					best = c
+	return clamp_pt(best + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0)))
 
 func spawn_enemy(k: String) -> void:
 	var f := Fox.new()
@@ -536,10 +532,7 @@ func spawn_stray(initial: bool) -> void:
 	s.seen = true
 	var p := Vector2.ZERO
 	if initial:
-		for tries in 30:
-			p = Vector2(randf_range(120.0, WX - 120.0), randf_range(120.0, WY - 120.0))
-			if not world.pen.grow(120.0).has_point(p) and p.distance_to(dog.position) > 160.0:
-				break
+		p = world.random_open_point(14.0)
 	else:
 		p = edge_point(false)
 	s.position = p
@@ -555,6 +548,8 @@ func update_camera(delta: float) -> void:
 	shake = maxf(0.0, shake - delta * 2.5)
 	var sh: Vector2 = Vector2(sin(clock * 63.0), cos(clock * 71.0)) * shake * shake * 3.0
 	cam.position = cam_pos + cam_look + sh
+	if overview:
+		cam.position = Vector2(WX / 2.0, WY / 2.0)
 
 func _physics_process(delta: float) -> void:
 	update_camera(delta)
@@ -628,6 +623,8 @@ func _process(delta: float) -> void:
 	for f in foxes:
 		(f as Fox).animate(delta)
 	var target_zoom: float = BASE_ZOOM * 0.95 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else BASE_ZOOM
+	if overview:
+		target_zoom = 0.36
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	cloud_mat.set_shader_parameter("cam", cam.get_screen_center_position())
@@ -656,7 +653,7 @@ func collide(e: Mover, r: float, bounce: float) -> void:
 		if w["broken"]:
 			continue
 		seg_push(e, r, w["a"], w["b"], bounce)
-	for k in world.rocks:
+	for k in world.rocks_near(e.position):
 		var kp: Vector2 = k["pos"]
 		var m: float = float(k["r"]) + r
 		var d: Vector2 = e.position - kp
@@ -745,6 +742,8 @@ func update_dog(dt: float) -> void:
 	dog.stam = minf(dog.stam_max, dog.stam)
 	var base: float = (95.0 if dog.crouch else 210.0) * speed_mult()
 	var sp: float = base * speedk * (0.72 if dog.winded else 1.0) * (1.55 if sprinting else 1.0) * (0.3 if dog.stun > 0.0 else 1.0)
+	if world.zone_kind(dog.position) == "water":
+		sp *= 0.5
 	dog.vel += (dir * sp - dog.vel) * minf(1.0, dt * 9.0)
 	dog.position += dog.vel * dt
 	collide(dog, 6.0, 0.0)
@@ -1365,6 +1364,8 @@ func update_sheep(dt: float) -> void:
 		var fr: float = 3.2 if sh.in_pen else 2.0
 		sh.vel *= exp(-fr * dt)
 		var cap: float = 95.0 * sh.spd * (1.0 + sh.panic * 0.5)
+		if world.zone_kind(sh.position) == "water":
+			cap *= 0.5
 		var v: float = sh.vel.length()
 		if v > cap:
 			sh.vel *= cap / v
@@ -1462,7 +1463,7 @@ func gnaw(f: Fox, dt: float) -> void:
 func kill_sheep(s: Sheep) -> void:
 	sheep.erase(s)
 	lost += 1
-	add_popup("CARRIED OFF", s.position + Vector2(0, -12), Color(1.0, 0.42, 0.42))
+	add_popup("OH NO!", s.position + Vector2(0, -12), Color(1.0, 0.42, 0.42))
 	s.queue_free()
 
 func nearest_edge(p: Vector2) -> Vector2:
@@ -1525,7 +1526,8 @@ func update_enemies(dt: float) -> void:
 				gnaw(fx, dt)
 		else:
 			gnaw(fx, dt)
-		fx.position += (fx.vel * (0.5 if fx.slow > 0.0 else 1.0) + fx.kb) * dt
+		var wk: float = 0.55 if world.zone_kind(fx.position) == "water" else 1.0
+		fx.position += (fx.vel * (0.5 if fx.slow > 0.0 else 1.0) * wk + fx.kb) * dt
 		collide(fx, fx.r, 0.0)
 
 # ---------------------------------------------------------------- the end

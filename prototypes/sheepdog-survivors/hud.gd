@@ -200,7 +200,7 @@ func _minimap(v: Vector2) -> void:
 	var o := Vector2(v.x - mw - 10.0, 86.0)
 	var sc := Vector2(mw / main.WX, mh / main.WY)
 	_panel(Rect2(o - Vector2(4, 4), Vector2(mw + 8, mh + 8)), Color(0.1, 0.12, 0.06, 0.78))
-	draw_rect(Rect2(o, Vector2(mw, mh)), Color(0.36, 0.40, 0.18, 0.9))
+	draw_texture_rect(main.world.minimap_tex, Rect2(o, Vector2(mw, mh)), false)
 	# castle walls, coloured by health
 	for w in main.world.walls:
 		if not w["pen"]:
