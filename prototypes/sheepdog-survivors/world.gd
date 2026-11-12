@@ -47,6 +47,7 @@ var minimap_tex: ImageTexture
 var n1: FastNoiseLite
 var n2: FastNoiseLite
 var river_pts: Array = []
+var flat: bool = false
 var path_pts: Array = []
 var rngw := RandomNumberGenerator.new()
 
@@ -217,7 +218,38 @@ func cell_all(cx: int, cy: int, t: int) -> bool:
 	return true
 
 # ---------------------------------------------------------------- ground tiles
+func _tiles_flat() -> void:
+	var f := FileAccess.open("res://art/flat/flat.json", FileAccess.READ)
+	var d: Dictionary = JSON.parse_string(f.get_as_text())
+	var g: Array = d["grass"]
+	var ac := Vector2i(int(g[0]), int(g[1]))
+	var ts := TileSet.new()
+	ts.tile_size = Vector2i(32, 32)
+	var src := TileSetAtlasSource.new()
+	src.texture = load("res://art/flat/tiles.png") as Texture2D
+	src.texture_region_size = Vector2i(32, 32)
+	src.create_tile(ac)
+	for a in range(1, 8):
+		var aid: int = src.create_alternative_tile(ac, a)
+		var td: TileData = src.get_tile_data(ac, aid)
+		td.transpose = (a & 1) != 0
+		td.flip_h = (a & 2) != 0
+		td.flip_v = (a & 4) != 0
+	ts.add_source(src, 0)
+	var layer := TileMapLayer.new()
+	layer.tile_set = ts
+	layer.scale = Vector2(1.5, 1.5)
+	layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	layer.z_index = -200
+	add_child(layer)
+	for cy in GH:
+		for cx in GW:
+			layer.set_cell(Vector2i(cx, cy), 0, ac, rngw.randi() % 8)
+
 func _tiles() -> void:
+	if flat:
+		_tiles_flat()
+		return
 	var f := FileAccess.open("res://art/tiles/tiles.json", FileAccess.READ)
 	var data: Dictionary = JSON.parse_string(f.get_as_text())
 	var order: Array = ["water", "path", "field", "forest"]
@@ -314,8 +346,8 @@ func rocks_near(p: Vector2) -> Array:
 	return out
 
 func _trees() -> void:
-	var ta: Texture2D = tex("tree_big_a")
-	var tb: Texture2D = tex("tree_big_b")
+	var ta: Texture2D = tex("tree_big_a") if not flat else (load("res://art/flat/tree.png") as Texture2D)
+	var tb: Texture2D = tex("tree_big_b") if not flat else ta
 	var rng := RandomNumberGenerator.new()
 	rng.seed = randi()
 	for cy in GH:
@@ -330,7 +362,7 @@ func _trees() -> void:
 				continue
 			var p := Vector2((float(cx) + 0.5) * CELL + rng.randf_range(-12.0, 12.0), (float(cy) + 0.5) * CELL + rng.randf_range(-12.0, 12.0))
 			var sc: float = rng.randf_range(1.45, 1.95)
-			_tree(ta if rng.randf() < 0.5 else tb, p, sc, false)
+			_tree(ta if rng.randf() < 0.5 else tb, p, sc * (1.2 if flat else 1.0), flat)
 			rock_add(p, 30.0)
 
 func _blocked(p: Vector2, r: float) -> bool:
@@ -370,15 +402,15 @@ func _obstacles() -> void:
 		var p2: Vector2 = random_open_point(30.0)
 		rock_add(p2, 16.0)
 		_tree(ta if randf() < 0.5 else tb, p2, 1.3, true)
-	var sh: Texture2D = tex("shrub_big")
-	var bu: Texture2D = tex("bush")
+	var sh: Texture2D = tex("shrub_big") if not flat else (load("res://art/flat/bush.png") as Texture2D)
+	var bu: Texture2D = tex("bush") if not flat else sh
 	for i in 80:
 		var p3: Vector2 = random_open_point(16.0)
 		var big: bool = randf() < 0.6
 		var s2 := Sprite2D.new()
 		s2.texture = sh if big else bu
 		s2.position = p3
-		s2.scale = Vector2.ONE * (1.7 if big else 1.3)
+		s2.scale = Vector2.ONE * ((2.1 if big else 1.7) if flat else (1.7 if big else 1.3))
 		s2.offset = Vector2(0, -s2.texture.get_height() * 0.5 + 4.0)
 		s2.material = wind_mat
 		ysort.add_child(s2)
@@ -558,6 +590,7 @@ func _ribbon(pts: Array, width: float, tex_path: String, tint: Color, edge_col: 
 	add_child(l)
 
 func _ribbons() -> void:
+	var ptex: String = "res://art/flat/path_tex.png" if flat else "res://art/tiles/path_tex.png"
 	if river_ctrl.size() > 1:
 		river_pts = _smooth(_meander(river_ctrl, 22.0), 10)
 	# muddy bank under the water, then the water itself
@@ -568,10 +601,12 @@ func _ribbons() -> void:
 	for pl in paths_ctrl:
 		var sm: Array = _smooth(_meander(pl, 12.0), 8)
 		path_pts.append(sm)
-		_ribbon(sm, 60.0, "res://art/tiles/path_tex.png", Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191, true)
-		_ribbon(sm, 48.0, "res://art/tiles/path_tex.png", Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190, true)
+		_ribbon(sm, 60.0, ptex, Color(0.82, 0.7, 0.55) if flat else Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191, true)
+		_ribbon(sm, 48.0, ptex, Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190, true)
 
 func _ground_patches() -> void:
+	if flat:
+		return
 	var g := ColorRect.new()
 	g.position = Vector2.ZERO
 	g.size = Vector2(wx, wy)
@@ -628,6 +663,8 @@ func _decal(t: Texture2D, p: Vector2, sc: float, z: int, sway: bool, in_ysort: b
 		add_child(s)
 
 func _decals() -> void:
+	if flat:
+		return
 	var tuft: Texture2D = _decal_tex("tuft", "tuft")
 	var tuft_old: Texture2D = tex("tuft")
 	var fa: Texture2D = tex("flowers_a")

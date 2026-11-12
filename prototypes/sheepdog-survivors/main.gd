@@ -102,6 +102,7 @@ var smoke: bool = false
 var demo: bool = false
 var overview: bool = false
 var look_mode: int = 0
+var style_flat: bool = false
 var alarm: float = 0.0
 var alarm_pos: Vector2 = Vector2.ZERO
 var smoke_n: int = 0
@@ -137,6 +138,7 @@ func _ready() -> void:
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
 		randomize()
+	style_flat = search.contains("style=flat")
 	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else 0
 	smoke = OS.get_cmdline_user_args().has("smoke")
 	if OS.has_feature("web"):
@@ -153,6 +155,7 @@ func _ready() -> void:
 	world = World.new()
 	world.wx = WX
 	world.wy = WY
+	world.flat = style_flat
 	add_child(world)
 	ysort = Node2D.new()
 	ysort.y_sort_enabled = true
