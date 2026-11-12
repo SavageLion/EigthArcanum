@@ -92,6 +92,12 @@ void fragment() {
 		c = floor(c * 5.0 + 0.5 + d * 0.9) / 5.0;
 		c = c * vec3(1.05, 1.0, 0.92);
 		c *= mix(1.0, vig, 0.25);
+	} else if (mode == 6) {
+		// flat sunlit: gentle warmth, a touch more colour, light from the upper left, soft vignette
+		c = mix(vec3(l), c, 1.14) * vec3(1.05, 1.0, 0.93);
+		c += vec3(1.0, 0.88, 0.55) * 0.05 * clamp(1.15 - uv.x - uv.y * 0.6, 0.0, 1.0);
+		c = (c - 0.5) * 1.05 + 0.5;
+		c *= mix(1.0, vig, 0.2);
 	} else {
 		// bright farm-sim: clean, saturated, little vignette
 		c = mix(vec3(l), c, 1.3);

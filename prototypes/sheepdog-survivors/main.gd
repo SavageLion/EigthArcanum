@@ -139,7 +139,7 @@ func _ready() -> void:
 	else:
 		randomize()
 	style_flat = not search.contains("style=painted")
-	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else 0
+	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else 6
 	smoke = OS.get_cmdline_user_args().has("smoke")
 	if OS.has_feature("web"):
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
@@ -184,6 +184,7 @@ func _ready() -> void:
 		spawn_stray(true)
 	_setup_camera()
 	_setup_layers()
+	_spawn_butterflies()
 	start_wave(1)
 	if demo or smoke:
 		gold = 600
@@ -204,6 +205,28 @@ func _ready() -> void:
 				foxes[foxes.size() - 1].position = dog.position + Vector2(-120.0 + 80.0 * float(i), 60.0 + 20.0 * float(i % 2))
 				foxes[foxes.size() - 1].stun = 40.0
 				world.pads[0].position = Vector2(-9999, -9999)
+
+func _spawn_butterflies() -> void:
+	var cols: Array = [Color(1.0, 0.82, 0.25), Color(1.0, 0.95, 0.95), Color(0.95, 0.5, 0.65), Color(0.45, 0.7, 1.0)]
+	var made: int = 0
+	for tries in 600:
+		if made >= 16:
+			break
+		var p := Vector2(randf_range(150.0, WX - 150.0), randf_range(150.0, WY - 150.0))
+		var on_flowers: bool = world.terr_at(p) == World.T_FLOWER
+		if not on_flowers and made >= 10:
+			continue
+		if not on_flowers and tries < 300:
+			continue
+		if world._blocked(p, 10.0) and not on_flowers:
+			continue
+		var b := Butterfly.new()
+		b.home = p
+		b.position = p
+		b.col = cols[randi() % cols.size()]
+		b.z_index = 28
+		add_child(b)
+		made += 1
 
 func _setup_camera() -> void:
 	cam = Camera2D.new()
@@ -232,6 +255,27 @@ func _setup_camera() -> void:
 	pollen.color = Color(1.0, 0.86, 0.92, 0.85)
 	pollen.z_index = 40
 	cam.add_child(pollen)
+	for kind in 2:
+		var pet := CPUParticles2D.new()
+		pet.amount = 10
+		pet.lifetime = 9.0
+		pet.preprocess = 9.0
+		pet.local_coords = false
+		pet.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+		pet.emission_rect_extents = Vector2(560.0, 60.0)
+		pet.position = Vector2(0.0, -300.0)
+		pet.direction = Vector2(0.4, 1.0)
+		pet.spread = 20.0
+		pet.initial_velocity_min = 10.0
+		pet.initial_velocity_max = 28.0
+		pet.gravity = Vector2(8.0, 6.0)
+		pet.angular_velocity_min = -90.0
+		pet.angular_velocity_max = 90.0
+		pet.scale_amount_min = 2.4
+		pet.scale_amount_max = 3.6
+		pet.color = Color(1.0, 0.86, 0.9, 0.95) if kind == 0 else Color(0.78, 0.86, 0.3, 0.95)
+		pet.z_index = 41
+		cam.add_child(pet)
 
 func _setup_layers() -> void:
 	var clouds_layer := CanvasLayer.new()
@@ -638,7 +682,7 @@ func _process(delta: float) -> void:
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	cloud_mat.set_shader_parameter("cam", cam.get_screen_center_position())
-	cloud_mat.set_shader_parameter("view_size", vp())
+	cloud_mat.set_shader_parameter("view_size", vp() / cam.zoom.x)
 	hud.queue_redraw()
 
 # ---------------------------------------------------------------- collisions
