@@ -138,7 +138,7 @@ func _ready() -> void:
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
 		randomize()
-	style_flat = search.contains("style=flat")
+	style_flat = not search.contains("style=painted")
 	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else 0
 	smoke = OS.get_cmdline_user_args().has("smoke")
 	if OS.has_feature("web"):
@@ -364,7 +364,7 @@ func try_build(i: int) -> void:
 		p.sprite = sprt
 	else:
 		p.lv += 1
-	var base: float = float(DEFS[p.kind]["sc"])
+	var base: float = float(DEFS[p.kind]["sc"]) * (1.4 if world.flat else 1.0)
 	p.sprite.scale = Vector2.ONE * base * (1.0 + 0.1 * float(p.lv - 1))
 	add_popup("BUILT!" if p.lv == 1 else "LEVEL %d!" % p.lv, p.position + Vector2(0, -40), Color(1.0, 0.9, 0.4))
 	ring(p.position, 46.0, Color(1.0, 0.85, 0.4), 0.5, 4.0)

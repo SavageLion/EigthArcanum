@@ -52,6 +52,8 @@ var path_pts: Array = []
 var rngw := RandomNumberGenerator.new()
 
 func tex(tname: String) -> Texture2D:
+	if flat and ResourceLoader.exists("res://art/flat/" + tname + ".png"):
+		return load("res://art/flat/" + tname + ".png") as Texture2D
 	return load("res://art/" + tname + ".png") as Texture2D
 
 func generate(ysort_node: Node2D) -> void:
@@ -236,6 +238,21 @@ func _tiles_flat() -> void:
 		td.flip_h = (a & 2) != 0
 		td.flip_v = (a & 4) != 0
 	ts.add_source(src, 0)
+	var wheat: Dictionary = {}
+	if FileAccess.file_exists("res://art/flat/field.json"):
+		var f2 := FileAccess.open("res://art/flat/field.json", FileAccess.READ)
+		var fd: Dictionary = JSON.parse_string(f2.get_as_text())
+		var src2 := TileSetAtlasSource.new()
+		src2.texture = load("res://art/flat/field.png") as Texture2D
+		src2.texture_region_size = Vector2i(32, 32)
+		var tl: Dictionary = fd["tiles"]
+		for k in tl.keys():
+			var xy: Array = tl[k]
+			var c2 := Vector2i(int(xy[0]), int(xy[1]))
+			if src2.get_tile_at_coords(c2) == Vector2i(-1, -1):
+				src2.create_tile(c2)
+			wheat[String(k)] = c2
+		ts.add_source(src2, 1)
 	var layer := TileMapLayer.new()
 	layer.tile_set = ts
 	layer.scale = Vector2(1.5, 1.5)
@@ -244,6 +261,18 @@ func _tiles_flat() -> void:
 	add_child(layer)
 	for cy in GH:
 		for cx in GW:
+			var cc: Array = cell_corners(cx, cy)
+			var has_field: bool = false
+			for v in cc:
+				if int(v) == T_FIELD:
+					has_field = true
+			if has_field and not wheat.is_empty():
+				var key: String = ""
+				for v in cc:
+					key += "u" if int(v) == T_FIELD else "l"
+				if wheat.has(key):
+					layer.set_cell(Vector2i(cx, cy), 1, wheat[key])
+					continue
 			layer.set_cell(Vector2i(cx, cy), 0, ac, rngw.randi() % 8)
 
 func _tiles() -> void:
@@ -346,8 +375,8 @@ func rocks_near(p: Vector2) -> Array:
 	return out
 
 func _trees() -> void:
-	var ta: Texture2D = tex("tree_big_a") if not flat else (load("res://art/flat/tree.png") as Texture2D)
-	var tb: Texture2D = tex("tree_big_b") if not flat else ta
+	var ta: Texture2D = tex("tree_big_a")
+	var tb: Texture2D = tex("tree_big_b")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = randi()
 	for cy in GH:
@@ -362,7 +391,7 @@ func _trees() -> void:
 				continue
 			var p := Vector2((float(cx) + 0.5) * CELL + rng.randf_range(-12.0, 12.0), (float(cy) + 0.5) * CELL + rng.randf_range(-12.0, 12.0))
 			var sc: float = rng.randf_range(1.45, 1.95)
-			_tree(ta if rng.randf() < 0.5 else tb, p, sc * (1.2 if flat else 1.0), flat)
+			_tree(ta if rng.randf() < 0.5 else tb, p, sc, flat)
 			rock_add(p, 30.0)
 
 func _blocked(p: Vector2, r: float) -> bool:
@@ -385,16 +414,16 @@ func random_open_point(margin: float) -> Vector2:
 
 func _obstacles() -> void:
 	var rk: Texture2D = tex("rock2")
-	for i in 26:
+	for i in 16:
 		var p: Vector2 = random_open_point(24.0)
 		var r: float = randf_range(16.0, 26.0)
 		rock_add(p, r)
 		var s := Sprite2D.new()
 		s.texture = rk
 		s.position = p + Vector2(0, 10)
-		var w: float = clampf(r * 1.7, 30.0, 52.0)
-		s.scale = Vector2(w / 30.0, w / 30.0)
-		s.offset = Vector2(0, -13)
+		var w: float = clampf(r * 2.4, 40.0, 70.0)
+		s.scale = Vector2.ONE * (w / float(rk.get_width()))
+		s.offset = Vector2(0, -float(rk.get_height()) * 0.5 + 3.0)
 		ysort.add_child(s)
 	var ta: Texture2D = tex("tree_big_a")
 	var tb: Texture2D = tex("tree_big_b")
@@ -402,9 +431,9 @@ func _obstacles() -> void:
 		var p2: Vector2 = random_open_point(30.0)
 		rock_add(p2, 16.0)
 		_tree(ta if randf() < 0.5 else tb, p2, 1.3, true)
-	var sh: Texture2D = tex("shrub_big") if not flat else (load("res://art/flat/bush.png") as Texture2D)
-	var bu: Texture2D = tex("bush") if not flat else sh
-	for i in 80:
+	var sh: Texture2D = tex("shrub_big")
+	var bu: Texture2D = tex("bush")
+	for i in 45:
 		var p3: Vector2 = random_open_point(16.0)
 		var big: bool = randf() < 0.6
 		var s2 := Sprite2D.new()
@@ -445,13 +474,25 @@ func _bridge() -> void:
 	add_child(b)
 
 func _pen_visuals() -> void:
+	if flat:
+		var fl := Sprite2D.new()
+		fl.texture = load("res://art/flat/path_tex.png") as Texture2D
+		fl.region_enabled = true
+		fl.region_rect = Rect2(0, 0, (pen.size.x + 70.0) / 1.5, (pen.size.y + 60.0) / 1.5)
+		fl.scale = Vector2(1.5, 1.5)
+		fl.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		fl.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		fl.position = pen.get_center() + Vector2(0, 14)
+		fl.z_index = -150
+		add_child(fl)
 	var dirt := Sprite2D.new()
 	dirt.texture = _masked("ground/gdirt")
 	dirt.position = pen.get_center()
 	dirt.scale = Vector2(1.3, 1.1)
 	dirt.modulate = Color(1, 1, 1, 0.85)
 	dirt.z_index = -150
-	add_child(dirt)
+	if not flat:
+		add_child(dirt)
 	var fence_h: Texture2D = tex("stone_wall")
 	for w in walls:
 		var a: Vector2 = w["a"]
