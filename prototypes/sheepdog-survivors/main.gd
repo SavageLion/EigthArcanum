@@ -101,6 +101,7 @@ var cam_init: bool = false
 var smoke: bool = false
 var demo: bool = false
 var overview: bool = false
+var look_mode: int = 0
 var alarm: float = 0.0
 var alarm_pos: Vector2 = Vector2.ZERO
 var smoke_n: int = 0
@@ -131,7 +132,12 @@ func pl(id: String) -> int:
 	return int(perk_lv.get(id, 0))
 
 func _ready() -> void:
-	randomize()
+	var search: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
+	if search.contains("seed="):
+		seed(search.substr(search.find("seed=") + 5).to_int())
+	else:
+		randomize()
+	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else 0
 	smoke = OS.get_cmdline_user_args().has("smoke")
 	if OS.has_feature("web"):
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
@@ -250,7 +256,8 @@ func _setup_layers() -> void:
 	gr.set_anchors_preset(Control.PRESET_FULL_RECT)
 	gr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var gm := ShaderMaterial.new()
-	gm.shader = load("res://shaders/grade.gdshader") as Shader
+	gm.shader = load("res://shaders/look.gdshader") as Shader
+	gm.set_shader_parameter("mode", look_mode)
 	gr.material = gm
 	grade_layer.add_child(gr)
 	var hud_layer := CanvasLayer.new()

@@ -67,7 +67,7 @@ func generate(ysort_node: Node2D) -> void:
 	_scale_layout()
 	_layout()
 	_terrain()
-	rngw.randomize()
+	rngw.seed = randi()
 	_tiles()
 	_ground_patches()
 	_ribbons()
@@ -253,7 +253,7 @@ func _tiles() -> void:
 	layer.z_index = -200
 	add_child(layer)
 	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	rng.seed = randi()
 	for cy in GH:
 		for cx in GW:
 			var c: Array = cell_corners(cx, cy)
@@ -317,7 +317,7 @@ func _trees() -> void:
 	var ta: Texture2D = tex("tree_big_a")
 	var tb: Texture2D = tex("tree_big_b")
 	var rng := RandomNumberGenerator.new()
-	rng.randomize()
+	rng.seed = randi()
 	for cy in GH:
 		for cx in GW:
 			if (cx + cy) % 2 != 0:
