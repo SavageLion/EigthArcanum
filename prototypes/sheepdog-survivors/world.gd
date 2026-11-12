@@ -42,6 +42,9 @@ var bridge_rect: Rect2 = Rect2(315, 840, 190, 60)
 var minimap_tex: ImageTexture
 var n1: FastNoiseLite
 var n2: FastNoiseLite
+var river_pts: Array = []
+var path_pts: Array = []
+var rngw := RandomNumberGenerator.new()
 
 func tex(tname: String) -> Texture2D:
 	return load("res://art/" + tname + ".png") as Texture2D
@@ -59,12 +62,16 @@ func generate(ysort_node: Node2D) -> void:
 	n2.frequency = 0.0035
 	_layout()
 	_terrain()
+	rngw.randomize()
 	_tiles()
+	_ground_patches()
+	_ribbons()
 	_minimap()
 	_trees()
 	_obstacles()
 	_pen_visuals()
 	_bridge()
+	_decals()
 	_spawn_points()
 
 # ---------------------------------------------------------------- layout of the castle
@@ -208,6 +215,13 @@ func _tiles() -> void:
 			if src.get_tile_at_coords(ac) == Vector2i(-1, -1):
 				src.create_tile(ac)
 			table[String(k)] = ac
+			if String(k) == ("uuuu" if i == 0 else "llll"):
+				for a in range(1, 8):
+					var aid: int = src.create_alternative_tile(ac, a)
+					var td: TileData = src.get_tile_data(ac, aid)
+					td.transpose = (a & 1) != 0
+					td.flip_h = (a & 2) != 0
+					td.flip_v = (a & 4) != 0
 		ts.add_source(src, i)
 		keys.append({"table": table, "upper": int((data[nm] as Dictionary)["upper"])})
 	var layer := TileMapLayer.new()
@@ -223,13 +237,15 @@ func _tiles() -> void:
 			var c: Array = cell_corners(cx, cy)
 			var special: int = T_GRASS
 			for v in c:
-				if int(v) != T_GRASS:
+				if int(v) == T_FIELD or int(v) == T_FOREST:
 					special = int(v)
 			var si: int = 0
+			var alt: int = 0
 			var key: String = ""
 			if special == T_GRASS:
-				si = rng.randi() % 4
+				si = 0
 				key = "uuuu" if si == 0 else "llll"
+				alt = rng.randi() % 8
 			else:
 				si = special - 1
 				var up: int = int(keys[si]["upper"])
@@ -240,7 +256,7 @@ func _tiles() -> void:
 				key = "uuuu" if si == 0 else "llll"
 				if not table2.has(key):
 					continue
-			layer.set_cell(Vector2i(cx, cy), si, table2[key])
+			layer.set_cell(Vector2i(cx, cy), si, table2[key], alt)
 
 func _minimap() -> void:
 	var img := Image.create(GW, GH, false, Image.FORMAT_RGBA8)
@@ -453,6 +469,171 @@ func in_zone(p: Vector2, _margin: float) -> bool:
 func zone_kind(p: Vector2) -> String:
 	if bridge_rect.has_point(p):
 		return ""
-	if terr_at(p) == T_WATER:
+	if river_pts.size() > 1 and dist_poly(p, river_pts) < 46.0:
 		return "water"
 	return ""
+
+# ---------------------------------------------------------------- smooth river and paths
+func _meander(pts: Array, jitter: float) -> Array:
+	var out: Array = []
+	for i in pts.size() - 1:
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[i + 1]
+		var l: float = a.distance_to(b)
+		var n: int = maxi(1, int(l / 90.0))
+		var perp: Vector2 = (b - a).normalized().orthogonal()
+		for s in n:
+			var t: float = float(s) / float(n)
+			var off: float = 0.0 if s == 0 else rngw.randf_range(-jitter, jitter)
+			out.append(a.lerp(b, t) + perp * off)
+	out.append(pts[pts.size() - 1])
+	return out
+
+func _smooth(pts: Array, seg: int) -> Array:
+	var out: Array = []
+	for i in pts.size() - 1:
+		var p0: Vector2 = pts[maxi(i - 1, 0)]
+		var p1: Vector2 = pts[i]
+		var p2: Vector2 = pts[i + 1]
+		var p3: Vector2 = pts[mini(i + 2, pts.size() - 1)]
+		for s in seg:
+			var t: float = float(s) / float(seg)
+			out.append(0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t * t + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t * t * t))
+	out.append(pts[pts.size() - 1])
+	return out
+
+func _ribbon(pts: Array, width: float, tex_path: String, tint: Color, edge_col: Color, edge_w: float, fringe: float, flow: float, sparkle: float, z: int) -> void:
+	var white := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	white.fill(Color(1, 1, 1, 1))
+	var l := Line2D.new()
+	l.points = PackedVector2Array(pts)
+	l.width = width
+	l.texture = ImageTexture.create_from_image(white)
+	l.texture_mode = Line2D.LINE_TEXTURE_STRETCH
+	l.joint_mode = Line2D.LINE_JOINT_ROUND
+	l.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	l.end_cap_mode = Line2D.LINE_CAP_ROUND
+	l.z_index = z
+	var c := Curve.new()
+	for i in 9:
+		c.add_point(Vector2(float(i) / 8.0, rngw.randf_range(0.84, 1.16)))
+	l.width_curve = c
+	var m := ShaderMaterial.new()
+	m.shader = load("res://shaders/ribbon.gdshader") as Shader
+	m.set_shader_parameter("tex", load(tex_path) as Texture2D)
+	m.set_shader_parameter("tex_scale", 48.0)
+	m.set_shader_parameter("tint", Vector3(tint.r, tint.g, tint.b))
+	m.set_shader_parameter("edge_col", Vector3(edge_col.r, edge_col.g, edge_col.b))
+	m.set_shader_parameter("edge_w", edge_w)
+	m.set_shader_parameter("fringe", fringe)
+	m.set_shader_parameter("flow", flow)
+	m.set_shader_parameter("sparkle", sparkle)
+	l.material = m
+	add_child(l)
+
+func _ribbons() -> void:
+	river_pts = _smooth(_meander(RIVER, 22.0), 10)
+	# muddy bank under the water, then the water itself
+	_ribbon(river_pts, 150.0, "res://art/tiles/path_tex.png", Color(0.5, 0.42, 0.28), Color(0.3, 0.24, 0.14), 0.0, 0.34, 0.0, 0.0, -193)
+	_ribbon(river_pts, 104.0, "res://art/tiles/water_tex.png", Color(1, 1, 1), Color(0.16, 0.3, 0.3), 0.16, 0.12, 1.0, 1.0, -192)
+	for pl in PATHS:
+		var sm: Array = _smooth(_meander(pl, 12.0), 8)
+		path_pts.append(sm)
+		_ribbon(sm, 60.0, "res://art/tiles/path_tex.png", Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191)
+		_ribbon(sm, 48.0, "res://art/tiles/path_tex.png", Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190)
+
+func _ground_patches() -> void:
+	var g := ColorRect.new()
+	g.position = Vector2.ZERO
+	g.size = Vector2(wx, wy)
+	g.z_index = -199
+	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = load("res://shaders/patches.gdshader") as Shader
+	m.set_shader_parameter("world_size", Vector2(wx, wy))
+	var fn := FastNoiseLite.new()
+	fn.seed = randi()
+	fn.frequency = 0.012
+	fn.fractal_octaves = 3
+	var nt := NoiseTexture2D.new()
+	nt.noise = fn
+	nt.seamless = true
+	nt.width = 512
+	nt.height = 512
+	m.set_shader_parameter("noise_tex", nt)
+	g.material = m
+	add_child(g)
+
+# ---------------------------------------------------------------- decals: tufts, flowers, pebbles, reeds, lily pads
+func _decal_tex(name: String, fallback: String) -> Texture2D:
+	var p: String = "res://art/decals/%s.png" % name
+	if ResourceLoader.exists(p):
+		return load(p) as Texture2D
+	return tex(fallback)
+
+func _on_open_grass(p: Vector2) -> bool:
+	if p.x < 20.0 or p.y < 20.0 or p.x > wx - 20.0 or p.y > wy - 20.0:
+		return false
+	if not cell_all(int(p.x / CELL), int(p.y / CELL), T_GRASS):
+		return false
+	if pen.grow(30.0).has_point(p) or dist_poly(p, river_pts) < 84.0:
+		return false
+	for pp in path_pts:
+		if dist_poly(p, pp) < 38.0:
+			return false
+	return true
+
+func _decal(t: Texture2D, p: Vector2, sc: float, z: int, sway: bool, in_ysort: bool) -> void:
+	var s := Sprite2D.new()
+	s.texture = t
+	s.position = p
+	s.scale = Vector2.ONE * sc
+	s.offset = Vector2(0, -t.get_height() * 0.5 + 3.0)
+	if sway:
+		s.material = wind_mat
+	s.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if t.get_width() <= 40 else CanvasItem.TEXTURE_FILTER_LINEAR
+	if in_ysort:
+		ysort.add_child(s)
+	else:
+		s.z_index = z
+		add_child(s)
+
+func _decals() -> void:
+	var tuft: Texture2D = _decal_tex("tuft", "tuft")
+	var tuft_old: Texture2D = tex("tuft")
+	var fa: Texture2D = tex("flowers_a")
+	var fb: Texture2D = tex("flowers_b")
+	var pebbles: Texture2D = _decal_tex("pebbles", "rock2")
+	var reeds: Texture2D = _decal_tex("reeds", "tuft")
+	var lily: Texture2D = _decal_tex("lily", "tuft")
+	for i in 220:
+		var c := Vector2(rngw.randf_range(30.0, wx - 30.0), rngw.randf_range(30.0, wy - 30.0))
+		if not _on_open_grass(c):
+			continue
+		for j in 3:
+			var p: Vector2 = c + Vector2(rngw.randf_range(-26.0, 26.0), rngw.randf_range(-14.0, 14.0))
+			var pick: float = rngw.randf()
+			if pick < 0.45:
+				_decal(tuft, p, rngw.randf_range(1.0, 1.5), -120, true, false)
+			elif pick < 0.65:
+				_decal(tuft_old, p, rngw.randf_range(0.7, 1.0), -120, true, false)
+			else:
+				_decal(fa if pick < 0.83 else fb, p, 0.85, -119, true, false)
+	for pp in path_pts:
+		for i in range(0, pp.size(), 3):
+			if rngw.randf() < 0.55:
+				var q: Vector2 = pp[i]
+				var side: float = 1.0 if rngw.randf() < 0.5 else -1.0
+				var off: Vector2 = (pp[mini(i + 1, pp.size() - 1)] - q).normalized().orthogonal() * side * rngw.randf_range(20.0, 40.0)
+				_decal(pebbles, q + off, rngw.randf_range(0.6, 0.9), -140, false, false)
+	for i in range(0, river_pts.size(), 2):
+		var q2: Vector2 = river_pts[i]
+		var dir: Vector2 = (river_pts[mini(i + 1, river_pts.size() - 1)] - q2).normalized()
+		var nrm: Vector2 = dir.orthogonal()
+		for side in [-1.0, 1.0]:
+			if rngw.randf() < 0.75 and not bridge_rect.grow(30.0).has_point(q2):
+				var rp: Vector2 = q2 + nrm * float(side) * rngw.randf_range(54.0, 66.0)
+				if rp.x > 0.0 and rp.x < wx and rp.y > 0.0 and rp.y < wy:
+					_decal(reeds, rp, rngw.randf_range(1.0, 1.5), 0, true, true)
+		if rngw.randf() < 0.22 and not bridge_rect.grow(40.0).has_point(q2):
+			_decal(lily, q2 + nrm * rngw.randf_range(-26.0, 26.0), rngw.randf_range(1.0, 1.4), -92, false, false)
