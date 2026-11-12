@@ -26,13 +26,13 @@ void fragment() {
 		vec2 root = cell + vec2(0.0, float(k));
 		float h = hash(root);
 		float len = 1.0 + floor(hash(root + 5.7) * 3.4);
-		if (h > 0.8 && float(k) < len) {
+		if (h > 0.86 && float(k) < len) {
 			float t = float(k) / max(len - 1.0, 1.0);
 			vec3 stroke = mix(c_dark * 0.92, c_tip, 0.3 + 0.7 * t);
-			col = mix(stroke, base, 0.28);
+			col = mix(stroke, base, 0.42);
 		}
 	}
-	if (hash(cell + vec2(19.0, 3.0)) > 0.94) {
+	if (hash(cell + vec2(19.0, 3.0)) > 0.96) {
 		col = mix(col, c_dark * 0.8, 0.6);
 	}
 	COLOR = vec4(col, 1.0);

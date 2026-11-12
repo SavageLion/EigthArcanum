@@ -887,6 +887,12 @@ func _meadow_patches() -> void:
 			else:
 				t = fa if roll < 0.5 else fb
 			_decal(t, p, rngw.randf_range(0.75, 1.1) if t.get_width() > 40 else 0.9, 0, true, true)
+	var tuft: Texture2D = _meadow_tex("tuft")
+	if tuft != null:
+		for i in 150:
+			var tp := Vector2(rngw.randf_range(40.0, wx - 40.0), rngw.randf_range(40.0, wy - 40.0))
+			if _on_open_grass(tp) and tp.distance_to(center) > 330.0:
+				_decal(tuft, tp, rngw.randf_range(0.55, 0.95), 0, true, true)
 	for i in 50:
 		var c2 := Vector2(rngw.randf_range(30.0, wx - 30.0), rngw.randf_range(30.0, wy - 30.0))
 		if not _on_open_grass(c2):
@@ -895,7 +901,7 @@ func _meadow_patches() -> void:
 			_decal(fa if rngw.randf() < 0.5 else fb, c2 + Vector2(rngw.randf_range(-16.0, 16.0), rngw.randf_range(-8.0, 8.0)), 0.85, -119, true, false)
 
 func _dirt_patches() -> void:
-	var t: Texture2D = load("res://art/tiles/path_tex.png") as Texture2D
+	var t: Texture2D = load("res://art/flat/path_tex.png") as Texture2D
 	var center: Vector2 = pen.get_center()
 	var made: int = 0
 	for tries in 60:
@@ -922,6 +928,6 @@ func _dirt_patches() -> void:
 		poly.texture = t
 		poly.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		poly.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		poly.color = Color(1.0, 0.88, 0.7)
+		poly.color = Color(0.98, 0.92, 0.8)
 		poly.z_index = -190
 		add_child(poly)
