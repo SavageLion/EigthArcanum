@@ -4,25 +4,29 @@ extends Node2D
 # a river with a bridge, and the castle pen in the middle.
 
 const CELL: float = 48.0
-const GW: int = 50
-const GH: int = 34
+const GW: int = 68
+const GH: int = 46
 const T_GRASS: int = 0
 const T_WATER: int = 1
 const T_PATH: int = 2
 const T_FIELD: int = 3
 const T_FOREST: int = 4
-const RIVER: Array = [Vector2(380, -80), Vector2(430, 300), Vector2(330, 620), Vector2(410, 880), Vector2(380, 1250), Vector2(450, 1720)]
-const PATHS: Array = [
+const RIVER0: Array = [Vector2(380, -80), Vector2(430, 300), Vector2(330, 620), Vector2(410, 880), Vector2(380, 1250), Vector2(450, 1720)]
+const PATHS0: Array = [
 	[Vector2(1200, 960), Vector2(900, 930), Vector2(700, 905), Vector2(560, 880), Vector2(410, 872), Vector2(250, 850), Vector2(-80, 810)],
 	[Vector2(1200, 960), Vector2(1500, 1010), Vector2(1850, 940), Vector2(2100, 1000), Vector2(2480, 960)],
 	[Vector2(1200, 960), Vector2(1240, 1250), Vector2(1320, 1450), Vector2(1330, 1720)],
 	[Vector2(1700, 985), Vector2(1780, 700), Vector2(1760, 300), Vector2(1800, -80)],
 ]
-const FIELDS: Array = [Rect2(1900, 220, 330, 270), Rect2(1650, 1190, 330, 270)]
-const GAPS: Array = [Vector2(60, 810), Vector2(2340, 960), Vector2(1330, 1570), Vector2(1800, 60), Vector2(700, 60), Vector2(1900, 1570), Vector2(60, 300)]
+const FIELDS0: Array = [Rect2(1900, 220, 330, 270), Rect2(1650, 1190, 330, 270)]
+const GAPS0: Array = [Vector2(60, 810), Vector2(2340, 960), Vector2(1330, 1570), Vector2(1800, 60), Vector2(700, 60), Vector2(1900, 1570), Vector2(60, 300)]
 
-var wx: float = 2400.0
-var wy: float = 1632.0
+var wx: float = 3264.0
+var wy: float = 2208.0
+var river_ctrl: Array = []
+var paths_ctrl: Array = []
+var fields_r: Array = []
+var gap_ctrl: Array = []
 var pen: Rect2
 var gate_x: float = 0.0
 var gap: float = 100.0
@@ -60,6 +64,7 @@ func generate(ysort_node: Node2D) -> void:
 	n2 = FastNoiseLite.new()
 	n2.seed = randi()
 	n2.frequency = 0.0035
+	_scale_layout()
 	_layout()
 	_terrain()
 	rngw.randomize()
@@ -75,6 +80,23 @@ func generate(ysort_node: Node2D) -> void:
 	_spawn_points()
 
 # ---------------------------------------------------------------- layout of the castle
+func _scale_layout() -> void:
+	var sv := Vector2(wx / 2400.0, wy / 1632.0)
+	for p in RIVER0:
+		river_ctrl.append((p as Vector2) * sv)
+	for pl in PATHS0:
+		var a: Array = []
+		for p in pl:
+			a.append((p as Vector2) * sv)
+		paths_ctrl.append(a)
+	for r in FIELDS0:
+		var rr: Rect2 = r
+		fields_r.append(Rect2(rr.position * sv, rr.size * sv))
+	for g in GAPS0:
+		gap_ctrl.append((g as Vector2) * sv)
+	var bc: Vector2 = (bridge_rect.position + bridge_rect.size / 2.0) * sv
+	bridge_rect = Rect2(bc - bridge_rect.size / 2.0, bridge_rect.size)
+
 func _layout() -> void:
 	var pw: float = 210.0
 	var ph: float = 160.0
@@ -130,29 +152,29 @@ func _terrain() -> void:
 			var p := Vector2(float(vx) * CELL, float(vy) * CELL)
 			var t: int = T_GRASS
 			var edge: float = minf(minf(p.x, wx - p.x), minf(p.y, wy - p.y))
-			var thick: float = 230.0 + 170.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)
-			var forest: bool = edge < thick or n2.get_noise_2d(p.x, p.y) > 0.3
+			var thick: float = 250.0 + 190.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)
+			var forest: bool = edge < thick
 			if p.distance_to(center) < 480.0:
 				forest = false
 			var dpath: float = 1.0e9
-			for pl in PATHS:
+			for pl in paths_ctrl:
 				dpath = minf(dpath, dist_poly(p, pl))
 			if dpath < 105.0:
 				forest = false
-			for g in GAPS:
+			for g in gap_ctrl:
 				if p.distance_to(g as Vector2) < 175.0:
 					forest = false
-			for fr in FIELDS:
+			for fr in fields_r:
 				if (fr as Rect2).grow(115.0).has_point(p):
 					forest = false
-			var driver: float = dist_poly(p, RIVER)
+			var driver: float = dist_poly(p, river_ctrl)
 			if driver < 120.0:
 				forest = false
 			if forest:
 				t = T_FOREST
 			if dpath < 27.0:
 				t = T_PATH
-			for fr in FIELDS:
+			for fr in fields_r:
 				if (fr as Rect2).has_point(p):
 					t = T_FIELD
 			if driver < 52.0 + 16.0 * n1.get_noise_2d(p.y * 1.3, p.x):
@@ -331,7 +353,7 @@ func random_open_point(margin: float) -> Vector2:
 
 func _obstacles() -> void:
 	var rk: Texture2D = tex("rock2")
-	for i in 14:
+	for i in 26:
 		var p: Vector2 = random_open_point(24.0)
 		var r: float = randf_range(16.0, 26.0)
 		rock_add(p, r)
@@ -344,13 +366,13 @@ func _obstacles() -> void:
 		ysort.add_child(s)
 	var ta: Texture2D = tex("tree_big_a")
 	var tb: Texture2D = tex("tree_big_b")
-	for i in 10:
+	for i in 20:
 		var p2: Vector2 = random_open_point(30.0)
 		rock_add(p2, 16.0)
 		_tree(ta if randf() < 0.5 else tb, p2, 1.3, true)
 	var sh: Texture2D = tex("shrub_big")
 	var bu: Texture2D = tex("bush")
-	for i in 40:
+	for i in 80:
 		var p3: Vector2 = random_open_point(16.0)
 		var big: bool = randf() < 0.6
 		var s2 := Sprite2D.new()
@@ -441,11 +463,11 @@ func _ramp(t: float) -> float:
 
 # ---------------------------------------------------------------- where raiders and strays come from
 func _spawn_points() -> void:
-	for g in GAPS:
+	for g in gap_ctrl:
 		gaps.append(g)
 	var center: Vector2 = pen.get_center()
-	for tries in 900:
-		if inner_pts.size() >= 90:
+	for tries in 1600:
+		if inner_pts.size() >= 150:
 			break
 		var p := Vector2(randf_range(80.0, wx - 80.0), randf_range(80.0, wy - 80.0))
 		if p.distance_to(center) < 520.0 or _blocked(p, 14.0):
@@ -532,11 +554,11 @@ func _ribbon(pts: Array, width: float, tex_path: String, tint: Color, edge_col: 
 	add_child(l)
 
 func _ribbons() -> void:
-	river_pts = _smooth(_meander(RIVER, 22.0), 10)
+	river_pts = _smooth(_meander(river_ctrl, 22.0), 10)
 	# muddy bank under the water, then the water itself
 	_ribbon(river_pts, 150.0, "res://art/tiles/path_tex.png", Color(0.5, 0.42, 0.28), Color(0.3, 0.24, 0.14), 0.0, 0.34, 0.0, 0.0, -193)
 	_ribbon(river_pts, 104.0, "res://art/tiles/water_tex.png", Color(1, 1, 1), Color(0.16, 0.3, 0.3), 0.16, 0.12, 1.0, 1.0, -192)
-	for pl in PATHS:
+	for pl in paths_ctrl:
 		var sm: Array = _smooth(_meander(pl, 12.0), 8)
 		path_pts.append(sm)
 		_ribbon(sm, 60.0, "res://art/tiles/path_tex.png", Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191)
@@ -606,7 +628,7 @@ func _decals() -> void:
 	var pebbles: Texture2D = _decal_tex("pebbles", "rock2")
 	var reeds: Texture2D = _decal_tex("reeds", "tuft")
 	var lily: Texture2D = _decal_tex("lily", "tuft")
-	for i in 220:
+	for i in 420:
 		var c := Vector2(rngw.randf_range(30.0, wx - 30.0), rngw.randf_range(30.0, wy - 30.0))
 		if not _on_open_grass(c):
 			continue

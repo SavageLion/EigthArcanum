@@ -1,16 +1,16 @@
 extends Node2D
 # Sheepdog Survivors: herd animals into the pen for XP, shoo off waves of raiders, hold the fence for ten waves.
 
-const WX: float = 2400.0
-const WY: float = 1632.0
+const WX: float = 3264.0
+const WY: float = 2208.0
 const XMIN: float = 36.0
-const XMAX: float = 2364.0
+const XMAX: float = 3228.0
 const YMIN: float = 36.0
-const YMAX: float = 1596.0
+const YMAX: float = 2172.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
 const LAST_WAVE: int = 10
-const BASE_ZOOM: float = 1.3
+const BASE_ZOOM: float = 1.1
 const TYPES: Dictionary = {
 	"normal": {"r": 7.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10},
 	"lamb": {"r": 4.5, "zone": 105.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 8},
@@ -171,7 +171,7 @@ func _ready() -> void:
 	spark.position = Vector2(0, -12)
 	spark.name = "Spark"
 	dog.add_child(spark)
-	for i in 18:
+	for i in 24:
 		spawn_stray(true)
 	_setup_camera()
 	_setup_layers()
@@ -595,7 +595,7 @@ func _physics_process(delta: float) -> void:
 		for s in sheep:
 			if not (s as Sheep).in_pen:
 				loose += 1
-		if loose < 26:
+		if loose < 34:
 			spawn_stray(false)
 	for pu in popups:
 		pu["t"] = float(pu["t"]) - dt
@@ -624,7 +624,7 @@ func _process(delta: float) -> void:
 		(f as Fox).animate(delta)
 	var target_zoom: float = BASE_ZOOM * 0.95 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else BASE_ZOOM
 	if overview:
-		target_zoom = 0.36
+		target_zoom = 0.27
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	cloud_mat.set_shader_parameter("cam", cam.get_screen_center_position())
