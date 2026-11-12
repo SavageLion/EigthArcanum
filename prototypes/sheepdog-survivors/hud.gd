@@ -45,6 +45,7 @@ func _draw() -> void:
 	draw_circle(Vector2(24, 77), 6.0, Color(0.72, 0.5, 0.1))
 	draw_circle(Vector2(24, 77), 4.5, Color(1.0, 0.82, 0.25))
 	_text("%d gold" % main.gold, Vector2(36, 83), 14, GOLD)
+	_minimap(v)
 	# top centre: wave
 	var left: int = int(ceil(main.WAVE_LEN - main.wave_t))
 	_panel(Rect2(v.x / 2.0 - 90, 6, 180, 32))
@@ -183,3 +184,49 @@ func _button(i: int, label: String, dim: bool, fill: float, on: bool) -> void:
 	if dim and fill < 1.0:
 		draw_arc(p, main.BTN_R - 5.0, -PI / 2.0, -PI / 2.0 + TAU * clampf(fill, 0.0, 1.0), 40, GOLD, 4.0, true)
 	_text(label, p + Vector2(-main.BTN_R, 6), 16, CREAM if not dim else Color(CREAM, 0.5), main.BTN_R * 2.0, HORIZONTAL_ALIGNMENT_CENTER)
+
+func _minimap(v: Vector2) -> void:
+	var mw: float = 168.0
+	var mh: float = mw * main.WY / main.WX
+	var o := Vector2(v.x - mw - 10.0, 86.0)
+	var sc := Vector2(mw / main.WX, mh / main.WY)
+	_panel(Rect2(o - Vector2(4, 4), Vector2(mw + 8, mh + 8)), Color(0.1, 0.12, 0.06, 0.78))
+	draw_rect(Rect2(o, Vector2(mw, mh)), Color(0.36, 0.40, 0.18, 0.9))
+	# castle walls, coloured by health
+	for w in main.world.walls:
+		if not w["pen"]:
+			continue
+		var fr: float = float(w["hp"]) / float(w["max"])
+		var col: Color = Color(0.8, 0.8, 0.75).lerp(Color(0.95, 0.3, 0.25), 1.0 - fr)
+		draw_line(o + (w["a"] as Vector2) * sc, o + (w["b"] as Vector2) * sc, col, 2.0)
+	# defences
+	for pp in main.world.pads:
+		var pd: Pad = pp
+		var q: Vector2 = o + pd.position * sc
+		if pd.kind == "":
+			draw_circle(q, 1.4, Color(1.0, 0.85, 0.4, 0.5))
+		else:
+			draw_rect(Rect2(q - Vector2(2.5, 2.5), Vector2(5, 5)), Color(1.0, 0.85, 0.3))
+	# loot
+	for c in main.coins:
+		draw_circle(o + (c as Coin).position * sc, 1.3, Color(0.5, 0.85, 1.0))
+	# animals out in the field
+	for s in main.sheep:
+		var sh: Sheep = s
+		if sh.in_pen:
+			continue
+		draw_circle(o + sh.position * sc, 1.8, Color(1.0, 0.97, 0.85))
+	# raiders
+	for f in main.foxes:
+		var fx: Fox = f
+		if fx.fleeing:
+			continue
+		var rr: float = 2.4 if fx.kind == "fox" else (3.2 if fx.kind == "wolf" else 4.6)
+		draw_circle(o + fx.position * sc, rr, Color(0.95, 0.25, 0.2))
+	# the view and the wizard
+	var vs: Vector2 = v / main.cam.zoom.x
+	var cc: Vector2 = main.cam.get_screen_center_position()
+	draw_rect(Rect2(o + (cc - vs / 2.0) * sc, vs * sc), Color(1, 1, 1, 0.35), false, 1.0)
+	var dp: Vector2 = o + main.dog.position * sc
+	draw_circle(dp, 3.6, Color(0.3, 0.55, 1.0))
+	draw_circle(dp, 1.6, Color(1, 1, 1))

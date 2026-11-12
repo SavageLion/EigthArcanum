@@ -22,9 +22,9 @@ var spr: AnimatedSprite2D
 var shadow: Sprite2D
 
 const KINDS: Dictionary = {
-	"fox": {"cell": 52, "scale": 0.62, "r": 6.0, "hp": 2.0, "spd": 125.0, "dps": 4.0, "sh": 0.4},
-	"wolf": {"cell": 76, "scale": 0.5, "r": 9.0, "hp": 5.0, "spd": 108.0, "dps": 11.0, "sh": 0.6},
-	"bear": {"cell": 76, "scale": 0.8, "r": 15.0, "hp": 24.0, "spd": 58.0, "dps": 26.0, "sh": 1.0},
+	"fox": {"cell": 52, "scale": 0.62, "r": 6.0, "hp": 6.0, "spd": 125.0, "dps": 4.0, "sh": 0.4},
+	"wolf": {"cell": 76, "scale": 0.5, "r": 9.0, "hp": 16.0, "spd": 108.0, "dps": 11.0, "sh": 0.6},
+	"bear": {"cell": 76, "scale": 0.8, "r": 15.0, "hp": 80.0, "spd": 58.0, "dps": 26.0, "sh": 1.0},
 }
 
 func setup(k: String, frames: SpriteFrames, shadow_tex: Texture2D, hp_mult: float) -> void:

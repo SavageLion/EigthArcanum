@@ -34,7 +34,7 @@ const PERKS: Array = [
 	{"id": "bark", "name": "Arcane Howl", "desc": "Your bark reaches further and recharges faster.", "max": 4},
 	{"id": "boots", "name": "Fleet Paws", "desc": "Run faster.", "max": 4},
 	{"id": "lungs", "name": "Deep Lungs", "desc": "More stamina, quicker recovery.", "max": 3},
-	{"id": "charm", "name": "Herder's Charm", "desc": "Every animal you pen gives more XP.", "max": 3},
+	{"id": "charm", "name": "Shepherd's Purse", "desc": "Every animal you pen pays more gold.", "max": 3},
 	{"id": "posts", "name": "Castle Walls", "desc": "Walls get stronger and mend a little.", "max": 4},
 	{"id": "moss", "name": "Mending Moss", "desc": "The walls slowly heal themselves.", "max": 3},
 	{"id": "paw2", "name": "Busy Paws", "desc": "Mend walls faster while you crouch beside them.", "max": 3},
@@ -436,9 +436,11 @@ func bark_cd() -> float:
 	return 2.4 * pow(0.88, float(pl("bark"))) * (1.0 - minf(0.3, 0.03 * float(ducks)))
 func speed_mult() -> float:
 	return 1.0 + 0.08 * float(pl("boots"))
-func xp_mult() -> float:
+func gold_mult() -> float:
 	var pigs: int = int(pen_counts.get("pig", 0))
 	return 1.0 + 0.25 * float(pl("charm")) + 0.04 * float(pigs)
+func xp_mult() -> float:
+	return 1.0
 func fence_regen() -> float:
 	var sheepish: int = int(pen_counts.get("normal", 0)) + int(pen_counts.get("lamb", 0)) + int(pen_counts.get("black", 0))
 	return 0.12 * float(sheepish) + 0.7 * float(pl("moss"))
@@ -506,7 +508,7 @@ func spawn_enemy(k: String) -> void:
 		fr = wolf_frames
 	elif k == "bear":
 		fr = bear_frames
-	f.setup(k, fr, shadow_tex, 1.0 + 0.1 * float(wave - 1))
+	f.setup(k, fr, shadow_tex, 1.0 + 0.15 * float(wave - 1))
 	f.position = edge_point(k == "fox")
 	foxes.append(f)
 	if k == "bear":
@@ -881,7 +883,7 @@ func update_weapons(dt: float) -> void:
 			var n: int = 1 + (1 if lb >= 3 else 0) + (1 if lb >= 5 else 0)
 			for i in n:
 				var t2: Fox = tg if i == 0 else random_enemy(dog.position, 320.0)
-				launch("bolt", t2 if t2 != null else tg, (2.0 + 0.5 * float(lb)) * pw, 0.0)
+				launch("bolt", t2 if t2 != null else tg, (3.0 + 0.5 * float(lb)) * pw, 0.0)
 		else:
 			bolt_t = 0.15
 	# fireball
@@ -1059,15 +1061,16 @@ func defeat(f: Fox) -> void:
 	add_popup("SHOO!", f.position + Vector2(0, -16), Color(1.0, 0.85, 0.4))
 	ring(f.position, 34.0, Color(1.0, 1.0, 1.0), 0.4, 3.0)
 	var nb: int = 1
-	var val: int = 3
+	var val: int = 6
 	if f.kind == "wolf":
 		nb = 2
-		val = 4
+		val = 9
 	elif f.kind == "bear":
 		nb = 5
-		val = 8
+		val = 16
 	for i in nb:
 		var b := Coin.new()
+		b.kind = "gem"
 		b.value = val
 		b.position = f.position + Vector2(randf_range(-18, 18), randf_range(-12, 12))
 		ysort.add_child(b)
@@ -1096,8 +1099,8 @@ func update_coins(dt: float) -> void:
 		if bn.fly:
 			bn.position += (dog.position - bn.position).normalized() * 300.0 * dt
 		if d < 12.0:
-			gold += bn.value
-			add_popup("+%d" % bn.value, bn.position + Vector2(0, -12), Color(1.0, 0.85, 0.3))
+			gain_xp(float(bn.value))
+			add_popup("+%d XP" % bn.value, bn.position + Vector2(0, -12), Color(0.6, 0.9, 1.0))
 			coins.erase(bn)
 			bn.queue_free()
 
@@ -1276,9 +1279,9 @@ func update_sheep(dt: float) -> void:
 			sh.in_pen = true
 			sh.squash = 1.0
 			herded += 1
-			var gain: float = float(TYPES[sh.type]["xp"])
-			add_popup("+%d XP" % int(gain * xp_mult()), sh.position + Vector2(0, -14), Color(0.6, 1.0, 0.6))
-			gain_xp(gain)
+			var pay: int = maxi(1, int(round(float(TYPES[sh.type]["xp"]) * 0.5 * gold_mult())))
+			gold += pay
+			add_popup("+%d gold" % pay, sh.position + Vector2(0, -14), Color(1.0, 0.85, 0.3))
 		if sh.in_pen:
 			sh.position.x = clampf(sh.position.x, P.position.x + sh.r + 2.0, P.end.x - sh.r - 2.0)
 			sh.position.y = clampf(sh.position.y, P.position.y + sh.r + 2.0, P.end.y - sh.r - 2.0)
