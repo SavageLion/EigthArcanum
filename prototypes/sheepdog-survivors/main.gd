@@ -137,7 +137,7 @@ func _ready() -> void:
 	var names: Array = ["east", "north", "south", "south-east", "north-east"]
 	dog_frames = U.raven_frames()
 	sheep_frames = U.sheep8_frames()
-	fox_frames = U.frames(load("res://art/chars/fox.png") as Texture2D, 52, names)
+	fox_frames = U.set8("fox8", 12.0)
 	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
 	bear_frames = U.frames(load("res://art/chars/bear.png") as Texture2D, 76, names)
 	world = World.new()
@@ -184,8 +184,13 @@ func _ready() -> void:
 		try_build(0)
 		near_pad = -1
 		if demo:
-			for i in 6:
-				spawn_enemy("fox" if i % 2 == 0 else "wolf")
+			perk_lv = {}
+			var kinds: Array = ["fox", "fox", "wolf", "bear"]
+			for i in 4:
+				spawn_enemy(String(kinds[i]))
+				foxes[foxes.size() - 1].position = dog.position + Vector2(-120.0 + 80.0 * float(i), 60.0 + 20.0 * float(i % 2))
+				foxes[foxes.size() - 1].stun = 40.0
+				world.pads[0].position = Vector2(-9999, -9999)
 
 func _setup_camera() -> void:
 	cam = Camera2D.new()

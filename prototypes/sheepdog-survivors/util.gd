@@ -84,3 +84,19 @@ static func sheep8_frames() -> SpriteFrames:
 				sf.add_frame(an, load("res://art/sheep8/%s/%s/%d.png" % [clip, d, i]) as Texture2D)
 				i += 1
 	return sf
+
+static func set8(root: String, walk_fps: float) -> SpriteFrames:
+	var sf := SpriteFrames.new()
+	sf.remove_animation("default")
+	var dirs: Array = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
+	for clip in ["walk", "idle"]:
+		for d in dirs:
+			var an: String = String(clip) + "_" + String(d)
+			sf.add_animation(an)
+			sf.set_animation_speed(an, walk_fps if clip == "walk" else 1.0)
+			sf.set_animation_loop(an, true)
+			var i: int = 0
+			while ResourceLoader.exists("res://art/%s/%s/%s/%d.png" % [root, clip, d, i]):
+				sf.add_frame(an, load("res://art/%s/%s/%s/%d.png" % [root, clip, d, i]) as Texture2D)
+				i += 1
+	return sf
