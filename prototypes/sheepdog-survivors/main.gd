@@ -314,6 +314,7 @@ func _setup_layers() -> void:
 	cloud_mat.set_shader_parameter("noise_tex", nt)
 	cr.material = cloud_mat
 	clouds_layer.add_child(cr)
+	clouds_layer.visible = false
 	var grade_layer := CanvasLayer.new()
 	grade_layer.layer = 2
 	add_child(grade_layer)

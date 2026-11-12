@@ -92,6 +92,7 @@ func generate(ysort_node: Node2D) -> void:
 	_ribbons()
 	_minimap()
 	_trees()
+	_forest_wall()
 	_obstacles()
 	_pen_visuals()
 	_bridge()
@@ -101,7 +102,7 @@ func generate(ysort_node: Node2D) -> void:
 # ---------------------------------------------------------------- layout of the castle
 func _scale_layout() -> void:
 	var sv := Vector2(wx / 2400.0, wy / 1632.0)
-	for pl in PATHS0:
+	for pl in []:
 		var a: Array = []
 		for p in pl:
 			a.append((p as Vector2) * sv)
@@ -454,6 +455,16 @@ func _trees() -> void:
 			var sc: float = rng.randf_range(1.45, 1.95)
 			_tree(ta if rng.randf() < 0.5 else tb, p, sc, flat)
 			rock_add(p, 30.0)
+
+func _forest_wall() -> void:
+	for cy in GH:
+		for cx in GW:
+			var forest: int = 0
+			for v in cell_corners(cx, cy):
+				if int(v) == T_FOREST:
+					forest += 1
+			if forest >= 2:
+				rock_add(Vector2((float(cx) + 0.5) * CELL, (float(cy) + 0.5) * CELL), 36.0)
 
 func _blocked(p: Vector2, r: float) -> bool:
 	if pen.grow(150.0).has_point(p) or p.distance_to(dog_start) < 120.0:
