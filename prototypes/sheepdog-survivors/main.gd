@@ -144,7 +144,7 @@ func _ready() -> void:
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
 		randomize()
-	style_name = "ref" if search.contains("style=ref") else ("painted" if search.contains("style=painted") else "flat")
+	style_name = "flat" if search.contains("style=flat") else ("painted" if search.contains("style=painted") else "ref")
 	style_flat = style_name == "flat"
 	if style_name == "ref":
 		XMIN = 100.0
@@ -387,8 +387,6 @@ func _input(event: InputEvent) -> void:
 				do_bark()
 			elif ke.keycode == KEY_F:
 				toggle_fullscreen()
-			elif ke.keycode == KEY_T:
-				toggle_style()
 
 func style_rect() -> Rect2:
 	return Rect2(vp().x - 92.0, 44.0, 38.0, 34.0)
@@ -462,9 +460,6 @@ func _press(p: Vector2, id: int) -> void:
 				return
 	if state != "result" and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
-		return
-	if state != "result" and style_rect().grow(6.0).has_point(p):
-		toggle_style()
 		return
 	if state == "result":
 		get_tree().reload_current_scene()

@@ -512,9 +512,17 @@ func random_open_point(margin: float) -> Vector2:
 	return Vector2(wx / 2.0, wy / 2.0 + 300.0)
 
 func _obstacles() -> void:
-	var rk: Texture2D = tex("rock2")
-	for i in 16:
+	var rock_tex: Array = []
+	if refst:
+		for rn in ["rock_a", "rock_b"]:
+			var rt: Texture2D = _meadow_tex(rn)
+			if rt != null:
+				rock_tex.append(rt)
+	else:
+		rock_tex.append(tex("rock2"))
+	for i in (16 if not rock_tex.is_empty() else 0):
 		var p: Vector2 = random_open_point(24.0)
+		var rk: Texture2D = rock_tex[randi() % rock_tex.size()]
 		var r: float = randf_range(16.0, 26.0)
 		rock_add(p, r)
 		var s := Sprite2D.new()
