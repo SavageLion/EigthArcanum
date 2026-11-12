@@ -19,9 +19,10 @@ const TYPES: Dictionary = {
 	"black": {"r": 7.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(0.3, 0.28, 0.32), "coh": 0.35, "xp": 14},
 	"goose": {"r": 6.0, "zone": 150.0, "flee": 1.3, "speed": 1.35, "hp": 1, "tint": Color(1.1, 1.12, 1.2), "coh": 0.5, "bark_mul": 1.6, "xp": 12},
 	"duck": {"r": 5.0, "zone": 125.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1.15, 1.1, 0.62), "xp": 10},
+	"cow": {"r": 11.0, "zone": 70.0, "flee": 0.5, "speed": 0.75, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.4, "xp": 20, "sc": 0.78},
 	"pig": {"r": 8.0, "zone": 80.0, "flee": 0.6, "speed": 0.7, "hp": 3, "tint": Color(1.2, 0.78, 0.86), "heavy": true, "bark_mul": 0.5, "xp": 16},
 }
-const STRAY_POOL: Array = ["normal", "normal", "normal", "normal", "lamb", "lamb", "goat", "goose", "ram", "black", "duck", "pig"]
+const STRAY_POOL: Array = ["cow", "normal", "normal", "normal", "normal", "lamb", "lamb", "goat", "goose", "ram", "black", "duck", "pig"]
 const PERKS: Array = [
 	{"id": "bolt", "name": "Magic Bolt", "desc": "Homing violet bolts. More bolts at levels 3 and 5.", "max": 5},
 	{"id": "fire", "name": "Fireball", "desc": "Hurl an exploding fireball at the nearest raider.", "max": 5},
@@ -63,6 +64,9 @@ var dog_frames: SpriteFrames
 var sheep_frames: SpriteFrames
 var fox_frames: SpriteFrames
 var imp_frames: SpriteFrames
+var cow_frames: SpriteFrames
+var pup_frames: SpriteFrames
+var pup: Pup
 var wolf_frames: SpriteFrames
 var bear_frames: SpriteFrames
 var shadow_tex: Texture2D
@@ -152,6 +156,12 @@ func _ready() -> void:
 	sheep_frames = U.sheep8_frames()
 	fox_frames = U.set8("fox8", 12.0)
 	imp_frames = U.set8("imp8", 12.0)
+	if style_name == "ref" and ResourceLoader.exists("res://art/sheep_ref/walk/south/0.png"):
+		sheep_frames = U.set8("sheep_ref", 12.0)
+	if ResourceLoader.exists("res://art/cow8/walk/south/0.png"):
+		cow_frames = U.set8("cow8", 11.0)
+	if ResourceLoader.exists("res://art/pup8/walk/south/0.png"):
+		pup_frames = U.set8("pup8", 12.0)
 	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
 	bear_frames = U.frames(load("res://art/chars/bear.png") as Texture2D, 76, names)
 	world = World.new()
@@ -168,6 +178,11 @@ func _ready() -> void:
 	ysort.add_child(dog)
 	dog.setup(dog_frames, shadow_tex)
 	dog.position = world.dog_start
+	if pup_frames != null:
+		pup = Pup.new()
+		ysort.add_child(pup)
+		pup.setup(pup_frames, shadow_tex)
+		pup.position = world.dog_start + Vector2(-30.0, 20.0)
 	var spark := CPUParticles2D.new()
 	spark.amount = 18
 	spark.lifetime = 0.8
@@ -601,7 +616,7 @@ func spawn_stray(initial: bool) -> void:
 	var t: String = STRAY_POOL[randi() % STRAY_POOL.size()]
 	var s := Sheep.new()
 	ysort.add_child(s)
-	s.setup(t, TYPES[t], sheep_frames, shadow_tex)
+	s.setup(t, TYPES[t], (cow_frames if t == "cow" else sheep_frames), shadow_tex)
 	s.seen = true
 	var p := Vector2.ZERO
 	if initial:
@@ -655,6 +670,8 @@ func _physics_process(delta: float) -> void:
 	banner_t = maxf(0.0, banner_t - dt)
 	count_pen()
 	update_dog(dt)
+	if pup != null:
+		pup.follow(dog.position - dog.heading * 38.0 + dog.heading.orthogonal() * 18.0, dt)
 	update_sheep(dt)
 	update_enemies(dt)
 	update_weapons(dt)
@@ -690,6 +707,8 @@ func count_pen() -> void:
 
 func _process(delta: float) -> void:
 	dog.animate(delta)
+	if pup != null:
+		pup.animate(delta)
 	(dog.get_node("Spark") as CPUParticles2D).emitting = dog.vel.length() > 40.0
 	for s in sheep:
 		(s as Sheep).animate(delta)

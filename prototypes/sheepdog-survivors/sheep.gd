@@ -57,7 +57,7 @@ func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture
 	spr.sprite_frames = frames
 	spr.modulate = def["tint"]
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	base_scale = 0.85 * r / 7.0 * (1.2 if t == "lamb" else 1.0)
+	base_scale = 0.85 * r / 7.0 * (1.2 if t == "lamb" else 1.0) * float(def.get("sc", 1.0))
 	spr.scale = Vector2(base_scale, base_scale)
 	spr.offset = Vector2(0, -13)
 	spr.play("idle_east")

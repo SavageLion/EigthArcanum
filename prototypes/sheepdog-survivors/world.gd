@@ -713,8 +713,12 @@ func _ribbons() -> void:
 	for pl in paths_ctrl:
 		var sm: Array = _smooth(_meander(pl, 12.0), 8)
 		path_pts.append(sm)
-		_ribbon(sm, 60.0, ptex, Color(0.82, 0.7, 0.55) if flat else Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191, true)
-		_ribbon(sm, 48.0, ptex, Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190, true)
+		if refst:
+			_ribbon(sm, 92.0, ptex, Color(0.95, 0.84, 0.66), Color(0.6, 0.45, 0.25), 0.0, 0.55, 0.0, 0.0, -191, true)
+			_ribbon(sm, 74.0, ptex, Color(1.12, 0.98, 0.78), Color(0.6, 0.45, 0.25), 0.0, 0.42, 0.0, 0.0, -190, true)
+		else:
+			_ribbon(sm, 60.0, ptex, Color(0.82, 0.7, 0.55) if flat else Color(0.5, 0.36, 0.22), Color(0.4, 0.28, 0.16), 0.0, 0.4, 0.0, 0.0, -191, true)
+			_ribbon(sm, 48.0, ptex, Color(1, 1, 1), Color(0.5, 0.36, 0.2), 0.0, 0.22, 0.0, 0.0, -190, true)
 
 func _ground_patches() -> void:
 	if flat:
@@ -737,7 +741,7 @@ func _ground_patches() -> void:
 	nt.width = 512
 	nt.height = 512
 	m.set_shader_parameter("noise_tex", nt)
-	m.set_shader_parameter("amt", 0.3 if refst else 1.0)
+	m.set_shader_parameter("amt", 0.12 if refst else 1.0)
 	g.material = m
 	add_child(g)
 
