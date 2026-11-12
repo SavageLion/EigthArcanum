@@ -179,7 +179,7 @@ func _terrain() -> void:
 			var p := Vector2(float(vx) * CELL, float(vy) * CELL)
 			var t: int = T_GRASS
 			var edge: float = minf(minf(p.x, wx - p.x), minf(p.y, wy - p.y))
-			var thick: float = (190.0 + 100.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)) if refst else (125.0 + 75.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5))
+			var thick: float = (80.0 + 40.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5)) if refst else (125.0 + 75.0 * (n1.get_noise_2d(p.x, p.y) * 0.5 + 0.5))
 			var forest: bool = edge < thick
 			if p.distance_to(center) < 480.0:
 				forest = false
@@ -482,6 +482,8 @@ func _trees() -> void:
 			rock_add(p, 30.0)
 
 func _forest_wall() -> void:
+	if refst:
+		return
 	for cy in GH:
 		for cx in GW:
 			var forest: int = 0
@@ -1033,6 +1035,11 @@ func _border_tex(n: String) -> Texture2D:
 		return load(p) as Texture2D
 	return null
 
+func _border_tree(trees: Array, p: Vector2, rng: RandomNumberGenerator, shrub: Texture2D) -> void:
+	_tree(trees[rng.randi() % trees.size()], p, rng.randf_range(0.9, 1.15), true)
+	if shrub != null and rng.randf() < 0.22:
+		_decal(shrub, p + Vector2(rng.randf_range(-34.0, 34.0), rng.randf_range(-6.0, 10.0)), rng.randf_range(0.45, 0.6), 0, true, true)
+
 func _trees_ref() -> void:
 	var trees: Array = []
 	for n in ["tree_a", "tree_b", "tree_c"]:
@@ -1042,23 +1049,16 @@ func _trees_ref() -> void:
 	if trees.is_empty():
 		trees = [tex("tree_big_a"), tex("tree_big_b")]
 	var shrub: Texture2D = _border_tex("shrub")
-	if shrub == null:
-		shrub = tex("shrub_big")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = randi()
-	var step: float = 44.0
-	var y: float = 0.0
-	while y < wy + 60.0:
-		var x: float = 0.0
-		while x < wx + 60.0:
-			var p := Vector2(x + rng.randf_range(-16.0, 16.0), y + rng.randf_range(-16.0, 16.0))
-			var d: float = forest_at(p)
-			var prob: float = clampf((d - 0.12) / 0.55, 0.0, 1.0)
-			if rng.randf() < prob * prob + (0.02 if d > 0.1 else 0.0):
-				var sc: float = rng.randf_range(0.82, 1.12) * (0.78 + 0.3 * d)
-				_tree(trees[rng.randi() % trees.size()], p, sc, true)
-				rock_add(p, 17.0)
-			elif d > 0.05 and d < 0.6 and rng.randf() < 0.05:
-				_decal(shrub, p, rng.randf_range(0.5, 0.7), 0, true, true)
-			x += step
-		y += step
+	# one thin, slightly staggered line of big trees along each edge; an invisible boundary sits just inside it
+	var t: float = -10.0
+	while t < wx + 40.0:
+		_border_tree(trees, Vector2(t + rng.randf_range(-10.0, 10.0), 50.0 + rng.randf_range(0.0, 34.0)), rng, shrub)
+		_border_tree(trees, Vector2(t + 33.0 + rng.randf_range(-10.0, 10.0), wy - 34.0 - rng.randf_range(0.0, 26.0)), rng, shrub)
+		t += 66.0
+	t = 70.0
+	while t < wy - 30.0:
+		_border_tree(trees, Vector2(38.0 + rng.randf_range(-6.0, 10.0), t + rng.randf_range(-8.0, 8.0)), rng, shrub)
+		_border_tree(trees, Vector2(wx - 38.0 + rng.randf_range(-10.0, 6.0), t + 33.0 + rng.randf_range(-8.0, 8.0)), rng, shrub)
+		t += 66.0

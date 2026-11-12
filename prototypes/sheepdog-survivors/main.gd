@@ -3,10 +3,10 @@ extends Node2D
 
 const WX: float = 3264.0
 const WY: float = 2208.0
-const XMIN: float = 36.0
-const XMAX: float = 3228.0
-const YMIN: float = 36.0
-const YMAX: float = 2172.0
+var XMIN: float = 36.0
+var XMAX: float = 3228.0
+var YMIN: float = 36.0
+var YMAX: float = 2172.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
 const LAST_WAVE: int = 10
@@ -146,6 +146,11 @@ func _ready() -> void:
 		randomize()
 	style_name = "ref" if search.contains("style=ref") else ("painted" if search.contains("style=painted") else "flat")
 	style_flat = style_name == "flat"
+	if style_name == "ref":
+		XMIN = 100.0
+		XMAX = WX - 100.0
+		YMIN = 108.0
+		YMAX = WY - 96.0
 	look_mode = search.substr(search.find("look=") + 5).to_int() if search.contains("look=") else (0 if style_name == "ref" else 6)
 	smoke = OS.get_cmdline_user_args().has("smoke")
 	if OS.has_feature("web"):

@@ -26,7 +26,7 @@ void fragment() {
 	// the soft edge of the forest: the grass keeps going but gets deeper, darker and thicker
 	float fm = texture(forest_tex, (wp / fcell + 0.5) / fgrid).r;
 	float shade = smoothstep(0.1, 0.85, fm);
-	base = mix(base, base * vec3(0.52, 0.72, 0.5), shade * 0.9);
+	base = mix(base, base * vec3(0.7, 0.84, 0.68), shade * 0.35);
 	vec2 cell = floor(wp / px);
 	vec3 col = base;
 	// the fading trampled-grass map
