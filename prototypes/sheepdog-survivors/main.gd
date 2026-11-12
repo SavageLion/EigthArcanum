@@ -105,6 +105,7 @@ var cam_init: bool = false
 var smoke: bool = false
 var demo: bool = false
 var overview: bool = false
+var autowalk: bool = false
 var look_mode: int = 0
 var style_flat: bool = false
 var style_name: String = "flat"
@@ -150,9 +151,10 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
 		overview = str(JavaScriptBridge.eval("window.location.search")).contains("overview")
+		autowalk = str(JavaScriptBridge.eval("window.location.search")).contains("autowalk")
 	shadow_tex = U.shadow_texture()
 	var names: Array = ["east", "north", "south", "south-east", "north-east"]
-	dog_frames = U.raven_frames()
+	dog_frames = U.raven_frames("wiz_ref" if style_name == "ref" else "wiz")
 	sheep_frames = U.sheep8_frames()
 	fox_frames = U.set8("fox8", 12.0)
 	imp_frames = U.set8("imp8", 12.0)
@@ -160,8 +162,6 @@ func _ready() -> void:
 		sheep_frames = U.set8("sheep_ref", 12.0)
 	if ResourceLoader.exists("res://art/cow8/walk/south/0.png"):
 		cow_frames = U.set8("cow8", 11.0)
-	if ResourceLoader.exists("res://art/pup8/walk/south/0.png"):
-		pup_frames = U.set8("pup8", 12.0)
 	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
 	bear_frames = U.frames(load("res://art/chars/bear.png") as Texture2D, 76, names)
 	world = World.new()
@@ -506,6 +506,8 @@ func _release(id: int) -> void:
 		sprint_id = -99
 
 func move_input() -> Vector2:
+	if autowalk:
+		return Vector2.from_angle(clock * 0.9) * 0.8
 	if stick_on:
 		return stick_vec
 	var v := Vector2.ZERO
@@ -736,6 +738,7 @@ func update_grass_actors() -> void:
 	world.wind_mat.set_shader_parameter("actors", acts)
 	if world.grass_mat != null:
 		world.grass_mat.set_shader_parameter("actors", acts)
+		world.update_trail(acts)
 
 func _process(delta: float) -> void:
 	update_grass_actors()

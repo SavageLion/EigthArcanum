@@ -22,6 +22,8 @@ void fragment() {
 	base = mix(base, c_light, smoothstep(0.50, 0.70, tone));
 	vec2 cell = floor(wp / px);
 	vec3 col = base;
+	// the fading trampled-grass map
+	float tr = 0.0;
 	// whoever walks here pushes the blades aside and presses the grass down a little
 	float pushx = 0.0;
 	float press = 0.0;
@@ -39,13 +41,13 @@ void fragment() {
 		vec2 root = cell + vec2(-lean, float(k));
 		float h = hash(root);
 		float len = 1.0 + floor(hash(root + 5.7) * 3.4);
-		if (h > 0.86 && float(k) < len) {
+		if (h > 0.86 + tr * 0.13 && float(k) < len - tr * 1.6) {
 			float t = float(k) / max(len - 1.0, 1.0);
 			vec3 stroke = mix(c_dark * 0.92, c_tip, 0.3 + 0.7 * t);
 			col = mix(stroke, base, 0.42);
 		}
 	}
-	col = mix(col, c_dark * 0.85, clamp(press, 0.0, 1.0) * 0.3);
+	col = mix(col, c_dark * 0.8, clamp(press * 0.3 + tr * 0.45, 0.0, 0.65));
 	if (hash(cell + vec2(19.0, 3.0)) > 0.96) {
 		col = mix(col, c_dark * 0.8, 0.6);
 	}

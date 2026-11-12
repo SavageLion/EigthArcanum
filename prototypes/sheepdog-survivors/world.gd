@@ -56,6 +56,7 @@ var river_pts: Array = []
 var flat: bool = false
 var refst: bool = false
 var grass_mat: ShaderMaterial
+var trail_dots: Array = []
 var ell_tex: Texture2D
 var path_pts: Array = []
 var rngw := RandomNumberGenerator.new()
@@ -937,3 +938,44 @@ func _dirt_patches() -> void:
 		poly.color = Color(0.98, 0.92, 0.8)
 		poly.z_index = -190
 		add_child(poly)
+
+# ---------------------------------------------------------------- trampled grass: a low-res ground map that fades slowly
+func _setup_trail(gm: ShaderMaterial) -> void:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(int(wx / 8.0), int(wy / 8.0))
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	vp.render_target_clear_mode = SubViewport.CLEAR_MODE_NEVER
+	vp.transparent_bg = false
+	add_child(vp)
+	var fade := ColorRect.new()
+	fade.size = Vector2(vp.size)
+	fade.color = Color(0.0042, 0.0042, 0.0042, 1.0)
+	var cm := CanvasItemMaterial.new()
+	cm.blend_mode = CanvasItemMaterial.BLEND_MODE_SUB
+	fade.material = cm
+	vp.add_child(fade)
+	var root := Node2D.new()
+	root.scale = Vector2(0.125, 0.125)
+	vp.add_child(root)
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 32
+	gt.height = 32
+	for i in 8:
+		var s := Sprite2D.new()
+		s.texture = gt
+		s.scale = Vector2(1.2, 1.2)
+		s.position = Vector2(-9999.0, -9999.0)
+		root.add_child(s)
+		trail_dots.append(s)
+	gm.set_shader_parameter("trail_tex", vp.get_texture())
+
+func update_trail(acts: PackedVector2Array) -> void:
+	for i in trail_dots.size():
+		(trail_dots[i] as Sprite2D).position = acts[i]

@@ -46,7 +46,7 @@ static func row_for(v: Vector2, has5: bool) -> String:
 		return "north" if v.y < 0.0 else "south"
 	return "east"
 
-static func raven_frames() -> SpriteFrames:
+static func raven_frames(root: String = "wiz") -> SpriteFrames:
 	# the Raven Astrologer: 8 directions of idle, walk and cast, one PNG per frame
 	var sf := SpriteFrames.new()
 	sf.remove_animation("default")
@@ -59,8 +59,8 @@ static func raven_frames() -> SpriteFrames:
 			sf.set_animation_speed(an, float((clips[clip] as Array)[0]))
 			sf.set_animation_loop(an, bool((clips[clip] as Array)[1]))
 			var i: int = 0
-			while ResourceLoader.exists("res://art/wiz/%s/%s/%d.png" % [clip, d, i]):
-				sf.add_frame(an, load("res://art/wiz/%s/%s/%d.png" % [clip, d, i]) as Texture2D)
+			while ResourceLoader.exists("res://art/%s/%s/%s/%d.png" % [root, clip, d, i]):
+				sf.add_frame(an, load("res://art/%s/%s/%s/%d.png" % [root, clip, d, i]) as Texture2D)
 				i += 1
 	return sf
 
