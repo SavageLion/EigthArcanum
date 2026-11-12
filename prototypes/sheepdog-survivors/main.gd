@@ -10,7 +10,7 @@ const YMAX: float = 1166.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
 const LAST_WAVE: int = 10
-const BASE_ZOOM: float = 1.8
+const BASE_ZOOM: float = 1.3
 const TYPES: Dictionary = {
 	"normal": {"r": 7.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10},
 	"lamb": {"r": 4.5, "zone": 105.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 8},
