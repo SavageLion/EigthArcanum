@@ -33,6 +33,9 @@ func _draw() -> void:
 	if main == null or main.dog == null:
 		return
 	var v: Vector2 = main.vp()
+	if main.state == "farm":
+		_farm(v)
+		return
 	# top left: xp and health
 	_panel(Rect2(8, 6, 230, 58))
 	_text("XP  %d" % int(main.xp), Vector2(18, 28), 17, Color(0.6, 0.9, 1.0))
@@ -142,6 +145,7 @@ func _draw() -> void:
 	if main.state == "inter":
 		_inter(v)
 	if main.state == "result":
+		var rw: Dictionary = main.result.get("reward", {})
 		draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.55))
 		var rr := Rect2(v.x / 2.0 - 200, v.y / 2.0 - 125, 400, 250)
 		_panel(rr, Color(0.2, 0.14, 0.1, 0.96))
@@ -149,7 +153,10 @@ func _draw() -> void:
 		_text("THE CASTLE HELD!" if won else "THE WALL FELL", rr.position + Vector2(0, 52), 30, GOLD if won else Color(1.0, 0.5, 0.42), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("Reached wave %d of %d" % [main.result["wave"], main.LAST_WAVE], rr.position + Vector2(0, 98), 17, CREAM, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("%d animals herded  ·  %d raiders defeated" % [main.result["herded"], main.result["defeated"]], rr.position + Vector2(0, 126), 15, Color(CREAM, 0.85), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text("tap to play again", rr.position + Vector2(0, 208), 18, GOLD, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		if not rw.is_empty():
+			var cn: String = String(Meta.CROPS[String(rw["crop"])]["name"])
+			_text("+%d %s" % [int(rw["amt"]), cn] + ("   (plot cleared!)" if bool(rw["fresh"]) else ""), rr.position + Vector2(0, 168), 18, Color(Meta.CROPS[String(rw["crop"])]["col"]), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("tap to return to the farm", rr.position + Vector2(0, 218), 18, GOLD, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var tr: Rect2 = main.test_rect()
 	_panel(tr, Color(0.4, 0.2, 0.5, 0.92))
 	_text("TEST", tr.position + Vector2(0, 22), 12, CREAM, tr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
@@ -248,6 +255,8 @@ func _inter_wizard(v: Vector2) -> void:
 func _inter_castle(v: Vector2) -> void:
 	_text("THE CASTLE", Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var nxt: int = [4, 10, 18, 0][main.world.tier]
+	if main.world.tier >= Meta.tier_cap() and main.world.tier < 3:
+		nxt = 0
 	var tline: String = "Your pen: %s" % String(main.world.TIER_NAMES[main.world.tier])
 	if nxt > 0:
 		tline += "   (next look at castle score %d, now %d)" % [nxt, main.castle_score()]
@@ -322,3 +331,117 @@ func _inter_castle(v: Vector2) -> void:
 	_text(hint, Vector2(dr.position.x, dr.end.y - 12), 15, Color(CREAM, 0.9), dr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	_btn(main.btn_left_rect(), "<  BACK", Color(0.32, 0.24, 0.5, 0.96))
 	_btn(main.btn_right_rect(), "START WAVE %d" % (main.wave + 1), Color(0.28, 0.5, 0.22, 0.96))
+
+# ---------------------------------------------------------------- the farm
+func _crop_icon(c: Vector2, col: Color, s: float = 1.0) -> void:
+	draw_circle(c, 7.0 * s, Color(0.1, 0.07, 0.05, 0.9))
+	draw_circle(c, 5.5 * s, col)
+	draw_circle(c + Vector2(-1.5, -1.8) * s, 1.8 * s, col.lightened(0.45))
+
+func _farmbtn(r: Rect2, label: String, col: Color, size: int = 17) -> void:
+	_panel(r, col)
+	_text(label, r.position + Vector2(0, r.size.y / 2.0 + float(size) * 0.35), size, CREAM, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+
+func _cost_text(cost: Dictionary) -> String:
+	var parts: Array = []
+	for k in cost:
+		parts.append("%d %s" % [int(cost[k]), String(Meta.CROPS[k]["name"])])
+	return ", ".join(parts)
+
+func _farm(v: Vector2) -> void:
+	draw_rect(Rect2(Vector2.ZERO, v), Color(0.2, 0.36, 0.17))
+	for i in 40:
+		var gx: float = fposmod(float(i) * 97.0, v.x)
+		var gy: float = fposmod(float(i) * 53.0, v.y)
+		draw_rect(Rect2(gx, gy, 14, 4), Color(0.26, 0.44, 0.2))
+	# crop bar
+	_panel(Rect2(8, 6, 640, 34), Color(0.13, 0.09, 0.08, 0.85))
+	for i in Meta.CROP_ORDER.size():
+		var k: String = String(Meta.CROP_ORDER[i])
+		var cx: float = 26.0 + float(i) * 104.0
+		_crop_icon(Vector2(cx, 23), Meta.CROPS[k]["col"])
+		_text("%d" % int(Meta.crops.get(k, 0)), Vector2(cx + 12.0, 29), 16, CREAM)
+	if main.farm_view != "shop":
+		_text("YOUR FARM", Vector2(0, 76), 20, GOLD, v.x - 316.0, HORIZONTAL_ALIGNMENT_CENTER)
+	if main.farm_view == "shop":
+		_farm_shop(v)
+	else:
+		_farm_map(v)
+	if main.farm_msg != "":
+		_panel(Rect2(v.x / 2.0 - 150, v.y - 60, 300, 36), Color(0.5, 0.38, 0.12, 0.96))
+		_text(main.farm_msg, Vector2(v.x / 2.0 - 150, v.y - 36), 16, CREAM, 300.0, HORIZONTAL_ALIGNMENT_CENTER)
+	var tr: Rect2 = main.test_rect()
+	_panel(tr, Color(0.4, 0.2, 0.5, 0.92))
+	_text("TEST", tr.position + Vector2(0, 22), 12, CREAM, tr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+
+func _farm_map(v: Vector2) -> void:
+	for i in Meta.PLOTS.size():
+		var pd: Dictionary = Meta.PLOTS[i]
+		var r: Rect2 = main.farm_plot_rect(i)
+		var open: bool = Meta.plot_open(i)
+		var done: bool = Meta.is_cleared(i)
+		var col: Color = Color(0.45, 0.32, 0.2) if done else (Color(0.34, 0.5, 0.26) if open else Color(0.28, 0.3, 0.27))
+		_panel(r, col)
+		var cc: Color = Meta.CROPS[String(pd["crop"])]["col"]
+		if done:
+			for row in 3:
+				for k in 4:
+					_crop_icon(r.position + Vector2(22.0 + float(k) * (r.size.x - 44.0) / 3.0, 26.0 + float(row) * 22.0), cc, 0.8)
+			var rc: int = Meta.ready_count(i)
+			if rc > 0:
+				_panel(Rect2(r.end.x - 40, r.position.y + 4, 36, 20), Color(0.2, 0.5, 0.2, 0.95))
+				_text("+%d" % rc, Vector2(r.end.x - 40, r.position.y + 19), 13, CREAM, 36.0, HORIZONTAL_ALIGNMENT_CENTER)
+		elif open:
+			_text("RAID", r.position + Vector2(0, 46), 18, Color(1.0, 0.85, 0.5), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		else:
+			_text("LOCKED", r.position + Vector2(0, 46), 14, Color(CREAM, 0.5), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(String(pd["name"]), r.position + Vector2(0, r.size.y - 10), 12, CREAM if open else Color(CREAM, 0.5), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		for d in 1 + int(pd["bonus"]) / 2:
+			draw_circle(r.position + Vector2(10.0 + float(d) * 9.0, r.size.y - 30.0), 3.2, Color(0.95, 0.4, 0.35) if open else Color(0.5, 0.5, 0.5))
+		if main.farm_sel == i:
+			draw_rect(r, GOLD, false, 3.0)
+	# detail panel
+	var pr: Rect2 = main.farm_panel_rect()
+	_panel(pr, Color(0.18, 0.13, 0.1, 0.96))
+	var s: int = main.farm_sel
+	if s < 0:
+		_text("Tap a plot", pr.position + Vector2(0, 40), 20, GOLD, pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("Defend a section of the farm", pr.position + Vector2(0, 72), 14, Color(CREAM, 0.8), pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("for 5 waves. Win to grow its crop,", pr.position + Vector2(0, 92), 14, Color(CREAM, 0.8), pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("then craft new spells and", pr.position + Vector2(0, 112), 14, Color(CREAM, 0.8), pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("castle pieces in the workshop.", pr.position + Vector2(0, 132), 14, Color(CREAM, 0.8), pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	else:
+		var pd2: Dictionary = Meta.PLOTS[s]
+		var cc2: Color = Meta.CROPS[String(pd2["crop"])]["col"]
+		_text(String(pd2["name"]), pr.position + Vector2(0, 38), 22, GOLD, pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_crop_icon(pr.position + Vector2(40, 76), cc2, 1.2)
+		_text("Grows " + String(Meta.CROPS[String(pd2["crop"])]["name"]), pr.position + Vector2(60, 82), 16, CREAM)
+		_text("Danger", pr.position + Vector2(20, 118), 14, Color(CREAM, 0.8))
+		for d in 1 + int(pd2["bonus"]) / 2:
+			draw_circle(pr.position + Vector2(86.0 + float(d) * 16.0, 113), 5.0, Color(0.95, 0.4, 0.35))
+		_text("5 waves  ·  win for 5+ crops", pr.position + Vector2(20, 146), 13, Color(CREAM, 0.8))
+		if Meta.is_cleared(s):
+			_text("Ripe now: %d" % Meta.ready_count(s), pr.position + Vector2(20, 172), 14, Color(0.6, 0.9, 0.5))
+		if Meta.plot_open(s):
+			_farmbtn(main.farm_start_rect(), "START RAID" if not Meta.is_cleared(s) else "RAID AGAIN", Color(0.62, 0.22, 0.18, 0.98), 20)
+		else:
+			_text("Clear " + String(Meta.PLOTS[int(pd2["req"])]["name"]) + " first", pr.position + Vector2(0, pr.size.y - 36), 14, Color(CREAM, 0.7), pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_farmbtn(main.farm_shop_rect(), "WORKSHOP", Color(0.4, 0.3, 0.14, 0.98))
+	var tr2: int = Meta.total_ready()
+	_farmbtn(main.farm_collect_rect(), "COLLECT (%d)" % tr2, Color(0.2, 0.42, 0.2, 0.98) if tr2 > 0 else Color(0.22, 0.24, 0.2, 0.9))
+
+func _farm_shop(v: Vector2) -> void:
+	_text("WORKSHOP", Vector2(0, 76), 20, GOLD, v.x - 316.0, HORIZONTAL_ALIGNMENT_CENTER)
+	for i in Meta.UNLOCKS.size():
+		var u: Dictionary = Meta.UNLOCKS[i]
+		var r: Rect2 = main.shop_row_rect(i)
+		var owned: bool = Meta.has(String(u["id"]))
+		var can: bool = Meta.can_afford(u)
+		_panel(r, Color(0.2, 0.4, 0.2, 0.96) if owned else (Color(0.3, 0.22, 0.14, 0.96) if can else Color(0.17, 0.13, 0.1, 0.92)))
+		_text(String(u["name"]), r.position + Vector2(10, 19), 15, CREAM)
+		_text(String(u["desc"]), r.position + Vector2(10, 37), 11, Color(CREAM, 0.7))
+		if owned:
+			_text("OWNED", Vector2(r.end.x - 90, r.position.y + 28), 14, Color(0.7, 1.0, 0.6), 80.0, HORIZONTAL_ALIGNMENT_RIGHT)
+		else:
+			_text(_cost_text(u["cost"]), Vector2(r.end.x - 230, r.position.y + 19), 12, GOLD if can else Color(GOLD, 0.5), 220.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	_farmbtn(main.farm_shop_rect(), "BACK", Color(0.4, 0.3, 0.14, 0.98))

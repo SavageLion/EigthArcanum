@@ -9,7 +9,7 @@ var YMIN: float = 36.0
 var YMAX: float = 2172.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
-const LAST_WAVE: int = 10
+var LAST_WAVE: int = 5
 const BASE_ZOOM: float = 1.1
 const TYPES: Dictionary = {
 	"normal": {"r": 8.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10, "set": "sheep_ref", "metric": "w", "target": 0.72},
@@ -79,6 +79,11 @@ var wolf_frames: SpriteFrames
 var bear_frames: SpriteFrames
 var shadow_tex: Texture2D
 var state: String = "play"
+var plot: int = 0
+var farm_sel: int = -1
+var farm_view: String = "map"
+var devmode: bool = false
+var farm_msg: String = ""
 var clock: float = 0.0
 var wave: int = 0
 var wave_t: float = 0.0
@@ -164,6 +169,16 @@ func _ready() -> void:
 		if zs.contains("zoomx="):
 			dbg_zoom = float(zs.substr(zs.find("zoomx=") + 6).to_float())
 		autowalk = str(JavaScriptBridge.eval("window.location.search")).contains("autowalk")
+	Meta.load_save()
+	devmode = smoke
+	if OS.has_feature("web"):
+		for key in ["demo", "overview", "lineup", "interdemo", "holesdemo", "intercastle", "autowalk", "tier", "play", "lowres"]:
+			if search.contains(key):
+				devmode = true
+	if devmode:
+		Meta.all_open = true
+	elif Meta.pending >= 0:
+		plot = Meta.pending
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.raven_frames("wiz_ref")
 	fox_frames = U.set8("fox8", 12.0)
@@ -218,6 +233,8 @@ func _ready() -> void:
 	_setup_layers()
 	_spawn_butterflies()
 	start_wave(1)
+	if not devmode and Meta.pending < 0:
+		state = "farm"
 	if lineup:
 		setup_lineup()
 	if OS.has_feature("web"):
@@ -462,6 +479,11 @@ func test_rect() -> Rect2:
 	return Rect2(vp().x - 100.0, 44.0, 46.0, 34.0)
 
 func test_boost() -> void:
+	if state == "farm":
+		for k in Meta.CROP_ORDER:
+			Meta.crops[k] = int(Meta.crops.get(k, 0)) + 20
+		Meta.save()
+		return
 	xp += 1000.0
 	gold += 1000
 	add_popup("+1000 XP  +1000 gold", dog.position + Vector2(0, -40), Color(1.0, 0.9, 0.5))
@@ -517,10 +539,14 @@ func _press(p: Vector2, id: int) -> void:
 	if state != "result" and test_rect().grow(6.0).has_point(p):
 		test_boost()
 		return
-	if state != "result" and fs_rect().grow(6.0).has_point(p):
+	if state != "result" and state != "farm" and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
 		return
+	if state == "farm":
+		farm_press(p)
+		return
 	if state == "result":
+		Meta.pending = -1
 		get_tree().reload_current_scene()
 		return
 	if state == "inter":
@@ -605,22 +631,27 @@ func start_wave(n: int) -> void:
 	wave = n
 	wave_t = 0.0
 	events.clear()
-	var fox_n: int = 5 + 2 * n
-	var wolf_n: int = n - 1
-	var imp_n: int = (1 + n / 2) if n >= 2 else 0
+	var pd: Dictionary = Meta.PLOTS[plot]
+	var bonus: int = int(pd["bonus"])
+	var extra: String = String(pd["extra"])
+	var eff: int = n + bonus
+	var fox_n: int = 5 + 2 * eff
+	var wolf_n: int = eff - 1
+	var imp_n: int = (1 + eff / 2) if eff >= 2 else 0
 	for i in imp_n:
 		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
 	for i in fox_n:
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
 	for i in wolf_n:
 		events.append({"t": randf_range(4.0, 52.0), "k": "wolf"})
-	if n == 5:
+	if extra != "":
+		for i in 2 + bonus / 2:
+			events.append({"t": randf_range(4.0, 52.0), "k": extra})
+	if n == LAST_WAVE:
+		for i in 1 + bonus / 3:
+			events.append({"t": 14.0 + 18.0 * float(i), "k": "bear"})
+	elif n == 3 and bonus >= 3:
 		events.append({"t": 20.0, "k": "bear"})
-	if n == 8:
-		events.append({"t": 15.0, "k": "bear"})
-	if n == 10:
-		events.append({"t": 10.0, "k": "bear"})
-		events.append({"t": 32.0, "k": "bear"})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
 	banner = "WAVE %d" % n if n < LAST_WAVE else "LAST WAVE!"
 	banner_t = 3.0
@@ -1393,7 +1424,7 @@ func pick_new_perk() -> Dictionary:
 		for o in perk_offers:
 			if String(o["id"]) == String(p["id"]):
 				already = true
-		if not already and pl(String(p["id"])) < int(p["max"]):
+		if not already and pl(String(p["id"])) < int(p["max"]) and Meta.perk_ok(String(p["id"])):
 			pool.append(p)
 	if pool.is_empty():
 		return {}
@@ -1446,6 +1477,67 @@ func buy_perk(i: int) -> bool:
 		perk_offers[i] = fresh
 	return true
 
+# ---------------------------------------------------------------- the farm
+func farm_cell() -> float:
+	var v: Vector2 = vp()
+	return minf((v.x - 24.0 - 316.0) / 3.0, (v.y - 90.0 - 76.0) / 3.0)
+
+func farm_plot_rect(i: int) -> Rect2:
+	var c: float = farm_cell()
+	return Rect2(24.0 + float(i % 3) * c, 90.0 + float(i / 3) * c, c - 8.0, c - 8.0)
+
+func farm_panel_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x - 300.0, 90.0, 288.0, v.y - 166.0)
+
+func farm_start_rect() -> Rect2:
+	var pr: Rect2 = farm_panel_rect()
+	return Rect2(pr.position.x + 19.0, pr.end.y - 64.0, 250.0, 50.0)
+
+func farm_shop_rect() -> Rect2:
+	return Rect2(24.0, vp().y - 60.0, 190.0, 46.0)
+
+func farm_collect_rect() -> Rect2:
+	return Rect2(224.0, vp().y - 60.0, 190.0, 46.0)
+
+func shop_row_rect(i: int) -> Rect2:
+	var w: float = (vp().x - 60.0) / 2.0
+	var col: int = i / 8
+	return Rect2(24.0 + float(col) * (w + 12.0), 84.0 + float(i % 8) * 47.0, w, 42.0)
+
+func farm_press(p: Vector2) -> void:
+	farm_msg = ""
+	if farm_view == "shop":
+		if farm_shop_rect().grow(6.0).has_point(p):
+			farm_view = "map"
+			return
+		for i in Meta.UNLOCKS.size():
+			if shop_row_rect(i).has_point(p):
+				var u: Dictionary = Meta.UNLOCKS[i]
+				if Meta.has(String(u["id"])):
+					return
+				if Meta.buy(u):
+					farm_msg = "Unlocked " + String(u["name"]) + "!"
+				else:
+					farm_msg = "Not enough crops yet"
+				return
+		return
+	if farm_shop_rect().grow(6.0).has_point(p):
+		farm_view = "shop"
+		return
+	if farm_collect_rect().grow(6.0).has_point(p):
+		var n: int = Meta.collect_all()
+		farm_msg = ("Collected %d crops" % n) if n > 0 else "Nothing ripe yet"
+		return
+	if farm_sel >= 0 and Meta.plot_open(farm_sel) and farm_start_rect().grow(6.0).has_point(p):
+		Meta.pending = farm_sel
+		get_tree().reload_current_scene()
+		return
+	for i in Meta.PLOTS.size():
+		if farm_plot_rect(i).has_point(p):
+			farm_sel = i
+			return
+
 func castle_score() -> int:
 	var s: int = walls_lv * 2 + moss_lv + market_lv + world.holes.size()
 	for pp in world.pads:
@@ -1464,7 +1556,7 @@ func tier_for_score(s: int) -> int:
 	return 0
 
 func check_tier() -> void:
-	var t: int = tier_for_score(castle_score())
+	var t: int = mini(tier_for_score(castle_score()), Meta.tier_cap())
 	if t == world.tier:
 		return
 	world.set_tier(t)
@@ -1486,6 +1578,8 @@ func rebuild_options() -> void:
 			upgradable += 1
 	if free > 0:
 		for k in DEF_ORDER:
+			if not Meta.tower_ok(String(k)):
+				continue
 			castle_opts.append({"id": "build_" + String(k), "name": String(DEFS[k]["name"]), "desc": "Tap an empty spot on the castle", "cost": int(DEFS[k]["cost"]), "mode": "place", "kind": String(k)})
 	if upgradable > 0:
 		castle_opts.append({"id": "upgrade", "name": "Upgrade a tower", "desc": "Tap one of your towers (its cost shows)", "cost": 0, "mode": "upgrade", "kind": ""})
@@ -1493,14 +1587,14 @@ func rebuild_options() -> void:
 	for side in ["north", "west", "east"]:
 		if not bool(world.holes.get(side, false)):
 			closed += 1
-	if closed > 0:
+	if closed > 0 and Meta.castle_ok("gate"):
 		castle_opts.append({"id": "gate", "name": "Open a gate", "desc": "Tap a wall to cut a gap so animals can walk in", "cost": 25, "mode": "gate", "kind": ""})
 	castle_opts.append({"id": "mend", "name": "Mend the walls", "desc": "Repair every wall to full strength", "cost": 15, "mode": "now", "kind": ""})
-	if walls_lv < 4:
+	if walls_lv < 4 and Meta.castle_ok("walls_up"):
 		castle_opts.append({"id": "walls_up", "name": "Stronger walls", "desc": "+30%% wall strength (level %d to %d)" % [walls_lv, walls_lv + 1], "cost": 40 + 30 * walls_lv, "mode": "now", "kind": ""})
-	if moss_lv < 3:
+	if moss_lv < 3 and Meta.castle_ok("moss"):
 		castle_opts.append({"id": "moss", "name": "Healing moss", "desc": "Walls slowly mend themselves (level %d to %d)" % [moss_lv, moss_lv + 1], "cost": 35 + 25 * moss_lv, "mode": "now", "kind": ""})
-	if market_lv < 3:
+	if market_lv < 3 and Meta.castle_ok("market"):
 		castle_opts.append({"id": "market", "name": "Market stall", "desc": "Penned animals pay +25%% gold (level %d to %d)" % [market_lv, market_lv + 1], "cost": 50 + 40 * market_lv, "mode": "now", "kind": ""})
 	if sel_item != "" and option_by_id(sel_item).is_empty():
 		sel_item = ""
@@ -2008,4 +2102,7 @@ func finish_day(why: String) -> void:
 		return
 	state = "result"
 	stick_on = false
-	result = {"why": why, "wave": wave, "xp": int(xp), "herded": herded, "defeated": defeated, "lost": lost}
+	var reward: Dictionary = {}
+	if not devmode:
+		reward = Meta.record_result(plot, why == "won", wave)
+	result = {"reward": reward, "plot": plot, "why": why, "wave": wave, "xp": int(xp), "herded": herded, "defeated": defeated, "lost": lost}
