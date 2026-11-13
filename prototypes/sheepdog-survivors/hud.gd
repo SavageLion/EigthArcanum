@@ -243,7 +243,11 @@ func _inter_wizard(v: Vector2) -> void:
 
 func _inter_castle(v: Vector2) -> void:
 	_text("THE CASTLE", Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_text("Step 2 of 2: pick an item, then tap where it goes", Vector2(0, 58), 14, Color(CREAM, 0.75), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var nxt: int = [4, 10, 18, 0][main.world.tier]
+	var tline: String = "Your pen: %s" % String(main.world.TIER_NAMES[main.world.tier])
+	if nxt > 0:
+		tline += "   (next look at castle score %d, now %d)" % [nxt, main.castle_score()]
+	_text(tline, Vector2(0, 58), 14, Color(1.0, 0.9, 0.5, 0.9), v.x, HORIZONTAL_ALIGNMENT_CENTER)
 	_text("%d gold" % main.gold, Vector2(v.x - 180, 36), 22, GOLD, 160.0, HORIZONTAL_ALIGNMENT_RIGHT)
 	# the column of choices
 	var lr: Rect2 = main.opt_list_rect()

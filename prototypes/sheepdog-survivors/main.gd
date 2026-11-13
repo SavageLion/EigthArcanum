@@ -220,6 +220,14 @@ func _ready() -> void:
 	start_wave(1)
 	if lineup:
 		setup_lineup()
+	if OS.has_feature("web"):
+		var ts: String = str(JavaScriptBridge.eval("window.location.search"))
+		for tt in [1, 2, 3]:
+			if ts.contains("tier%d" % tt):
+				world.set_tier(tt)
+				dog.position = world.pen.get_center() + Vector2(0.0, 40.0)
+				cam_pos = dog.position
+				cam_init = true
 	if holesdemo:
 		dog.position = world.pen.get_center() + Vector2(0.0, 40.0)
 		cam_pos = dog.position
@@ -1423,6 +1431,34 @@ func buy_perk(i: int) -> bool:
 		perk_offers[i] = fresh
 	return true
 
+func castle_score() -> int:
+	var s: int = walls_lv * 2 + moss_lv + market_lv + world.holes.size()
+	for pp in world.pads:
+		var p: Pad = pp
+		if p.kind != "":
+			s += p.lv
+	return s
+
+func tier_for_score(s: int) -> int:
+	if s >= 18:
+		return 3
+	if s >= 10:
+		return 2
+	if s >= 4:
+		return 1
+	return 0
+
+func check_tier() -> void:
+	var t: int = tier_for_score(castle_score())
+	if t == world.tier:
+		return
+	world.set_tier(t)
+	for w in world.walls:
+		set_wall_hp(w, float(w["hp"]))
+	if t > 0:
+		ring(world.pen.get_center(), 200.0, Color(1.0, 0.85, 0.4), 0.9, 6.0)
+		add_popup("YOUR PEN IS NOW A " + String(world.TIER_NAMES[t]).to_upper() + "!", world.pen.get_center() + Vector2(0, -60), Color(1.0, 0.9, 0.5))
+
 func rebuild_options() -> void:
 	castle_opts.clear()
 	var free: int = 0
@@ -1508,6 +1544,7 @@ func apply_option(o: Dictionary, target: Variant) -> bool:
 			moss_lv += 1
 		elif id == "market":
 			market_lv += 1
+	check_tier()
 	rebuild_options()
 	return true
 

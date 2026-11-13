@@ -615,6 +615,7 @@ func _pen_visuals() -> void:
 		fl.position = pen.get_center() + Vector2(0, 14)
 		fl.z_index = -150
 		add_child(fl)
+		pen_floor = fl
 	var dirt := Sprite2D.new()
 	dirt.texture = _masked("ground/gdirt")
 	dirt.position = pen.get_center()
@@ -627,8 +628,144 @@ func _pen_visuals() -> void:
 	for w in walls:
 		_wall_nodes(w)
 
+var tier: int = 0
+var tier_tex: Dictionary = {}
+var post_nodes: Array = []
+var pen_floor: Sprite2D
+
+const TIER_NAMES: Array = ["Wooden Fence", "Log Palisade", "Stone Keep", "Grand Castle"]
+
+func _px(img: Image, x0: int, y0: int, w: int, h: int, c: Color) -> void:
+	for y in range(maxi(y0, 0), mini(y0 + h, img.get_height())):
+		for x in range(maxi(x0, 0), mini(x0 + w, img.get_width())):
+			img.set_pixel(x, y, c)
+
+func make_wall_tex(t: int) -> Texture2D:
+	if t <= 0:
+		return fence_tex
+	if tier_tex.has(t):
+		return tier_tex[t]
+	var W: int = 80
+	var H: int = [0, 30, 34, 44][t]
+	var img := Image.create(W, H, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var out := Color(0.16, 0.12, 0.1)
+	if t == 1:
+		for i in 10:
+			var top: int = 2 + (i * 7) % 5
+			var x0: int = i * 8
+			var sh: float = 0.0 if i % 2 == 0 else 0.07
+			var base := Color(0.56 - sh, 0.37 - sh, 0.2 - sh * 0.5)
+			_px(img, x0, top, 8, H - top, out)
+			_px(img, x0 + 1, top + 1, 6, H - top - 2, base)
+			_px(img, x0 + 1, top + 1, 2, H - top - 2, base.lightened(0.18))
+			_px(img, x0 + 5, top + 1, 2, H - top - 2, base.darkened(0.2))
+			for k in 3:
+				_px(img, x0 + 1 + k, top - 1 + (0 if k == 1 else 1), 6 - 2 * k if k < 3 else 1, 1, out)
+			_px(img, x0 + 2, top - 1, 4, 1, out)
+			_px(img, x0 + 3, top - 2, 2, 1, out)
+		_px(img, 0, H - 14, W, 3, Color(0.3, 0.2, 0.12))
+		_px(img, 0, H - 8, W, 3, Color(0.3, 0.2, 0.12))
+	else:
+		var stone := Color(0.66, 0.66, 0.7) if t == 2 else Color(0.6, 0.62, 0.72)
+		var mer: int = 8 if t == 2 else 9
+		var body_y: int = mer
+		_px(img, 0, body_y, W, H - body_y, out)
+		_px(img, 1, body_y + 1, W - 2, H - body_y - 3, stone)
+		for x in range(0, W, 16):
+			_px(img, x, 0, 9, body_y + 1, out)
+			_px(img, x + 1, 1, 7, body_y, stone.lightened(0.1))
+		_px(img, 1, body_y + 1, W - 2, 1, stone.lightened(0.25))
+		var rows: int = (H - body_y - 3) / 7
+		for r in rows:
+			var yy: int = body_y + 7 + r * 7
+			_px(img, 1, yy, W - 2, 1, stone.darkened(0.25))
+			var off: int = 0 if r % 2 == 0 else 6
+			for x in range(off + 6, W - 1, 12):
+				_px(img, x, yy - 6, 1, 6, stone.darkened(0.22))
+		_px(img, 1, H - 4, W - 2, 3, stone.darkened(0.18))
+		if t == 3:
+			_px(img, 1, body_y + 11, W - 2, 5, Color(0.72, 0.16, 0.16))
+			_px(img, 1, body_y + 11, W - 2, 1, Color(0.9, 0.3, 0.25))
+			for x in range(8, W - 4, 16):
+				_px(img, x, body_y + 12, 4, 3, Color(1.0, 0.82, 0.3))
+	var tx := ImageTexture.create_from_image(img)
+	tier_tex[t] = tx
+	return tx
+
+func make_post_tex(t: int) -> Texture2D:
+	var key: int = 100 + t
+	if tier_tex.has(key):
+		return tier_tex[key]
+	var H: int = [0, 40, 52, 70][t]
+	var W: int = 14 if t < 3 else 18
+	var img := Image.create(W, H + 14, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var out := Color(0.14, 0.1, 0.09)
+	var base := Color(0.5, 0.33, 0.18) if t == 1 else (Color(0.7, 0.7, 0.74) if t == 2 else Color(0.62, 0.64, 0.76))
+	var top: int = 14
+	_px(img, 0, top, W, H, out)
+	_px(img, 1, top + 1, W - 2, H - 2, base)
+	_px(img, 1, top + 1, 3, H - 2, base.lightened(0.18))
+	_px(img, W - 4, top + 1, 3, H - 2, base.darkened(0.22))
+	if t == 1:
+		_px(img, 2, top - 3, W - 4, 3, out)
+		_px(img, 3, top - 2, W - 6, 2, base.lightened(0.1))
+	else:
+		for x in range(0, W, 6):
+			_px(img, x, top - 5, 4, 6, out)
+			_px(img, x + 1, top - 4, 2, 5, base.lightened(0.12))
+		for y in range(top + 6, top + H - 4, 7):
+			_px(img, 1, y, W - 2, 1, base.darkened(0.25))
+	if t == 3:
+		_px(img, W / 2 - 1, 0, 2, top - 4, out)
+		_px(img, W / 2 + 1, 1, 8, 5, Color(0.8, 0.16, 0.16))
+		_px(img, W / 2 + 1, 1, 8, 1, Color(0.95, 0.35, 0.3))
+	var tx := ImageTexture.create_from_image(img)
+	tier_tex[key] = tx
+	return tx
+
+func set_tier(t: int) -> void:
+	if t == tier:
+		return
+	tier = t
+	for w in walls:
+		if not w.has("nodes"):
+			continue
+		for n in (w["nodes"] as Array):
+			(n as Sprite2D).queue_free()
+		_wall_nodes(w)
+	_build_posts()
+	if pen_floor != null:
+		pen_floor.modulate = [Color(1, 1, 1), Color(1, 0.97, 0.92), Color(0.86, 0.86, 0.92), Color(0.78, 0.8, 0.92)][t]
+
+func _build_posts() -> void:
+	for n in post_nodes:
+		(n as Sprite2D).queue_free()
+	post_nodes.clear()
+	if tier <= 0:
+		return
+	var seen: Dictionary = {}
+	var tx: Texture2D = make_post_tex(tier)
+	for w in walls:
+		if not bool(w["pen"]):
+			continue
+		for key in ["a", "b"]:
+			var p: Vector2 = w[key]
+			var k := Vector2i(roundi(p.x / 6.0), roundi(p.y / 6.0))
+			if seen.has(k):
+				continue
+			seen[k] = true
+			var sp := Sprite2D.new()
+			sp.texture = tx
+			sp.position = p + Vector2(0, 2)
+			sp.offset = Vector2(0, -float(tx.get_height()) * 0.5 + 6.0)
+			sp.scale = Vector2(1.15, 1.15)
+			ysort.add_child(sp)
+			post_nodes.append(sp)
+
 func _wall_nodes(w: Dictionary) -> void:
-	var fence_h: Texture2D = fence_tex
+	var fence_h: Texture2D = make_wall_tex(tier)
 	var a: Vector2 = w["a"]
 	var b: Vector2 = w["b"]
 	var l: float = a.distance_to(b)
@@ -646,7 +783,7 @@ func _wall_nodes(w: Dictionary) -> void:
 		sp.position = a.lerp(b, t)
 		sp.rotation = ang
 		sp.scale = Vector2(k * 1.05, k * 0.95)
-		sp.offset = Vector2(0, -9)
+		sp.offset = Vector2(0, -9.0 if tier == 0 else -float(fence_h.get_height()) * 0.5 + 3.0)
 		ysort.add_child(sp)
 		nodes.append(sp)
 	w["nodes"] = nodes
@@ -675,6 +812,7 @@ func open_hole(side: String) -> void:
 		_wall_nodes(w1)
 		_wall_nodes(w2)
 		holes[side] = true
+		_build_posts()
 		return
 
 func _masked(path: String) -> Texture2D:
