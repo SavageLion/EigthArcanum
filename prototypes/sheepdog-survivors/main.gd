@@ -222,6 +222,8 @@ func _ready() -> void:
 		setup_lineup()
 	if OS.has_feature("web"):
 		var ts: String = str(JavaScriptBridge.eval("window.location.search"))
+		if ts.contains("lowres"):
+			set_low_res()
 		for tt in [1, 2, 3]:
 			if ts.contains("tier%d" % tt):
 				world.set_tier(tt)
@@ -721,6 +723,7 @@ func _physics_process(delta: float) -> void:
 	if state != "play":
 		return
 	var dt: float = minf(delta, 0.05)
+	perf_check(delta)
 	clock += dt
 	wave_t += dt
 	if smoke:
@@ -1731,6 +1734,31 @@ func pressure_from(s: Sheep, p: Vector2, h: Vector2, mult: float, calm: bool, dt
 	s.vel += (u * t * t * 430.0 + Vector2(-u.y, u.x) * side * t * 95.0) * k * dt
 	return t
 
+var perf_acc: float = 0.0
+var perf_n: int = 0
+var perf_low: bool = false
+
+func set_low_res() -> void:
+	if perf_low:
+		return
+	perf_low = true
+	var w: Window = get_window()
+	w.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+	w.content_scale_size = Vector2i(960, 540)
+	w.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	add_popup("Performance mode on", dog.position + Vector2(0, -50), Color(0.8, 0.9, 1.0))
+
+func perf_check(delta: float) -> void:
+	if perf_low or not OS.has_feature("web") or state != "play" or wave_t < 3.0:
+		return
+	perf_acc += delta
+	perf_n += 1
+	if perf_acc >= 3.0:
+		if float(perf_n) / perf_acc < 42.0:
+			set_low_res()
+		perf_acc = 0.0
+		perf_n = 0
+
 func update_sheep(dt: float) -> void:
 	for s in sheep:
 		var sh: Sheep = s
@@ -1764,33 +1792,35 @@ func update_sheep(dt: float) -> void:
 					dog.stun = 0.7
 					dog.vel += (dog.position - sh.position) / maxf(dd, 0.01) * 260.0
 					add_popup("OOF!", dog.position + Vector2(0, -16), Color(1.0, 0.72, 0.29))
-			var c := Vector2.ZERO
-			var vsum := Vector2.ZERO
-			var n: int = 0
-			var sep := Vector2.ZERO
-			for o in sheep:
-				var ot: Sheep = o
-				if ot == sh or ot.in_pen or ot.carried:
-					continue
-				var dv: Vector2 = ot.position - sh.position
-				var dist: float = dv.length()
-				if dist < (260.0 if huddle else 130.0):
-					c += ot.position
-					vsum += ot.vel
-					n += 1
-				var m: float = sh.r + ot.r + 5.0
-				if dist < m and dist > 0.1:
-					sep -= dv / dist * (1.0 - dist / m)
-			if n > 0:
-				c /= float(n)
-				vsum /= float(n)
-				var coh: float = 26.0 * (2.4 if sh.type == "lamb" else sh.coh) * (1.5 if pressure > 0.0 else 1.0) * (3.0 if huddle else 1.0)
-				var dc: Vector2 = c - sh.position
-				var dl: float = maxf(dc.length(), 0.001)
-				if dl > (20.0 if huddle else 28.0):
-					sh.vel += dc / dl * coh * dt
-				sh.vel += (vsum - sh.vel) * 0.7 * dt
-			sh.vel += sep * 260.0 * dt
+			var fdt: float = dt * 2.0
+			if sh.get_instance_id() % 2 == Engine.get_process_frames() % 2:
+				var c := Vector2.ZERO
+				var vsum := Vector2.ZERO
+				var n: int = 0
+				var sep := Vector2.ZERO
+				for o in sheep:
+					var ot: Sheep = o
+					if ot == sh or ot.in_pen or ot.carried:
+						continue
+					var dv: Vector2 = ot.position - sh.position
+					var dist: float = dv.length()
+					if dist < (260.0 if huddle else 130.0):
+						c += ot.position
+						vsum += ot.vel
+						n += 1
+					var m: float = sh.r + ot.r + 5.0
+					if dist < m and dist > 0.1:
+						sep -= dv / dist * (1.0 - dist / m)
+				if n > 0:
+					c /= float(n)
+					vsum /= float(n)
+					var coh: float = 26.0 * (2.4 if sh.type == "lamb" else sh.coh) * (1.5 if pressure > 0.0 else 1.0) * (3.0 if huddle else 1.0)
+					var dc: Vector2 = c - sh.position
+					var dl: float = maxf(dc.length(), 0.001)
+					if dl > (20.0 if huddle else 28.0):
+						sh.vel += dc / dl * coh * fdt
+					sh.vel += (vsum - sh.vel) * 0.7 * fdt
+				sh.vel += sep * 260.0 * fdt
 			if pressure < 0.05 and not huddle:
 				sh.graze -= dt
 				if sh.graze <= 0.0:
