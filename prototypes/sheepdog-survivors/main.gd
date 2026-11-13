@@ -58,8 +58,10 @@ var orbit_nodes: Array = []
 var orbit_ang: float = 0.0
 var gold: int = 0
 var perk_offers: Array = []
-var castle_rows: Array = []
-var inter_page: int = 0
+var castle_opts: Array = []
+var inter_stage: String = "wizard"
+var reroll_n: int = 0
+var sel_item: String = ""
 var walls_lv: int = 0
 var moss_lv: int = 0
 var market_lv: int = 0
@@ -110,6 +112,7 @@ var overview: bool = false
 var lineup: bool = false
 var interdemo: bool = false
 var holesdemo: bool = false
+var intercastle: bool = false
 var dbg_zoom: float = 0.0
 var autowalk: bool = false
 var look_mode: int = 0
@@ -156,6 +159,7 @@ func _ready() -> void:
 		lineup = str(JavaScriptBridge.eval("window.location.search")).contains("lineup")
 		interdemo = str(JavaScriptBridge.eval("window.location.search")).contains("interdemo")
 		holesdemo = str(JavaScriptBridge.eval("window.location.search")).contains("holesdemo")
+		intercastle = str(JavaScriptBridge.eval("window.location.search")).contains("intercastle")
 		var zs: String = str(JavaScriptBridge.eval("window.location.search"))
 		if zs.contains("zoomx="):
 			dbg_zoom = float(zs.substr(zs.find("zoomx=") + 6).to_float())
@@ -230,7 +234,11 @@ func _ready() -> void:
 		gold = 220
 		wave = 3
 		build_on(0, "archer")
+		build_on(3, "brazier")
 		begin_intermission()
+		if intercastle:
+			inter_stage = "castle"
+			sel_item = "build_frost"
 	if demo or smoke:
 		gold = 600
 		perk_lv = {"bolt": 3, "fire": 2, "nova": 2, "zap": 2, "orbit": 2}
@@ -419,7 +427,7 @@ func _input(event: InputEvent) -> void:
 		if ke.pressed and not ke.echo:
 			if state == "inter":
 				if ke.keycode == KEY_ENTER or ke.keycode == KEY_SPACE:
-					end_intermission()
+					inter_next()
 			elif ke.keycode == KEY_SPACE:
 				do_bark()
 			elif ke.keycode == KEY_F:
@@ -1339,97 +1347,38 @@ func gain_xp(amount: float) -> void:
 func perk_cost(id: String) -> int:
 	return 25 + 20 * pl(id)
 
-func roll_perk_offers() -> void:
+func reroll_cost() -> int:
+	return 10 + 6 * reroll_n
+
+func pick_new_perk() -> Dictionary:
 	var pool: Array = []
 	for p in PERKS:
-		if pl(String(p["id"])) < int(p["max"]):
+		var already: bool = false
+		for o in perk_offers:
+			if String(o["id"]) == String(p["id"]):
+				already = true
+		if not already and pl(String(p["id"])) < int(p["max"]):
 			pool.append(p)
-	pool.shuffle()
-	perk_offers = pool.slice(0, 6)
+	if pool.is_empty():
+		return {}
+	return pool[randi() % pool.size()]
 
-func rebuild_castle_rows() -> void:
-	castle_rows.clear()
-	var free: int = 0
-	for pp in world.pads:
-		if (pp as Pad).kind == "":
-			free += 1
-	if free > 0:
-		for k in DEF_ORDER:
-			castle_rows.append({"id": "build_" + String(k), "name": String(DEFS[k]["name"]), "desc": "Add a new one (%d free spots)" % free, "cost": int(DEFS[k]["cost"])})
-	for i in world.pads.size():
-		var p: Pad = world.pads[i]
-		if p.kind != "" and p.lv < 4:
-			castle_rows.append({"id": "up_%d" % i, "name": "Upgrade %s" % String(DEFS[p.kind]["name"]), "desc": "Level %d to %d" % [p.lv, p.lv + 1], "cost": int(DEFS[p.kind]["cost"]) * p.lv})
-	for side in ["north", "west", "east"]:
-		if not bool(world.holes.get(side, false)):
-			castle_rows.append({"id": "hole_" + String(side), "name": "Open the %s gate" % String(side), "desc": "Cut a gap in the %s wall so animals can walk in" % String(side), "cost": 25})
-	castle_rows.append({"id": "mend", "name": "Mend the walls", "desc": "Repair every wall to full strength", "cost": 15})
-	if walls_lv < 4:
-		castle_rows.append({"id": "walls_up", "name": "Stronger walls", "desc": "+30%% wall strength (level %d to %d)" % [walls_lv, walls_lv + 1], "cost": 40 + 30 * walls_lv})
-	if moss_lv < 3:
-		castle_rows.append({"id": "moss", "name": "Healing moss", "desc": "Walls slowly mend themselves (level %d to %d)" % [moss_lv, moss_lv + 1], "cost": 35 + 25 * moss_lv})
-	if market_lv < 3:
-		castle_rows.append({"id": "market", "name": "Market stall", "desc": "Penned animals pay +25%% gold (level %d to %d)" % [market_lv, market_lv + 1], "cost": 50 + 40 * market_lv})
+func roll_perk_offers() -> void:
+	perk_offers.clear()
+	for i in 4:
+		var p: Dictionary = pick_new_perk()
+		if p.is_empty():
+			break
+		perk_offers.append(p)
 
-func begin_intermission() -> void:
-	state = "inter"
-	inter_page = 0
-	stick_on = false
-	stick_vec = Vector2.ZERO
-	dog.ko_t = 0.0
-	dog.hp = dog.hp_max
+func do_reroll() -> bool:
+	var c: int = reroll_cost()
+	if xp < float(c):
+		return false
+	xp -= float(c)
+	reroll_n += 1
 	roll_perk_offers()
-	rebuild_castle_rows()
-
-func end_intermission() -> void:
-	if state != "inter":
-		return
-	state = "play"
-	start_wave(wave + 1)
-
-func inter_panels() -> Array:
-	var v: Vector2 = vp()
-	var w: float = (v.x - 60.0) / 2.0
-	var h: float = v.y - 140.0
-	return [Rect2(20.0, 54.0, w, h), Rect2(40.0 + w, 54.0, w, h)]
-
-func inter_row_rect(panel: Rect2, i: int) -> Rect2:
-	return Rect2(panel.position.x + 10.0, panel.position.y + 44.0 + float(i) * 52.0, panel.size.x - 20.0, 48.0)
-
-func inter_per_page() -> int:
-	var panel: Rect2 = inter_panels()[1]
-	return maxi(1, int((panel.size.y - 44.0 - 40.0) / 52.0))
-
-func inter_pages() -> int:
-	return maxi(1, int(ceil(float(castle_rows.size()) / float(inter_per_page()))))
-
-func start_rect() -> Rect2:
-	var v: Vector2 = vp()
-	return Rect2(v.x / 2.0 - 130.0, v.y - 72.0, 260.0, 52.0)
-
-func page_rect(dir: int) -> Rect2:
-	var panel: Rect2 = inter_panels()[1]
-	return Rect2(panel.end.x - 96.0 + (0.0 if dir < 0 else 48.0), panel.end.y - 36.0, 40.0, 28.0)
-
-func inter_press(p: Vector2) -> void:
-	if start_rect().has_point(p):
-		end_intermission()
-		return
-	var panels: Array = inter_panels()
-	for i in perk_offers.size():
-		if inter_row_rect(panels[0], i).has_point(p):
-			buy_perk(i)
-			return
-	var per: int = inter_per_page()
-	for i in per:
-		var idx: int = inter_page * per + i
-		if idx < castle_rows.size() and inter_row_rect(panels[1], i).has_point(p):
-			buy_castle(idx)
-			return
-	if page_rect(-1).has_point(p):
-		inter_page = maxi(0, inter_page - 1)
-	elif page_rect(1).has_point(p):
-		inter_page = mini(inter_pages() - 1, inter_page + 1)
+	return true
 
 func buy_perk(i: int) -> bool:
 	if i >= perk_offers.size():
@@ -1444,64 +1393,243 @@ func buy_perk(i: int) -> bool:
 	if id == "vigor":
 		dog.hp_max = max_hp()
 		dog.hp = minf(dog.hp_max, dog.hp + 25.0)
+	# the bought card is replaced by a fresh choice so there are always four
+	var fresh: Dictionary = {}
 	if pl(id) >= int(pk["max"]):
-		var pool: Array = []
-		for p in PERKS:
-			var already: bool = false
-			for o in perk_offers:
-				if String(o["id"]) == String(p["id"]):
-					already = true
-			if not already and pl(String(p["id"])) < int(p["max"]):
-				pool.append(p)
-		if pool.is_empty():
-			perk_offers.remove_at(i)
-		else:
-			perk_offers[i] = pool[randi() % pool.size()]
+		fresh = pick_new_perk()
+	else:
+		var tmp: Array = perk_offers.duplicate()
+		perk_offers.remove_at(i)
+		fresh = pick_new_perk()
+		perk_offers = tmp
+		if fresh.is_empty():
+			fresh = pk
+	if fresh.is_empty():
+		perk_offers.remove_at(i)
+	else:
+		perk_offers[i] = fresh
 	return true
 
-func buy_castle(idx: int) -> bool:
-	if idx >= castle_rows.size():
-		return false
-	var r: Dictionary = castle_rows[idx]
-	var cost: int = int(r["cost"])
-	if gold < cost:
-		return false
-	var id: String = String(r["id"])
-	gold -= cost
-	if id.begins_with("build_"):
-		for i in world.pads.size():
-			if (world.pads[i] as Pad).kind == "":
-				build_on(i, id.substr(6))
-				break
-	elif id.begins_with("up_"):
-		upgrade_pad(int(id.substr(3)))
-	elif id.begins_with("hole_"):
-		world.open_hole(id.substr(5))
+func rebuild_options() -> void:
+	castle_opts.clear()
+	var free: int = 0
+	var upgradable: int = 0
+	for pp in world.pads:
+		var p: Pad = pp
+		if p.kind == "":
+			free += 1
+		elif p.lv < 4:
+			upgradable += 1
+	if free > 0:
+		for k in DEF_ORDER:
+			castle_opts.append({"id": "build_" + String(k), "name": String(DEFS[k]["name"]), "desc": "Tap an empty spot on the castle", "cost": int(DEFS[k]["cost"]), "mode": "place", "kind": String(k)})
+	if upgradable > 0:
+		castle_opts.append({"id": "upgrade", "name": "Upgrade a tower", "desc": "Tap one of your towers (its cost shows)", "cost": 0, "mode": "upgrade", "kind": ""})
+	var closed: int = 0
+	for side in ["north", "west", "east"]:
+		if not bool(world.holes.get(side, false)):
+			closed += 1
+	if closed > 0:
+		castle_opts.append({"id": "gate", "name": "Open a gate", "desc": "Tap a wall to cut a gap so animals can walk in", "cost": 25, "mode": "gate", "kind": ""})
+	castle_opts.append({"id": "mend", "name": "Mend the walls", "desc": "Repair every wall to full strength", "cost": 15, "mode": "now", "kind": ""})
+	if walls_lv < 4:
+		castle_opts.append({"id": "walls_up", "name": "Stronger walls", "desc": "+30%% wall strength (level %d to %d)" % [walls_lv, walls_lv + 1], "cost": 40 + 30 * walls_lv, "mode": "now", "kind": ""})
+	if moss_lv < 3:
+		castle_opts.append({"id": "moss", "name": "Healing moss", "desc": "Walls slowly mend themselves (level %d to %d)" % [moss_lv, moss_lv + 1], "cost": 35 + 25 * moss_lv, "mode": "now", "kind": ""})
+	if market_lv < 3:
+		castle_opts.append({"id": "market", "name": "Market stall", "desc": "Penned animals pay +25%% gold (level %d to %d)" % [market_lv, market_lv + 1], "cost": 50 + 40 * market_lv, "mode": "now", "kind": ""})
+	if sel_item != "" and option_by_id(sel_item).is_empty():
+		sel_item = ""
+
+func option_by_id(id: String) -> Dictionary:
+	for o in castle_opts:
+		if String(o["id"]) == id:
+			return o
+	return {}
+
+func apply_option(o: Dictionary, target: Variant) -> bool:
+	var mode: String = String(o["mode"])
+	var id: String = String(o["id"])
+	var cost: int = int(o["cost"])
+	if mode == "place":
+		var i: int = int(target)
+		if i < 0 or i >= world.pads.size() or (world.pads[i] as Pad).kind != "" or gold < cost:
+			return false
+		gold -= cost
+		build_on(i, String(o["kind"]))
+	elif mode == "upgrade":
+		var i2: int = int(target)
+		if i2 < 0 or i2 >= world.pads.size():
+			return false
+		var p: Pad = world.pads[i2]
+		if p.kind == "" or p.lv >= 4:
+			return false
+		var c2: int = int(DEFS[p.kind]["cost"]) * p.lv
+		if gold < c2:
+			return false
+		gold -= c2
+		upgrade_pad(i2)
+	elif mode == "gate":
+		var side: String = String(target)
+		if bool(world.holes.get(side, false)) or gold < cost:
+			return false
+		gold -= cost
+		world.open_hole(side)
 		for w in world.walls:
 			set_wall_hp(w, float(w["hp"]))
-	elif id == "mend":
-		for w in world.walls:
-			if w["pen"]:
-				set_wall_hp(w, float(w["max"]))
-	elif id == "walls_up":
-		walls_lv += 1
-		for w in world.walls:
-			if w["pen"]:
-				w["max"] = float(w["max"]) * 1.3
-				set_wall_hp(w, float(w["hp"]) + 25.0)
-	elif id == "moss":
-		moss_lv += 1
-	elif id == "market":
-		market_lv += 1
-	rebuild_castle_rows()
-	inter_page = mini(inter_page, inter_pages() - 1)
+	else:
+		if gold < cost:
+			return false
+		gold -= cost
+		if id == "mend":
+			for w in world.walls:
+				if w["pen"]:
+					set_wall_hp(w, float(w["max"]))
+		elif id == "walls_up":
+			walls_lv += 1
+			for w in world.walls:
+				if w["pen"]:
+					w["max"] = float(w["max"]) * 1.3
+					set_wall_hp(w, float(w["hp"]) + 25.0)
+		elif id == "moss":
+			moss_lv += 1
+		elif id == "market":
+			market_lv += 1
+	rebuild_options()
 	return true
+
+func begin_intermission() -> void:
+	state = "inter"
+	inter_stage = "wizard"
+	reroll_n = 0
+	sel_item = ""
+	stick_on = false
+	stick_vec = Vector2.ZERO
+	dog.ko_t = 0.0
+	dog.hp = dog.hp_max
+	roll_perk_offers()
+	rebuild_options()
+
+func end_intermission() -> void:
+	if state != "inter":
+		return
+	state = "play"
+	start_wave(wave + 1)
+
+func inter_next() -> void:
+	if inter_stage == "wizard":
+		inter_stage = "castle"
+	else:
+		end_intermission()
+
+# ---- screen layout
+func card_rect(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	var w: float = (v.x - 80.0) / 2.0
+	return Rect2(30.0 + float(i % 2) * (w + 20.0), 96.0 + float(i / 2) * 150.0, w, 134.0)
+
+func btn_left_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 290.0, v.y - 84.0, 270.0, 54.0)
+
+func btn_right_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 + 20.0, v.y - 84.0, 270.0, 54.0)
+
+func opt_list_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(20.0, 62.0, 340.0, v.y - 62.0 - 100.0)
+
+func opt_row_rect(i: int) -> Rect2:
+	var lr: Rect2 = opt_list_rect()
+	return Rect2(lr.position.x + 8.0, lr.position.y + 38.0 + float(i) * 36.0, lr.size.x - 16.0, 33.0)
+
+func diagram_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(376.0, 62.0, v.x - 376.0 - 20.0, v.y - 62.0 - 100.0)
+
+func diagram_scale() -> float:
+	var dr: Rect2 = diagram_rect()
+	return minf((dr.size.x * 0.9) / (world.pen.size.x + 110.0), (dr.size.y * 0.86) / (world.pen.size.y + 100.0))
+
+func to_view(p: Vector2) -> Vector2:
+	var dr: Rect2 = diagram_rect()
+	return dr.get_center() + Vector2(0.0, 6.0) + (p - world.pen.get_center()) * diagram_scale()
+
+func side_pos(side: String) -> Vector2:
+	var pr: Rect2 = world.pen
+	if side == "north":
+		return Vector2(pr.position.x + pr.size.x / 2.0, pr.position.y)
+	if side == "west":
+		return Vector2(pr.position.x, pr.position.y + pr.size.y / 2.0)
+	return Vector2(pr.end.x, pr.position.y + pr.size.y / 2.0)
+
+func inter_press(p: Vector2) -> void:
+	if btn_right_rect().has_point(p):
+		inter_next()
+		return
+	if inter_stage == "wizard":
+		if btn_left_rect().has_point(p):
+			do_reroll()
+			return
+		for i in perk_offers.size():
+			if card_rect(i).has_point(p):
+				buy_perk(i)
+				return
+		return
+	if btn_left_rect().has_point(p):
+		inter_stage = "wizard"
+		sel_item = ""
+		return
+	for i in castle_opts.size():
+		if opt_row_rect(i).has_point(p):
+			var o: Dictionary = castle_opts[i]
+			if String(o["mode"]) == "now":
+				apply_option(o, -1)
+			else:
+				sel_item = "" if sel_item == String(o["id"]) else String(o["id"])
+			return
+	if sel_item == "":
+		return
+	var sel: Dictionary = option_by_id(sel_item)
+	if sel.is_empty():
+		return
+	var mode: String = String(sel["mode"])
+	if mode == "place" or mode == "upgrade":
+		for i in world.pads.size():
+			if to_view((world.pads[i] as Pad).position).distance_to(p) < 26.0:
+				apply_option(sel, i)
+				return
+	elif mode == "gate":
+		for side in ["north", "west", "east"]:
+			if to_view(side_pos(String(side))).distance_to(p) < 32.0:
+				apply_option(sel, String(side))
+				return
+
+func auto_target(o: Dictionary) -> Variant:
+	var mode: String = String(o["mode"])
+	if mode == "place":
+		for i in world.pads.size():
+			if (world.pads[i] as Pad).kind == "":
+				return i
+	elif mode == "upgrade":
+		for i in world.pads.size():
+			var p: Pad = world.pads[i]
+			if p.kind != "" and p.lv < 4:
+				return i
+	elif mode == "gate":
+		for side in ["north", "west", "east"]:
+			if not bool(world.holes.get(side, false)):
+				return String(side)
+	else:
+		return -1
+	return null
 
 func inter_auto() -> void:
 	# the scripted test spends everything it can, then starts the next wave
 	gold += 400
 	var guard: int = 0
-	while guard < 60:
+	while guard < 40:
 		guard += 1
 		var bought: bool = false
 		for i in perk_offers.size():
@@ -1509,11 +1637,17 @@ func inter_auto() -> void:
 				bought = true
 				break
 		if not bought:
-			for i in castle_rows.size():
-				if buy_castle(i):
-					bought = true
-					break
-		if not bought:
+			break
+	guard = 0
+	while guard < 60:
+		guard += 1
+		var done: bool = false
+		for o in castle_opts:
+			var t: Variant = auto_target(o)
+			if t != null and apply_option(o, t):
+				done = true
+				break
+		if not done:
 			break
 	end_intermission()
 

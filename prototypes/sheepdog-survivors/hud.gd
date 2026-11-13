@@ -208,44 +208,106 @@ func _minimap(v: Vector2) -> void:
 	draw_circle(dp, 3.6, Color(0.3, 0.55, 1.0))
 	draw_circle(dp, 1.6, Color(1, 1, 1))
 
-func _row(rr: Rect2, name: String, desc: String, cost: String, ccol: Color, can: bool) -> void:
-	_panel(rr, Color(0.26, 0.19, 0.13, 0.96) if can else Color(0.15, 0.11, 0.08, 0.9))
-	_text(name, rr.position + Vector2(10, 20), 15, CREAM if can else Color(CREAM, 0.55))
-	_text(desc, rr.position + Vector2(10, 38), 12, Color(CREAM, 0.75 if can else 0.4))
-	_text(cost, Vector2(rr.end.x - 96, rr.position.y + 28), 15, ccol if can else Color(ccol, 0.5), 88.0, HORIZONTAL_ALIGNMENT_RIGHT)
+func _btn(r: Rect2, label: String, col: Color, can: bool = true) -> void:
+	_panel(r, col if can else Color(0.15, 0.11, 0.08, 0.9))
+	_text(label, r.position + Vector2(0, 34), 19, CREAM if can else Color(CREAM, 0.5), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _inter(v: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.9))
-	_text("WAVE %d CLEARED" % main.wave, Vector2(0, 38), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
-	var panels: Array = main.inter_panels()
-	var lp: Rect2 = panels[0]
-	var rp: Rect2 = panels[1]
-	_panel(lp, Color(0.18, 0.13, 0.1, 0.96))
-	_panel(rp, Color(0.18, 0.13, 0.1, 0.96))
-	_text("THE WIZARD", lp.position + Vector2(14, 30), 20, Color(0.7, 0.85, 1.0))
-	_text("%d XP" % int(main.xp), lp.position + Vector2(lp.size.x - 130, 30), 18, Color(0.6, 0.9, 1.0), 116.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	if main.inter_stage == "wizard":
+		_inter_wizard(v)
+	else:
+		_inter_castle(v)
+
+func _inter_wizard(v: Vector2) -> void:
+	_text("WAVE %d CLEARED" % main.wave, Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("Step 1 of 2: your wizard", Vector2(0, 60), 15, Color(CREAM, 0.75), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("%d XP" % int(main.xp), Vector2(v.x - 160, 36), 22, Color(0.6, 0.9, 1.0), 140.0, HORIZONTAL_ALIGNMENT_RIGHT)
 	for i in main.perk_offers.size():
 		var pk: Dictionary = main.perk_offers[i]
 		var id: String = String(pk["id"])
 		var lv: int = main.pl(id)
 		var cost: int = main.perk_cost(id)
-		_row(main.inter_row_rect(lp, i), "%s   Lv %d > %d" % [String(pk["name"]), lv, lv + 1], String(pk["desc"]), "%d XP" % cost, Color(0.6, 0.9, 1.0), main.xp >= float(cost))
-	_text("THE CASTLE", rp.position + Vector2(14, 30), 20, GOLD)
-	_text("%d gold" % main.gold, rp.position + Vector2(rp.size.x - 130, 30), 18, GOLD, 116.0, HORIZONTAL_ALIGNMENT_RIGHT)
-	var per: int = main.inter_per_page()
-	for i in per:
-		var idx: int = main.inter_page * per + i
-		if idx >= main.castle_rows.size():
-			break
-		var r: Dictionary = main.castle_rows[idx]
-		_row(main.inter_row_rect(rp, i), String(r["name"]), String(r["desc"]), "%d gold" % int(r["cost"]), GOLD, main.gold >= int(r["cost"]))
-	var pages: int = main.inter_pages()
-	if pages > 1:
-		_text("page %d / %d" % [main.inter_page + 1, pages], Vector2(rp.position.x + 14, rp.end.y - 14), 13, Color(CREAM, 0.7))
-		for dd in [-1, 1]:
-			var br: Rect2 = main.page_rect(dd)
-			_panel(br, Color(0.26, 0.19, 0.13, 0.96))
-			_text("<" if dd < 0 else ">", br.position + Vector2(0, 20), 16, CREAM, br.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	var sr: Rect2 = main.start_rect()
-	_panel(sr, Color(0.28, 0.5, 0.22, 0.95))
-	_text("START WAVE %d" % (main.wave + 1), sr.position + Vector2(0, 33), 20, CREAM, sr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		var can: bool = main.xp >= float(cost)
+		var r: Rect2 = main.card_rect(i)
+		_panel(r, Color(0.28, 0.2, 0.14, 0.97) if can else Color(0.16, 0.12, 0.09, 0.92))
+		_text(String(pk["name"]), r.position + Vector2(16, 34), 21, GOLD if can else Color(GOLD, 0.5))
+		_text("Lv %d > %d" % [lv, lv + 1], r.position + Vector2(16, 56), 14, Color(0.6, 1.0, 0.6) if can else Color(0.6, 1.0, 0.6, 0.5))
+		draw_multiline_string(font, r.position + Vector2(16, 80), String(pk["desc"]), HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 150.0, 14, 3, Color(CREAM, 0.9 if can else 0.5))
+		_text("%d XP" % cost, Vector2(r.end.x - 130, r.end.y - 18), 20, Color(0.6, 0.9, 1.0) if can else Color(0.6, 0.9, 1.0, 0.5), 114.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	_btn(main.btn_left_rect(), "REROLL  (%d XP)" % main.reroll_cost(), Color(0.32, 0.24, 0.5, 0.96), main.xp >= float(main.reroll_cost()))
+	_btn(main.btn_right_rect(), "NEXT: THE CASTLE  >", Color(0.28, 0.5, 0.22, 0.96))
+
+func _inter_castle(v: Vector2) -> void:
+	_text("THE CASTLE", Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("Step 2 of 2: pick an item, then tap where it goes", Vector2(0, 58), 14, Color(CREAM, 0.75), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("%d gold" % main.gold, Vector2(v.x - 180, 36), 22, GOLD, 160.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	# the column of choices
+	var lr: Rect2 = main.opt_list_rect()
+	_panel(lr, Color(0.18, 0.13, 0.1, 0.96))
+	_text("BUILD", lr.position + Vector2(14, 28), 16, Color(CREAM, 0.8))
+	for i in main.castle_opts.size():
+		var o: Dictionary = main.castle_opts[i]
+		var rr: Rect2 = main.opt_row_rect(i)
+		var cost: int = int(o["cost"])
+		var mode: String = String(o["mode"])
+		var can: bool = main.gold >= cost or mode == "upgrade"
+		var sel: bool = main.sel_item == String(o["id"])
+		_panel(rr, Color(0.5, 0.38, 0.12, 0.98) if sel else (Color(0.26, 0.19, 0.13, 0.96) if can else Color(0.15, 0.11, 0.08, 0.9)))
+		_text(String(o["name"]), rr.position + Vector2(10, 23), 15, CREAM if can else Color(CREAM, 0.5))
+		var ctext: String = ("%d gold" % cost) if mode != "upgrade" else "tap tower"
+		_text(ctext, Vector2(rr.end.x - 110, rr.position.y + 23), 13, GOLD if can else Color(GOLD, 0.5), 100.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	# the castle itself
+	var dr: Rect2 = main.diagram_rect()
+	_panel(dr, Color(0.24, 0.42, 0.2, 0.97))
+	var sc: float = main.diagram_scale()
+	var pr: Rect2 = main.world.pen
+	var tl: Vector2 = main.to_view(pr.position)
+	var br: Vector2 = main.to_view(pr.end)
+	draw_rect(Rect2(tl, br - tl), Color(0.84, 0.72, 0.52))
+	var sel_o: Dictionary = main.option_by_id(main.sel_item)
+	var smode: String = "" if sel_o.is_empty() else String(sel_o["mode"])
+	var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.008)
+	for w in main.world.walls:
+		if not w["pen"]:
+			continue
+		var fr: float = float(w["hp"]) / float(w["max"])
+		var wc: Color = Color(0.5, 0.33, 0.16).lerp(Color(0.9, 0.3, 0.25), 1.0 - fr)
+		draw_line(main.to_view(w["a"]), main.to_view(w["b"]), wc, 7.0)
+	# gates: the south gate is always open, the others only once bought
+	for side in ["north", "west", "east"]:
+		var sp: Vector2 = main.to_view(main.side_pos(String(side)))
+		if bool(main.world.holes.get(String(side), false)):
+			_text("gate", sp + Vector2(-20, 4), 11, Color(0.2, 0.15, 0.08, 0.8), 40.0, HORIZONTAL_ALIGNMENT_CENTER)
+		elif smode == "gate":
+			draw_arc(sp, 17.0 + pulse * 4.0, 0.0, TAU, 24, Color(1.0, 0.85, 0.3, 0.95), 3.0, true)
+			_text("OPEN", sp + Vector2(-25, 5), 12, Color(1, 0.95, 0.7), 50.0, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("south gate", main.to_view(Vector2(pr.position.x + pr.size.x / 2.0, pr.end.y)) + Vector2(-40, 20), 12, Color(CREAM, 0.7), 80.0, HORIZONTAL_ALIGNMENT_CENTER)
+	for i in main.world.pads.size():
+		var pad: Pad = main.world.pads[i]
+		var pp: Vector2 = main.to_view(pad.position)
+		if pad.kind == "":
+			var hot: bool = smode == "place"
+			draw_arc(pp, 13.0 + (pulse * 3.0 if hot else 0.0), 0.0, TAU, 20, Color(1.0, 0.85, 0.3, 0.95 if hot else 0.35), 2.5 if hot else 1.5, true)
+			draw_line(pp - Vector2(5, 0), pp + Vector2(5, 0), Color(1.0, 0.85, 0.3, 0.95 if hot else 0.35), 2.0)
+			draw_line(pp - Vector2(0, 5), pp + Vector2(0, 5), Color(1.0, 0.85, 0.3, 0.95 if hot else 0.35), 2.0)
+		else:
+			var tex: Texture2D = main.world.tex(String(main.DEFS[pad.kind]["tex"]))
+			var k: float = minf(1.4, 40.0 / maxf(float(tex.get_height()), 1.0) * 1.1)
+			var sz: Vector2 = Vector2(tex.get_width(), tex.get_height()) * k
+			draw_texture_rect(tex, Rect2(pp - Vector2(sz.x / 2.0, sz.y * 0.85), sz), false)
+			for j in pad.lv:
+				draw_circle(pp + Vector2((float(j) - float(pad.lv - 1) / 2.0) * 7.0, 8.0), 2.4, GOLD)
+			if smode == "upgrade" and pad.lv < 4:
+				draw_arc(pp - Vector2(0, sz.y * 0.4), maxf(sz.x, sz.y) * 0.55 + pulse * 3.0, 0.0, TAU, 24, Color(1.0, 0.85, 0.3, 0.95), 2.5, true)
+				_text("%dg" % (int(main.DEFS[pad.kind]["cost"]) * pad.lv), pp + Vector2(-24, -sz.y - 4), 13, GOLD, 48.0, HORIZONTAL_ALIGNMENT_CENTER)
+	var hint: String = "Pick an item from the list"
+	if smode == "place":
+		hint = "Tap an empty spot to build the %s" % String(sel_o["name"])
+	elif smode == "upgrade":
+		hint = "Tap a tower to upgrade it"
+	elif smode == "gate":
+		hint = "Tap a wall to open a gate there"
+	_text(hint, Vector2(dr.position.x, dr.end.y - 12), 15, Color(CREAM, 0.9), dr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_btn(main.btn_left_rect(), "<  BACK", Color(0.32, 0.24, 0.5, 0.96))
+	_btn(main.btn_right_rect(), "START WAVE %d" % (main.wave + 1), Color(0.28, 0.5, 0.22, 0.96))
