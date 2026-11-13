@@ -432,6 +432,8 @@ func _input(event: InputEvent) -> void:
 				do_bark()
 			elif ke.keycode == KEY_F:
 				toggle_fullscreen()
+			elif ke.keycode == KEY_T:
+				test_boost()
 
 func style_rect() -> Rect2:
 	return Rect2(vp().x - 92.0, 44.0, 38.0, 34.0)
@@ -443,6 +445,14 @@ func toggle_style() -> void:
 	var to_style: String = String(order[(order.find(style_name) + 1) % order.size()])
 	var to_look: int = 6 if to_style == "flat" else 0
 	JavaScriptBridge.eval("(function(){var u=new URL(window.location.href);u.searchParams.set('style','%s');u.searchParams.set('look','%d');window.location.href=u.toString();})()" % [to_style, to_look])
+
+func test_rect() -> Rect2:
+	return Rect2(vp().x - 100.0, 44.0, 46.0, 34.0)
+
+func test_boost() -> void:
+	xp += 1000.0
+	gold += 1000
+	add_popup("+1000 XP  +1000 gold", dog.position + Vector2(0, -40), Color(1.0, 0.9, 0.5))
 
 func fs_rect() -> Rect2:
 	return Rect2(vp().x - 46.0, 44.0, 38.0, 34.0)
@@ -482,6 +492,9 @@ func upgrade_pad(i: int) -> void:
 	ring(p.position, 46.0, Color(1.0, 0.85, 0.4), 0.5, 4.0)
 
 func _press(p: Vector2, id: int) -> void:
+	if state != "result" and test_rect().grow(6.0).has_point(p):
+		test_boost()
+		return
 	if state != "result" and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
 		return

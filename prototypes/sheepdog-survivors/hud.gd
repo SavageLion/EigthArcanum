@@ -150,6 +150,9 @@ func _draw() -> void:
 		_text("Reached wave %d of %d" % [main.result["wave"], main.LAST_WAVE], rr.position + Vector2(0, 98), 17, CREAM, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("%d animals herded  ·  %d raiders defeated" % [main.result["herded"], main.result["defeated"]], rr.position + Vector2(0, 126), 15, Color(CREAM, 0.85), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("tap to play again", rr.position + Vector2(0, 208), 18, GOLD, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var tr: Rect2 = main.test_rect()
+	_panel(tr, Color(0.4, 0.2, 0.5, 0.92))
+	_text("TEST", tr.position + Vector2(0, 22), 12, CREAM, tr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _button(i: int, label: String, dim: bool, fill: float, on: bool) -> void:
 	var p: Vector2 = main.btn_pos(i)
