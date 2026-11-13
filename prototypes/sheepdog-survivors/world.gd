@@ -38,6 +38,8 @@ var walls: Array = []
 var rocks: Array = []
 var zones: Array = []
 var pads: Array = []
+var holes: Dictionary = {}
+var fence_tex: Texture2D
 var dog_start: Vector2 = Vector2.ZERO
 var ysort: Node2D
 var wind_mat: ShaderMaterial
@@ -136,17 +138,19 @@ func _layout() -> void:
 	var hp: float = 140.0
 	var by: float = py + ph
 	walls = [
-		_wall(Vector2(px, py), Vector2(px + pw, py), true, hp),
-		_wall(Vector2(px, py), Vector2(px, by), true, hp),
-		_wall(Vector2(px + pw, py), Vector2(px + pw, by), true, hp),
-		_wall(Vector2(px, by), Vector2(gate_x - gap / 2.0, by), true, hp),
-		_wall(Vector2(gate_x + gap / 2.0, by), Vector2(px + pw, by), true, hp),
+		_wall(Vector2(px, py), Vector2(px + pw, py), true, hp, "north"),
+		_wall(Vector2(px, py), Vector2(px, by), true, hp, "west"),
+		_wall(Vector2(px + pw, py), Vector2(px + pw, by), true, hp, "east"),
+		_wall(Vector2(px, by), Vector2(gate_x - gap / 2.0, by), true, hp, "south"),
+		_wall(Vector2(gate_x + gap / 2.0, by), Vector2(px + pw, by), true, hp, "south"),
 	]
 	dog_start = Vector2(gate_x, by + 120.0)
 	var spots: Array = [
 		Vector2(px - 18.0, py - 14.0), Vector2(px + pw + 18.0, py - 14.0),
 		Vector2(px - 18.0, by + 14.0), Vector2(px + pw + 18.0, by + 14.0),
-		Vector2(gate_x, py - 24.0), Vector2(px - 26.0, py + ph / 2.0), Vector2(px + pw + 26.0, py + ph / 2.0),
+		Vector2(gate_x - 82.0, py - 24.0), Vector2(gate_x + 82.0, py - 24.0),
+		Vector2(px - 26.0, py + 22.0), Vector2(px - 26.0, py + ph - 22.0),
+		Vector2(px + pw + 26.0, py + 22.0), Vector2(px + pw + 26.0, py + ph - 22.0),
 		Vector2(gate_x - gap / 2.0 - 40.0, by + 24.0), Vector2(gate_x + gap / 2.0 + 40.0, by + 24.0),
 	]
 	for sp in spots:
@@ -156,8 +160,8 @@ func _layout() -> void:
 		add_child(pd)
 		pads.append(pd)
 
-func _wall(a: Vector2, b: Vector2, is_pen: bool, hp: float) -> Dictionary:
-	return {"a": a, "b": b, "pen": is_pen, "hp": hp, "max": hp, "broken": false, "nodes": []}
+func _wall(a: Vector2, b: Vector2, is_pen: bool, hp: float, side: String = "") -> Dictionary:
+	return {"a": a, "b": b, "pen": is_pen, "hp": hp, "max": hp, "broken": false, "nodes": [], "side": side}
 
 # ---------------------------------------------------------------- terrain grid
 func vidx(x: int, y: int) -> int:
@@ -619,29 +623,59 @@ func _pen_visuals() -> void:
 	dirt.z_index = -150
 	if not (flat or refst):
 		add_child(dirt)
-	var fence_h: Texture2D = tex("stone_wall")
+	fence_tex = tex("stone_wall")
 	for w in walls:
+		_wall_nodes(w)
+
+func _wall_nodes(w: Dictionary) -> void:
+	var fence_h: Texture2D = fence_tex
+	var a: Vector2 = w["a"]
+	var b: Vector2 = w["b"]
+	var l: float = a.distance_to(b)
+	if l < 2.0:
+		return
+	var nodes: Array = []
+	var ang: float = atan2(b.y - a.y, b.x - a.x)
+	var n2c: int = maxi(1, roundi(l / 80.0))
+	var sw: float = l / float(n2c)
+	var k: float = sw / float(fence_h.get_width()) + 0.01
+	for i in n2c:
+		var t: float = (float(i) + 0.5) / float(n2c)
+		var sp := Sprite2D.new()
+		sp.texture = fence_h
+		sp.position = a.lerp(b, t)
+		sp.rotation = ang
+		sp.scale = Vector2(k * 1.05, k * 0.95)
+		sp.offset = Vector2(0, -9)
+		ysort.add_child(sp)
+		nodes.append(sp)
+	w["nodes"] = nodes
+
+# cut a gap in the middle of one side of the pen so animals can come in
+func open_hole(side: String) -> void:
+	if bool(holes.get(side, false)):
+		return
+	for i in walls.size():
+		var w: Dictionary = walls[i]
+		if String(w["side"]) != side:
+			continue
 		var a: Vector2 = w["a"]
 		var b: Vector2 = w["b"]
-		var l: float = a.distance_to(b)
-		if l < 2.0:
-			continue
-		var nodes: Array = []
-		var ang: float = atan2(b.y - a.y, b.x - a.x)
-		var n2c: int = maxi(1, roundi(l / 80.0))
-		var sw: float = l / float(n2c)
-		var k: float = sw / float(fence_h.get_width()) + 0.01
-		for i in n2c:
-			var t: float = (float(i) + 0.5) / float(n2c)
-			var s := Sprite2D.new()
-			s.texture = fence_h
-			s.position = a.lerp(b, t)
-			s.rotation = ang
-			s.scale = Vector2(k * 1.05, k * 0.95)
-			s.offset = Vector2(0, -9)
-			ysort.add_child(s)
-			nodes.append(s)
-		w["nodes"] = nodes
+		var dir: Vector2 = (b - a).normalized()
+		var mid: Vector2 = (a + b) / 2.0
+		var half: float = 52.0
+		var w1: Dictionary = _wall(a, mid - dir * half, true, float(w["max"]), side)
+		var w2: Dictionary = _wall(mid + dir * half, b, true, float(w["max"]), side)
+		w1["hp"] = w["hp"]
+		w2["hp"] = w["hp"]
+		for n in (w["nodes"] as Array):
+			(n as Sprite2D).queue_free()
+		walls[i] = w1
+		walls.append(w2)
+		_wall_nodes(w1)
+		_wall_nodes(w2)
+		holes[side] = true
+		return
 
 func _masked(path: String) -> Texture2D:
 	var img: Image = (load("res://art/" + path + ".png") as Texture2D).get_image()

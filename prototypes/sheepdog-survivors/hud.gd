@@ -33,21 +33,17 @@ func _draw() -> void:
 	if main == null or main.dog == null:
 		return
 	var v: Vector2 = main.vp()
-	# top left: level and xp
-	_panel(Rect2(8, 6, 230, 70))
-	_text("LV %d" % main.level, Vector2(18, 28), 17, GOLD)
-	_bar(Rect2(70, 15, 158, 10), main.xp / main.xp_need, Color(0.55, 0.85, 0.4))
-	_text("%d in the pen" % main.pen_total, Vector2(18, 69), 12, Color(CREAM, 0.85))
-	# stamina
-	_text("SPRINT", Vector2(18, 38), 10, Color(CREAM, 0.8))
-	_bar(Rect2(70, 30, 158, 7), main.dog.stam / main.dog.stam_max, Color(0.95, 0.45, 0.35) if main.dog.winded else Color(0.45, 0.75, 0.9))
-	_text("HP", Vector2(18, 52), 10, Color(CREAM, 0.8))
-	_bar(Rect2(70, 43, 158, 8), main.dog.hp / main.dog.hp_max, Color(0.9, 0.3, 0.3))
+	# top left: xp and health
+	_panel(Rect2(8, 6, 230, 58))
+	_text("XP  %d" % int(main.xp), Vector2(18, 28), 17, Color(0.6, 0.9, 1.0))
+	_text("HP", Vector2(18, 46), 10, Color(CREAM, 0.8))
+	_bar(Rect2(50, 38, 178, 9), main.dog.hp / main.dog.hp_max, Color(0.9, 0.3, 0.3))
+	_text("%d in the pen" % main.pen_total, Vector2(18, 59), 12, Color(CREAM, 0.85))
 	# gold
-	_panel(Rect2(8, 82, 104, 26))
-	draw_circle(Vector2(24, 95), 6.0, Color(0.72, 0.5, 0.1))
-	draw_circle(Vector2(24, 95), 4.5, Color(1.0, 0.82, 0.25))
-	_text("%d gold" % main.gold, Vector2(36, 101), 14, GOLD)
+	_panel(Rect2(8, 72, 104, 26))
+	draw_circle(Vector2(24, 85), 6.0, Color(0.72, 0.5, 0.1))
+	draw_circle(Vector2(24, 85), 4.5, Color(1.0, 0.82, 0.25))
+	_text("%d gold" % main.gold, Vector2(36, 91), 14, GOLD)
 	_minimap(v)
 	# top centre: wave
 	var left: int = int(ceil(main.WAVE_LEN - main.wave_t))
@@ -138,49 +134,21 @@ func _draw() -> void:
 		draw_arc(main.stick_origin, 62.0, 0.0, TAU, 40, Color(1, 0.95, 0.8, 0.35), 2.0, true)
 		draw_circle(main.stick_pos, 24.0, Color(1, 0.95, 0.8, 0.45))
 	_button(0, "BARK", main.dog.bark_cd > 0.0, 1.0 - main.dog.bark_cd / main.bark_cd(), false)
-	_button(1, "CALM", false, 1.0, main.calm_held or main.dog.crouch)
-	_button(2, "SPRINT", main.dog.winded, 1.0, main.sprint_held)
-	# build menu when standing on a pad
-	if main.near_pad >= 0 and main.state == "play":
-		var pad: Pad = main.world.pads[main.near_pad]
-		for i in main.build_count():
-			var br: Rect2 = main.build_rect(i)
-			var cost: int = main.def_cost(pad, i)
-			var can: bool = cost >= 0 and main.gold >= cost
-			_panel(br, Color(0.2, 0.14, 0.1, 0.92) if can else Color(0.13, 0.09, 0.08, 0.8))
-			var nm: String = ""
-			if pad.kind == "":
-				nm = String(main.DEFS[main.DEF_ORDER[i]]["name"])
-			else:
-				nm = "Upgrade %s" % String(main.DEFS[pad.kind]["name"]) if cost >= 0 else "%s (max)" % String(main.DEFS[pad.kind]["name"])
-			_text(nm, br.position + Vector2(0, 22), 13, CREAM if can else Color(CREAM, 0.5), br.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-			if cost >= 0:
-				_text("%d gold  [%d]" % [cost, i + 1], br.position + Vector2(0, 42), 13, GOLD if can else Color(GOLD, 0.5), br.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	# banner
 	if main.banner_t > 0.0 and main.state == "play":
 		var ba: float = minf(1.0, main.banner_t)
 		_panel(Rect2(v.x / 2.0 - 190, 70, 380, 38), Color(0.13, 0.09, 0.08, 0.7 * ba))
 		_text(main.banner, Vector2(v.x / 2.0 - 190, 95), 18, Color(CREAM, ba), 380.0, HORIZONTAL_ALIGNMENT_CENTER)
-	if main.state == "levelup":
-		draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.6))
-		_text("LEVEL UP  -  pick one", Vector2(0, v.y / 2.0 - 112), 24, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
-		for i in main.choices.size():
-			var r: Rect2 = main.card_rect(i)
-			var pk: Dictionary = main.choices[i]
-			_panel(r, Color(0.2, 0.14, 0.1, 0.96))
-			var lv: int = main.pl(String(pk["id"]))
-			_text(String(pk["name"]), r.position + Vector2(0, 38), 20, GOLD, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-			_text("Lv %d -> %d" % [lv, lv + 1] if lv > 0 else "NEW", r.position + Vector2(0, 62), 14, Color(0.6, 1.0, 0.6), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-			draw_multiline_string(font, r.position + Vector2(14, 92), String(pk["desc"]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 28.0, 15, -1, CREAM)
-			_text("tap or press %d" % (i + 1), r.position + Vector2(0, 164), 12, Color(CREAM, 0.6), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	if main.state == "inter":
+		_inter(v)
 	if main.state == "result":
 		draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.55))
 		var rr := Rect2(v.x / 2.0 - 200, v.y / 2.0 - 125, 400, 250)
 		_panel(rr, Color(0.2, 0.14, 0.1, 0.96))
 		var won: bool = String(main.result["why"]) == "won"
 		_text("THE CASTLE HELD!" if won else "THE WALL FELL", rr.position + Vector2(0, 52), 30, GOLD if won else Color(1.0, 0.5, 0.42), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text("Reached wave %d  ·  level %d" % [main.result["wave"], main.result["level"]], rr.position + Vector2(0, 98), 17, CREAM, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text("%d animals herded  ·  %d raiders shooed" % [main.result["herded"], main.result["defeated"]], rr.position + Vector2(0, 126), 15, Color(CREAM, 0.85), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("Reached wave %d of %d" % [main.result["wave"], main.LAST_WAVE], rr.position + Vector2(0, 98), 17, CREAM, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("%d animals herded  ·  %d raiders defeated" % [main.result["herded"], main.result["defeated"]], rr.position + Vector2(0, 126), 15, Color(CREAM, 0.85), rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("tap to play again", rr.position + Vector2(0, 208), 18, GOLD, rr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _button(i: int, label: String, dim: bool, fill: float, on: bool) -> void:
@@ -239,3 +207,45 @@ func _minimap(v: Vector2) -> void:
 	var dp: Vector2 = o + main.dog.position * sc
 	draw_circle(dp, 3.6, Color(0.3, 0.55, 1.0))
 	draw_circle(dp, 1.6, Color(1, 1, 1))
+
+func _row(rr: Rect2, name: String, desc: String, cost: String, ccol: Color, can: bool) -> void:
+	_panel(rr, Color(0.26, 0.19, 0.13, 0.96) if can else Color(0.15, 0.11, 0.08, 0.9))
+	_text(name, rr.position + Vector2(10, 20), 15, CREAM if can else Color(CREAM, 0.55))
+	_text(desc, rr.position + Vector2(10, 38), 12, Color(CREAM, 0.75 if can else 0.4))
+	_text(cost, Vector2(rr.end.x - 96, rr.position.y + 28), 15, ccol if can else Color(ccol, 0.5), 88.0, HORIZONTAL_ALIGNMENT_RIGHT)
+
+func _inter(v: Vector2) -> void:
+	draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.9))
+	_text("WAVE %d CLEARED" % main.wave, Vector2(0, 38), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var panels: Array = main.inter_panels()
+	var lp: Rect2 = panels[0]
+	var rp: Rect2 = panels[1]
+	_panel(lp, Color(0.18, 0.13, 0.1, 0.96))
+	_panel(rp, Color(0.18, 0.13, 0.1, 0.96))
+	_text("THE WIZARD", lp.position + Vector2(14, 30), 20, Color(0.7, 0.85, 1.0))
+	_text("%d XP" % int(main.xp), lp.position + Vector2(lp.size.x - 130, 30), 18, Color(0.6, 0.9, 1.0), 116.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	for i in main.perk_offers.size():
+		var pk: Dictionary = main.perk_offers[i]
+		var id: String = String(pk["id"])
+		var lv: int = main.pl(id)
+		var cost: int = main.perk_cost(id)
+		_row(main.inter_row_rect(lp, i), "%s   Lv %d > %d" % [String(pk["name"]), lv, lv + 1], String(pk["desc"]), "%d XP" % cost, Color(0.6, 0.9, 1.0), main.xp >= float(cost))
+	_text("THE CASTLE", rp.position + Vector2(14, 30), 20, GOLD)
+	_text("%d gold" % main.gold, rp.position + Vector2(rp.size.x - 130, 30), 18, GOLD, 116.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	var per: int = main.inter_per_page()
+	for i in per:
+		var idx: int = main.inter_page * per + i
+		if idx >= main.castle_rows.size():
+			break
+		var r: Dictionary = main.castle_rows[idx]
+		_row(main.inter_row_rect(rp, i), String(r["name"]), String(r["desc"]), "%d gold" % int(r["cost"]), GOLD, main.gold >= int(r["cost"]))
+	var pages: int = main.inter_pages()
+	if pages > 1:
+		_text("page %d / %d" % [main.inter_page + 1, pages], Vector2(rp.position.x + 14, rp.end.y - 14), 13, Color(CREAM, 0.7))
+		for dd in [-1, 1]:
+			var br: Rect2 = main.page_rect(dd)
+			_panel(br, Color(0.26, 0.19, 0.13, 0.96))
+			_text("<" if dd < 0 else ">", br.position + Vector2(0, 20), 16, CREAM, br.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var sr: Rect2 = main.start_rect()
+	_panel(sr, Color(0.28, 0.5, 0.22, 0.95))
+	_text("START WAVE %d" % (main.wave + 1), sr.position + Vector2(0, 33), 20, CREAM, sr.size.x, HORIZONTAL_ALIGNMENT_CENTER)

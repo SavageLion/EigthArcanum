@@ -33,12 +33,12 @@ const PERKS: Array = [
 	{"id": "haste", "name": "Quick Cast", "desc": "All your spells recharge faster.", "max": 5},
 	{"id": "wide", "name": "Wide Magic", "desc": "Bigger explosions, rings and orbits.", "max": 4},
 	{"id": "bark", "name": "Arcane Howl", "desc": "Your bark reaches further and recharges faster.", "max": 4},
-	{"id": "boots", "name": "Fleet Paws", "desc": "Run faster.", "max": 4},
-	{"id": "lungs", "name": "Deep Lungs", "desc": "A longer sprint bar that refills faster.", "max": 3},
-	{"id": "charm", "name": "Shepherd's Purse", "desc": "Every animal you pen pays more gold.", "max": 3},
-	{"id": "posts", "name": "Castle Walls", "desc": "Walls get stronger and mend a little.", "max": 4},
-	{"id": "moss", "name": "Mending Moss", "desc": "The walls slowly heal themselves.", "max": 3},
-	{"id": "paw2", "name": "Busy Paws", "desc": "Mend walls faster while you crouch beside them.", "max": 3},
+	{"id": "boots", "name": "Fleet Paws", "desc": "You run faster.", "max": 4},
+	{"id": "vigor", "name": "Vitality", "desc": "+25 maximum health and a quick heal.", "max": 5},
+	{"id": "regen", "name": "Second Wind", "desc": "You heal faster when out of danger.", "max": 4},
+	{"id": "ward", "name": "Warding Robe", "desc": "You take less damage from raiders.", "max": 4},
+	{"id": "magnet", "name": "Gem Magnet", "desc": "Pick up XP gems from further away.", "max": 4},
+	{"id": "study", "name": "Quick Study", "desc": "Every gem gives more XP.", "max": 4},
 ]
 const DEFS: Dictionary = {
 	"archer": {"name": "Archer Tower", "cost": 20, "tex": "tower", "sc": 1.5},
@@ -57,7 +57,12 @@ var orbs: Array = []
 var orbit_nodes: Array = []
 var orbit_ang: float = 0.0
 var gold: int = 0
-var near_pad: int = -1
+var perk_offers: Array = []
+var castle_rows: Array = []
+var inter_page: int = 0
+var walls_lv: int = 0
+var moss_lv: int = 0
+var market_lv: int = 0
 var cam: Camera2D
 var hud: Hud
 var dog_frames: SpriteFrames
@@ -80,12 +85,8 @@ var stray_t: float = 3.0
 var lost: int = 0
 var herded: int = 0
 var defeated: int = 0
-var level: int = 1
 var xp: float = 0.0
-var xp_need: float = 30.0
-var pending: int = 0
 var perk_lv: Dictionary = {"bolt": 1}
-var choices: Array = []
 var result: Dictionary = {}
 var banner: String = ""
 var banner_t: float = 0.0
@@ -107,6 +108,9 @@ var smoke: bool = false
 var demo: bool = false
 var overview: bool = false
 var lineup: bool = false
+var interdemo: bool = false
+var holesdemo: bool = false
+var dbg_zoom: float = 0.0
 var autowalk: bool = false
 var look_mode: int = 0
 var style_flat: bool = false
@@ -120,10 +124,6 @@ var stick_id: int = -99
 var stick_origin: Vector2 = Vector2.ZERO
 var stick_pos: Vector2 = Vector2.ZERO
 var stick_vec: Vector2 = Vector2.ZERO
-var calm_held: bool = false
-var calm_id: int = -99
-var sprint_held: bool = false
-var sprint_id: int = -99
 
 func vp() -> Vector2:
 	return get_viewport_rect().size
@@ -131,11 +131,6 @@ func vp() -> Vector2:
 func btn_pos(i: int) -> Vector2:
 	var v: Vector2 = vp()
 	return Vector2(v.x - 70.0 - 126.0 * float(i), v.y - 72.0)
-
-func card_rect(i: int) -> Rect2:
-	var v: Vector2 = vp()
-	var x0: float = (v.x - 778.0) / 2.0
-	return Rect2(x0 + float(i) * 264.0, v.y / 2.0 - 88.0, 250.0, 176.0)
 
 func pl(id: String) -> int:
 	return int(perk_lv.get(id, 0))
@@ -159,6 +154,11 @@ func _ready() -> void:
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
 		overview = str(JavaScriptBridge.eval("window.location.search")).contains("overview")
 		lineup = str(JavaScriptBridge.eval("window.location.search")).contains("lineup")
+		interdemo = str(JavaScriptBridge.eval("window.location.search")).contains("interdemo")
+		holesdemo = str(JavaScriptBridge.eval("window.location.search")).contains("holesdemo")
+		var zs: String = str(JavaScriptBridge.eval("window.location.search"))
+		if zs.contains("zoomx="):
+			dbg_zoom = float(zs.substr(zs.find("zoomx=") + 6).to_float())
 		autowalk = str(JavaScriptBridge.eval("window.location.search")).contains("autowalk")
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.raven_frames("wiz_ref")
@@ -216,17 +216,28 @@ func _ready() -> void:
 	start_wave(1)
 	if lineup:
 		setup_lineup()
+	if holesdemo:
+		dog.position = world.pen.get_center() + Vector2(0.0, 40.0)
+		cam_pos = dog.position
+		cam_init = true
+		cam.position = dog.position
+		for sd in ["north", "west", "east"]:
+			world.open_hole(sd)
+		for w in world.walls:
+			set_wall_hp(w, float(w["hp"]))
+	if interdemo:
+		xp = 260.0
+		gold = 220
+		wave = 3
+		build_on(0, "archer")
+		begin_intermission()
 	if demo or smoke:
 		gold = 600
 		perk_lv = {"bolt": 3, "fire": 2, "nova": 2, "zap": 2, "orbit": 2}
 		for i in 4:
-			near_pad = i
-			world.pads[i].position = world.pads[i].position
-			try_build(i % 3)
-		near_pad = 5
-		try_build(1)
-		try_build(0)
-		near_pad = -1
+			build_on(i, String(DEF_ORDER[i % 3]))
+		build_on(5, "brazier")
+		build_on(6, "archer")
 		if demo:
 			perk_lv = {}
 			var kinds: Array = ["fox", "imp", "wolf", "bear"]
@@ -406,19 +417,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var ke := event as InputEventKey
 		if ke.pressed and not ke.echo:
-			if state == "levelup":
-				if ke.keycode == KEY_1:
-					pick_perk(0)
-				elif ke.keycode == KEY_2:
-					pick_perk(1)
-				elif ke.keycode == KEY_3:
-					pick_perk(2)
-			elif ke.keycode == KEY_1 and near_pad >= 0:
-				try_build(0)
-			elif ke.keycode == KEY_2 and near_pad >= 0 and build_count() > 1:
-				try_build(1)
-			elif ke.keycode == KEY_3 and near_pad >= 0 and build_count() > 1:
-				try_build(2)
+			if state == "inter":
+				if ke.keycode == KEY_ENTER or ke.keycode == KEY_SPACE:
+					end_intermission()
 			elif ke.keycode == KEY_SPACE:
 				do_bark()
 			elif ke.keycode == KEY_F:
@@ -442,79 +443,48 @@ func toggle_fullscreen() -> void:
 	var w: Window = get_window()
 	w.mode = Window.MODE_WINDOWED if w.mode == Window.MODE_FULLSCREEN or w.mode == Window.MODE_EXCLUSIVE_FULLSCREEN else Window.MODE_FULLSCREEN
 
-func build_rect(i: int) -> Rect2:
-	var v: Vector2 = vp()
-	if near_pad >= 0 and (world.pads[near_pad] as Pad).kind != "":
-		return Rect2(v.x / 2.0 - 110.0, 116.0, 220.0, 54.0)
-	return Rect2(v.x / 2.0 - 192.0 + float(i) * 130.0, 116.0, 124.0, 54.0)
-
-func build_count() -> int:
-	if near_pad < 0:
-		return 0
-	return 1 if (world.pads[near_pad] as Pad).kind != "" else 3
-
-func def_cost(p: Pad, i: int) -> int:
-	if p.kind == "":
-		return int(DEFS[DEF_ORDER[i]]["cost"])
-	if p.lv >= 4:
-		return -1
-	return int(DEFS[p.kind]["cost"]) * p.lv
-
-func try_build(i: int) -> void:
-	if near_pad < 0 or state != "play":
+func build_on(i: int, kind: String) -> void:
+	var p: Pad = world.pads[i]
+	if p.kind != "":
 		return
-	var p: Pad = world.pads[near_pad]
-	var c: int = def_cost(p, i)
-	if c < 0 or gold < c:
-		add_popup("NOT ENOUGH GOLD" if c > 0 else "MAX LEVEL", p.position + Vector2(0, -34), Color(1.0, 0.5, 0.4))
-		return
-	gold -= c
-	if p.kind == "":
-		p.kind = DEF_ORDER[i]
-		p.lv = 1
-		var def: Dictionary = DEFS[p.kind]
-		var t: Texture2D = world.tex(String(def["tex"]))
-		var sprt := Sprite2D.new()
-		sprt.texture = t
-		sprt.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprt.offset = Vector2(0, -t.get_height() * 0.5 + 3.0)
-		sprt.position = p.position + Vector2(0, 8.0)
-		ysort.add_child(sprt)
-		p.sprite = sprt
-	else:
-		p.lv += 1
+	p.kind = kind
+	p.lv = 1
+	var def: Dictionary = DEFS[kind]
+	var t: Texture2D = world.tex(String(def["tex"]))
+	var sprt := Sprite2D.new()
+	sprt.texture = t
+	sprt.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprt.offset = Vector2(0, -t.get_height() * 0.5 + 3.0)
+	sprt.position = p.position + Vector2(0, 8.0)
+	ysort.add_child(sprt)
+	p.sprite = sprt
+	pad_scale(p)
+	ring(p.position, 46.0, Color(1.0, 0.85, 0.4), 0.5, 4.0)
+
+func pad_scale(p: Pad) -> void:
 	var base: float = float(DEFS[p.kind]["sc"]) * (1.4 if world.flat else (1.0 if (not world.refst or p.kind == "archer") else 1.5))
 	p.sprite.scale = Vector2.ONE * base * (1.0 + 0.1 * float(p.lv - 1))
-	add_popup("BUILT!" if p.lv == 1 else "LEVEL %d!" % p.lv, p.position + Vector2(0, -40), Color(1.0, 0.9, 0.4))
+
+func upgrade_pad(i: int) -> void:
+	var p: Pad = world.pads[i]
+	if p.kind == "" or p.lv >= 4:
+		return
+	p.lv += 1
+	pad_scale(p)
 	ring(p.position, 46.0, Color(1.0, 0.85, 0.4), 0.5, 4.0)
 
 func _press(p: Vector2, id: int) -> void:
-	if state == "play" and near_pad >= 0:
-		for i in build_count():
-			if build_rect(i).has_point(p):
-				try_build(i)
-				return
 	if state != "result" and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
 		return
 	if state == "result":
 		get_tree().reload_current_scene()
 		return
-	if state == "levelup":
-		for i in choices.size():
-			if card_rect(i).has_point(p):
-				pick_perk(i)
+	if state == "inter":
+		inter_press(p)
 		return
 	if p.distance_to(btn_pos(0)) < BTN_R + 14.0:
 		do_bark()
-		return
-	if p.distance_to(btn_pos(2)) < BTN_R + 14.0:
-		sprint_held = true
-		sprint_id = id
-		return
-	if p.distance_to(btn_pos(1)) < BTN_R + 14.0:
-		calm_held = true
-		calm_id = id
 		return
 	if not stick_on and p.y > 46.0:
 		stick_on = true
@@ -538,12 +508,6 @@ func _release(id: int) -> void:
 		stick_on = false
 		stick_id = -99
 		stick_vec = Vector2.ZERO
-	if id == calm_id:
-		calm_held = false
-		calm_id = -99
-	if id == sprint_id:
-		sprint_held = false
-		sprint_id = -99
 
 func move_input() -> Vector2:
 	if autowalk:
@@ -578,14 +542,20 @@ func speed_mult() -> float:
 	return 1.0 + 0.08 * float(pl("boots"))
 func gold_mult() -> float:
 	var pigs: int = int(pen_counts.get("pig", 0))
-	return 1.0 + 0.25 * float(pl("charm")) + 0.04 * float(pigs)
+	return 1.0 + 0.25 * float(market_lv) + 0.04 * float(pigs)
 func xp_mult() -> float:
-	return 1.0
+	return 1.0 + 0.15 * float(pl("study"))
 func fence_regen() -> float:
 	var sheepish: int = int(pen_counts.get("normal", 0)) + int(pen_counts.get("lamb", 0)) + int(pen_counts.get("black", 0))
-	return 0.12 * float(sheepish) + 0.7 * float(pl("moss"))
-func repair_rate() -> float:
-	return 5.0 * (1.0 + 0.6 * float(pl("paw2")))
+	return 0.12 * float(sheepish) + 0.7 * float(moss_lv)
+func max_hp() -> float:
+	return 100.0 + 25.0 * float(pl("vigor"))
+func regen_rate() -> float:
+	return 4.0 + 2.5 * float(pl("regen"))
+func ward_k() -> float:
+	return 1.0 - 0.08 * float(pl("ward"))
+func magnet_r() -> float:
+	return 70.0 + 35.0 * float(pl("magnet"))
 
 # ---------------------------------------------------------------- waves
 func start_wave(n: int) -> void:
@@ -689,8 +659,8 @@ func _physics_process(delta: float) -> void:
 		stray_t = 99.0
 	if smoke:
 		smoke_n += 1
-		if state == "levelup":
-			pick_perk(0)
+		if state == "inter":
+			inter_auto()
 		elif smoke_n % 90 == 0 and state == "play":
 			gain_xp(40.0)
 		if smoke_n == 300:
@@ -706,12 +676,14 @@ func _physics_process(delta: float) -> void:
 			spawn_enemy("imp")
 			foxes[foxes.size() - 1].position = dog.position + Vector2(160.0, 0.0)
 		if smoke_n % 600 == 0:
-			print("smoke hp=", dog.hp, " ko=", dog.ko_t, " t=", smoke_n, " state=", state, " wave=", wave, " foxes=", foxes.size(), " sheep=", sheep.size(), " lvl=", level, " perks=", perk_lv)
+			print("smoke hp=", dog.hp, " ko=", dog.ko_t, " t=", smoke_n, " state=", state, " wave=", wave, " foxes=", foxes.size(), " sheep=", sheep.size(), " xp=", int(xp), " gold=", gold, " walls=", world.walls.size(), " perks=", perk_lv)
 	if state != "play":
 		return
 	var dt: float = minf(delta, 0.05)
 	clock += dt
 	wave_t += dt
+	if smoke:
+		wave_t += dt * 6.0
 	alarm = maxf(0.0, alarm - dt)
 	banner_t = maxf(0.0, banner_t - dt)
 	count_pen()
@@ -740,7 +712,7 @@ func _physics_process(delta: float) -> void:
 		if wave >= LAST_WAVE:
 			finish_day("won")
 		else:
-			start_wave(wave + 1)
+			begin_intermission()
 
 func count_pen() -> void:
 	pen_counts.clear()
@@ -793,7 +765,7 @@ func _process(delta: float) -> void:
 		(s as Sheep).animate(delta)
 	for f in foxes:
 		(f as Fox).animate(delta)
-	var target_zoom: float = BASE_ZOOM * 0.95 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else BASE_ZOOM
+	var target_zoom: float = BASE_ZOOM if dbg_zoom <= 0.0 else dbg_zoom
 	if overview:
 		target_zoom = 0.27
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
@@ -852,6 +824,7 @@ func collide(e: Mover, r: float, bounce: float) -> void:
 func damage_dog(amount: float, from: Vector2) -> void:
 	if dog.invuln > 0.0 or dog.ko_t > 0.0:
 		return
+	amount *= ward_k()
 	dog.hp -= amount
 	dog.hurt_t = 0.3
 	dog.regen_t = 4.0
@@ -871,8 +844,9 @@ func update_dog(dt: float) -> void:
 	dog.invuln = maxf(0.0, dog.invuln - dt)
 	dog.hurt_t = maxf(0.0, dog.hurt_t - dt)
 	dog.regen_t = maxf(0.0, dog.regen_t - dt)
+	dog.hp_max = max_hp()
 	if dog.regen_t <= 0.0 and dog.hp < dog.hp_max:
-		dog.hp = minf(dog.hp_max, dog.hp + 4.0 * dt)
+		dog.hp = minf(dog.hp_max, dog.hp + regen_rate() * dt)
 	if dog.ko_t > 0.0:
 		dog.ko_t -= dt
 		dog.vel = Vector2.ZERO
@@ -880,7 +854,6 @@ func update_dog(dt: float) -> void:
 			dog.position = world.dog_start
 			dog.hp = dog.hp_max
 			dog.invuln = 1.5
-			dog.stam = dog.stam_max
 			ring(dog.position, 70.0, Color(0.7, 0.85, 1.0), 0.6, 4.0)
 		return
 	var inp: Vector2 = move_input()
@@ -888,31 +861,10 @@ func update_dog(dt: float) -> void:
 	var dir: Vector2 = inp.normalized() if mag > 0.02 else Vector2.ZERO
 	dog.stun = maxf(0.0, dog.stun - dt)
 	dog.bark_cd = maxf(0.0, dog.bark_cd - dt)
-	var want_sprint: bool = sprint_held or Input.is_key_pressed(KEY_SHIFT)
-	dog.walk = stick_on and mag > 0.12 and mag < 0.58
-	dog.crouch = calm_held or Input.is_key_pressed(KEY_C) or dog.walk
-	dog.stam_max = 100.0 + 25.0 * float(pl("lungs"))
-	var speedk: float
-	if dog.crouch:
-		speedk = maxf(0.55, mag)
-	elif mag < 0.12:
-		speedk = 0.0
-	else:
-		speedk = 0.62 + 0.38 * minf(1.0, (mag - 0.12) / 0.5)
-	if dog.winded and dog.stam > dog.stam_max * 0.3:
-		dog.winded = false
-	var sprinting: bool = want_sprint and (not dog.winded) and dog.stam > 0.0 and mag > 0.12 and not dog.crouch
-	var regen: float = 1.0 + 0.3 * float(pl("lungs"))
-	if sprinting:
-		dog.stam -= 28.0 * dt
-	else:
-		dog.stam += 18.0 * regen * dt
-	if dog.stam <= 0.0:
-		dog.stam = 0.0
-		dog.winded = true
-	dog.stam = minf(dog.stam_max, dog.stam)
-	var base: float = (95.0 if dog.crouch else 210.0) * speed_mult()
-	var sp: float = base * speedk * (0.72 if dog.winded else 1.0) * (1.55 if sprinting else 1.0) * (0.3 if dog.stun > 0.0 else 1.0)
+	dog.walk = false
+	dog.crouch = false
+	var speedk: float = 0.0 if mag < 0.12 else (0.55 + 0.45 * minf(1.0, (mag - 0.12) / 0.6))
+	var sp: float = 235.0 * speed_mult() * speedk * (0.3 if dog.stun > 0.0 else 1.0)
 	if world.zone_kind(dog.position) == "water":
 		sp *= 0.5
 	dog.vel += (dir * sp - dog.vel) * minf(1.0, dt * 9.0)
@@ -922,25 +874,6 @@ func update_dog(dt: float) -> void:
 	var v: float = dog.vel.length()
 	if v > 20.0:
 		dog.heading = dog.vel / v
-	# which build pad am I standing on?
-	near_pad = -1
-	var bd: float = 38.0
-	for i in world.pads.size():
-		var pd: Pad = world.pads[i]
-		var d: float = pd.position.distance_to(dog.position)
-		pd.near = false
-		if d < bd:
-			bd = d
-			near_pad = i
-	if near_pad >= 0:
-		(world.pads[near_pad] as Pad).near = true
-	# crouching beside a damaged fence mends it
-	if dog.crouch:
-		for w in world.walls:
-			if not w["pen"] or w["broken"] or float(w["hp"]) >= float(w["max"]):
-				continue
-			if seg_dist(dog.position, w["a"], w["b"]) < 46.0:
-				set_wall_hp(w, float(w["hp"]) + repair_rate() * dt)
 
 func seg_dist(p: Vector2, a: Vector2, b: Vector2) -> float:
 	var ab: Vector2 = b - a
@@ -1356,7 +1289,7 @@ func update_coins(dt: float) -> void:
 			bn.queue_free()
 			continue
 		var d: float = bn.position.distance_to(dog.position)
-		if d < 70.0:
+		if d < magnet_r():
 			bn.fly = true
 		if bn.fly:
 			bn.position += (dog.position - bn.position).normalized() * 300.0 * dt
@@ -1401,46 +1334,188 @@ func update_pen_bonus(dt: float) -> void:
 # ---------------------------------------------------------------- xp and perks
 func gain_xp(amount: float) -> void:
 	xp += amount * xp_mult()
-	while xp >= xp_need:
-		xp -= xp_need
-		level += 1
-		xp_need = 30.0 + 20.0 * float(level - 1)
-		pending += 1
-		add_popup("LEVEL UP!", dog.position + Vector2(0, -26), Color(1.0, 0.9, 0.4))
-		ring(dog.position, 70.0, Color(1.0, 0.9, 0.4), 0.7, 3.0)
-	if pending > 0 and state == "play":
-		open_levelup()
 
-func open_levelup() -> void:
+# ---------------------------------------------------------------- between waves
+func perk_cost(id: String) -> int:
+	return 25 + 20 * pl(id)
+
+func roll_perk_offers() -> void:
 	var pool: Array = []
 	for p in PERKS:
 		if pl(String(p["id"])) < int(p["max"]):
 			pool.append(p)
 	pool.shuffle()
-	choices = pool.slice(0, 3)
-	if choices.is_empty():
-		pending = 0
-		return
-	state = "levelup"
+	perk_offers = pool.slice(0, 6)
+
+func rebuild_castle_rows() -> void:
+	castle_rows.clear()
+	var free: int = 0
+	for pp in world.pads:
+		if (pp as Pad).kind == "":
+			free += 1
+	if free > 0:
+		for k in DEF_ORDER:
+			castle_rows.append({"id": "build_" + String(k), "name": String(DEFS[k]["name"]), "desc": "Add a new one (%d free spots)" % free, "cost": int(DEFS[k]["cost"])})
+	for i in world.pads.size():
+		var p: Pad = world.pads[i]
+		if p.kind != "" and p.lv < 4:
+			castle_rows.append({"id": "up_%d" % i, "name": "Upgrade %s" % String(DEFS[p.kind]["name"]), "desc": "Level %d to %d" % [p.lv, p.lv + 1], "cost": int(DEFS[p.kind]["cost"]) * p.lv})
+	for side in ["north", "west", "east"]:
+		if not bool(world.holes.get(side, false)):
+			castle_rows.append({"id": "hole_" + String(side), "name": "Open the %s gate" % String(side), "desc": "Cut a gap in the %s wall so animals can walk in" % String(side), "cost": 25})
+	castle_rows.append({"id": "mend", "name": "Mend the walls", "desc": "Repair every wall to full strength", "cost": 15})
+	if walls_lv < 4:
+		castle_rows.append({"id": "walls_up", "name": "Stronger walls", "desc": "+30%% wall strength (level %d to %d)" % [walls_lv, walls_lv + 1], "cost": 40 + 30 * walls_lv})
+	if moss_lv < 3:
+		castle_rows.append({"id": "moss", "name": "Healing moss", "desc": "Walls slowly mend themselves (level %d to %d)" % [moss_lv, moss_lv + 1], "cost": 35 + 25 * moss_lv})
+	if market_lv < 3:
+		castle_rows.append({"id": "market", "name": "Market stall", "desc": "Penned animals pay +25%% gold (level %d to %d)" % [market_lv, market_lv + 1], "cost": 50 + 40 * market_lv})
+
+func begin_intermission() -> void:
+	state = "inter"
+	inter_page = 0
 	stick_on = false
 	stick_vec = Vector2.ZERO
-	calm_held = false
-	sprint_held = false
+	dog.ko_t = 0.0
+	dog.hp = dog.hp_max
+	roll_perk_offers()
+	rebuild_castle_rows()
 
-func pick_perk(i: int) -> void:
-	if state != "levelup" or i >= choices.size():
+func end_intermission() -> void:
+	if state != "inter":
 		return
-	var id: String = String(choices[i]["id"])
+	state = "play"
+	start_wave(wave + 1)
+
+func inter_panels() -> Array:
+	var v: Vector2 = vp()
+	var w: float = (v.x - 60.0) / 2.0
+	var h: float = v.y - 140.0
+	return [Rect2(20.0, 54.0, w, h), Rect2(40.0 + w, 54.0, w, h)]
+
+func inter_row_rect(panel: Rect2, i: int) -> Rect2:
+	return Rect2(panel.position.x + 10.0, panel.position.y + 44.0 + float(i) * 52.0, panel.size.x - 20.0, 48.0)
+
+func inter_per_page() -> int:
+	var panel: Rect2 = inter_panels()[1]
+	return maxi(1, int((panel.size.y - 44.0 - 40.0) / 52.0))
+
+func inter_pages() -> int:
+	return maxi(1, int(ceil(float(castle_rows.size()) / float(inter_per_page()))))
+
+func start_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 130.0, v.y - 72.0, 260.0, 52.0)
+
+func page_rect(dir: int) -> Rect2:
+	var panel: Rect2 = inter_panels()[1]
+	return Rect2(panel.end.x - 96.0 + (0.0 if dir < 0 else 48.0), panel.end.y - 36.0, 40.0, 28.0)
+
+func inter_press(p: Vector2) -> void:
+	if start_rect().has_point(p):
+		end_intermission()
+		return
+	var panels: Array = inter_panels()
+	for i in perk_offers.size():
+		if inter_row_rect(panels[0], i).has_point(p):
+			buy_perk(i)
+			return
+	var per: int = inter_per_page()
+	for i in per:
+		var idx: int = inter_page * per + i
+		if idx < castle_rows.size() and inter_row_rect(panels[1], i).has_point(p):
+			buy_castle(idx)
+			return
+	if page_rect(-1).has_point(p):
+		inter_page = maxi(0, inter_page - 1)
+	elif page_rect(1).has_point(p):
+		inter_page = mini(inter_pages() - 1, inter_page + 1)
+
+func buy_perk(i: int) -> bool:
+	if i >= perk_offers.size():
+		return false
+	var pk: Dictionary = perk_offers[i]
+	var id: String = String(pk["id"])
+	var cost: int = perk_cost(id)
+	if pl(id) >= int(pk["max"]) or float(cost) > xp:
+		return false
+	xp -= float(cost)
 	perk_lv[id] = pl(id) + 1
-	if id == "posts":
+	if id == "vigor":
+		dog.hp_max = max_hp()
+		dog.hp = minf(dog.hp_max, dog.hp + 25.0)
+	if pl(id) >= int(pk["max"]):
+		var pool: Array = []
+		for p in PERKS:
+			var already: bool = false
+			for o in perk_offers:
+				if String(o["id"]) == String(p["id"]):
+					already = true
+			if not already and pl(String(p["id"])) < int(p["max"]):
+				pool.append(p)
+		if pool.is_empty():
+			perk_offers.remove_at(i)
+		else:
+			perk_offers[i] = pool[randi() % pool.size()]
+	return true
+
+func buy_castle(idx: int) -> bool:
+	if idx >= castle_rows.size():
+		return false
+	var r: Dictionary = castle_rows[idx]
+	var cost: int = int(r["cost"])
+	if gold < cost:
+		return false
+	var id: String = String(r["id"])
+	gold -= cost
+	if id.begins_with("build_"):
+		for i in world.pads.size():
+			if (world.pads[i] as Pad).kind == "":
+				build_on(i, id.substr(6))
+				break
+	elif id.begins_with("up_"):
+		upgrade_pad(int(id.substr(3)))
+	elif id.begins_with("hole_"):
+		world.open_hole(id.substr(5))
+		for w in world.walls:
+			set_wall_hp(w, float(w["hp"]))
+	elif id == "mend":
+		for w in world.walls:
+			if w["pen"]:
+				set_wall_hp(w, float(w["max"]))
+	elif id == "walls_up":
+		walls_lv += 1
 		for w in world.walls:
 			if w["pen"]:
 				w["max"] = float(w["max"]) * 1.3
 				set_wall_hp(w, float(w["hp"]) + 25.0)
-	pending -= 1
-	state = "play"
-	if pending > 0:
-		open_levelup()
+	elif id == "moss":
+		moss_lv += 1
+	elif id == "market":
+		market_lv += 1
+	rebuild_castle_rows()
+	inter_page = mini(inter_page, inter_pages() - 1)
+	return true
+
+func inter_auto() -> void:
+	# the scripted test spends everything it can, then starts the next wave
+	gold += 400
+	var guard: int = 0
+	while guard < 60:
+		guard += 1
+		var bought: bool = false
+		for i in perk_offers.size():
+			if buy_perk(i):
+				bought = true
+				break
+		if not bought:
+			for i in castle_rows.size():
+				if buy_castle(i):
+					bought = true
+					break
+		if not bought:
+			break
+	end_intermission()
 
 # ---------------------------------------------------------------- the flock
 func zone_mult() -> float:
@@ -1707,4 +1782,4 @@ func finish_day(why: String) -> void:
 		return
 	state = "result"
 	stick_on = false
-	result = {"why": why, "wave": wave, "level": level, "herded": herded, "defeated": defeated, "lost": lost}
+	result = {"why": why, "wave": wave, "xp": int(xp), "herded": herded, "defeated": defeated, "lost": lost}
