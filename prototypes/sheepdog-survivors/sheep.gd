@@ -48,9 +48,14 @@ func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture
 	wa = randf() * TAU
 	graze = randf() * 3.0
 	hop = randf() * 6.0
+	var fit: Dictionary = {}
+	if def.has("set"):
+		fit = U.fit(String(def["set"]), String(def["metric"]), float(def["target"]) * U.WH)
 	shadow = Sprite2D.new()
 	shadow.texture = shadow_tex
 	shadow.scale = Vector2(r * 0.34, r * 0.16)
+	if not fit.is_empty():
+		shadow.scale = Vector2(float(fit["w"]) / 64.0 * 1.2, float(fit["w"]) / 64.0 * 0.5)
 	shadow.show_behind_parent = true
 	add_child(shadow)
 	spr = AnimatedSprite2D.new()
@@ -60,6 +65,10 @@ func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture
 	base_scale = 0.85 * r / 7.0 * (1.2 if t == "lamb" else 1.0) * float(def.get("sc", 1.0))
 	spr.scale = Vector2(base_scale, base_scale)
 	spr.offset = Vector2(0, -13)
+	if not fit.is_empty():
+		base_scale = float(fit["scale"])
+		spr.scale = Vector2(base_scale, base_scale)
+		spr.offset = fit["offset"]
 	spr.play("idle_east")
 	add_child(spr)
 

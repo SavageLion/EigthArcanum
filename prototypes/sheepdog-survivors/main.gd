@@ -12,15 +12,15 @@ const WAVE_LEN: float = 60.0
 const LAST_WAVE: int = 10
 const BASE_ZOOM: float = 1.1
 const TYPES: Dictionary = {
-	"normal": {"r": 7.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10},
-	"lamb": {"r": 4.5, "zone": 105.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 8},
-	"ram": {"r": 9.0, "zone": 62.0, "flee": 0.55, "speed": 0.8, "hp": 4, "tint": Color(0.8, 0.68, 0.55), "heavy": true, "bark_mul": 0.4, "xp": 18},
-	"goat": {"r": 7.0, "zone": 90.0, "flee": 0.45, "speed": 0.9, "hp": 3, "tint": Color(0.88, 0.7, 0.45), "xp": 14},
-	"black": {"r": 7.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(0.3, 0.28, 0.32), "coh": 0.35, "xp": 14},
-	"goose": {"r": 6.0, "zone": 150.0, "flee": 1.3, "speed": 1.35, "hp": 1, "tint": Color(1.1, 1.12, 1.2), "coh": 0.5, "bark_mul": 1.6, "xp": 12},
-	"duck": {"r": 5.0, "zone": 125.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1.15, 1.1, 0.62), "xp": 10},
-	"cow": {"r": 11.0, "zone": 70.0, "flee": 0.5, "speed": 0.75, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.4, "xp": 20, "sc": 0.78},
-	"pig": {"r": 8.0, "zone": 80.0, "flee": 0.6, "speed": 0.7, "hp": 3, "tint": Color(1.2, 0.78, 0.86), "heavy": true, "bark_mul": 0.5, "xp": 16},
+	"normal": {"r": 8.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10, "set": "sheep_ref", "metric": "w", "target": 0.72},
+	"lamb": {"r": 5.0, "zone": 105.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 8, "set": "lamb8", "metric": "w", "target": 0.45},
+	"ram": {"r": 10.0, "zone": 62.0, "flee": 0.55, "speed": 0.8, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.4, "xp": 18, "set": "ram8", "metric": "w", "target": 0.85},
+	"goat": {"r": 8.0, "zone": 90.0, "flee": 0.45, "speed": 0.9, "hp": 3, "tint": Color(1, 1, 1), "xp": 14, "set": "goat8", "metric": "w", "target": 0.72},
+	"black": {"r": 8.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "coh": 0.35, "xp": 14, "set": "black8", "metric": "w", "target": 0.72},
+	"goose": {"r": 6.5, "zone": 150.0, "flee": 1.3, "speed": 1.35, "hp": 1, "tint": Color(1, 1, 1), "coh": 0.5, "bark_mul": 1.6, "xp": 12, "set": "goose8", "metric": "h", "target": 0.5},
+	"duck": {"r": 5.5, "zone": 125.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 10, "set": "duck8", "metric": "h", "target": 0.34},
+	"cow": {"r": 13.0, "zone": 70.0, "flee": 0.5, "speed": 0.75, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.4, "xp": 20, "set": "cow8", "metric": "w", "target": 1.25},
+	"pig": {"r": 9.0, "zone": 80.0, "flee": 0.6, "speed": 0.7, "hp": 3, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.5, "xp": 16, "set": "pig8", "metric": "w", "target": 0.8},
 }
 const STRAY_POOL: Array = ["cow", "normal", "normal", "normal", "normal", "lamb", "lamb", "goat", "goose", "ram", "black", "duck", "pig"]
 const PERKS: Array = [
@@ -65,8 +65,7 @@ var sheep_frames: SpriteFrames
 var fox_frames: SpriteFrames
 var imp_frames: SpriteFrames
 var cow_frames: SpriteFrames
-var wolf8: bool = false
-var bear8: bool = false
+var animal_frames: Dictionary = {}
 var pup_frames: SpriteFrames
 var pup: Pup
 var wolf_frames: SpriteFrames
@@ -107,6 +106,7 @@ var cam_init: bool = false
 var smoke: bool = false
 var demo: bool = false
 var overview: bool = false
+var lineup: bool = false
 var autowalk: bool = false
 var look_mode: int = 0
 var style_flat: bool = false
@@ -158,25 +158,18 @@ func _ready() -> void:
 	if OS.has_feature("web"):
 		demo = str(JavaScriptBridge.eval("window.location.search")).contains("demo")
 		overview = str(JavaScriptBridge.eval("window.location.search")).contains("overview")
+		lineup = str(JavaScriptBridge.eval("window.location.search")).contains("lineup")
 		autowalk = str(JavaScriptBridge.eval("window.location.search")).contains("autowalk")
 	shadow_tex = U.shadow_texture()
-	var names: Array = ["east", "north", "south", "south-east", "north-east"]
 	dog_frames = U.raven_frames("wiz_ref")
-	sheep_frames = U.sheep8_frames()
 	fox_frames = U.set8("fox8", 12.0)
 	imp_frames = U.set8("imp8", 12.0)
-	if style_name == "ref" and ResourceLoader.exists("res://art/sheep_ref/walk/south/0.png"):
-		sheep_frames = U.set8("sheep_ref", 12.0)
-	if ResourceLoader.exists("res://art/wolf8/walk/south/0.png"):
-		wolf_frames = U.set8("wolf8", 12.0)
-		wolf8 = true
-	if ResourceLoader.exists("res://art/bear8/walk/south/0.png"):
-		bear_frames = U.set8("bear8", 10.0)
-		bear8 = true
-	if ResourceLoader.exists("res://art/cow8/walk/south/0.png"):
-		cow_frames = U.set8("cow8", 11.0)
-	wolf_frames = U.frames(load("res://art/chars/wolf.png") as Texture2D, 76, names)
-	bear_frames = U.frames(load("res://art/chars/bear.png") as Texture2D, 76, names)
+	wolf_frames = U.set8("wolf_b", 12.0)
+	bear_frames = U.set8("bear_b", 10.0)
+	for tk in TYPES.keys():
+		var st: String = String((TYPES[tk] as Dictionary)["set"])
+		if not animal_frames.has(st):
+			animal_frames[st] = U.set8(st, 11.0)
 	world = World.new()
 	world.wx = WX
 	world.wy = WY
@@ -221,6 +214,8 @@ func _ready() -> void:
 	_setup_layers()
 	_spawn_butterflies()
 	start_wave(1)
+	if lineup:
+		setup_lineup()
 	if demo or smoke:
 		gold = 600
 		perk_lv = {"bolt": 3, "fire": 2, "nova": 2, "zap": 2, "orbit": 2}
@@ -262,6 +257,39 @@ func _spawn_butterflies() -> void:
 		b.z_index = 28
 		add_child(b)
 		made += 1
+
+func setup_lineup() -> void:
+	# every character in a row, standing still, for comparing sizes
+	events.clear()
+	perk_lv = {}
+	for s in sheep:
+		(s as Sheep).queue_free()
+	sheep.clear()
+	var base := Vector2(WX / 2.0, WY / 2.0 + 420.0)
+	dog.position = base
+	cam_pos = base
+	cam_init = true
+	cam.position = base
+	for c in ysort.get_children():
+		if c is Sprite2D and (c as Sprite2D).position.distance_to(base) < 700.0:
+			(c as Sprite2D).visible = false
+	var types: Array = TYPES.keys()
+	for i in types.size():
+		var t: String = String(types[i])
+		var s := Sheep.new()
+		ysort.add_child(s)
+		s.setup(t, TYPES[t], animal_frames[String((TYPES[t] as Dictionary)["set"])], shadow_tex)
+		s.seen = true
+		s.carried = true
+		s.position = base + Vector2(-360.0 + 90.0 * float(i), 90.0)
+		sheep.append(s)
+	var kinds: Array = ["fox", "imp", "wolf", "bear"]
+	var xs: Array = [-330.0, -220.0, -110.0, 120.0]
+	for i in kinds.size():
+		spawn_enemy(String(kinds[i]))
+		var f: Fox = foxes[foxes.size() - 1]
+		f.position = base + Vector2(float(xs[i]), -70.0)
+		f.stun = 9999.0
 
 func _setup_camera() -> void:
 	cam = Camera2D.new()
@@ -620,8 +648,6 @@ func spawn_enemy(k: String) -> void:
 	elif k == "imp":
 		fr = imp_frames
 	f.setup(k, fr, shadow_tex, 1.0 + 0.15 * float(wave - 1))
-	if (k == "wolf" and wolf8) or (k == "bear" and bear8):
-		f.apply_eight()
 	f.position = edge_point(k == "fox")
 	foxes.append(f)
 	if k == "bear":
@@ -633,7 +659,7 @@ func spawn_stray(initial: bool) -> void:
 	var t: String = STRAY_POOL[randi() % STRAY_POOL.size()]
 	var s := Sheep.new()
 	ysort.add_child(s)
-	s.setup(t, TYPES[t], (cow_frames if t == "cow" else sheep_frames), shadow_tex)
+	s.setup(t, TYPES[t], animal_frames[String((TYPES[t] as Dictionary)["set"])], shadow_tex)
 	s.seen = true
 	var p := Vector2.ZERO
 	if initial:
@@ -658,6 +684,9 @@ func update_camera(delta: float) -> void:
 
 func _physics_process(delta: float) -> void:
 	update_camera(delta)
+	if lineup:
+		events.clear()
+		stray_t = 99.0
 	if smoke:
 		smoke_n += 1
 		if state == "levelup":

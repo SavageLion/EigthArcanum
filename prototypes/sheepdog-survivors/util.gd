@@ -100,3 +100,22 @@ static func set8(root: String, walk_fps: float) -> SpriteFrames:
 				sf.add_frame(an, load("res://art/%s/%s/%s/%d.png" % [root, clip, d, i]) as Texture2D)
 				i += 1
 	return sf
+
+const WH: float = 58.8
+static var _sizes: Dictionary = {}
+
+static func fit(set_name: String, metric: String, target: float) -> Dictionary:
+	# scale a character so its silhouette reaches target pixels (metric "h" = height, "w" = side-view width) and put its feet on the origin
+	if _sizes.is_empty():
+		var f := FileAccess.open("res://art/sizes.json", FileAccess.READ)
+		if f != null:
+			_sizes = JSON.parse_string(f.get_as_text())
+	if not _sizes.has(set_name):
+		return {}
+	var d: Dictionary = _sizes[set_name]
+	var sb: Dictionary = d["south"]
+	var eb: Dictionary = d["east"] if d.has("east") else sb
+	var meas: float = (float(eb["x1"]) - float(eb["x0"])) if metric == "w" else (float(sb["y1"]) - float(sb["y0"]))
+	var sc: float = target / maxf(meas, 1.0)
+	var feet: float = float(sb["y1"]) - float(sb["ch"]) / 2.0
+	return {"scale": sc, "offset": Vector2(0.0, -feet), "w": (float(eb["x1"]) - float(eb["x0"])) * sc}
