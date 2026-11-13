@@ -153,6 +153,10 @@ func _draw() -> void:
 	var tr: Rect2 = main.test_rect()
 	_panel(tr, Color(0.4, 0.2, 0.5, 0.92))
 	_text("TEST", tr.position + Vector2(0, 22), 12, CREAM, tr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	if main.state == "play":
+		var er: Rect2 = main.endwave_rect()
+		_panel(er, Color(0.5, 0.2, 0.2, 0.92))
+		_text("END WAVE", er.position + Vector2(0, 22), 12, CREAM, er.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _button(i: int, label: String, dim: bool, fill: float, on: bool) -> void:
 	var p: Vector2 = main.btn_pos(i)

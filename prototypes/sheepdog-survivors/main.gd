@@ -442,6 +442,8 @@ func _input(event: InputEvent) -> void:
 				toggle_fullscreen()
 			elif ke.keycode == KEY_T:
 				test_boost()
+			elif ke.keycode == KEY_E:
+				end_wave_now()
 
 func style_rect() -> Rect2:
 	return Rect2(vp().x - 92.0, 44.0, 38.0, 34.0)
@@ -461,6 +463,13 @@ func test_boost() -> void:
 	xp += 1000.0
 	gold += 1000
 	add_popup("+1000 XP  +1000 gold", dog.position + Vector2(0, -40), Color(1.0, 0.9, 0.5))
+
+func endwave_rect() -> Rect2:
+	return Rect2(vp().x - 176.0, 44.0, 70.0, 34.0)
+
+func end_wave_now() -> void:
+	if state == "play":
+		wave_t = WAVE_LEN
 
 func fs_rect() -> Rect2:
 	return Rect2(vp().x - 46.0, 44.0, 38.0, 34.0)
@@ -500,6 +509,9 @@ func upgrade_pad(i: int) -> void:
 	ring(p.position, 46.0, Color(1.0, 0.85, 0.4), 0.5, 4.0)
 
 func _press(p: Vector2, id: int) -> void:
+	if state == "play" and endwave_rect().grow(6.0).has_point(p):
+		end_wave_now()
+		return
 	if state != "result" and test_rect().grow(6.0).has_point(p):
 		test_boost()
 		return
