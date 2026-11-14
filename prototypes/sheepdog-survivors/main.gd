@@ -10,7 +10,7 @@ var YMAX: float = 2172.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
 const DEFEND_LEN: float = 60.0
-var LAST_WAVE: int = 5
+var LAST_WAVE: int = 3
 const BASE_ZOOM: float = 1.1
 const TYPES: Dictionary = {
 	"normal": {"r": 8.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10, "set": "sheep_ref", "metric": "w", "target": 0.72},
@@ -85,6 +85,7 @@ var farm_sel: int = -1
 var farm_view: String = "map"
 var devmode: bool = false
 var farm_msg: String = ""
+var route_sel: int = -1
 var clock: float = 0.0
 var wave: int = 0
 var wave_t: float = 0.0
@@ -234,6 +235,8 @@ func _ready() -> void:
 	_setup_layers()
 	_spawn_butterflies()
 	start_wave(1)
+	if not devmode and Meta.pending >= 0 and not (Meta.run.get("carry", {}) as Dictionary).is_empty():
+		restore_carry(Meta.run["carry"])
 	if not devmode and Meta.pending < 0:
 		state = "farm"
 	if lineup:
@@ -487,6 +490,9 @@ func test_rect() -> Rect2:
 	return Rect2(vp().x - 100.0, 44.0, 46.0, 34.0)
 
 func test_boost() -> void:
+	if state == "route":
+		gold += 1000
+		return
 	if state == "farm":
 		for k in Meta.CROP_ORDER:
 			Meta.crops[k] = int(Meta.crops.get(k, 0)) + 20
@@ -554,14 +560,18 @@ func _press(p: Vector2, id: int) -> void:
 	if state != "result" and test_rect().grow(6.0).has_point(p):
 		test_boost()
 		return
-	if state != "result" and state != "farm" and fs_rect().grow(6.0).has_point(p):
+	if state != "result" and state != "farm" and state != "route" and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
 		return
 	if state == "farm":
 		farm_press(p)
 		return
+	if state == "route":
+		route_press(p)
+		return
 	if state == "result":
 		Meta.pending = -1
+		Meta.run = {}
 		get_tree().reload_current_scene()
 		return
 	if state == "levelup":
@@ -658,7 +668,7 @@ func start_wave(n: int) -> void:
 		banner = "HERD THE ANIMALS INTO THE PEN"
 	banner_t = 3.5
 	var pd0: Dictionary = Meta.PLOTS[plot]
-	var eff0: int = n + int(pd0["bonus"])
+	var eff0: int = n + int(pd0["bonus"]) + run_depth() / 2
 	var ex0: String = String(pd0["extra"])
 	for i in 8 + 3 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0):
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
@@ -693,7 +703,7 @@ func start_defend() -> void:
 			fo.queue_free()
 	var pd: Dictionary = Meta.PLOTS[plot]
 	var bonus: int = int(pd["bonus"])
-	var eff: int = wave + bonus
+	var eff: int = wave + bonus + run_depth() / 2
 	for i in 2 + eff:
 		events.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": "imp"})
 	var wolf_n: int = 4 + 2 * eff + bonus / 2
@@ -1606,6 +1616,67 @@ func buy_perk(i: int) -> bool:
 		perk_offers[i] = fresh
 	return true
 
+# ---------------------------------------------------------------- the expedition
+func run_depth() -> int:
+	if devmode:
+		return 0
+	return (Meta.run.get("visited", []) as Array).size()
+
+func route_options() -> Array:
+	var out: Array = []
+	var v: Array = Meta.run.get("visited", [])
+	if v.is_empty():
+		return out
+	var cur: int = int(v.back())
+	for i in Meta.PLOTS.size():
+		if Meta.adjacent(cur, i) and not v.has(i):
+			out.append(i)
+	return out
+
+func capture_carry() -> Dictionary:
+	var pads_out: Array = []
+	for pp in world.pads:
+		var p: Pad = pp
+		pads_out.append([p.kind, p.lv])
+	var hs: Array = []
+	for k in world.holes.keys():
+		if bool(world.holes[k]):
+			hs.append(k)
+	return {"perk_lv": perk_lv.duplicate(), "level": level, "xp": xp, "gold": gold, "walls_lv": walls_lv, "moss_lv": moss_lv, "market_lv": market_lv, "pads": pads_out, "holes": hs}
+
+func restore_carry(c: Dictionary) -> void:
+	perk_lv = (c["perk_lv"] as Dictionary).duplicate()
+	level = int(c["level"])
+	xp = float(c["xp"])
+	gold = int(c["gold"])
+	walls_lv = int(c["walls_lv"])
+	moss_lv = int(c["moss_lv"])
+	market_lv = int(c["market_lv"])
+	var pads_in: Array = c["pads"]
+	for i in pads_in.size():
+		var kind: String = String((pads_in[i] as Array)[0])
+		if kind == "":
+			continue
+		build_on(i, kind)
+		for k in int((pads_in[i] as Array)[1]) - 1:
+			upgrade_pad(i)
+	for side in (c["holes"] as Array):
+		world.open_hole(String(side))
+	for w in world.walls:
+		if w["pen"]:
+			w["max"] = float(w["max"]) * pow(1.3, float(walls_lv))
+			set_wall_hp(w, float(w["max"]))
+	check_tier()
+
+func route_press(p: Vector2) -> void:
+	for i in Meta.PLOTS.size():
+		if farm_plot_rect(i).has_point(p) and route_options().has(i):
+			route_sel = i
+			return
+	if route_sel >= 0 and farm_start_rect().grow(6.0).has_point(p):
+		Meta.pending = route_sel
+		get_tree().reload_current_scene()
+
 # ---------------------------------------------------------------- the farm
 func farm_cell() -> float:
 	var v: Vector2 = vp()
@@ -1659,6 +1730,7 @@ func farm_press(p: Vector2) -> void:
 		farm_msg = ("Collected %d crops" % n) if n > 0 else "Nothing ripe yet"
 		return
 	if farm_sel >= 0 and Meta.plot_open(farm_sel) and farm_start_rect().grow(6.0).has_point(p):
+		Meta.run = {"active": true, "visited": [], "banked": {}, "carry": {}}
 		Meta.pending = farm_sel
 		get_tree().reload_current_scene()
 		return
@@ -2270,11 +2342,23 @@ func update_enemies(dt: float) -> void:
 
 # ---------------------------------------------------------------- the end
 func finish_day(why: String) -> void:
-	if state == "result":
+	if state == "result" or state == "route":
 		return
-	state = "result"
 	stick_on = false
-	var reward: Dictionary = {}
-	if not devmode:
-		reward = Meta.record_result(plot, why == "won", wave)
-	result = {"reward": reward, "plot": plot, "why": why, "wave": wave, "xp": int(xp), "herded": herded, "defeated": defeated, "lost": lost}
+	var expedition: bool = not devmode and bool(Meta.run.get("active", false))
+	var banked: Dictionary = {}
+	var plots_done: int = 0
+	if expedition:
+		if why == "won":
+			Meta.record_win(plot)
+			if (Meta.run["visited"] as Array).size() < Meta.RUN_PLOTS and not route_options().is_empty():
+				Meta.run["carry"] = capture_carry()
+				route_sel = -1
+				state = "route"
+				return
+			Meta.finish_bonus()
+		banked = Meta.run.get("banked", {})
+		plots_done = (Meta.run.get("visited", []) as Array).size()
+	state = "result"
+	result = {"banked": banked, "plots": plots_done, "plot": plot, "why": why, "wave": wave, "xp": int(xp), "herded": herded, "defeated": defeated, "lost": lost}
+

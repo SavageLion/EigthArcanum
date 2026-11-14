@@ -5,6 +5,7 @@ extends RefCounted
 const SAVE_PATH: String = "user://farm.json"
 const GROW_SECS: float = 30.0
 const GROW_CAP: int = 8
+const RUN_PLOTS: int = 6
 
 const CROPS: Dictionary = {
 	"wheat": {"name": "Wheat", "col": Color(0.95, 0.8, 0.3)},
@@ -51,6 +52,7 @@ static var crops: Dictionary = {}
 static var cleared: Dictionary = {}   # plot index (as string) -> unix time of last harvest
 static var unlocked: Dictionary = {}
 static var pending: int = -1
+static var run: Dictionary = {}
 static var all_open: bool = false
 static var loaded: bool = false
 
@@ -116,19 +118,32 @@ static func collect_all() -> int:
 	save()
 	return n
 
-# the run is over: give out crops and (on a win) clear the plot
-static func record_result(plot: int, won: bool, wave: int) -> Dictionary:
+static func adjacent(a: int, b: int) -> bool:
+	return absi(a % 3 - b % 3) + absi(a / 3 - b / 3) == 1
+
+# a plot of the expedition is won: bank its crop at once and mark it cleared for good
+static func record_win(plot: int) -> void:
 	var crop: String = String(PLOTS[plot]["crop"])
-	var amt: int = maxi(0, wave - 1)
-	var fresh: bool = false
-	if won:
-		amt = 5 + int(PLOTS[plot]["bonus"]) / 2
-		if not is_cleared(plot):
-			fresh = true
-			cleared[str(plot)] = Time.get_unix_time_from_system()
+	var amt: int = 5 + int(PLOTS[plot]["bonus"]) / 2
 	crops[crop] = int(crops.get(crop, 0)) + amt
+	if not is_cleared(plot):
+		cleared[str(plot)] = Time.get_unix_time_from_system()
+	var b: Dictionary = run.get("banked", {})
+	b[crop] = int(b.get(crop, 0)) + amt
+	run["banked"] = b
+	var v: Array = run.get("visited", [])
+	v.append(plot)
+	run["visited"] = v
 	save()
-	return {"crop": crop, "amt": amt, "fresh": fresh}
+
+# finishing the whole expedition pays a little extra of every crop it touched
+static func finish_bonus() -> void:
+	var b: Dictionary = run.get("banked", {})
+	for k in b.keys():
+		crops[k] = int(crops.get(k, 0)) + 3
+		b[k] = int(b[k]) + 3
+	run["banked"] = b
+	save()
 
 static func can_afford(u: Dictionary) -> bool:
 	for k in (u["cost"] as Dictionary):
