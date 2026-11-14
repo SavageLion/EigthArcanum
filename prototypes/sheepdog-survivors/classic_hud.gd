@@ -40,8 +40,20 @@ func _draw() -> void:
 		_panel(fr, Color(0.25, 0.5, 0.2, 0.9))
 		_text("END DAY", fr.position + Vector2(0, 21), 16, CREAM, fr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	# back to the farm
-	_panel(Rect2(8, 62, 96, 28))
-	_text("< FARM", Vector2(8, 82), 14, CREAM, 96.0, HORIZONTAL_ALIGNMENT_CENTER)
+	_panel(Rect2(8, 92, 96, 28))
+	_text("< FARM", Vector2(8, 112), 14, CREAM, 96.0, HORIZONTAL_ALIGNMENT_CENTER)
+	# level and xp
+	_text("LV %d" % main.run_level, Vector2(18, 76), 14, Color(0.6, 0.9, 1.0))
+	draw_rect(Rect2(60, 66, 108, 8), Color(0, 0, 0, 0.5))
+	draw_rect(Rect2(60, 66, 108.0 * clampf(main.run_xp / main.xp_need(), 0.0, 1.0), 8), Color(0.45, 0.8, 1.0))
+	draw_rect(Rect2(60, 66, 108, 8), Color(1, 0.9, 0.7, 0.35), false, 1.0)
+	var py: float = 134.0
+	for pk in main.PERKS:
+		var lvp: int = main.pl(String(pk["id"]))
+		if lvp > 0:
+			_text("%s  %d" % [String(pk["name"]), lvp], Vector2(10, py), 12, Color(CREAM, 0.9))
+			py += 15.0
+	_text("Day %d" % main.run_day, Vector2(0, 76), 14, Color(CREAM, 0.8), v.x, HORIZONTAL_ALIGNMENT_CENTER)
 	# stamina
 	var sr := Rect2(18, 46, 150, 10)
 	draw_rect(sr, Color(0, 0, 0, 0.5))
@@ -88,16 +100,30 @@ func _draw() -> void:
 		var ba: float = minf(1.0, main.banner_t)
 		_panel(Rect2(v.x / 2.0 - 190, 70, 380, 38), Color(0.13, 0.09, 0.08, 0.7 * ba))
 		_text(main.banner, Vector2(v.x / 2.0 - 190, 95), 18, Color(CREAM, ba), 380.0, HORIZONTAL_ALIGNMENT_CENTER)
+	# level-up
+	if main.state == "levelup":
+		draw_rect(Rect2(Vector2.ZERO, v), Color(0.04, 0.03, 0.08, 0.82))
+		_text("LEVEL UP!  Level %d" % main.run_level, Vector2(0, 62), 30, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("Choose a helper", Vector2(0, 92), 16, Color(CREAM, 0.8), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+		for i in main.perk_offers.size():
+			var pk2: Dictionary = main.perk_offers[i]
+			var lv2: int = main.pl(String(pk2["id"]))
+			var cr: Rect2 = main.lv_card_rect(i)
+			_panel(cr, Color(0.28, 0.2, 0.14, 0.97))
+			_text(String(pk2["name"]), cr.position + Vector2(0, 46), 24, GOLD, cr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+			_text("Lv %d > %d" % [lv2, lv2 + 1], cr.position + Vector2(0, 78), 16, Color(0.6, 1.0, 0.6), cr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+			draw_multiline_string(font, cr.position + Vector2(18, 118), String(pk2["desc"]), HORIZONTAL_ALIGNMENT_CENTER, cr.size.x - 36.0, 16, 4, Color(CREAM, 0.92))
+			_text("TAP TO CHOOSE", cr.position + Vector2(0, cr.size.y - 20), 14, Color(0.6, 0.9, 1.0), cr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	# result
 	if main.state == "result":
 		draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.55))
 		var r := Rect2(v.x / 2.0 - 190, v.y / 2.0 - 120, 380, 240)
 		_panel(r, Color(0.2, 0.14, 0.1, 0.96))
 		var ok: bool = bool(main.result["ok"])
-		_text("DAY WON" if ok else "DAY LOST", r.position + Vector2(0, 52), 34, GOLD if ok else Color(1.0, 0.5, 0.42), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(("DAY %d WON" % int(main.result["day"])) if ok else "THE RUN ENDS", r.position + Vector2(0, 52), 34, GOLD if ok else Color(1.0, 0.5, 0.42), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("%d of %d sheep safe in the pen" % [main.result["penned"], main.result["total"]], r.position + Vector2(0, 98), 18, CREAM, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text("needed %d   ·   lost %d" % [main.result["need"], main.result["lost"]], r.position + Vector2(0, 126), 16, Color(CREAM, 0.8), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text("tap to play again", r.position + Vector2(0, 196), 18, GOLD, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(("tap for day %d" % (int(main.result["day"]) + 1)) if ok else ("%d days survived. Tap to start a new run" % (int(main.result["day"]) - 1)), r.position + Vector2(0, 196), 17, GOLD, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _button(i: int, label: String, dim: bool, fill: float, on: bool) -> void:
 	var p: Vector2 = main.btn_pos(i)

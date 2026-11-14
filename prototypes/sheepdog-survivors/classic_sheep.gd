@@ -28,6 +28,7 @@ var spr: AnimatedSprite2D
 var shadow: Sprite2D
 var base_scale: float = 0.64
 var squash: float = 0.0
+var home_t: float = 0.0
 
 func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	type = t

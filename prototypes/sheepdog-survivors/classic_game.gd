@@ -18,6 +18,33 @@ const TYPES: Dictionary = {
 	"duck": {"r": 5.0, "zone": 125.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1.15, 1.1, 0.62), "lure": "water", "swim": 1.4},
 	"pig": {"r": 8.0, "zone": 80.0, "flee": 0.6, "speed": 0.7, "hp": 3, "tint": Color(1.2, 0.78, 0.86), "heavy": true, "bark_mul": 0.5, "lure": "mud", "mud": 1.0},
 }
+const PERKS: Array = [
+	{"id": "gust", "name": "Guiding Gust", "desc": "Every few seconds a gust pushes loose sheep around you toward the pen.", "max": 5},
+	{"id": "pups", "name": "Spectral Pups", "desc": "Ghost pups run behind stray sheep and drive them to the pen.", "max": 5},
+	{"id": "whistle", "name": "Rally Whistle", "desc": "A whistle sends the sheep around you trotting toward the pen.", "max": 5},
+	{"id": "sniff", "name": "Keen Nose", "desc": "Finds hidden sheep and marks every sheep you have not seen.", "max": 5},
+	{"id": "shadow", "name": "Long Shadow", "desc": "Your push reaches further, so you can herd from a distance.", "max": 5},
+	{"id": "steady", "name": "Steady Flock", "desc": "Sheep calm down faster and stick together more.", "max": 5},
+	{"id": "fleet", "name": "Fleet Paws", "desc": "Run faster and tire more slowly.", "max": 5},
+	{"id": "echo", "name": "Echo Bark", "desc": "Your bark echoes after itself and reaches further.", "max": 4},
+	{"id": "ward", "name": "Fox Ward", "desc": "Foxes near you are frightened off and drop what they carry.", "max": 5},
+	{"id": "magnet", "name": "Gate Magnet", "desc": "Sheep near the pen gate are drawn gently inside.", "max": 5},
+	{"id": "fleece", "name": "Lucky Fleece", "desc": "Every sheep that enters the pen is worth more XP.", "max": 4},
+]
+const XP_OF: Dictionary = {"normal": 10, "goat": 14, "goose": 12, "ram": 18, "black": 14}
+static var run_day: int = 1
+static var run_perks: Dictionary = {}
+static var run_level: int = 1
+static var run_xp: float = 0.0
+static var run_best: int = 0
+var perk_offers: Array = []
+var pending_lv: int = 0
+var gust_t: float = 3.0
+var whistle_t: float = 4.0
+var sniff_t: float = 2.0
+var ward_t: float = 3.0
+var echo_q: Array = []
+var pups: Array = []
 const HERD: Array = ["normal", "normal", "normal", "normal", "normal", "normal", "goat", "goat", "goose", "goose", "ram", "black"]
 
 var world: World
@@ -88,11 +115,15 @@ func _ready() -> void:
 	_spawn_sheep()
 	_setup_camera()
 	_setup_layers()
-	need = int(ceil(float(sheep.size()) * 0.5))
-	for i in 3:
-		events.append({"t": randf_range(20.0, 170.0), "raid": randf() < 0.4})
+	need = int(ceil(float(sheep.size()) * minf(0.7, 0.5 + 0.02 * float(run_day - 1))))
+	t_total = 240.0 + 6.0 * float(maxi(0, sheep.size() - 12))
+	t_left = t_total
+	dog.bark_cd = 0.0
+	for i in 3 + mini(run_day, 7):
+		events.append({"t": randf_range(20.0, t_total - 70.0), "raid": randf() < 0.4 + 0.03 * float(run_day)})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
-	banner = "FIND YOUR SHEEP"
+	banner = "DAY %d  -  FIND YOUR SHEEP" % run_day
+	ensure_pups()
 	banner_t = 3.5
 
 func _spawn_dog() -> void:
@@ -118,7 +149,7 @@ func _spawn_sheep() -> void:
 	if cs.is_empty():
 		cs.append(Vector2(WX * 0.4, WY * 0.5))
 	var idx: int = 0
-	for t in HERD:
+	for t in herd_list():
 		var s := ClassicSheep.new()
 		ysort.add_child(s)
 		s.setup(String(t), TYPES[String(t)], sheep_frames, shadow_tex)
@@ -214,8 +245,20 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var ke := event as InputEventKey
 		if ke.pressed and not ke.echo:
-			if ke.keycode == KEY_SPACE:
+			if state == "levelup":
+				if ke.keycode == KEY_1:
+					pick_levelup(0)
+				elif ke.keycode == KEY_2:
+					pick_levelup(1)
+				elif ke.keycode == KEY_3:
+					pick_levelup(2)
+			elif ke.keycode == KEY_SPACE:
 				do_bark()
+			elif ke.keycode == KEY_T:
+				gain_xp(xp_need(), dog.position)
+			elif ke.keycode == KEY_P:
+				for s in loose_sheep():
+					(s as ClassicSheep).position = world.pen.get_center() + Vector2(randf_range(-70.0, 70.0), randf_range(-40.0, 40.0))
 			elif ke.keycode == KEY_F:
 				_toggle_fullscreen()
 
@@ -227,10 +270,20 @@ func _toggle_fullscreen() -> void:
 		w.mode = Window.MODE_FULLSCREEN
 
 func _press(p: Vector2, id: int) -> void:
+	if state == "levelup":
+		for i in perk_offers.size():
+			if lv_card_rect(i).has_point(p):
+				pick_levelup(i)
+				return
+		return
 	if state == "result":
+		if bool(result["ok"]):
+			run_day += 1
+		else:
+			reset_run()
 		get_tree().reload_current_scene()
 		return
-	if Rect2(8.0, 62.0, 96.0, 28.0).grow(8.0).has_point(p):
+	if Rect2(8.0, 92.0, 96.0, 28.0).grow(8.0).has_point(p):
 		get_tree().change_scene_to_file("res://main.tscn")
 		return
 	if penned >= need and finish_rect().grow(8.0).has_point(p):
@@ -302,6 +355,7 @@ func _physics_process(delta: float) -> void:
 	update_dog(dt)
 	update_sheep(dt)
 	update_foxes(dt)
+	update_perks(dt)
 	run_events()
 	for pu in popups:
 		pu["t"] = float(pu["t"]) - dt
@@ -443,7 +497,8 @@ func update_dog(dt: float) -> void:
 		dog.stam = 0.0
 		dog.winded = true
 	dog.stam = minf(dog.stam_max, dog.stam)
-	var base: float = 95.0 if dog.crouch else 210.0
+	dog.stam_max = 100.0 * (1.0 + 0.15 * float(pl("fleet")))
+	var base: float = (95.0 if dog.crouch else 210.0) * (1.0 + 0.07 * float(pl("fleet")))
 	var sp: float = base * speedk * (0.72 if dog.winded else 1.0) * (1.55 if sprinting else 1.0) * (0.3 if dog.stun > 0.0 else 1.0)
 	var zk: String = world.zone_kind(dog.position)
 	if zk == "water":
@@ -489,7 +544,7 @@ func do_bark() -> void:
 	dog.bark_cd = 2.4
 	dog.squash = 1.0
 	shake = 1.0
-	var R: float = 150.0
+	var R: float = 150.0 * (1.0 + 0.15 * float(pl("echo")))
 	var ring := RingFx.new()
 	ring.position = dog.position
 	ring.maxr = R
@@ -515,6 +570,10 @@ func do_bark() -> void:
 		var fx: ClassicFox = f
 		if fx.position.distance_to(dog.position) < R * 1.35:
 			scare_fox(fx, 2.8)
+	if pl("echo") >= 1:
+		echo_q.append(0.45)
+	if pl("echo") >= 3:
+		echo_q.append(0.9)
 
 func reveal(s: ClassicSheep) -> void:
 	s.hidden_grass = false
@@ -531,7 +590,7 @@ func add_popup(text: String, pos: Vector2, col: Color) -> void:
 
 # ---------------------------------------------------------------- the flock
 func zone_mult() -> float:
-	return 1.18 if dog.crouch else 1.6
+	return (1.18 if dog.crouch else 1.6) * (1.0 + 0.1 * float(pl("shadow")))
 
 func pressure_from(s: ClassicSheep, p: Vector2, h: Vector2, mult: float, calm: bool, dt: float, zone_base: float) -> float:
 	var zb: float = zone_base if zone_base > 0.0 else s.zone
@@ -563,7 +622,7 @@ func update_sheep(dt: float) -> void:
 				huddle = true
 			if pd < 95.0:
 				sh.panic = maxf(sh.panic, 0.6)
-		sh.panic = maxf(0.0, sh.panic - dt * 0.55)
+		sh.panic = maxf(0.0, sh.panic - dt * 0.55 * (1.0 + 0.4 * float(pl("steady"))))
 		if sh.in_pen:
 			sh.wa += randf_range(-1.0, 1.0) * dt * 3.0
 			sh.vel += Vector2(cos(sh.wa), sin(sh.wa)) * 14.0 * dt
@@ -600,7 +659,7 @@ func update_sheep(dt: float) -> void:
 			if n > 0:
 				c /= float(n)
 				vsum /= float(n)
-				var coh: float = 26.0 * (2.4 if sh.type == "lamb" else sh.coh) * (1.5 if pressure > 0.0 else 1.0) * (3.0 if huddle else 1.0)
+				var coh: float = 26.0 * (1.0 + 0.15 * float(pl("steady"))) * (2.4 if sh.type == "lamb" else sh.coh) * (1.5 if pressure > 0.0 else 1.0) * (3.0 if huddle else 1.0)
 				var dc: Vector2 = c - sh.position
 				var dl: float = maxf(dc.length(), 0.001)
 				if dl > (20.0 if huddle else 28.0):
@@ -624,6 +683,16 @@ func update_sheep(dt: float) -> void:
 					var o2s: ClassicSheep = o2
 					if o2s != sh and not o2s.in_pen and not o2s.carried and not o2s.heavy and o2s.position.distance_to(sh.position) < 46.0 and randf() < dt * 2.2:
 						o2s.panic = maxf(o2s.panic, sh.panic * 0.8)
+		if not sh.in_pen:
+			if sh.home_t > 0.0:
+				sh.home_t -= dt
+				sh.vel += (pen_goal(sh.position) - sh.position).normalized() * (215.0 if sh.heavy else 235.0) * dt
+			var mg: int = pl("magnet")
+			if mg > 0:
+				var gate: Vector2 = Vector2(world.gate_x, world.pen.end.y)
+				if sh.position.distance_to(gate) < 150.0 + 30.0 * float(mg):
+					var inside: Vector2 = gate + Vector2(0.0, -50.0)
+					sh.vel += (inside - sh.position).normalized() * (40.0 + 20.0 * float(mg)) * dt
 		var fr: float = 3.2 if sh.in_pen else 2.0
 		sh.vel *= exp(-fr * dt)
 		var zk: String = world.zone_kind(sh.position)
@@ -643,6 +712,7 @@ func update_sheep(dt: float) -> void:
 			sh.in_pen = true
 			sh.squash = 1.0
 			add_popup("+1", sh.position + Vector2(0, -14), Color(0.6, 1.0, 0.6))
+			gain_xp(float(XP_OF.get(sh.type, 10)) * (1.0 + 0.25 * float(pl("fleece"))), sh.position)
 		if sh.in_pen:
 			sh.position.x = clampf(sh.position.x, P.position.x + sh.r + 2.0, P.end.x - sh.r - 2.0)
 			sh.position.y = clampf(sh.position.y, P.position.y + sh.r + 2.0, P.end.y - sh.r - 2.0)
@@ -857,4 +927,270 @@ func finish_day(why: String) -> void:
 		return
 	state = "result"
 	var ok: bool = penned >= need
-	result = {"ok": ok, "penned": penned, "need": need, "total": sheep.size() + lost, "lost": lost, "why": why}
+	result = {"ok": ok, "penned": penned, "need": need, "total": sheep.size() + lost, "lost": lost, "why": why, "day": run_day, "level": run_level}
+	if not ok:
+		run_best = maxi(run_best, run_day - 1)
+
+# ---------------------------------------------------------------- the run: xp, perks that help gather
+func pl(id: String) -> int:
+	return int(run_perks.get(id, 0))
+
+func reset_run() -> void:
+	run_day = 1
+	run_perks = {}
+	run_level = 1
+	run_xp = 0.0
+
+func herd_list() -> Array:
+	var out: Array = HERD.duplicate()
+	var extra: Array = ["normal", "goat", "goose", "ram", "black", "normal"]
+	var n: int = mini(30, 12 + 2 * (run_day - 1)) - 12
+	for i in n:
+		out.append(extra[i % extra.size()])
+	return out
+
+func xp_need() -> float:
+	return 30.0 + 20.0 * float(run_level - 1)
+
+func gain_xp(amount: float, at: Vector2) -> void:
+	run_xp += amount
+	add_popup("+%d xp" % int(amount), at + Vector2(0, -28), Color(0.6, 0.9, 1.0))
+	while run_xp >= xp_need():
+		run_xp -= xp_need()
+		run_level += 1
+		pending_lv += 1
+	if pending_lv > 0 and state == "play":
+		begin_levelup()
+
+func roll_offers() -> void:
+	perk_offers.clear()
+	var pool: Array = []
+	for p in PERKS:
+		if pl(String(p["id"])) < int(p["max"]):
+			pool.append(p)
+	pool.shuffle()
+	for i in mini(3, pool.size()):
+		perk_offers.append(pool[i])
+
+func begin_levelup() -> void:
+	state = "levelup"
+	stick_on = false
+	stick_vec = Vector2.ZERO
+	calm_held = false
+	sprint_held = false
+	roll_offers()
+	if perk_offers.is_empty():
+		pending_lv = 0
+		state = "play"
+
+func lv_card_rect(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	var w: float = (v.x - 100.0) / 3.0
+	return Rect2(30.0 + float(i) * (w + 20.0), 120.0, w, 250.0)
+
+func pick_levelup(i: int) -> void:
+	if state != "levelup" or i < 0 or i >= perk_offers.size():
+		return
+	var id: String = String(perk_offers[i]["id"])
+	run_perks[id] = pl(id) + 1
+	add_popup(String(perk_offers[i]["name"]) + "!", dog.position + Vector2(0, -44), Color(0.8, 0.95, 1.0))
+	var ring := RingFx.new()
+	ring.position = dog.position
+	ring.maxr = 70.0
+	ring.col = Color(0.7, 0.9, 1.0)
+	add_child(ring)
+	pending_lv -= 1
+	ensure_pups()
+	if pending_lv > 0:
+		roll_offers()
+		if perk_offers.is_empty():
+			pending_lv = 0
+	if pending_lv <= 0:
+		state = "play"
+
+# ---------------------------------------------------------------- where a sheep should be sent
+func pen_entrances() -> Array:
+	var P: Rect2 = world.pen
+	var out: Array = [[Vector2(world.gate_x, P.end.y), Vector2(0.0, 1.0)]]
+	if bool(world.holes.get("north", false)):
+		out.append([Vector2(P.get_center().x, P.position.y), Vector2(0.0, -1.0)])
+	if bool(world.holes.get("west", false)):
+		out.append([Vector2(P.position.x, P.get_center().y), Vector2(-1.0, 0.0)])
+	if bool(world.holes.get("east", false)):
+		out.append([Vector2(P.end.x, P.get_center().y), Vector2(1.0, 0.0)])
+	return out
+
+func seg_blocked(a: Vector2, b: Vector2, box: Rect2) -> bool:
+	for i in range(1, 9):
+		if box.has_point(a.lerp(b, float(i) / 9.0)):
+			return true
+	return false
+
+# the way in: the nearest open gate, around the walls if need be
+func pen_goal(p: Vector2) -> Vector2:
+	var best_st := Vector2.ZERO
+	var best_e := Vector2.ZERO
+	var best_n := Vector2.ZERO
+	var bd: float = 1.0e9
+	for en in pen_entrances():
+		var e: Vector2 = en[0]
+		var n: Vector2 = en[1]
+		var st: Vector2 = e + n * 80.0
+		var d: float = p.distance_to(st)
+		if d < bd:
+			bd = d
+			best_st = st
+			best_e = e
+			best_n = n
+	var rel: Vector2 = p - best_e
+	var along: float = rel.dot(best_n)
+	var lat: float = absf(rel.dot(best_n.orthogonal()))
+	if along < 110.0 and along > -60.0 and lat < 45.0:
+		return best_e - best_n * 50.0
+	var box: Rect2 = world.pen.grow(8.0)
+	if not seg_blocked(p, best_st, box):
+		return best_st
+	var cb: Rect2 = world.pen.grow(44.0)
+	var corners: Array = [cb.position, Vector2(cb.end.x, cb.position.y), cb.end, Vector2(cb.position.x, cb.end.y)]
+	var pick: Vector2 = best_st
+	var pd: float = 1.0e9
+	for c in corners:
+		var cc: Vector2 = c
+		if p.distance_to(cc) < 16.0 or seg_blocked(p, cc, box):
+			continue
+		var dd: float = p.distance_to(cc) + cc.distance_to(best_st)
+		if dd < pd:
+			pd = dd
+			pick = cc
+	return pick
+
+func loose_sheep() -> Array:
+	var out: Array = []
+	for s in sheep:
+		var sh: ClassicSheep = s
+		if not sh.in_pen and not sh.carried and not sh.hidden_grass:
+			out.append(sh)
+	return out
+
+func perk_ring(r: float, col: Color) -> void:
+	var ring := RingFx.new()
+	ring.position = dog.position
+	ring.maxr = r
+	ring.col = col
+	add_child(ring)
+
+# ---------------------------------------------------------------- the perks that fire by themselves
+func update_perks(dt: float) -> void:
+	var lg: int = pl("gust")
+	if lg > 0:
+		gust_t -= dt
+		if gust_t <= 0.0:
+			gust_t = 6.0 - 0.6 * float(lg)
+			var rg: float = 200.0 + 30.0 * float(lg)
+			perk_ring(rg, Color(0.7, 0.9, 1.0))
+			for s in loose_sheep():
+				var sh: ClassicSheep = s
+				if sh.position.distance_to(dog.position) < rg:
+					sh.vel += (pen_goal(sh.position) - sh.position).normalized() * 150.0
+					sh.home_t = maxf(sh.home_t, 1.2)
+	var lw: int = pl("whistle")
+	if lw > 0:
+		whistle_t -= dt
+		if whistle_t <= 0.0:
+			whistle_t = 9.0 - 0.8 * float(lw)
+			var rw: float = 280.0 + 40.0 * float(lw)
+			perk_ring(rw, Color(1.0, 0.9, 0.5))
+			add_popup("WHISTLE!", dog.position + Vector2(0, -38), Color(1.0, 0.9, 0.5))
+			for s2 in loose_sheep():
+				var sh2: ClassicSheep = s2
+				if sh2.position.distance_to(dog.position) < rw:
+					sh2.home_t = maxf(sh2.home_t, 3.0 + 0.4 * float(lw))
+					sh2.panic = maxf(sh2.panic, 0.3)
+	var ln: int = pl("sniff")
+	if ln > 0:
+		sniff_t -= dt
+		if sniff_t <= 0.0:
+			sniff_t = 7.0 - 0.6 * float(ln)
+			var rn: float = 420.0 + 90.0 * float(ln)
+			for s3 in sheep:
+				var sh3: ClassicSheep = s3
+				if sh3.carried or sh3.in_pen:
+					continue
+				var d3: float = sh3.position.distance_to(dog.position)
+				if sh3.hidden_grass and d3 < rn:
+					reveal(sh3)
+				elif not sh3.seen:
+					sh3.ping = 4.0
+	var lf: int = pl("ward")
+	if lf > 0:
+		ward_t -= dt
+		if ward_t <= 0.0:
+			ward_t = 6.0 - 0.5 * float(lf)
+			var rf: float = 220.0 + 40.0 * float(lf)
+			var any: bool = false
+			for f in foxes:
+				var fx: ClassicFox = f
+				if fx.position.distance_to(dog.position) < rf:
+					scare_fox(fx, 3.0)
+					any = true
+			if any:
+				perk_ring(rf, Color(1.0, 0.6, 0.4))
+	# the bark echoes
+	for i in range(echo_q.size() - 1, -1, -1):
+		echo_q[i] = float(echo_q[i]) - dt
+		if float(echo_q[i]) <= 0.0:
+			echo_q.remove_at(i)
+			var re: float = 150.0 * (1.0 + 0.15 * float(pl("echo")))
+			perk_ring(re, Color(1.0, 0.95, 0.75))
+			for s4 in sheep:
+				var sh4: ClassicSheep = s4
+				if sh4.carried or sh4.in_pen:
+					continue
+				var dd4: Vector2 = sh4.position - dog.position
+				var dist4: float = dd4.length()
+				if dist4 < re and dist4 > 0.1:
+					sh4.vel += dd4 / dist4 * 190.0 * (1.0 - dist4 / re) * sh4.bark_mul * 0.7
+	update_pups(dt)
+
+func ensure_pups() -> void:
+	var want: int = 0 if pl("pups") == 0 else 1 + pl("pups") / 2
+	while pups.size() < want:
+		var pd := ClassicDog.new()
+		ysort.add_child(pd)
+		pd.setup(dog_frames, shadow_tex)
+		pd.spr.modulate = Color(0.6, 0.85, 1.0, 0.75)
+		pd.position = dog.position + Vector2(randf_range(-30.0, 30.0), randf_range(20.0, 40.0))
+		pups.append(pd)
+	while pups.size() > want:
+		(pups.pop_back() as Node).queue_free()
+
+# a ghost pup picks a stray, gets behind it and drives it toward the pen
+func update_pups(dt: float) -> void:
+	var lp: int = pl("pups")
+	var taken: Array = []
+	for pu in pups:
+		var pd: ClassicDog = pu
+		pd.animate(dt)
+		var tgt: ClassicSheep = null
+		var worst: float = -1.0
+		for s in loose_sheep():
+			var sh: ClassicSheep = s
+			if taken.has(sh) or sh.position.distance_to(dog.position) > 700.0:
+				continue
+			var far: float = sh.position.distance_to(world.pen.get_center())
+			if far > worst:
+				worst = far
+				tgt = sh
+		var spd: float = 135.0 + 15.0 * float(lp)
+		if tgt == null:
+			move_to(pd, dog.position + Vector2(40.0, 40.0), spd, dt, 5.0)
+		else:
+			taken.append(tgt)
+			var dirv: Vector2 = (pen_goal(tgt.position) - tgt.position).normalized()
+			var spot: Vector2 = tgt.position - dirv * 70.0
+			move_to(pd, spot, spd, dt, 5.0)
+			if pd.position.distance_to(tgt.position) < 130.0:
+				pressure_from(tgt, pd.position, dirv, 0.9, true, dt, 0.0)
+		pd.position += pd.vel * dt
+		pd.position.x = clampf(pd.position.x, XMIN, XMAX)
+		pd.position.y = clampf(pd.position.y, YMIN, YMAX)
