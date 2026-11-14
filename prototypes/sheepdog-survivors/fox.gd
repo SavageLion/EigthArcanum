@@ -21,6 +21,7 @@ var hit_done: bool = false
 var slow: float = 0.0
 var tgt: Sheep = null
 var carry: Sheep = null
+var hits: Array = []
 var tt: float = 0.0
 var zig: float = 0.0
 var r: float = 6.0
@@ -36,6 +37,14 @@ const KINDS: Dictionary = {
 	"gargoyle": {"set": "gargoyle", "target": 0.95, "r": 10.0, "hp": 22.0, "spd": 85.0, "dps": 0.0},
 	"harpy": {"set": "harpy", "target": 1.1, "r": 10.0, "hp": 12.0, "spd": 135.0, "dps": 6.0},
 	"ogre": {"set": "ogre", "target": 1.7, "r": 18.0, "hp": 95.0, "spd": 62.0, "dps": 30.0},
+	"griffin": {"set": "griffin", "target": 1.2, "r": 12.0, "hp": 14.0, "spd": 150.0, "dps": 0.0},
+	"gorebeast": {"set": "gorebeast", "target": 1.3, "r": 15.0, "hp": 30.0, "spd": 95.0, "dps": 0.0},
+	"wisp": {"set": "wisp", "target": 0.6, "r": 8.0, "hp": 6.0, "spd": 110.0, "dps": 0.0},
+	"hexer": {"set": "hexer", "target": 1.0, "r": 9.0, "hp": 14.0, "spd": 85.0, "dps": 0.0},
+	"minotaur": {"set": "minotaur", "target": 1.5, "r": 16.0, "hp": 55.0, "spd": 70.0, "dps": 20.0},
+	"torchling": {"set": "torchling", "target": 0.75, "r": 8.0, "hp": 8.0, "spd": 120.0, "dps": 4.0},
+	"skeleton": {"set": "skeleton", "target": 0.9, "r": 9.0, "hp": 4.0, "spd": 105.0, "dps": 4.0},
+	"kobold": {"set": "kobold", "target": 0.7, "r": 8.0, "hp": 8.0, "spd": 140.0, "dps": 0.0},
 	"drake": {"set": "drake", "target": 2.8, "r": 28.0, "hp": 260.0, "spd": 50.0, "dps": 0.0},
 }
 

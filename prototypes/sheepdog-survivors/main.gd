@@ -695,6 +695,14 @@ func start_wave(n: int) -> void:
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
 	for i in 2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0):
 		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
+	if campaign:
+		var att0: int = int(Meta.camp["attacks"]) + 1
+		var pv: float = clampf(0.1 + 0.06 * float(att0), 0.0, 0.55)
+		for ev in events:
+			if String(ev["k"]) == "fox" and att0 >= 2 and randf() < pv:
+				ev["k"] = "gorebeast" if (att0 >= 4 and randf() < 0.5) else "griffin"
+			elif String(ev["k"]) == "imp" and att0 >= 4 and randf() < pv:
+				ev["k"] = "hexer" if (att0 >= 6 and randf() < 0.45) else "wisp"
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
 	if n > 1:
 		var loose: int = 0
@@ -728,8 +736,8 @@ func start_defend() -> void:
 	var eff: int = att + bonus / 3
 	var boss: bool = campaign and att >= Meta.FINAL_ATTACK
 	var budget: float = 10.0 + 5.0 * float(eff)
-	var costs: Dictionary = {"wolf": 2.0, "imp": 2.0, "goblin": 1.5, "gargoyle": 3.5, "harpy": 3.0, "ogre": 8.0}
-	var mins: Dictionary = {"wolf": 0, "imp": 0, "goblin": 3, "gargoyle": 5, "harpy": 6, "ogre": 7}
+	var costs: Dictionary = {"wolf": 2.0, "imp": 2.0, "goblin": 1.5, "gargoyle": 3.5, "harpy": 3.0, "ogre": 8.0, "skeleton": 3.0, "torchling": 2.5, "minotaur": 5.0, "kobold": 2.5, "wisp": 2.5, "hexer": 3.5}
+	var mins: Dictionary = {"wolf": 0, "imp": 0, "skeleton": 2, "torchling": 2, "goblin": 3, "kobold": 3, "minotaur": 4, "wisp": 4, "gargoyle": 5, "harpy": 6, "hexer": 6, "ogre": 7}
 	var mix: Array = Meta.PLOTS[plot]["mix"] if campaign else [["wolf", 3], ["imp", 1]]
 	var kinds: Array = []
 	for e in mix:
@@ -781,7 +789,12 @@ func edge_point(near_loose: bool) -> Vector2:
 					best = c
 	return clamp_pt(best + Vector2(randf_range(-30.0, 30.0), randf_range(-30.0, 30.0)))
 
-func spawn_enemy(k: String) -> void:
+func spawn_enemy(k: String, at: Vector2 = Vector2(-1.0, -1.0)) -> void:
+	if k == "skeleton" and at.x < 0.0:
+		var p0: Vector2 = edge_point(false)
+		for i in 4:
+			spawn_enemy("skeleton", clamp_pt(p0 + Vector2(randf_range(-28.0, 28.0), randf_range(-28.0, 28.0))))
+		return
 	var f := Fox.new()
 	ysort.add_child(f)
 	var fr: SpriteFrames = fox_frames
@@ -795,7 +808,7 @@ func spawn_enemy(k: String) -> void:
 		fr = CreatureArt.frames(String(Fox.KINDS[k]["set"]))
 	var hm: float = (1.0 + 0.1 * float(Meta.camp["attacks"])) if campaign else (1.0 + 0.15 * float(wave - 1))
 	f.setup(k, fr, shadow_tex, hm)
-	f.position = edge_point(k == "fox")
+	f.position = edge_point(k == "fox") if at.x < 0.0 else at
 	foxes.append(f)
 	if k == "drake":
 		banner = "A DRAGON DARKENS THE SKY!"
@@ -893,7 +906,9 @@ func _physics_process(delta: float) -> void:
 		if smoke_n == 300 and OS.get_cmdline_user_args().has("fantasy"):
 			for i in 5:
 				spawn_pen_animal("normal")
-			for k in ["goblin", "gargoyle", "harpy", "ogre", "drake"]:
+			for i in 4:
+				spawn_stray(true)
+			for k in ["griffin", "gorebeast", "wisp", "hexer", "minotaur", "torchling", "skeleton", "kobold", "harpy"]:
 				spawn_enemy(String(k))
 		if smoke_n % 300 == 0 and OS.get_cmdline_user_args().has("fantasy"):
 			var ks: Array = []
@@ -1488,7 +1503,7 @@ func defeat(f: Fox) -> void:
 	tw.chain().tween_callback(f.queue_free)
 	var nb: int = 1
 	var val: int = 6
-	var gem: Dictionary = {"wolf": [2, 9], "bear": [5, 16], "goblin": [1, 8], "gargoyle": [2, 10], "harpy": [2, 10], "ogre": [5, 14], "drake": [12, 22]}
+	var gem: Dictionary = {"wolf": [2, 9], "bear": [5, 16], "goblin": [1, 8], "gargoyle": [2, 10], "harpy": [2, 10], "ogre": [5, 14], "drake": [12, 22], "griffin": [2, 10], "gorebeast": [3, 12], "wisp": [1, 8], "hexer": [2, 10], "minotaur": [4, 14], "torchling": [1, 8], "skeleton": [1, 5], "kobold": [1, 8]}
 	if gem.has(f.kind):
 		nb = int((gem[f.kind] as Array)[0])
 		val = int((gem[f.kind] as Array)[1])
@@ -2423,8 +2438,8 @@ func gargoyle_ai(f: Fox, dt: float) -> void:
 			ring(nw["p"], 26.0, Color(0.75, 0.75, 0.85), 0.3, 3.0)
 			add_popup("CRACK!", (nw["p"] as Vector2) + Vector2(0, -16), Color(0.85, 0.85, 0.95))
 
-# flies over the walls, snatches an animal from the pen and carries it off the map
-func harpy_ai(f: Fox, dt: float) -> void:
+# flies in, grabs an animal and carries it off the map (harpies take penned ones, griffins loose ones)
+func snatch_ai(f: Fox, dt: float, from_pen: bool) -> void:
 	if f.carry != null:
 		move_to(f, nearest_edge(f.position), 170.0, dt, 6.0)
 		f.carry.position = f.position + Vector2(0, 8)
@@ -2434,19 +2449,22 @@ func harpy_ai(f: Fox, dt: float) -> void:
 			foxes.erase(f)
 			f.queue_free()
 		return
-	if f.tgt == null or not sheep.has(f.tgt) or not f.tgt.in_pen or f.tgt.carried:
+	if f.tgt == null or not sheep.has(f.tgt) or f.tgt.carried or f.tgt.in_pen != from_pen:
 		var best: Sheep = null
 		var bd: float = 1.0e9
 		for s in sheep:
 			var sh: Sheep = s
-			if sh.in_pen and not sh.carried:
+			if sh.in_pen == from_pen and not sh.carried:
 				var d: float = sh.position.distance_to(f.position)
 				if d < bd:
 					bd = d
 					best = sh
 		f.tgt = best
 	if f.tgt == null:
-		gnaw(f, dt)
+		if from_pen:
+			gnaw(f, dt)
+		else:
+			f.vel *= exp(-3.0 * dt)
 		return
 	move_to(f, f.tgt.position, f.base_speed, dt, 6.0)
 	if f.position.distance_to(f.tgt.position) < f.r + 12.0:
@@ -2454,6 +2472,215 @@ func harpy_ai(f: Fox, dt: float) -> void:
 		f.tgt.carried = true
 		f.tgt.in_pen = false
 		add_popup("SNATCHED!", f.position + Vector2(0, -28), Color(1.0, 0.5, 0.5))
+
+func harpy_ai(f: Fox, dt: float) -> void:
+	snatch_ai(f, dt, true)
+
+func griffin_ai(f: Fox, dt: float) -> void:
+	snatch_ai(f, dt, false)
+
+# winds up, then charges through the loose animals and knocks them about
+func gorebeast_ai(f: Fox, dt: float) -> void:
+	f.atk_cd = maxf(0.0, f.atk_cd - dt)
+	if f.mode == "dash":
+		f.vel = f.dash_dir * 380.0
+		f.tt -= dt
+		for s in sheep:
+			var sh: Sheep = s
+			if sh.in_pen or sh.carried or f.hits.has(sh):
+				continue
+			if sh.position.distance_to(f.position) < f.r + sh.r + 4.0:
+				f.hits.append(sh)
+				bite(f, sh, 9.0)
+		if f.tt <= 0.0:
+			f.mode = "rest"
+			f.tt = 1.0
+			f.atk_cd = 1.5
+		return
+	if f.mode == "wind":
+		f.vel *= exp(-9.0 * dt)
+		f.flash = 0.12
+		f.tt -= dt
+		if f.tt <= 0.0:
+			f.mode = "dash"
+			f.tt = 0.45
+			f.hits.clear()
+		return
+	if f.mode == "rest":
+		f.vel *= exp(-6.0 * dt)
+		f.tt -= dt
+		if f.tt <= 0.0:
+			f.mode = "chase"
+		return
+	var tg: Sheep = null
+	var bd: float = 1.0e9
+	for s in sheep:
+		var sh2: Sheep = s
+		if sh2.in_pen or sh2.carried:
+			continue
+		var d: float = sh2.position.distance_to(f.position)
+		if d < bd:
+			bd = d
+			tg = sh2
+	if tg == null:
+		f.vel *= exp(-3.0 * dt)
+		return
+	move_to(f, tg.position, f.base_speed, dt, 5.0)
+	if bd < 210.0 and f.atk_cd <= 0.0:
+		f.mode = "wind"
+		f.tt = 0.55
+		f.dash_dir = (tg.position - f.position).normalized()
+
+func fire_shot(from: Vector2, to: Vector2, speed: float, col: Color, effect: String) -> void:
+	var sh := Shot.new()
+	sh.main = self
+	sh.position = from
+	sh.vel = (to - from).normalized() * speed
+	sh.col = col
+	sh.effect = effect
+	sh.z_index = 30
+	add_child(sh)
+
+func shot_hit(effect: String, pos: Vector2) -> void:
+	if effect == "curse":
+		dog.bark_cd = maxf(dog.bark_cd, 0.0) + 3.5
+		add_popup("CURSED! no barking", dog.position + Vector2(0, -44), Color(0.8, 0.5, 1.0))
+		ring(dog.position, 40.0, Color(0.7, 0.4, 0.95), 0.4, 4.0)
+	else:
+		damage_dog(0.0, pos)
+
+# floats about and throws fireballs at the wizard
+func wisp_ai(f: Fox, dt: float) -> void:
+	var dd: Vector2 = dog.position - f.position
+	var dist: float = dd.length()
+	if dist > 270.0:
+		move_to(f, dog.position, f.base_speed, dt, 4.0)
+	elif dist < 170.0:
+		move_to(f, f.position - dd.normalized() * 100.0, f.base_speed, dt, 4.0)
+	else:
+		f.vel = f.vel.lerp(dd.orthogonal().normalized() * 60.0, minf(1.0, dt * 2.0))
+	f.atk_cd -= dt
+	if f.atk_cd <= 0.0 and dist < 400.0:
+		f.atk_cd = 2.8
+		fire_shot(f.position, dog.position + dog.vel * 0.3, 210.0, Color(1.0, 0.55, 0.15), "stun")
+
+# keeps well back and curses the wizard so he cannot bark
+func hexer_ai(f: Fox, dt: float) -> void:
+	var dd: Vector2 = dog.position - f.position
+	var dist: float = dd.length()
+	if dist > 300.0:
+		move_to(f, dog.position, f.base_speed, dt, 4.0)
+	elif dist < 200.0:
+		move_to(f, f.position - dd.normalized() * 100.0, f.base_speed, dt, 4.0)
+	else:
+		f.vel *= exp(-4.0 * dt)
+	f.atk_cd -= dt
+	if f.atk_cd <= 0.0 and dist < 420.0:
+		f.atk_cd = 5.0
+		fire_shot(f.position, dog.position, 160.0, Color(0.7, 0.4, 0.95), "curse")
+
+# charges a wall at full speed, hits it hard, then stands dazed
+func minotaur_ai(f: Fox, dt: float) -> void:
+	var nw: Dictionary = nearest_wall(f.position)
+	if nw.is_empty():
+		return
+	f.atk_cd = maxf(0.0, f.atk_cd - dt)
+	if f.mode == "rest":
+		f.mode = "chase"
+	if f.mode == "dash":
+		f.vel = f.dash_dir * 430.0
+		f.tt -= dt
+		if float(nw["d"]) < f.r + 12.0 or f.tt <= 0.0:
+			if float(nw["d"]) < f.r + 18.0:
+				damage_wall(world.walls[int(nw["i"])], 34.0)
+				ring(nw["p"], 54.0, Color(0.85, 0.75, 0.6), 0.4, 6.0)
+				add_popup("SMASH!", (nw["p"] as Vector2) + Vector2(0, -22), Color(1.0, 0.8, 0.5))
+				shake = 0.8
+			f.mode = "rest"
+			f.stun = 2.0
+			f.vel = Vector2.ZERO
+		return
+	if f.mode == "wind":
+		f.vel *= exp(-9.0 * dt)
+		f.flash = 0.12
+		f.tt -= dt
+		if f.tt <= 0.0:
+			f.mode = "dash"
+			f.tt = 0.7
+			f.dash_dir = ((nw["p"] as Vector2) - f.position).normalized()
+		return
+	move_to(f, nw["p"], f.base_speed, dt, 6.0)
+	if float(nw["d"]) < 170.0 and f.atk_cd <= 0.0:
+		f.mode = "wind"
+		f.tt = 0.7
+
+# stands off and throws a torch that sets the wall burning
+func torchling_ai(f: Fox, dt: float) -> void:
+	var nw: Dictionary = nearest_wall(f.position)
+	if nw.is_empty():
+		return
+	f.atk_cd = maxf(0.0, f.atk_cd - dt)
+	if float(nw["d"]) > 120.0:
+		move_to(f, nw["p"], f.base_speed, dt, 5.0)
+	else:
+		f.vel *= exp(-6.0 * dt)
+		if f.atk_cd <= 0.0:
+			f.atk_cd = 4.0
+			world.walls[int(nw["i"])]["burn"] = 6.0
+			ring(nw["p"], 32.0, Color(1.0, 0.5, 0.1), 0.4, 4.0)
+			add_popup("ABLAZE!", (nw["p"] as Vector2) + Vector2(0, -18), Color(1.0, 0.6, 0.2))
+
+# sneaks in through a gate, steals an animal and slips out the same way
+func kobold_ai(f: Fox, dt: float) -> void:
+	var e := Vector2.ZERO
+	var n := Vector2.ZERO
+	var bd: float = 1.0e9
+	for en in pen_entrances():
+		var d: float = f.position.distance_to(en[0])
+		if d < bd:
+			bd = d
+			e = en[0]
+			n = en[1]
+	var rel: Vector2 = f.position - e
+	var along: float = rel.dot(n)
+	var lat: float = absf(rel.dot(n.orthogonal()))
+	if f.carry != null:
+		var goal: Vector2
+		if along < 25.0:
+			goal = (e - n * 40.0) if lat > 22.0 else (e + n * 70.0)
+		else:
+			goal = nearest_edge(f.position)
+		move_to(f, goal, 150.0, dt, 6.0)
+		f.carry.position = f.position + Vector2(0, 6)
+		if f.position.x < XMIN - 20.0 or f.position.x > XMAX + 20.0 or f.position.y < YMIN - 20.0 or f.position.y > YMAX + 20.0:
+			kill_sheep(f.carry)
+			f.carry = null
+			foxes.erase(f)
+			f.queue_free()
+		return
+	if f.tgt == null or not sheep.has(f.tgt) or not f.tgt.in_pen or f.tgt.carried:
+		var best: Sheep = null
+		var bb: float = 1.0e9
+		for s in sheep:
+			var sh: Sheep = s
+			if sh.in_pen and not sh.carried:
+				var dd: float = sh.position.distance_to(f.position)
+				if dd < bb:
+					bb = dd
+					best = sh
+		f.tgt = best
+	if f.tgt == null:
+		gnaw(f, dt)
+		return
+	var goal2: Vector2 = f.tgt.position
+	if along > 30.0 and lat > 25.0:
+		goal2 = e + n * 70.0
+	move_to(f, goal2, f.base_speed, dt, 6.0)
+	if f.position.distance_to(f.tgt.position) < f.r + 12.0:
+		f.carry = f.tgt
+		f.tgt.carried = true
+		f.tgt.in_pen = false
+		add_popup("STOLEN!", f.position + Vector2(0, -24), Color(1.0, 0.5, 0.5))
 
 # the boss: circles the pen and breathes fire on the walls
 func drake_ai(f: Fox, dt: float) -> void:
@@ -2549,6 +2776,13 @@ func nearest_edge(p: Vector2) -> Vector2:
 	return best
 
 func update_enemies(dt: float) -> void:
+	for bw in world.walls:
+		var bt: float = float(bw.get("burn", 0.0))
+		if bt > 0.0 and not bool(bw["broken"]):
+			bw["burn"] = bt - dt
+			damage_wall(bw, 7.0 * dt)
+			if fmod(clock, 0.7) < dt:
+				ring(((bw["a"] as Vector2) + (bw["b"] as Vector2)) / 2.0, 16.0, Color(1.0, 0.5, 0.1), 0.3, 3.0)
 	for f in foxes.duplicate():
 		var fx: Fox = f
 		fx.stun = maxf(0.0, fx.stun - dt)
@@ -2571,6 +2805,20 @@ func update_enemies(dt: float) -> void:
 			gargoyle_ai(fx, dt)
 		elif fx.kind == "harpy":
 			harpy_ai(fx, dt)
+		elif fx.kind == "griffin":
+			griffin_ai(fx, dt)
+		elif fx.kind == "gorebeast":
+			gorebeast_ai(fx, dt)
+		elif fx.kind == "wisp":
+			wisp_ai(fx, dt)
+		elif fx.kind == "hexer":
+			hexer_ai(fx, dt)
+		elif fx.kind == "minotaur":
+			minotaur_ai(fx, dt)
+		elif fx.kind == "torchling":
+			torchling_ai(fx, dt)
+		elif fx.kind == "kobold":
+			kobold_ai(fx, dt)
 		elif fx.kind == "drake":
 			drake_ai(fx, dt)
 		elif fx.kind == "fox":
@@ -2607,7 +2855,7 @@ func update_enemies(dt: float) -> void:
 		var wk: float = 0.55 if world.zone_kind(fx.position) == "water" else 1.0
 		var mv: Vector2 = fx.vel * (0.5 if fx.slow > 0.0 else 1.0) * wk + fx.kb
 		fx.position += Vector2(mv.x, mv.y * U.up()) * dt
-		if fx.kind != "harpy" and fx.kind != "drake":
+		if not ["harpy", "drake", "griffin", "wisp"].has(fx.kind):
 			collide(fx, fx.r, 0.0)
 
 # ---------------------------------------------------------------- the end

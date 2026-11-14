@@ -3,8 +3,8 @@ extends RefCounted
 # Fantasy animals and raiders drawn pixel by pixel in code (placeholder until real art is made).
 # Every creature is drawn facing east; the other directions reuse it (mirrored for the west side).
 
-const NAMES: Array = ["chicken", "alpaca", "yak", "boar", "unicorn", "dragon", "phoenix", "goblin", "gargoyle", "harpy", "ogre", "drake"]
-const FLYERS: Array = ["phoenix", "gargoyle", "harpy", "drake", "dragon"]
+const NAMES: Array = ["chicken", "alpaca", "yak", "boar", "unicorn", "dragon", "phoenix", "goblin", "gargoyle", "harpy", "ogre", "drake", "griffin", "gorebeast", "wisp", "hexer", "minotaur", "torchling", "skeleton", "kobold"]
+const FLYERS: Array = ["phoenix", "gargoyle", "harpy", "drake", "dragon", "griffin", "wisp"]
 static var _cache: Dictionary = {}
 
 static func has(n: String) -> bool:
@@ -15,6 +15,10 @@ static func canvas(n: String) -> Vector2i:
 		return Vector2i(112, 96)
 	if n == "ogre":
 		return Vector2i(80, 80)
+	if n == "minotaur":
+		return Vector2i(72, 80)
+	if n == "gorebeast":
+		return Vector2i(80, 64)
 	return Vector2i(64, 64)
 
 # ---------------------------------------------------------------- drawing helpers
@@ -324,6 +328,136 @@ static func _drake(img: Image, f: int, g: float) -> void:
 		_ell(img, 106.0, g - 47.0, 5.0, 3.0, Color(1.0, 0.55, 0.1))
 		_ell(img, 109.0, g - 47.0, 3.0, 2.0, Color(1.0, 0.9, 0.3))
 
+static func _griffin(img: Image, f: int, g: float) -> void:
+	var sw: float = [0.0, 1.0, 0.0, -1.0][f]
+	var wy: float = [0.0, -6.0, -12.0, -6.0][f]
+	var tan := Color(0.82, 0.6, 0.3)
+	_line(img, Vector2(17, g - 22), Vector2(6, g - 30), 2.0, tan.darkened(0.2))
+	_ball(img, 5.0, g - 31.0, 3.0, 3.0, Color(0.45, 0.28, 0.15))
+	_rect(img, 19.0 - sw, g - 9.0, 3.0, 9.0, tan.darkened(0.2))
+	_rect(img, 24.0 + sw, g - 9.0, 3.0, 9.0, tan.darkened(0.2))
+	_ell(img, 26.0, g - 31.0 + wy, 12.0, 6.0, Color(0.5, 0.36, 0.22))
+	_ell(img, 35.0, g - 33.0 + wy * 0.8, 10.0, 5.0, Color(0.68, 0.52, 0.32))
+	_ball(img, 28.0, g - 20.0, 12.0, 8.0, tan)
+	_ball(img, 38.0, g - 26.0, 6.0, 7.0, Color(0.95, 0.92, 0.85))
+	_rect(img, 33.0 + sw, g - 8.0, 3.0, 8.0, Color(0.95, 0.8, 0.2))
+	_rect(img, 37.0 - sw, g - 8.0, 3.0, 8.0, Color(0.95, 0.8, 0.2))
+	_ball(img, 43.0, g - 35.0, 5.0, 5.0, Color(0.96, 0.94, 0.88))
+	_tri(img, Vector2(46, g - 37), Vector2(53, g - 34), Vector2(46, g - 31), Color(1.0, 0.75, 0.15))
+	_px(img, 44, int(g - 37.0), Color(0.05, 0.05, 0.05))
+
+static func _gorebeast(img: Image, f: int, g: float) -> void:
+	var sw: float = [0.0, 3.0, 0.0, -3.0][f]
+	var dk := Color(0.36, 0.22, 0.26)
+	for lx in [20.0, 28.0]:
+		_rect(img, float(lx) - sw, g - 12.0, 6.0, 12.0, dk.darkened(0.25))
+	for lx in [48.0, 56.0]:
+		_rect(img, float(lx) + sw, g - 12.0, 6.0, 12.0, dk.darkened(0.25))
+	_line(img, Vector2(14, g - 24), Vector2(6, g - 14), 2.0, dk.darkened(0.2))
+	for i in 5:
+		_tri(img, Vector2(20 + i * 6, g - 33), Vector2(23 + i * 6, g - 41), Vector2(26 + i * 6, g - 33), Color(0.2, 0.12, 0.15))
+	_ball(img, 36.0, g - 22.0, 22.0, 13.0, dk)
+	_ball(img, 30.0, g - 34.0, 10.0, 7.0, dk)
+	_ball(img, 58.0, g - 22.0, 9.0, 8.0, dk.lightened(0.05))
+	_ball(img, 66.0, g - 19.0, 5.0, 4.0, Color(0.7, 0.55, 0.55))
+	_tri(img, Vector2(54, g - 28), Vector2(49, g - 42), Vector2(58, g - 29), Color(0.97, 0.93, 0.8))
+	_tri(img, Vector2(62, g - 28), Vector2(69, g - 39), Vector2(65, g - 27), Color(0.97, 0.93, 0.8))
+	_px(img, 61, int(g - 24.0), Color(1.0, 0.2, 0.1))
+	_px(img, 68, int(g - 19.0), Color(0.1, 0.05, 0.05))
+
+static func _wisp(img: Image, f: int, g: float) -> void:
+	var wy: float = [0.0, -3.0, -5.0, -2.0][f]
+	_ell(img, 30.0, g - 30.0, 17.0, 19.0, Color(1.0, 0.55, 0.1, 0.25))
+	_tri(img, Vector2(23, g - 33), Vector2(30, g - 52 + wy), Vector2(37, g - 33), Color(1.0, 0.5, 0.12))
+	_tri(img, Vector2(26, g - 33), Vector2(30, g - 46 + wy), Vector2(34, g - 33), Color(1.0, 0.85, 0.3))
+	_ball(img, 30.0, g - 28.0, 9.0, 10.0, Color(1.0, 0.55, 0.15))
+	_ball(img, 30.0, g - 26.0, 6.0, 6.0, Color(1.0, 0.9, 0.4))
+	_px(img, 27, int(g - 28.0), Color(0.15, 0.05, 0.02))
+	_px(img, 28, int(g - 28.0), Color(0.15, 0.05, 0.02))
+	_px(img, 32, int(g - 28.0), Color(0.15, 0.05, 0.02))
+	_px(img, 33, int(g - 28.0), Color(0.15, 0.05, 0.02))
+	_rect(img, 29.0, g - 24.0, 3.0, 1.0, Color(0.15, 0.05, 0.02))
+	_tri(img, Vector2(26, g - 18), Vector2(23, g - 8), Vector2(30, g - 17), Color(1.0, 0.6, 0.15, 0.8))
+	_tri(img, Vector2(31, g - 18), Vector2(35, g - 10), Vector2(35, g - 18), Color(1.0, 0.7, 0.2, 0.7))
+
+static func _hexer(img: Image, f: int, g: float) -> void:
+	var sw: float = [0.0, 1.0, 0.0, -1.0][f]
+	var pu := Color(0.42, 0.26, 0.62)
+	_line(img, Vector2(43, g - 6), Vector2(43, g - 50), 2.0, Color(0.45, 0.3, 0.18))
+	_ball(img, 43.0, g - 53.0, 4.0, 4.0, Color(0.7, 1.0, 0.4))
+	_tri(img, Vector2(21 + sw, g - 2), Vector2(31, g - 32), Vector2(41 + sw, g - 2), pu.darkened(0.2))
+	_ball(img, 31.0, g - 20.0, 10.0, 14.0, pu)
+	_rect(img, 20.0 + sw, g - 3.0, 22.0, 3.0, pu.darkened(0.35))
+	_line(img, Vector2(36, g - 26), Vector2(42, g - 32), 3.0, pu.lightened(0.1))
+	_ball(img, 31.0, g - 38.0, 7.0, 7.0, pu.darkened(0.15))
+	_ell(img, 33.0, g - 37.0, 4.0, 4.0, Color(0.05, 0.02, 0.08))
+	_px(img, 33, int(g - 38.0), Color(0.8, 1.0, 0.3))
+	_px(img, 35, int(g - 38.0), Color(0.8, 1.0, 0.3))
+
+static func _minotaur(img: Image, f: int, g: float) -> void:
+	var sw: float = [0.0, 3.0, 0.0, -3.0][f]
+	var fur := Color(0.45, 0.32, 0.22)
+	_rect(img, 26.0 + sw, g - 16.0, 8.0, 16.0, fur.darkened(0.3))
+	_rect(img, 40.0 - sw, g - 16.0, 8.0, 16.0, fur.darkened(0.3))
+	_rect(img, 25.0 + sw, g - 3.0, 10.0, 3.0, Color(0.2, 0.15, 0.1))
+	_rect(img, 39.0 - sw, g - 3.0, 10.0, 3.0, Color(0.2, 0.15, 0.1))
+	_ball(img, 38.0, g - 36.0, 16.0, 18.0, fur)
+	_ball(img, 39.0, g - 31.0, 10.0, 9.0, fur.lightened(0.12))
+	_rect(img, 28.0, g - 24.0, 22.0, 8.0, Color(0.5, 0.2, 0.15))
+	_ball(img, 20.0, g - 40.0, 6.0, 12.0, fur)
+	_ball(img, 57.0, g - 40.0, 6.0, 12.0, fur)
+	_ball(img, 38.0, g - 63.0, 10.0, 9.0, fur.darkened(0.1))
+	_ball(img, 46.0, g - 59.0, 6.0, 5.0, Color(0.78, 0.62, 0.55))
+	_px(img, 49, int(g - 58.0), Color(0.95, 0.8, 0.2))
+	_tri(img, Vector2(30, g - 68), Vector2(21, g - 84), Vector2(35, g - 68), Color(0.97, 0.93, 0.8))
+	_tri(img, Vector2(46, g - 68), Vector2(57, g - 82), Vector2(42, g - 68), Color(0.97, 0.93, 0.8))
+	_px(img, 41, int(g - 65.0), Color(1.0, 0.2, 0.1))
+	_px(img, 45, int(g - 65.0), Color(1.0, 0.2, 0.1))
+
+static func _torchling(img: Image, f: int, g: float) -> void:
+	var sw: float = [0.0, 2.0, 0.0, -2.0][f]
+	var rd := Color(0.82, 0.36, 0.26)
+	_rect(img, 27.0 + sw, g - 12.0, 4.0, 12.0, rd.darkened(0.3))
+	_rect(img, 34.0 - sw, g - 12.0, 4.0, 12.0, rd.darkened(0.3))
+	_ball(img, 32.0, g - 21.0, 7.0, 9.0, Color(0.35, 0.25, 0.2))
+	_line(img, Vector2(36, g - 24), Vector2(44, g - 32), 2.0, Color(0.45, 0.3, 0.18))
+	_ball(img, 45.0, g - 36.0, 4.0, 5.0, Color(1.0, 0.5, 0.1))
+	_ball(img, 45.0, g - 35.0, 2.0, 3.0, Color(1.0, 0.9, 0.3))
+	_ball(img, 33.0, g - 34.0, 7.0, 6.0, rd)
+	_tri(img, Vector2(27, g - 35), Vector2(18, g - 39), Vector2(28, g - 31), rd)
+	_tri(img, Vector2(39, g - 35), Vector2(46, g - 40), Vector2(38, g - 31), rd)
+	_px(img, 35, int(g - 35.0), Color(1.0, 0.95, 0.2))
+	_px(img, 31, int(g - 35.0), Color(1.0, 0.95, 0.2))
+
+static func _skeleton(img: Image, f: int, g: float) -> void:
+	var sw: float = [0.0, 2.0, 0.0, -2.0][f]
+	var bone := Color(0.92, 0.9, 0.8)
+	_rect(img, 28.0 + sw, g - 14.0, 3.0, 14.0, bone.darkened(0.15))
+	_rect(img, 35.0 - sw, g - 14.0, 3.0, 14.0, bone.darkened(0.15))
+	_ball(img, 32.0, g - 24.0, 7.0, 9.0, bone)
+	for i in 3:
+		_rect(img, 27.0, g - 28.0 + float(i) * 4.0, 11.0, 1.0, Color(0.35, 0.3, 0.25))
+	_line(img, Vector2(37, g - 26), Vector2(45, g - 30), 2.0, bone.darkened(0.1))
+	_line(img, Vector2(45, g - 30), Vector2(52, g - 45), 2.0, Color(0.62, 0.52, 0.45))
+	_ball(img, 33.0, g - 38.0, 7.0, 7.0, bone)
+	_ell(img, 31.0, g - 38.0, 2.0, 2.0, Color(0.1, 0.05, 0.05))
+	_ell(img, 36.0, g - 38.0, 2.0, 2.0, Color(0.1, 0.05, 0.05))
+	_rect(img, 30.0, g - 33.0, 7.0, 2.0, bone.darkened(0.2))
+
+static func _kobold(img: Image, f: int, g: float) -> void:
+	var sw: float = [0.0, 2.0, 0.0, -2.0][f]
+	var tl := Color(0.35, 0.6, 0.55)
+	_line(img, Vector2(23, g - 10), Vector2(10, g - 5), 3.0, tl.darkened(0.15))
+	_rect(img, 27.0 + sw, g - 8.0, 3.0, 8.0, tl.darkened(0.3))
+	_rect(img, 33.0 - sw, g - 8.0, 3.0, 8.0, tl.darkened(0.3))
+	_ball(img, 26.0, g - 22.0, 7.0, 8.0, Color(0.6, 0.45, 0.25))
+	_px(img, 26, int(g - 30.0), Color(0.3, 0.2, 0.1))
+	_ball(img, 31.0, g - 15.0, 7.0, 8.0, tl)
+	_ball(img, 37.0, g - 26.0, 6.0, 5.0, tl)
+	_ball(img, 43.0, g - 24.0, 4.0, 3.0, tl.lightened(0.1))
+	_tri(img, Vector2(34, g - 30), Vector2(31, g - 37), Vector2(37, g - 30), tl.darkened(0.1))
+	_px(img, 39, int(g - 27.0), Color(1.0, 0.9, 0.2))
+
 # ---------------------------------------------------------------- building the frames
 static func _draw_one(n: String, f: int) -> Image:
 	var sz: Vector2i = canvas(n)
@@ -343,6 +477,14 @@ static func _draw_one(n: String, f: int) -> Image:
 		"harpy": _harpy(img, f, g)
 		"ogre": _ogre(img, f, g)
 		"drake": _drake(img, f, g)
+		"griffin": _griffin(img, f, g)
+		"gorebeast": _gorebeast(img, f, g)
+		"wisp": _wisp(img, f, g)
+		"hexer": _hexer(img, f, g)
+		"minotaur": _minotaur(img, f, g)
+		"torchling": _torchling(img, f, g)
+		"skeleton": _skeleton(img, f, g)
+		"kobold": _kobold(img, f, g)
 	_outline(img)
 	return img
 
