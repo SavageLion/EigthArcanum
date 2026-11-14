@@ -9,6 +9,7 @@ var spd: float = 1.0
 var hp: float = 6.0
 var maxhp: float = 6.0
 var panic: float = 0.0
+var home_t: float = 0.0
 var wa: float = 0.0
 var graze: float = 0.0
 var gs: float = 0.0

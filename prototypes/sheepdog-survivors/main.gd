@@ -14,13 +14,13 @@ const BASE_ZOOM: float = 1.1
 const TYPES: Dictionary = {
 	"normal": {"r": 8.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "xp": 10, "set": "sheep_ref", "metric": "w", "target": 0.72},
 	"lamb": {"r": 5.0, "zone": 105.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 8, "set": "lamb8", "metric": "w", "target": 0.45},
-	"ram": {"r": 10.0, "zone": 62.0, "flee": 0.55, "speed": 0.8, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.4, "xp": 18, "set": "ram8", "metric": "w", "target": 0.85},
-	"goat": {"r": 8.0, "zone": 90.0, "flee": 0.45, "speed": 0.9, "hp": 3, "tint": Color(1, 1, 1), "xp": 14, "set": "goat8", "metric": "w", "target": 0.72},
+	"ram": {"r": 10.0, "zone": 62.0, "flee": 0.9, "speed": 0.9, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.9, "xp": 18, "set": "ram8", "metric": "w", "target": 0.85},
+	"goat": {"r": 8.0, "zone": 90.0, "flee": 0.75, "speed": 0.95, "hp": 3, "tint": Color(1, 1, 1), "xp": 14, "set": "goat8", "metric": "w", "target": 0.72},
 	"black": {"r": 8.0, "zone": 120.0, "flee": 1.0, "speed": 1.0, "hp": 2, "tint": Color(1, 1, 1), "coh": 0.35, "xp": 14, "set": "black8", "metric": "w", "target": 0.72},
 	"goose": {"r": 6.5, "zone": 150.0, "flee": 1.3, "speed": 1.35, "hp": 1, "tint": Color(1, 1, 1), "coh": 0.5, "bark_mul": 1.6, "xp": 12, "set": "goose8", "metric": "h", "target": 0.5},
 	"duck": {"r": 5.5, "zone": 125.0, "flee": 1.0, "speed": 1.1, "hp": 1, "tint": Color(1, 1, 1), "xp": 10, "set": "duck8", "metric": "h", "target": 0.34},
-	"cow": {"r": 13.0, "zone": 70.0, "flee": 0.5, "speed": 0.75, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.4, "xp": 20, "set": "cow8", "metric": "w", "target": 1.25},
-	"pig": {"r": 9.0, "zone": 80.0, "flee": 0.6, "speed": 0.7, "hp": 3, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.5, "xp": 16, "set": "pig8", "metric": "w", "target": 0.8},
+	"cow": {"r": 13.0, "zone": 70.0, "flee": 0.9, "speed": 0.85, "hp": 4, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.9, "xp": 20, "set": "cow8", "metric": "w", "target": 1.25},
+	"pig": {"r": 9.0, "zone": 80.0, "flee": 0.9, "speed": 0.85, "hp": 3, "tint": Color(1, 1, 1), "heavy": true, "bark_mul": 0.9, "xp": 16, "set": "pig8", "metric": "w", "target": 0.8},
 }
 const STRAY_POOL: Array = ["cow", "normal", "normal", "normal", "normal", "lamb", "lamb", "goat", "goose", "ram", "black", "duck", "pig"]
 const PERKS: Array = [
@@ -603,7 +603,7 @@ func cdm() -> float:
 func am() -> float:
 	return 1.0 + 0.15 * float(pl("wide"))
 func bark_r() -> float:
-	return 150.0 * (1.0 + 0.2 * float(pl("bark")))
+	return 250.0 * (1.0 + 0.2 * float(pl("bark")))
 func bark_cd() -> float:
 	var ducks: int = int(pen_counts.get("duck", 0))
 	return 2.4 * pow(0.88, float(pl("bark"))) * (1.0 - minf(0.3, 0.03 * float(ducks)))
@@ -654,6 +654,8 @@ func start_wave(n: int) -> void:
 		events.append({"t": 20.0, "k": "bear"})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
 	banner = "WAVE %d" % n if n < LAST_WAVE else "LAST WAVE!"
+	if n == 1:
+		banner = "BARK CALLS THE ANIMALS TO THE PEN"
 	banner_t = 3.0
 
 func run_events() -> void:
@@ -731,7 +733,40 @@ func _physics_process(delta: float) -> void:
 	if lineup:
 		events.clear()
 		stray_t = 99.0
-	if smoke:
+	if smoke and OS.get_cmdline_user_args().has("herdtest"):
+		smoke_n += 1
+		events.clear()
+		stray_t = 99.0
+		wave_t = 0.0
+		if state == "inter":
+			inter_auto()
+		if smoke_n % 150 == 0:
+			var far: Sheep = null
+			var fd: float = -1.0
+			for s in sheep:
+				var sh: Sheep = s
+				if not sh.in_pen and sh.position.distance_to(world.pen.get_center()) > fd:
+					fd = sh.position.distance_to(world.pen.get_center())
+					far = sh
+			if far != null:
+				var toward: Vector2 = (world.pen.get_center() - far.position).normalized()
+				dog.position = far.position + toward * 110.0
+				dog.bark_cd = 0.0
+				do_bark()
+		if smoke_n % 600 == 0:
+			var loose: Array = []
+			for s in sheep:
+				if not (s as Sheep).in_pen:
+					loose.append((s as Sheep).type)
+			var dsum: float = 0.0
+			for s in sheep:
+				dsum += (s as Sheep).position.distance_to(world.pen.get_center())
+			print("herdtest t=", smoke_n, " herded=", herded, " avgdist=", int(dsum / float(maxi(sheep.size(), 1))), " loose=", loose.size(), " dogpos=", dog.position, " pen=", world.pen)
+			if smoke_n == 4800:
+				for s in sheep:
+					var q: Sheep = s
+					print("  ", q.type, " ", q.position, " goal=", pen_goal(q.position), " home=", q.home_t, " vel=", q.vel)
+	elif smoke:
 		smoke_n += 1
 		if state == "inter":
 			inter_auto()
@@ -1011,15 +1046,18 @@ func do_bark() -> void:
 		var dd: Vector2 = sh.position - dog.position
 		var dist: float = dd.length()
 		if dist < R and dist > 0.1:
-			var f: float = 1.0 - dist / R
-			sh.vel += dd / dist * 190.0 * f * sh.bark_mul
-			sh.panic = maxf(sh.panic, 0.9 * sh.bark_mul)
+			var f: float = maxf(0.45, 1.0 - dist / R)
+			var gd: Vector2 = (pen_goal(sh.position) - sh.position).normalized()
+			var dir: Vector2 = (dd / dist * 0.3 + gd * 0.7).normalized()
+			sh.vel += dir * 170.0 * f * sh.bark_mul
+			sh.panic = maxf(sh.panic, 0.45)
+			sh.home_t = 5.0 if sh.heavy else 4.0
 			sh.squash = 1.0
 	for f in foxes.duplicate():
 		var fx: Fox = f
 		if fx.fleeing:
 			continue
-		if fx.position.distance_to(dog.position) < R * 1.1:
+		if fx.position.distance_to(dog.position) < R * 0.68:
 			hurt(fx, 2.0 * sp(), dog.position, 260.0, 1.0)
 
 func add_popup(text: String, pos: Vector2, col: Color) -> void:
@@ -1811,6 +1849,58 @@ func inter_auto() -> void:
 	end_intermission()
 
 # ---------------------------------------------------------------- the flock
+func pen_entrances() -> Array:
+	var P: Rect2 = world.pen
+	var out: Array = [[Vector2(world.gate_x, P.end.y), Vector2(0.0, 1.0)]]
+	if bool(world.holes.get("north", false)):
+		out.append([Vector2(P.get_center().x, P.position.y), Vector2(0.0, -1.0)])
+	if bool(world.holes.get("west", false)):
+		out.append([Vector2(P.position.x, P.get_center().y), Vector2(-1.0, 0.0)])
+	if bool(world.holes.get("east", false)):
+		out.append([Vector2(P.end.x, P.get_center().y), Vector2(1.0, 0.0)])
+	return out
+
+func seg_blocked(a: Vector2, b: Vector2, box: Rect2) -> bool:
+	for i in range(1, 9):
+		if box.has_point(a.lerp(b, float(i) / 9.0)):
+			return true
+	return false
+
+# where an animal out in the field should head to reach the pen: the nearest open gate, around the walls if need be
+func pen_goal(p: Vector2) -> Vector2:
+	var best_st := Vector2.ZERO
+	var best_e := Vector2.ZERO
+	var best_n := Vector2.ZERO
+	var bd: float = 1.0e9
+	for en in pen_entrances():
+		var e: Vector2 = en[0]
+		var n: Vector2 = en[1]
+		var st: Vector2 = e + n * 80.0
+		var d: float = p.distance_to(st)
+		if d < bd:
+			bd = d
+			best_st = st
+			best_e = e
+			best_n = n
+	if bd < 110.0:
+		return best_e - best_n * 50.0
+	var box: Rect2 = world.pen.grow(8.0)
+	if not seg_blocked(p, best_st, box):
+		return best_st
+	var cb: Rect2 = world.pen.grow(44.0)
+	var corners: Array = [cb.position, Vector2(cb.end.x, cb.position.y), cb.end, Vector2(cb.position.x, cb.end.y)]
+	var pick: Vector2 = best_st
+	var pd: float = 1.0e9
+	for c in corners:
+		var cc: Vector2 = c
+		if p.distance_to(cc) < 16.0 or seg_blocked(p, cc, box):
+			continue
+		var dd: float = p.distance_to(cc) + cc.distance_to(best_st)
+		if dd < pd:
+			pd = dd
+			pick = cc
+	return pick
+
 func zone_mult() -> float:
 	return 1.18 if dog.crouch else 1.0
 
@@ -1880,6 +1970,14 @@ func update_sheep(dt: float) -> void:
 				if fx2.fleeing or fx2.carry != null:
 					continue
 				pressure += pressure_from(sh, fx2.position, fx2.vel.normalized(), 1.0, false, dt, 80.0) * 0.7
+			var gdir: Vector2 = (pen_goal(sh.position) - sh.position).normalized()
+			if pressure > 0.0:
+				sh.vel += gdir * 170.0 * pressure * dt
+			if sh.home_t > 0.0:
+				sh.home_t -= dt
+				sh.vel += gdir * (215.0 if sh.heavy else 235.0) * dt
+			elif pressure <= 0.0 and sh.panic < 0.5 and sh.position.distance_to(world.pen.get_center()) < 420.0:
+				sh.vel += gdir * 38.0 * dt
 			if sh.type == "ram":
 				var dd: float = dog.position.distance_to(sh.position)
 				if dd < 26.0 and dog.stun <= 0.0 and sh.panic < 0.2:
