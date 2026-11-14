@@ -72,6 +72,21 @@ func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture
 		spr.offset = fit["offset"]
 	spr.play("idle_east")
 	add_child(spr)
+	if def.has("fx"):
+		var ps := CPUParticles2D.new()
+		ps.amount = 9
+		ps.lifetime = 1.0
+		ps.local_coords = false
+		ps.direction = Vector2(0, -1)
+		ps.spread = 100.0
+		ps.initial_velocity_min = 5.0
+		ps.initial_velocity_max = 16.0
+		ps.gravity = Vector2(0, -8)
+		ps.scale_amount_min = 1.2
+		ps.scale_amount_max = 2.4
+		ps.color = def["fx"]
+		ps.position = Vector2(0, -22)
+		add_child(ps)
 
 func animate(dt: float) -> void:
 	var speed: float = vel.length()

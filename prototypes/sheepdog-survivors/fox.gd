@@ -32,6 +32,11 @@ const KINDS: Dictionary = {
 	"imp": {"set": "imp8", "target": 0.78, "r": 9.0, "hp": 10.0, "spd": 140.0, "dps": 0.0},
 	"wolf": {"set": "wolf_b", "target": 1.0, "r": 11.0, "hp": 16.0, "spd": 108.0, "dps": 11.0},
 	"bear": {"set": "bear_b", "target": 1.45, "r": 17.0, "hp": 80.0, "spd": 58.0, "dps": 26.0},
+	"goblin": {"set": "goblin", "target": 0.8, "r": 9.0, "hp": 7.0, "spd": 150.0, "dps": 0.0},
+	"gargoyle": {"set": "gargoyle", "target": 0.95, "r": 10.0, "hp": 22.0, "spd": 85.0, "dps": 0.0},
+	"harpy": {"set": "harpy", "target": 1.1, "r": 10.0, "hp": 12.0, "spd": 135.0, "dps": 6.0},
+	"ogre": {"set": "ogre", "target": 1.7, "r": 18.0, "hp": 95.0, "spd": 62.0, "dps": 30.0},
+	"drake": {"set": "drake", "target": 2.8, "r": 28.0, "hp": 260.0, "spd": 50.0, "dps": 0.0},
 }
 
 func setup(k: String, frames: SpriteFrames, shadow_tex: Texture2D, hp_mult: float) -> void:

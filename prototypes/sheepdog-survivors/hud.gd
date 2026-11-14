@@ -380,12 +380,12 @@ func _cost_text(cost: Dictionary) -> String:
 	return ", ".join(parts)
 
 func _mat_bar() -> void:
-	_panel(Rect2(8, 6, 640, 34), Color(0.13, 0.09, 0.08, 0.85))
+	_panel(Rect2(8, 6, 668, 34), Color(0.13, 0.09, 0.08, 0.85))
 	for i in Meta.MAT_ORDER.size():
 		var k: String = String(Meta.MAT_ORDER[i])
-		var cx: float = 26.0 + float(i) * 104.0
-		_crop_icon(Vector2(cx, 23), Meta.MATS[k]["col"])
-		_text("%d" % int((Meta.camp["mats"] as Dictionary).get(k, 0)), Vector2(cx + 12.0, 29), 16, CREAM)
+		var cx: float = 24.0 + float(i) * 55.0
+		_crop_icon(Vector2(cx, 23), Meta.MATS[k]["col"], 0.85)
+		_text("%d" % int((Meta.camp["mats"] as Dictionary).get(k, 0)), Vector2(cx + 10.0, 28), 13, CREAM)
 
 func _farm(v: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, v), Color(0.2, 0.36, 0.17))

@@ -119,3 +119,7 @@ static func fit(set_name: String, metric: String, target: float) -> Dictionary:
 	var sc: float = target / maxf(meas, 1.0)
 	var feet: float = float(sb["y1"]) - float(sb["ch"]) / 2.0
 	return {"scale": sc, "offset": Vector2(0.0, -feet), "w": (float(eb["x1"]) - float(eb["x0"])) * sc}
+
+static func register_size(n: String, b: Dictionary) -> void:
+	fit("_load_", "h", 1.0)
+	_sizes[n] = {"south": b, "east": b}
