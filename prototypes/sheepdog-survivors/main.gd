@@ -761,9 +761,19 @@ func start_wave(n: int) -> void:
 		var pv: float = clampf(0.1 + 0.06 * float(att0), 0.0, 0.55)
 		for ev in events:
 			if String(ev["k"]) == "fox" and att0 >= 2 and randf() < pv:
-				ev["k"] = "gorebeast" if (att0 >= 4 and randf() < 0.5) else "griffin"
-			elif String(ev["k"]) == "imp" and att0 >= 4 and randf() < pv:
-				ev["k"] = "hexer" if (att0 >= 6 and randf() < 0.45) else "wisp"
+				var hunters: Array = ["griffin", "bat"]
+				if att0 >= 3:
+					hunters.append("cutpurse")
+				if att0 >= 4:
+					hunters.append("gorebeast")
+				ev["k"] = hunters[randi() % hunters.size()]
+			elif String(ev["k"]) == "imp" and att0 >= 3 and randf() < pv * 1.3:
+				var casters: Array = ["frostling"]
+				if att0 >= 4:
+					casters.append("wisp")
+				if att0 >= 6:
+					casters.append_array(["hexer", "banshee"])
+				ev["k"] = casters[randi() % casters.size()]
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
 	if n > 1:
 		var loose: int = 0
@@ -797,8 +807,8 @@ func start_defend() -> void:
 	var eff: int = att + bonus / 3
 	var boss: bool = campaign and att >= Meta.FINAL_ATTACK
 	var budget: float = 2.0 * (10.0 + 5.0 * float(eff))
-	var costs: Dictionary = {"wolf": 2.0, "imp": 2.0, "goblin": 1.5, "gargoyle": 3.5, "harpy": 3.0, "ogre": 8.0, "skeleton": 3.0, "torchling": 2.5, "minotaur": 5.0, "kobold": 2.5, "wisp": 2.5, "hexer": 3.5}
-	var mins: Dictionary = {"wolf": 0, "imp": 0, "skeleton": 2, "torchling": 2, "goblin": 3, "kobold": 3, "minotaur": 4, "wisp": 4, "gargoyle": 5, "harpy": 6, "hexer": 6, "ogre": 7}
+	var costs: Dictionary = {"wolf": 2.0, "imp": 2.0, "goblin": 1.5, "gargoyle": 3.5, "harpy": 3.0, "ogre": 8.0, "skeleton": 3.0, "torchling": 2.5, "minotaur": 5.0, "kobold": 2.5, "wisp": 2.5, "hexer": 3.5, "frostling": 2.5, "bat": 2.0, "slime": 3.0, "knight": 4.5, "mole": 4.0, "necromancer": 6.0, "shaman": 4.0, "banshee": 4.0, "cutpurse": 2.5}
+	var mins: Dictionary = {"wolf": 0, "imp": 0, "bat": 2, "slime": 3, "frostling": 3, "cutpurse": 3, "mole": 4, "knight": 5, "shaman": 5, "necromancer": 6, "banshee": 6, "skeleton": 2, "torchling": 2, "goblin": 3, "kobold": 3, "minotaur": 4, "wisp": 4, "gargoyle": 5, "harpy": 6, "hexer": 6, "ogre": 7}
 	var mix: Array = Meta.PLOTS[plot]["mix"] if campaign else [["wolf", 3], ["imp", 1]]
 	var kinds: Array = []
 	for e in mix:
@@ -822,14 +832,14 @@ func start_defend() -> void:
 	var extra_wiz: Array = []
 	var wiz_n: int = 0
 	for ev in events:
-		if ["imp", "wisp", "hexer"].has(String(ev["k"])):
+		if ["imp", "wisp", "hexer", "frostling", "banshee"].has(String(ev["k"])):
 			wiz_n += 1
 			if wiz_n % 2 == 0:
 				extra_wiz.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": ev["k"]})
 	events.append_array(extra_wiz)
 	var twin: Array = []
 	for ev2 in events:
-		if ["imp", "wisp", "hexer"].has(String(ev2["k"])):
+		if ["imp", "wisp", "hexer", "frostling", "banshee"].has(String(ev2["k"])):
 			twin.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": ev2["k"]})
 	events.append_array(twin)
 	if not campaign and wave == LAST_WAVE:
@@ -983,7 +993,7 @@ func _physics_process(delta: float) -> void:
 				spawn_pen_animal("normal")
 			for i in 4:
 				spawn_stray(true)
-			for k in ["griffin", "gorebeast", "wisp", "hexer", "minotaur", "torchling", "skeleton", "kobold", "harpy"]:
+			for k in ["frostling", "bat", "slime", "knight", "mole", "necromancer", "shaman", "banshee", "cutpurse"]:
 				spawn_enemy(String(k))
 		if smoke_n % 300 == 0 and OS.get_cmdline_user_args().has("fantasy"):
 			var ks: Array = []
@@ -1163,6 +1173,7 @@ func damage_dog(_amount: float, from: Vector2) -> void:
 
 func update_dog(dt: float) -> void:
 	dog.invuln = maxf(0.0, dog.invuln - dt)
+	chill_t = maxf(0.0, chill_t - dt)
 	dog.hurt_t = maxf(0.0, dog.hurt_t - dt)
 	dog.regen_t = maxf(0.0, dog.regen_t - dt)
 	dog.hp_max = max_hp()
@@ -1186,7 +1197,7 @@ func update_dog(dt: float) -> void:
 	dog.walk = false
 	dog.crouch = false
 	var speedk: float = 0.0 if mag < 0.12 else (0.55 + 0.45 * minf(1.0, (mag - 0.12) / 0.6))
-	var sp: float = 235.0 * speed_mult() * speedk * (0.1 if dog.stun > 0.0 else 1.0)
+	var sp: float = 235.0 * speed_mult() * speedk * (0.1 if dog.stun > 0.0 else 1.0) * (0.45 if chill_t > 0.0 else 1.0)
 	if world.zone_kind(dog.position) == "water":
 		sp *= 0.5
 	dog.vel += (dir * sp - dog.vel) * minf(1.0, dt * 9.0)
@@ -1264,7 +1275,7 @@ func do_bark() -> void:
 			sh.squash = 1.0
 	for f in foxes.duplicate():
 		var fx: Fox = f
-		if fx.fleeing:
+		if fx.fleeing or fx.buried:
 			continue
 		if fx.position.distance_to(dog.position) < R * 1.1:
 			hurt(fx, 2.0 * sp(), dog.position, 260.0, 1.0)
@@ -1278,7 +1289,7 @@ func nearest_enemy(p: Vector2, maxd: float) -> Fox:
 	var bd: float = maxd
 	for f in foxes:
 		var fx: Fox = f
-		if fx.fleeing:
+		if fx.fleeing or fx.buried:
 			continue
 		var d: float = fx.position.distance_to(p)
 		if d < bd:
@@ -1290,7 +1301,7 @@ func random_enemy(p: Vector2, maxd: float) -> Fox:
 	var pool: Array = []
 	for f in foxes:
 		var fx: Fox = f
-		if not fx.fleeing and fx.position.distance_to(p) < maxd:
+		if not fx.fleeing and not fx.buried and fx.position.distance_to(p) < maxd:
 			pool.append(fx)
 	if pool.is_empty():
 		return null
@@ -1520,8 +1531,10 @@ func update_defenses(dt: float) -> void:
 
 
 func hurt(f: Fox, dmg: float, from: Vector2, power: float, stun: float) -> void:
-	if f.fleeing:
+	if f.fleeing or f.buried:
 		return
+	if f.kind == "knight":
+		dmg *= 0.3
 	f.hp -= dmg
 	f.flash = 0.22
 	add_popup(str(int(dmg)), f.position + Vector2(randf_range(-8, 8), -22), Color(1.0, 0.95, 0.6))
@@ -1550,6 +1563,22 @@ func defeat(f: Fox) -> void:
 	f.fleeing = true
 	defeated += 1
 	drop_carry(f)
+	if f.kind == "slime":
+		for i in 2:
+			spawn_enemy("slimelet", clamp_pt(f.position + Vector2(randf_range(-16.0, 16.0), randf_range(-16.0, 16.0))))
+	elif f.kind == "bat" and f.gem > 0:
+		var gc := Coin.new()
+		gc.kind = "gem"
+		gc.value = f.gem
+		gc.position = f.position
+		ysort.add_child(gc)
+		coins.append(gc)
+		f.gem = 0
+		add_popup("GEM SAVED!", f.position + Vector2(0, -28), Color(0.5, 0.9, 1.0))
+	elif f.kind == "cutpurse" and f.gem > 0:
+		gold += f.gem
+		add_popup("+%d gold back" % f.gem, f.position + Vector2(0, -28), Color(1.0, 0.85, 0.3))
+		f.gem = 0
 	foxes.erase(f)
 	f.vel = Vector2.ZERO
 	add_popup("POOF!", f.position + Vector2(0, -22), Color(1.0, 0.85, 0.4))
@@ -1580,7 +1609,7 @@ func defeat(f: Fox) -> void:
 	tw.chain().tween_callback(f.queue_free)
 	var nb: int = 1
 	var val: int = 6
-	var gem: Dictionary = {"wolf": [2, 9], "bear": [5, 16], "goblin": [1, 8], "gargoyle": [2, 10], "harpy": [2, 10], "ogre": [5, 14], "drake": [12, 22], "griffin": [2, 10], "gorebeast": [3, 12], "wisp": [1, 8], "hexer": [2, 10], "minotaur": [4, 14], "torchling": [1, 8], "skeleton": [1, 5], "kobold": [1, 8]}
+	var gem: Dictionary = {"wolf": [2, 9], "bear": [5, 16], "goblin": [1, 8], "gargoyle": [2, 10], "harpy": [2, 10], "ogre": [5, 14], "drake": [12, 22], "frostling": [1, 8], "bat": [1, 6], "slime": [2, 8], "slimelet": [1, 4], "knight": [4, 14], "mole": [2, 10], "necromancer": [3, 12], "shaman": [3, 12], "banshee": [2, 10], "cutpurse": [1, 8], "griffin": [2, 10], "gorebeast": [3, 12], "wisp": [1, 8], "hexer": [2, 10], "minotaur": [4, 14], "torchling": [1, 8], "skeleton": [1, 5], "kobold": [1, 8]}
 	if gem.has(f.kind):
 		nb = int((gem[f.kind] as Array)[0])
 		val = int((gem[f.kind] as Array)[1])
@@ -2317,6 +2346,7 @@ func pressure_from(s: Sheep, p: Vector2, h: Vector2, mult: float, calm: bool, dt
 	s.vel += (u * t * t * 430.0 + Vector2(-u.y, u.x) * side * t * 95.0) * k * dt
 	return t
 
+var chill_t: float = 0.0
 var perf_acc: float = 0.0
 var perf_n: int = 0
 var perf_low: bool = false
@@ -2759,6 +2789,159 @@ func kobold_ai(f: Fox, dt: float) -> void:
 		f.tgt.in_pen = false
 		add_popup("STOLEN!", f.position + Vector2(0, -24), Color(1.0, 0.5, 0.5))
 
+func outside_map(p: Vector2) -> bool:
+	return p.x < XMIN - 20.0 or p.x > XMAX + 20.0 or p.y < YMIN - 20.0 or p.y > YMAX + 20.0
+
+# a cold spirit: it does no damage, but near it the wizard moves at half speed
+func frostling_ai(f: Fox, dt: float) -> void:
+	var dd: Vector2 = dog.position - f.position
+	var dist: float = dd.length()
+	if dist > 70.0:
+		move_to(f, dog.position, f.base_speed, dt, 4.0)
+	else:
+		f.vel *= exp(-5.0 * dt)
+	if dist < 140.0:
+		chill_t = 0.5
+
+# steals XP gems off the ground and flies off; kill it to get the gem back
+func bat_ai(f: Fox, dt: float) -> void:
+	if f.gem > 0:
+		move_to(f, nearest_edge(f.position), 200.0, dt, 6.0)
+		if outside_map(f.position):
+			foxes.erase(f)
+			f.queue_free()
+		return
+	var best: Coin = null
+	var bd: float = 1.0e9
+	for c in coins:
+		var cn: Coin = c
+		if cn.kind == "gem":
+			var d: float = cn.position.distance_to(f.position)
+			if d < bd:
+				bd = d
+				best = cn
+	if best == null:
+		var orbit: Vector2 = dog.position + Vector2.from_angle(clock * 2.0 + float(f.get_instance_id() % 10)) * 120.0
+		move_to(f, orbit, f.base_speed, dt, 5.0)
+		return
+	move_to(f, best.position, f.base_speed, dt, 6.0)
+	if f.position.distance_to(best.position) < 16.0:
+		f.gem = best.value
+		coins.erase(best)
+		best.queue_free()
+		add_popup("GEM STOLEN!", f.position + Vector2(0, -24), Color(1.0, 0.6, 0.6))
+
+# tunnels under the ground where nothing can hurt it, then pops up at a wall and chews
+func mole_ai(f: Fox, dt: float) -> void:
+	var nw: Dictionary = nearest_wall(f.position)
+	if nw.is_empty():
+		return
+	if f.mode == "up":
+		f.tt -= dt
+		f.vel *= exp(-6.0 * dt)
+		damage_wall(world.walls[int(nw["i"])], 8.0 * dt)
+		if f.tt <= 0.0:
+			f.mode = "dig"
+			f.buried = true
+		return
+	f.buried = true
+	move_to(f, nw["p"], 150.0, dt, 6.0)
+	if float(nw["d"]) < f.r + 12.0:
+		f.buried = false
+		f.mode = "up"
+		f.tt = 3.0
+		damage_wall(world.walls[int(nw["i"])], 22.0)
+		ring(f.position, 46.0, Color(0.6, 0.45, 0.3), 0.4, 5.0)
+		add_popup("POP!", f.position + Vector2(0, -22), Color(0.9, 0.75, 0.5))
+
+# keeps its distance and raises more skeletons
+func necromancer_ai(f: Fox, dt: float) -> void:
+	var nw: Dictionary = nearest_wall(f.position)
+	if nw.is_empty():
+		return
+	if float(nw["d"]) > 300.0:
+		move_to(f, nw["p"], f.base_speed, dt, 4.0)
+	else:
+		f.vel *= exp(-5.0 * dt)
+	f.atk_cd -= dt
+	if f.atk_cd <= 0.0:
+		f.atk_cd = 6.0
+		var alive: int = 0
+		for o in foxes:
+			if (o as Fox).kind == "skeleton":
+				alive += 1
+		if alive < 24:
+			for i in 2:
+				spawn_enemy("skeleton", clamp_pt(f.position + Vector2(randf_range(-26.0, 26.0), randf_range(-26.0, 26.0))))
+			ring(f.position, 40.0, Color(0.3, 1.0, 0.4), 0.5, 4.0)
+			add_popup("RISE!", f.position + Vector2(0, -30), Color(0.5, 1.0, 0.6))
+
+# hangs back and heals the other raiders around it
+func shaman_ai(f: Fox, dt: float) -> void:
+	var c: Vector2 = world.pen.get_center()
+	if f.position.distance_to(c) > 340.0:
+		move_to(f, c, f.base_speed, dt, 4.0)
+	else:
+		f.vel *= exp(-5.0 * dt)
+	f.atk_cd -= dt
+	if f.atk_cd <= 0.0:
+		f.atk_cd = 3.0
+		var healed: bool = false
+		for o in foxes:
+			var of: Fox = o
+			if of != f and not of.fleeing and of.hp < of.maxhp and of.position.distance_to(f.position) < 220.0:
+				of.hp = minf(of.maxhp, of.hp + 6.0)
+				add_popup("+6", of.position + Vector2(0, -26), Color(0.5, 1.0, 0.5))
+				healed = true
+		if healed:
+			ring(f.position, 60.0, Color(0.4, 0.95, 0.5), 0.5, 4.0)
+
+# wails: throws the wizard back and sends the loose animals running
+func banshee_ai(f: Fox, dt: float) -> void:
+	var dd: Vector2 = dog.position - f.position
+	var dist: float = dd.length()
+	if dist > 230.0:
+		move_to(f, dog.position, f.base_speed, dt, 4.0)
+	elif dist < 170.0:
+		move_to(f, f.position - dd.normalized() * 100.0, f.base_speed, dt, 4.0)
+	else:
+		f.vel *= exp(-4.0 * dt)
+	f.atk_cd -= dt
+	if f.atk_cd <= 0.0 and dist < 360.0:
+		f.atk_cd = 7.0
+		ring(f.position, 300.0, Color(0.8, 0.85, 1.0), 0.6, 8.0)
+		add_popup("WAIL!", f.position + Vector2(0, -34), Color(0.85, 0.9, 1.0))
+		if dist < 320.0:
+			dog.vel += dd.normalized() * 420.0
+		for s in sheep:
+			var sh: Sheep = s
+			if sh.in_pen or sh.carried:
+				continue
+			var away: Vector2 = sh.position - f.position
+			if away.length() < 340.0:
+				sh.panic = 1.0
+				sh.home_t = 0.0
+				sh.vel += away.normalized() * 240.0
+
+# runs at the wizard and steals a quarter of his gold; kill it to get the gold back
+func cutpurse_ai(f: Fox, dt: float) -> void:
+	if f.gem > 0:
+		move_to(f, nearest_edge(f.position), 200.0, dt, 6.0)
+		if outside_map(f.position):
+			foxes.erase(f)
+			f.queue_free()
+		return
+	var dd: Vector2 = dog.position - f.position
+	if dd.length() > 22.0:
+		move_to(f, dog.position, f.base_speed, dt, 6.0)
+	elif gold >= 10:
+		var steal: int = maxi(10, gold / 4)
+		gold -= steal
+		f.gem = steal
+		add_popup("-%d gold!" % steal, dog.position + Vector2(0, -44), Color(1.0, 0.5, 0.4))
+	else:
+		f.vel *= exp(-5.0 * dt)
+
 # the boss: circles the pen and breathes fire on the walls
 func drake_ai(f: Fox, dt: float) -> void:
 	var c: Vector2 = world.pen.get_center()
@@ -2896,6 +3079,20 @@ func update_enemies(dt: float) -> void:
 			torchling_ai(fx, dt)
 		elif fx.kind == "kobold":
 			kobold_ai(fx, dt)
+		elif fx.kind == "frostling":
+			frostling_ai(fx, dt)
+		elif fx.kind == "bat":
+			bat_ai(fx, dt)
+		elif fx.kind == "mole":
+			mole_ai(fx, dt)
+		elif fx.kind == "necromancer":
+			necromancer_ai(fx, dt)
+		elif fx.kind == "shaman":
+			shaman_ai(fx, dt)
+		elif fx.kind == "banshee":
+			banshee_ai(fx, dt)
+		elif fx.kind == "cutpurse":
+			cutpurse_ai(fx, dt)
 		elif fx.kind == "drake":
 			drake_ai(fx, dt)
 		elif fx.kind == "fox":
@@ -2932,7 +3129,7 @@ func update_enemies(dt: float) -> void:
 		var wk: float = 0.55 if world.zone_kind(fx.position) == "water" else 1.0
 		var mv: Vector2 = fx.vel * (0.5 if fx.slow > 0.0 else 1.0) * wk + fx.kb
 		fx.position += Vector2(mv.x, mv.y * U.up()) * dt
-		if not ["harpy", "drake", "griffin", "wisp"].has(fx.kind):
+		if not ["harpy", "drake", "griffin", "wisp", "bat", "banshee", "frostling"].has(fx.kind) and not fx.buried:
 			collide(fx, fx.r, 0.0)
 
 # ---------------------------------------------------------------- the end

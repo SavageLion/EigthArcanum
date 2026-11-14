@@ -22,6 +22,8 @@ var slow: float = 0.0
 var tgt: Sheep = null
 var carry: Sheep = null
 var hits: Array = []
+var buried: bool = false
+var gem: int = 0
 var tt: float = 0.0
 var zig: float = 0.0
 var r: float = 6.0
@@ -45,6 +47,16 @@ const KINDS: Dictionary = {
 	"torchling": {"set": "torchling", "target": 0.75, "r": 8.0, "hp": 8.0, "spd": 120.0, "dps": 4.0},
 	"skeleton": {"set": "skeleton", "target": 0.9, "r": 9.0, "hp": 4.0, "spd": 105.0, "dps": 4.0},
 	"kobold": {"set": "kobold", "target": 0.7, "r": 8.0, "hp": 8.0, "spd": 140.0, "dps": 0.0},
+	"frostling": {"set": "frostling", "target": 0.9, "r": 9.0, "hp": 10.0, "spd": 95.0, "dps": 0.0},
+	"bat": {"set": "bat", "target": 0.45, "r": 7.0, "hp": 5.0, "spd": 175.0, "dps": 0.0},
+	"slime": {"set": "slime", "target": 0.7, "r": 12.0, "hp": 18.0, "spd": 55.0, "dps": 6.0},
+	"slimelet": {"set": "slime", "target": 0.38, "r": 7.0, "hp": 5.0, "spd": 100.0, "dps": 3.0},
+	"knight": {"set": "knight", "target": 1.15, "r": 12.0, "hp": 55.0, "spd": 55.0, "dps": 18.0},
+	"mole": {"set": "mole", "target": 0.6, "r": 9.0, "hp": 22.0, "spd": 150.0, "dps": 0.0},
+	"necromancer": {"set": "necromancer", "target": 1.05, "r": 10.0, "hp": 20.0, "spd": 70.0, "dps": 0.0},
+	"shaman": {"set": "shaman", "target": 1.0, "r": 10.0, "hp": 16.0, "spd": 70.0, "dps": 0.0},
+	"banshee": {"set": "banshee", "target": 1.1, "r": 10.0, "hp": 14.0, "spd": 85.0, "dps": 0.0},
+	"cutpurse": {"set": "cutpurse", "target": 0.85, "r": 9.0, "hp": 9.0, "spd": 175.0, "dps": 0.0},
 	"drake": {"set": "drake", "target": 2.8, "r": 28.0, "hp": 260.0, "spd": 50.0, "dps": 0.0},
 }
 
@@ -84,4 +96,4 @@ func animate(dt: float) -> void:
 	spr.speed_scale = clampf(speed / 100.0, 0.6, 2.4)
 	flash = maxf(0.0, flash - dt)
 	var fl: float = 1.0 + flash * 7.0
-	spr.self_modulate = Color(fl, fl, fl, 0.7 if fleeing else 1.0)
+	spr.self_modulate = Color(fl, fl, fl, 0.7 if fleeing else (0.28 if buried else 1.0))
