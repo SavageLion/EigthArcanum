@@ -95,6 +95,8 @@ var farm_msg: String = ""
 var shop_tab: int = 0
 var spin_t: float = 0.0
 var campaign: bool = false
+var expedition: bool = false
+var xdone_msg: String = ""
 var mode: String = "gather"
 var clock: float = 0.0
 var wave: int = 0
@@ -162,6 +164,14 @@ func _ready() -> void:
 		if search.contains("angle="):
 			U.PROJ = clampf(float(search.substr(search.find("angle=") + 6, 2).to_int()) / 100.0, 0.4, 1.0)
 		WY = float(roundi(2208.0 / U.PROJ / 48.0)) * 48.0
+	if search.contains("xtest="):
+		var xk: String = search.substr(search.find("xtest=") + 6).get_slice("&", 0)
+		Meta.new_run()
+		Meta.run["cur"] = [5, 0]
+		Meta.run_node(5, 0)["type"] = xk
+		Meta.run_node(5, 0)["biome"] = 5
+		((Meta.run["wagon"] as Dictionary)["animals"] as Dictionary)["normal"] = 6
+		Meta.pending_mode = "xgather" if xk == "gather" else "xdefend"
 	if search.contains("seed="):
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
@@ -195,6 +205,11 @@ func _ready() -> void:
 	campaign = not devmode
 	if devmode:
 		Meta.all_open = true
+	elif Meta.pending_mode.begins_with("x"):
+		expedition = true
+		campaign = false
+		mode = Meta.pending_mode.substr(1)
+		plot = int(Meta.run_node(int((Meta.run["cur"] as Array)[0]), int((Meta.run["cur"] as Array)[1]))["biome"])
 	elif Meta.pending_mode != "":
 		mode = Meta.pending_mode
 		plot = Meta.pending_plot
@@ -262,8 +277,12 @@ func _ready() -> void:
 		if Meta.pending_mode == "":
 			state = "farm"
 			farm_enter()
+			if Meta.run_active():
+				state = "xmap"
 		else:
 			restore_plot()
+	if expedition:
+		restore_wagon()
 	if lineup:
 		setup_lineup()
 	if OS.has_feature("web"):
@@ -575,6 +594,11 @@ func test_rect() -> Rect2:
 	return Rect2(vp().x - 100.0, 44.0, 46.0, 34.0)
 
 func test_boost() -> void:
+	if state.begins_with("x"):
+		for k in Meta.MAT_ORDER:
+			(Meta.run["mats"] as Dictionary)[k] = int((Meta.run["mats"] as Dictionary).get(k, 0)) + 20
+		(Meta.run["wagon"] as Dictionary)["gold"] = int((Meta.run["wagon"] as Dictionary)["gold"]) + 200
+		return
 	if state == "farm":
 		for k in Meta.MAT_ORDER:
 			(Meta.camp["mats"] as Dictionary)[k] = int((Meta.camp["mats"] as Dictionary).get(k, 0)) + 20
@@ -642,17 +666,22 @@ func _press(p: Vector2, id: int) -> void:
 	if state != "result" and test_rect().grow(6.0).has_point(p):
 		test_boost()
 		return
-	if state != "result" and state != "farm" and state != "route" and fs_rect().grow(6.0).has_point(p):
+	if state != "result" and state != "farm" and state != "route" and not state.begins_with("x") and fs_rect().grow(6.0).has_point(p):
 		toggle_fullscreen()
 		return
 	if state == "farm":
 		farm_press(p)
+		return
+	if state.begins_with("x"):
+		x_press(p)
 		return
 	if state == "result":
 		if campaign:
 			if String(result.get("kind", "")) == "won" or String(result.get("kind", "")) == "lost_all":
 				Meta.new_campaign()
 				Meta.save()
+			Meta.pending_mode = ""
+		if expedition:
 			Meta.pending_mode = ""
 		get_tree().reload_current_scene()
 		return
@@ -750,14 +779,14 @@ func start_wave(n: int) -> void:
 		banner = "HERD THE ANIMALS INTO THE PEN"
 	banner_t = 3.5
 	var pd0: Dictionary = Meta.PLOTS[plot]
-	var eff0: int = (1 + int(Meta.camp["attacks"]) / 2 + int(pd0["bonus"]) / 3) if campaign else (n + int(pd0["bonus"]))
+	var eff0: int = (1 + int(Meta.camp["attacks"]) / 2 + int(pd0["bonus"]) / 3) if campaign else ((x_att() / 2 + 1 + int(pd0["bonus"]) / 3) if expedition else (n + int(pd0["bonus"])))
 	var ex0: String = String(pd0["extra"])
 	for i in 2 * (8 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0)):
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
 	for i in 6 * (2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0)):
 		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
-	if campaign:
-		var att0: int = int(Meta.camp["attacks"]) + 1
+	if campaign or expedition:
+		var att0: int = (int(Meta.camp["attacks"]) + 1) if campaign else x_att()
 		var pv: float = clampf(0.1 + 0.06 * float(att0), 0.0, 0.55)
 		for ev in events:
 			if String(ev["k"]) == "fox" and att0 >= 2 and randf() < pv:
@@ -803,13 +832,13 @@ func start_defend() -> void:
 			fo.queue_free()
 	var pd: Dictionary = Meta.PLOTS[plot]
 	var bonus: int = int(pd["bonus"])
-	var att: int = (int(Meta.camp["attacks"]) + 1) if campaign else wave
+	var att: int = (int(Meta.camp["attacks"]) + 1) if campaign else (x_att() if expedition else wave)
 	var eff: int = att + bonus / 3
-	var boss: bool = campaign and att >= Meta.FINAL_ATTACK
-	var budget: float = 2.0 * (10.0 + 5.0 * float(eff))
+	var boss: bool = (campaign and att >= Meta.FINAL_ATTACK) or (expedition and x_node_type() == "boss")
+	var budget: float = 2.0 * (10.0 + 5.0 * float(eff)) * (1.5 if (expedition and x_node_type() == "elite") else 1.0)
 	var costs: Dictionary = {"wolf": 2.0, "imp": 2.0, "goblin": 1.5, "gargoyle": 3.5, "harpy": 3.0, "ogre": 8.0, "skeleton": 3.0, "torchling": 2.5, "minotaur": 5.0, "kobold": 2.5, "wisp": 2.5, "hexer": 3.5, "frostling": 2.5, "bat": 2.0, "slime": 3.0, "knight": 4.5, "mole": 4.0, "necromancer": 6.0, "shaman": 4.0, "banshee": 4.0, "cutpurse": 2.5}
 	var mins: Dictionary = {"wolf": 0, "imp": 0, "bat": 2, "slime": 3, "frostling": 3, "cutpurse": 3, "mole": 4, "knight": 5, "shaman": 5, "necromancer": 6, "banshee": 6, "skeleton": 2, "torchling": 2, "goblin": 3, "kobold": 3, "minotaur": 4, "wisp": 4, "gargoyle": 5, "harpy": 6, "hexer": 6, "ogre": 7}
-	var mix: Array = Meta.PLOTS[plot]["mix"] if campaign else [["wolf", 3], ["imp", 1]]
+	var mix: Array = Meta.PLOTS[plot]["mix"] if (campaign or expedition) else [["wolf", 3], ["imp", 1]]
 	var kinds: Array = []
 	for e in mix:
 		if att >= int(mins.get(String((e as Array)[0]), 0)):
@@ -904,7 +933,7 @@ func spawn_enemy(k: String, at: Vector2 = Vector2(-1.0, -1.0)) -> void:
 		Input.vibrate_handheld(60)
 
 func spawn_stray(initial: bool) -> void:
-	var pool: Array = Meta.PLOTS[plot]["pool"] if campaign else STRAY_POOL
+	var pool: Array = Meta.PLOTS[plot]["pool"] if (campaign or expedition) else STRAY_POOL
 	var t: String = pool[randi() % pool.size()]
 	var s := Sheep.new()
 	ysort.add_child(s)
@@ -1043,6 +1072,8 @@ func _physics_process(delta: float) -> void:
 	elif events.is_empty() and (foxes.is_empty() and wave_t >= DEFEND_LEN or wave_t > 200.0):
 		if campaign:
 			defend_won()
+		elif expedition:
+			x_defend_won()
 		elif wave >= LAST_WAVE:
 			finish_day("won")
 		else:
@@ -1628,7 +1659,7 @@ func drop_carry(f: Fox) -> void:
 	s.carried = false
 	s.panic = 1.0
 	s.vel = Vector2(randf_range(-60, 60), randf_range(-60, 60))
-	if campaign and phase == "defend":
+	if (campaign or expedition) and phase == "defend":
 		var P: Rect2 = world.pen
 		s.in_pen = true
 		s.position = Vector2(clampf(s.position.x, P.position.x + 20.0, P.end.x - 20.0), clampf(s.position.y, P.position.y + 20.0, P.end.y - 24.0))
@@ -1912,6 +1943,234 @@ func lose_plot_now() -> void:
 	var left: int = Meta.open_plots().size()
 	result = {"kind": "lost_all" if left == 0 else "plotlost", "plot": plot, "attacks": int(Meta.camp["attacks"]), "why": "fence", "wave": wave, "herded": herded, "defeated": defeated, "left": left}
 
+# ---------------------------------------------------------------- the expedition
+func x_layer() -> int:
+	return int((Meta.run["cur"] as Array)[0])
+
+func x_node_type() -> String:
+	return String(Meta.run_node(int((Meta.run["cur"] as Array)[0]), int((Meta.run["cur"] as Array)[1]))["type"])
+
+func x_att() -> int:
+	return 1 + roundi(float(x_layer()) * 1.3)
+
+func xnode_pos(l: int, i: int) -> Vector2:
+	var v: Vector2 = vp()
+	var n: int = ((Meta.run["layers"] as Array)[l] as Array).size()
+	var x: float = 64.0 + float(l) * (v.x - 128.0) / 9.0
+	var y: float = v.y / 2.0 + 10.0 + (float(i) - (float(n) - 1.0) / 2.0) * 92.0
+	return Vector2(x, y)
+
+func xopt_rect(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 250.0 + float(i) * 260.0, v.y / 2.0 + 30.0, 240.0, 76.0)
+
+func xshop_row_rect(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 240.0, 120.0 + float(i) * 72.0, 480.0, 62.0)
+
+func xleave_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 100.0, v.y - 76.0, 200.0, 46.0)
+
+func restore_wagon() -> void:
+	var w: Dictionary = Meta.run["wizard"]
+	perk_lv = (w["perk_lv"] as Dictionary).duplicate()
+	level = int(w["level"])
+	xp = float(w["xp"])
+	var wg: Dictionary = Meta.run["wagon"]
+	gold = int(wg["gold"])
+	var c: Dictionary = wg["castle"]
+	if not c.is_empty():
+		walls_lv = int(c["walls_lv"])
+		moss_lv = int(c["moss_lv"])
+		market_lv = int(c["market_lv"])
+		var pads_in: Array = c["pads"]
+		for i in pads_in.size():
+			var kind: String = String((pads_in[i] as Array)[0])
+			if kind == "":
+				continue
+			build_on(i, kind)
+			for k in int((pads_in[i] as Array)[1]) - 1:
+				upgrade_pad(i)
+		for side in (c["holes"] as Array):
+			world.open_hole(String(side))
+		for wl in world.walls:
+			if wl["pen"]:
+				wl["max"] = float(wl["max"]) * pow(1.3, float(walls_lv))
+				set_wall_hp(wl, float(wl["max"]))
+		check_tier()
+	var an: Dictionary = wg["animals"]
+	for t in an.keys():
+		for i in int(an[t]):
+			spawn_pen_animal(String(t))
+	if mode == "defend":
+		for s in sheep.duplicate():
+			var sh: Sheep = s
+			if not sh.in_pen:
+				sheep.erase(sh)
+				sh.queue_free()
+		begin_intermission()
+
+func save_back_x() -> void:
+	Meta.run["wizard"] = {"perk_lv": perk_lv.duplicate(), "level": level, "xp": xp}
+	var an: Dictionary = {}
+	for s in sheep:
+		var sh: Sheep = s
+		if sh.in_pen:
+			an[sh.type] = int(an.get(sh.type, 0)) + 1
+	var wg: Dictionary = Meta.run["wagon"]
+	wg["animals"] = an
+	wg["gold"] = gold
+	wg["castle"] = castle_dict()
+
+func x_finish_gather() -> void:
+	if state == "leaving":
+		return
+	save_back_x()
+	Meta.run_production()
+	Meta.run_node_done()
+	Meta.pending_mode = ""
+	state = "leaving"
+	get_tree().reload_current_scene()
+
+func x_defend_won() -> void:
+	if state == "result":
+		return
+	var elite: bool = x_node_type() == "elite"
+	var boss: bool = x_node_type() == "boss"
+	var layer: int = x_layer()
+	var gold_r: int = (25 + 8 * layer) * (2 if elite else 1)
+	gold += gold_r
+	var pool: Array = Meta.PLOTS[plot]["pool"]
+	var got: Dictionary = {}
+	var cnt: int = 3 + layer / 2 * (2 if elite else 1)
+	for i in cnt:
+		var mt: String = String(Meta.MAT_OF.get(String(pool[randi() % pool.size()]), "wool"))
+		(Meta.run["mats"] as Dictionary)[mt] = int((Meta.run["mats"] as Dictionary).get(mt, 0)) + 1
+		got[mt] = int(got.get(mt, 0)) + 1
+	save_back_x()
+	Meta.run_node_done()
+	state = "result"
+	if boss:
+		var summ: Dictionary = Meta.end_run(true)
+		result = {"kind": "xwon", "banked": summ["banked"], "done": summ["done"], "herded": herded, "defeated": defeated, "plot": plot, "why": "won", "wave": wave}
+	else:
+		result = {"kind": "xheld", "gold": gold_r, "mats": got, "herded": herded, "defeated": defeated, "plot": plot, "why": "won", "wave": wave}
+
+func x_lose() -> void:
+	if state == "result":
+		return
+	state = "result"
+	var summ: Dictionary = Meta.end_run(false)
+	result = {"kind": "xdead", "banked": summ["banked"], "done": summ["done"], "herded": herded, "defeated": defeated, "plot": plot, "why": "fence", "wave": wave}
+
+func x_finish_node() -> void:
+	Meta.run_node_done()
+	state = "xmap"
+
+func x_enter(o: Array) -> void:
+	Meta.run["cur"] = [int(o[0]), int(o[1])]
+	var nd: Dictionary = Meta.run_node(int(o[0]), int(o[1]))
+	var tp: String = String(nd["type"])
+	farm_msg = ""
+	if tp == "gather":
+		Meta.pending_mode = "xgather"
+		get_tree().reload_current_scene()
+	elif tp == "defend" or tp == "elite" or tp == "boss":
+		Meta.pending_mode = "xdefend"
+		get_tree().reload_current_scene()
+	elif tp == "rest":
+		state = "xrest"
+	elif tp == "merchant":
+		Meta.run["shop"] = Meta.run_offers()
+		state = "xshop"
+	else:
+		Meta.run["event"] = ["unicorn", "bard", "chest"][randi() % 3]
+		state = "xevent"
+
+func x_press(p: Vector2) -> void:
+	var wg: Dictionary = Meta.run["wagon"]
+	if state == "xmap":
+		for o in Meta.run_options():
+			if xnode_pos(int((o as Array)[0]), int((o as Array)[1])).distance_to(p) < 28.0:
+				x_enter(o)
+				return
+	elif state == "xrest":
+		for i in 2:
+			if xopt_rect(i).has_point(p):
+				if i == 0:
+					var an: Dictionary = wg["animals"]
+					var added: int = 0
+					for t in an.keys():
+						if int(an[t]) >= 2 and added < 5:
+							an[t] = int(an[t]) + 1
+							added += 1
+					farm_msg = "The herd grew by %d" % added
+				else:
+					wg["gold"] = int(wg["gold"]) + 45
+					farm_msg = "You rest and trade: +45 gold"
+				x_finish_node()
+				return
+	elif state == "xshop":
+		if xleave_rect().has_point(p):
+			x_finish_node()
+			return
+		var offers: Array = Meta.run["shop"]
+		for i in offers.size():
+			if xshop_row_rect(i).has_point(p):
+				var u: Dictionary = Meta.unlock_by_id(String(offers[i]))
+				if Meta.run_buy(u):
+					farm_msg = "Bought " + String(u["name"])
+					offers.remove_at(i)
+				else:
+					farm_msg = "Not enough materials"
+				return
+	elif state == "xevent":
+		for i in 2:
+			if xopt_rect(i).has_point(p):
+				x_event_choice(String(Meta.run["event"]), i)
+				return
+
+func x_event_choice(id: String, opt: int) -> void:
+	var wg: Dictionary = Meta.run["wagon"]
+	var mats: Dictionary = Meta.run["mats"]
+	if id == "unicorn":
+		if opt == 0:
+			if int(wg["gold"]) >= 30:
+				wg["gold"] = int(wg["gold"]) - 30
+				var an: Dictionary = wg["animals"]
+				an["unicorn"] = int(an.get("unicorn", 0)) + 1
+				farm_msg = "The unicorn joins your herd!"
+			else:
+				farm_msg = "You cannot afford the healer, and it wanders off"
+		else:
+			farm_msg = "You walk on"
+	elif id == "bard":
+		if opt == 0:
+			wg["gold"] = int(wg["gold"]) + 40
+			farm_msg = "The bard pays you for the audience: +40 gold"
+		elif int(wg["gold"]) >= 25:
+			wg["gold"] = int(wg["gold"]) - 25
+			var wz: Dictionary = Meta.run["wizard"]
+			wz["level"] = int(wz["level"]) + 1
+			farm_msg = "A lesson well learned: +1 level"
+		else:
+			farm_msg = "You cannot afford the lesson"
+	else:
+		if opt == 0:
+			if randf() < 0.6:
+				wg["gold"] = int(wg["gold"]) + 50
+				for i in 3:
+					var mt: String = String(Meta.MAT_ORDER[randi() % 6])
+					mats[mt] = int(mats.get(mt, 0)) + 2
+				farm_msg = "Treasure! +50 gold and some materials"
+			else:
+				wg["gold"] = int(wg["gold"]) / 2
+				farm_msg = "A trap! You lose half your gold"
+		else:
+			farm_msg = "You leave it alone"
+	x_finish_node()
+
 func castle_summary(c: Dictionary) -> String:
 	if c.is_empty():
 		return "A bare wooden fence.\nNo upgrades yet."
@@ -1962,6 +2221,9 @@ func farm_go_rect() -> Rect2:
 func farm_shop_rect() -> Rect2:
 	return Rect2(24.0, vp().y - 60.0, 190.0, 46.0)
 
+func farm_exp_rect() -> Rect2:
+	return Rect2(224.0, vp().y - 60.0, 190.0, 46.0)
+
 func shop_tab_rect(t: int) -> Rect2:
 	return Rect2(24.0 + float(t) * 166.0, 48.0, 160.0, 34.0)
 
@@ -2005,6 +2267,11 @@ func farm_press(p: Vector2) -> void:
 		return
 	if farm_shop_rect().grow(6.0).has_point(p):
 		farm_view = "shop"
+		return
+	if farm_exp_rect().grow(6.0).has_point(p):
+		Meta.new_run()
+		farm_msg = ""
+		state = "xmap"
 		return
 	if farm_sel >= 0 and Meta.plot_open(farm_sel) and farm_go_rect().grow(6.0).has_point(p):
 		Meta.pending_mode = "gather"
@@ -2159,6 +2426,9 @@ func end_intermission() -> void:
 		return
 	if campaign and mode == "gather":
 		finish_gather()
+		return
+	if expedition and mode == "gather":
+		x_finish_gather()
 		return
 	state = "play"
 	start_defend()
@@ -3000,7 +3270,7 @@ func imp_ai(f: Fox, dt: float) -> void:
 			f.mode = "chase"
 
 func gnaw(f: Fox, dt: float) -> void:
-	if campaign and phase == "gather":
+	if (campaign or expedition) and phase == "gather":
 		return
 	var nw: Dictionary = nearest_wall(f.position)
 	if nw.is_empty():
@@ -3137,6 +3407,10 @@ func finish_day(why: String) -> void:
 	if state == "result":
 		return
 	stick_on = false
+	if expedition:
+		if why == "fence" and phase == "defend":
+			x_lose()
+		return
 	if campaign:
 		if why == "fence" and phase == "defend":
 			lose_plot_now()

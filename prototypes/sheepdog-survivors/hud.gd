@@ -36,6 +36,9 @@ func _draw() -> void:
 	if main.state == "farm":
 		_farm(v)
 		return
+	if main.state.begins_with("x"):
+		_xscreens(v)
+		return
 	# top left: xp and health
 	_panel(Rect2(8, 6, 230, 58))
 	_text("LV %d" % main.level, Vector2(18, 28), 17, Color(0.6, 0.9, 1.0))
@@ -54,11 +57,13 @@ func _draw() -> void:
 	var raiders: int = main.foxes.size() + main.events.size()
 	if main.phase == "gather":
 		wl = "GATHER  %d" % int(ceil(main.WAVE_LEN - main.wave_t))
-		if main.campaign:
+		if main.campaign or main.expedition:
 			wl = "%s  ·  GATHER  %d" % [String(Meta.PLOTS[main.plot]["name"]), int(ceil(main.WAVE_LEN - main.wave_t))]
 	else:
 		wl = "DEFEND  %d  (%d raiders)" % [maxi(0, int(ceil(main.DEFEND_LEN - main.wave_t))), raiders]
-		if main.campaign:
+		if main.expedition:
+			wl = "STOP %d / 10  ·  %d  (%d raiders)" % [int((Meta.run["cur"] as Array)[0]) + 1, maxi(0, int(ceil(main.DEFEND_LEN - main.wave_t))), raiders]
+		elif main.campaign:
 			wl = "ATTACK %d / %d  ·  %d  (%d raiders)" % [int(Meta.camp["attacks"]) + 1, Meta.FINAL_ATTACK, maxi(0, int(ceil(main.DEFEND_LEN - main.wave_t))), raiders]
 	_panel(Rect2(v.x / 2.0 - 150, 6, 300, 32))
 	_text(wl, Vector2(v.x / 2.0 - 150, 28), 16, CREAM, 300.0, HORIZONTAL_ALIGNMENT_CENTER)
@@ -182,6 +187,22 @@ func _draw() -> void:
 			title = "THE FARM IS LOST"
 			l2 = "Every plot has fallen after %d attacks" % int(main.result["attacks"])
 			prompt = "tap to start a new campaign"
+		elif kind == "xheld":
+			title = "THE WAGON HELD!"
+			tcol = GOLD
+			var gm: Array = []
+			for k in (main.result["mats"] as Dictionary):
+				gm.append("%d %s" % [int(main.result["mats"][k]), String(Meta.MATS[k]["name"])])
+			l2 = "Spoils: +%d gold, %s" % [int(main.result["gold"]), ", ".join(gm)]
+			prompt = "tap to continue the road"
+		elif kind == "xwon" or kind == "xdead":
+			title = "THE ROAD ENDS IN VICTORY!" if kind == "xwon" else "THE EXPEDITION ENDS"
+			tcol = GOLD if kind == "xwon" else Color(1.0, 0.5, 0.42)
+			var bm: Array = []
+			for k2 in (main.result["banked"] as Dictionary):
+				bm.append("%d %s" % [int(main.result["banked"][k2]), String(Meta.MATS[k2]["name"])])
+			l2 = "%d of 10 stops cleared. Banked for the farm: %s" % [int(main.result["done"]), ", ".join(bm) if not bm.is_empty() else "nothing"]
+			prompt = "tap to return to the farm"
 		else:
 			var won: bool = String(main.result["why"]) == "won"
 			title = "THE CASTLE HELD!" if won else "THE WALL FELL"
@@ -285,7 +306,7 @@ func _inter_wizard(v: Vector2) -> void:
 	_btn(main.btn_right_rect(), "NEXT: THE CASTLE  >", Color(0.28, 0.5, 0.22, 0.96))
 
 func _inter_castle(v: Vector2) -> void:
-	_text("UPGRADE THE PEN" if (main.campaign and main.mode == "gather") else "PREPARE THE DEFENCE", Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("UPGRADE THE PEN" if ((main.campaign or main.expedition) and main.mode == "gather") else "PREPARE THE DEFENCE", Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var nxt: int = [4, 10, 18, 0][main.world.tier]
 	if main.world.tier >= Meta.tier_cap() and main.world.tier < 3:
 		nxt = 0
@@ -361,7 +382,7 @@ func _inter_castle(v: Vector2) -> void:
 	elif smode == "gate":
 		hint = "Tap a wall to open a gate there"
 	_text(hint, Vector2(dr.position.x, dr.end.y - 12), 15, Color(CREAM, 0.9), dr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_btn(main.btn_right_rect(), ("BACK TO THE FARM  >" if (main.campaign and main.mode == "gather") else "START DEFENCE  >"), Color(0.28, 0.5, 0.22, 0.96))
+	_btn(main.btn_right_rect(), ("CONTINUE ON THE ROAD  >" if (main.expedition and main.mode == "gather") else ("BACK TO THE FARM  >" if (main.campaign and main.mode == "gather") else "START DEFENCE  >")), Color(0.28, 0.5, 0.22, 0.96))
 
 # ---------------------------------------------------------------- the farm
 func _crop_icon(c: Vector2, col: Color, s: float = 1.0) -> void:
@@ -481,8 +502,9 @@ func _farm_map(v: Vector2) -> void:
 			_text("Locked", pr.position + Vector2(0, 70), 16, Color(CREAM, 0.6), pr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 			draw_multiline_string(font, pr.position + Vector2(20, 100), "Open it with materials in the Workshop (Plots tab). It starts with a fresh pen.", HORIZONTAL_ALIGNMENT_CENTER, pr.size.x - 40.0, 14, 4, Color(CREAM, 0.8))
 	_farmbtn(main.farm_shop_rect(), "WORKSHOP", Color(0.4, 0.3, 0.14, 0.98))
+	_farmbtn(main.farm_exp_rect(), "EXPEDITION", Color(0.5, 0.22, 0.2, 0.98))
 	var left: int = maxi(0, Meta.GATHERS_PER_ATTACK - int(Meta.camp["gathers"]))
-	_text("Raid in %d gathers  ·  attacks faced %d / %d" % [left, int(Meta.camp["attacks"]), Meta.FINAL_ATTACK], Vector2(230, v.y - 30), 14, Color(CREAM, 0.85))
+	_text("Raid in %d gathers  ·  attacks faced %d / %d" % [left, int(Meta.camp["attacks"]), Meta.FINAL_ATTACK], Vector2(430, v.y - 30), 14, Color(CREAM, 0.85))
 
 func _farm_shop(v: Vector2) -> void:
 	var names: Array = ["Spells and perks", "Castle", "Plots"]
@@ -594,3 +616,115 @@ func _biome_thumb(r: Rect2, biome_id: String, open: bool) -> void:
 		"kingsgrave":
 			draw_rect(Rect2(cx + Vector2(-14, -8), Vector2(10, 16)), Color(0.6, 0.62, 0.64) * d)
 			draw_rect(Rect2(cx + Vector2(6, -4), Vector2(10, 12)), Color(0.6, 0.62, 0.64) * d)
+
+# ---------------------------------------------------------------- the expedition screens
+const NODE_COL: Dictionary = {"gather": Color(0.35, 0.65, 0.3), "defend": Color(0.72, 0.3, 0.25), "elite": Color(0.62, 0.3, 0.72), "rest": Color(0.3, 0.55, 0.82), "merchant": Color(0.92, 0.72, 0.25), "event": Color(0.75, 0.75, 0.82), "boss": Color(0.85, 0.15, 0.1)}
+const NODE_LET: Dictionary = {"gather": "G", "defend": "D", "elite": "E", "rest": "R", "merchant": "M", "event": "?", "boss": "B"}
+
+func _run_bar() -> void:
+	_panel(Rect2(8, 6, 668, 34), Color(0.13, 0.09, 0.08, 0.85))
+	for i in Meta.MAT_ORDER.size():
+		var k: String = String(Meta.MAT_ORDER[i])
+		var cx: float = 24.0 + float(i) * 55.0
+		_crop_icon(Vector2(cx, 23), Meta.MATS[k]["col"], 0.85)
+		_text("%d" % int((Meta.run["mats"] as Dictionary).get(k, 0)), Vector2(cx + 10.0, 28), 13, CREAM)
+
+func _xscreens(v: Vector2) -> void:
+	draw_rect(Rect2(Vector2.ZERO, v), Color(0.2, 0.36, 0.17))
+	for i in 40:
+		draw_rect(Rect2(fposmod(float(i) * 97.0, v.x), fposmod(float(i) * 53.0, v.y), 14, 4), Color(0.26, 0.44, 0.2))
+	_run_bar()
+	var wg: Dictionary = Meta.run["wagon"]
+	_text("Gold %d  ·  Herd %d  ·  Wizard Lv %d" % [int(wg["gold"]), Meta.run_herd(), int((Meta.run["wizard"] as Dictionary)["level"])], Vector2(8, 62), 14, Color(CREAM, 0.9))
+	match main.state:
+		"xmap":
+			_xmap(v)
+		"xrest":
+			_xchoice(v, "A QUIET CAMP", "The wagon rests by the road.", ["Breed the herd", "Every species with two or more gains one animal (up to five)"], ["Trade and mend", "Sell a few things for 45 gold"])
+		"xshop":
+			_xshop(v)
+		"xevent":
+			_xevent(v)
+	if main.farm_msg != "":
+		_panel(Rect2(v.x / 2.0 - 220, v.y - 44, 440, 34), Color(0.5, 0.38, 0.12, 0.96))
+		_text(main.farm_msg, Vector2(v.x / 2.0 - 220, v.y - 21), 15, CREAM, 440.0, HORIZONTAL_ALIGNMENT_CENTER)
+	var tr: Rect2 = main.test_rect()
+	_panel(tr, Color(0.4, 0.2, 0.5, 0.92))
+	_text("TEST", tr.position + Vector2(0, 22), 12, CREAM, tr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+
+func _xmap(v: Vector2) -> void:
+	_text("THE ROAD", Vector2(0, 86), 22, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var layers: Array = Meta.run["layers"]
+	var opts: Array = Meta.run_options()
+	var pos: Array = Meta.run["pos"]
+	for l in layers.size() - 1:
+		for i in (layers[l] as Array).size():
+			var nd: Dictionary = (layers[l] as Array)[i]
+			for k in (nd["next"] as Array):
+				var lit: bool = int(pos[0]) == l and int(pos[1]) == i
+				draw_line(main.xnode_pos(l, i), main.xnode_pos(l + 1, int(k)), Color(1.0, 0.9, 0.6, 0.9) if lit else Color(0.1, 0.2, 0.1, 0.45), 3.0 if lit else 2.0)
+	var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.008)
+	for l in layers.size():
+		for i in (layers[l] as Array).size():
+			var nd2: Dictionary = (layers[l] as Array)[i]
+			var p: Vector2 = main.xnode_pos(l, i)
+			var tp: String = String(nd2["type"])
+			var rad: float = 24.0 if tp == "boss" else 18.0
+			var col: Color = NODE_COL[tp]
+			var done: bool = bool(nd2["done"])
+			var is_opt: bool = false
+			for o in opts:
+				if int((o as Array)[0]) == l and int((o as Array)[1]) == i:
+					is_opt = true
+			if done:
+				col = col.darkened(0.55)
+			draw_circle(p, rad + 3.0, Color(0.08, 0.06, 0.05, 0.9))
+			draw_circle(p, rad, col)
+			_text(String(NODE_LET[tp]), p + Vector2(-rad, 6), 16, CREAM if not done else Color(CREAM, 0.5), rad * 2.0, HORIZONTAL_ALIGNMENT_CENTER)
+			var bc: Color = Meta.BIOMES[String(Meta.PLOTS[int(nd2["biome"])]["biome"])]["grass"][1]
+			draw_circle(p + Vector2(0, rad + 9.0), 4.0, bc)
+			if is_opt:
+				draw_arc(p, rad + 6.0 + pulse * 3.0, 0.0, TAU, 28, Color(1.0, 0.85, 0.3, 0.6 + 0.4 * pulse), 3.0, true)
+			if int(pos[0]) == l and int(pos[1]) == i:
+				draw_arc(p, rad + 5.0, 0.0, TAU, 28, Color(0.6, 0.9, 1.0), 3.0, true)
+	var kinds: Array = ["gather", "defend", "elite", "rest", "merchant", "event", "boss"]
+	var names: Array = ["Gather", "Defend", "Elite", "Rest", "Merchant", "Event", "Boss"]
+	for i in kinds.size():
+		var lx: float = 40.0 + float(i) * 118.0
+		draw_circle(Vector2(lx, v.y - 24), 8.0, NODE_COL[String(kinds[i])])
+		_text(String(names[i]), Vector2(lx + 14.0, v.y - 19), 12, Color(CREAM, 0.85))
+	_text("Tap a glowing stop to travel there", Vector2(0, v.y - 52), 13, Color(CREAM, 0.7), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+
+func _xchoice(v: Vector2, title: String, text: String, a: Array, b: Array) -> void:
+	_text(title, Vector2(0, v.y / 2.0 - 70), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(text, Vector2(0, v.y / 2.0 - 40), 15, Color(CREAM, 0.85), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	for i in 2:
+		var r: Rect2 = main.xopt_rect(i)
+		var opt: Array = a if i == 0 else b
+		_panel(r, Color(0.3, 0.22, 0.14, 0.97))
+		_text(String(opt[0]), r.position + Vector2(0, 28), 17, GOLD, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		draw_multiline_string(font, r.position + Vector2(12, 48), String(opt[1]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 24.0, 12, 2, Color(CREAM, 0.85))
+
+func _xevent(v: Vector2) -> void:
+	var id: String = String(Meta.run["event"])
+	if id == "unicorn":
+		_xchoice(v, "A WOUNDED UNICORN", "It limps out of the trees.", ["Heal it", "30 gold. It joins your herd."], ["Walk on", "Leave it be."])
+	elif id == "bard":
+		_xchoice(v, "A TRAVELLING BARD", "He offers you a song, or a lesson.", ["Listen", "Earn 40 gold."], ["Take a lesson", "25 gold for +1 level."])
+	else:
+		_xchoice(v, "A LOCKED CHEST", "It sits by the road, unguarded.", ["Open it", "Probably treasure. Maybe a trap."], ["Leave it", "Better safe than sorry."])
+
+func _xshop(v: Vector2) -> void:
+	_text("THE MERCHANT", Vector2(0, 100), 24, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var offers: Array = Meta.run["shop"]
+	if offers.is_empty():
+		_text("Nothing left to sell you.", Vector2(0, 200), 16, Color(CREAM, 0.7), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	for i in offers.size():
+		var u: Dictionary = Meta.unlock_by_id(String(offers[i]))
+		var r: Rect2 = main.xshop_row_rect(i)
+		var can: bool = Meta.run_can_afford(u)
+		_panel(r, Color(0.3, 0.22, 0.14, 0.97) if can else Color(0.17, 0.13, 0.1, 0.93))
+		_text(String(u["name"]), r.position + Vector2(14, 24), 17, CREAM)
+		_text(String(u["desc"]), r.position + Vector2(14, 44), 12, Color(CREAM, 0.75))
+		_text(_cost_text(u["cost"]), Vector2(r.end.x - 250, r.position.y + 24), 12, GOLD if can else Color(GOLD, 0.5), 238.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	_farmbtn(main.xleave_rect(), "LEAVE", Color(0.4, 0.3, 0.14, 0.98))

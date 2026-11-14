@@ -94,6 +94,7 @@ const UNLOCKS: Array = [
 ]
 
 static var camp: Dictionary = {}
+static var run: Dictionary = {}
 static var pending_mode: String = ""
 static var pending_plot: int = 0
 static var all_open: bool = false
@@ -210,7 +211,11 @@ static func tab_items(tab: int) -> Array:
 	return out
 
 static func has(id: String) -> bool:
-	return all_open or bool((camp["unlocked"] as Dictionary).get(id, false))
+	if all_open:
+		return true
+	if run_active():
+		return bool((run["acquired"] as Dictionary).get(id, false))
+	return bool((camp["unlocked"] as Dictionary).get(id, false))
 
 static func can_afford(u: Dictionary) -> bool:
 	var mats: Dictionary = camp["mats"]
@@ -259,3 +264,171 @@ static func castle_ok(id: String) -> bool:
 		if String(u["kind"]) == "castle" and String(u["ref"]) == id:
 			return has(String(u["id"]))
 	return true
+
+# ================================================================ the expedition: a ten-stop road with the pen on a wagon
+const RUN_LAYERS: int = 10
+const BASIC: Array = ["perk_wide", "perk_study", "perk_nova", "tower_brazier", "tower_frost", "castle_gate", "castle_moss"]
+const NODE_NAMES: Dictionary = {"gather": "Gather", "defend": "Defend", "elite": "Elite raid", "rest": "Rest", "merchant": "Merchant", "event": "Event", "boss": "The boss"}
+
+static func run_active() -> bool:
+	return bool(run.get("active", false))
+
+static func new_run() -> void:
+	var layers: Array = []
+	for l in RUN_LAYERS:
+		var n: int = 1 if (l == 0 or l == RUN_LAYERS - 1) else (2 + randi() % 2)
+		var layer: Array = []
+		for i in n:
+			var tp: String = "gather"
+			if l == RUN_LAYERS - 1:
+				tp = "boss"
+			elif l == RUN_LAYERS - 2:
+				tp = "rest" if randf() < 0.5 else "merchant"
+			elif l > 0:
+				var roll: float = randf() * (100.0 if l >= 3 else 90.0)
+				if roll < 28.0:
+					tp = "gather"
+				elif roll < 54.0:
+					tp = "defend"
+				elif roll < 64.0:
+					tp = "rest"
+				elif roll < 74.0:
+					tp = "merchant"
+				elif roll < 88.0:
+					tp = "event"
+				else:
+					tp = "elite"
+			var b: int = clampi(roundi(float(l) * 8.0 / 9.0) + (randi() % 3 - 1), 0, 8)
+			if l == 0:
+				b = 0
+			if l == RUN_LAYERS - 1:
+				b = 8
+			layer.append({"type": tp, "biome": b, "next": [], "done": false})
+		layers.append(layer)
+	var l1: Array = layers[1]
+	var has_gather: bool = false
+	for nd in l1:
+		if String(nd["type"]) == "gather":
+			has_gather = true
+	if not has_gather:
+		(l1[0] as Dictionary)["type"] = "gather"
+	for l in RUN_LAYERS - 1:
+		var cur: Array = layers[l]
+		var nxt: Array = layers[l + 1]
+		var incoming: Array = []
+		for k in nxt.size():
+			incoming.append(false)
+		for j in cur.size():
+			var base: int = clampi(roundi((float(j) + 0.5) * float(nxt.size()) / float(cur.size()) - 0.5), 0, nxt.size() - 1)
+			var links: Array = [base]
+			if nxt.size() > 1 and randf() < 0.5:
+				var alt: int = base + (1 if (base == 0 or randf() < 0.5) else -1)
+				if alt >= 0 and alt < nxt.size() and not links.has(alt):
+					links.append(alt)
+			(cur[j] as Dictionary)["next"] = links
+			for k2 in links:
+				incoming[int(k2)] = true
+		for k3 in nxt.size():
+			if not bool(incoming[k3]):
+				var from: int = clampi(roundi((float(k3) + 0.5) * float(cur.size()) / float(nxt.size()) - 0.5), 0, cur.size() - 1)
+				((cur[from] as Dictionary)["next"] as Array).append(k3)
+	var mats: Dictionary = {}
+	for k in MAT_ORDER:
+		mats[k] = 0
+	mats["wool"] = 10
+	mats["eggs"] = 4
+	run = {"active": true, "layers": layers, "pos": [-1, 0], "cur": [0, 0], "wizard": {"perk_lv": {"bolt": 1}, "level": 1, "xp": 0.0}, "wagon": {"animals": {}, "castle": {}, "gold": 30}, "mats": mats, "acquired": {}, "done": 0, "shop": [], "event": ""}
+
+static func run_options() -> Array:
+	var out: Array = []
+	var pos: Array = run["pos"]
+	var layers: Array = run["layers"]
+	if int(pos[0]) < 0:
+		out.append([0, 0])
+		return out
+	for k in ((layers[int(pos[0])] as Array)[int(pos[1])] as Dictionary)["next"]:
+		out.append([int(pos[0]) + 1, int(k)])
+	return out
+
+static func run_node(l: int, i: int) -> Dictionary:
+	return (run["layers"] as Array)[l][i]
+
+static func run_node_done() -> void:
+	var cur: Array = run["cur"]
+	run_node(int(cur[0]), int(cur[1]))["done"] = true
+	run["pos"] = [int(cur[0]), int(cur[1])]
+	run["done"] = int(run["done"]) + 1
+
+static func run_herd() -> int:
+	var n: int = 0
+	var an: Dictionary = (run["wagon"] as Dictionary)["animals"]
+	for k in an:
+		n += int(an[k])
+	return n
+
+# every animal on the wagon makes one material
+static func run_production() -> void:
+	var mats: Dictionary = run["mats"]
+	var an: Dictionary = (run["wagon"] as Dictionary)["animals"]
+	for k in an:
+		var m: String = String(MAT_OF.get(k, "wool"))
+		mats[m] = int(mats.get(m, 0)) + int(an[k])
+
+static func run_pool() -> Array:
+	var ids: Array = BASIC.duplicate()
+	for k in (camp["unlocked"] as Dictionary):
+		if bool((camp["unlocked"] as Dictionary)[k]) and not ids.has(k):
+			ids.append(k)
+	return ids
+
+static func run_offers() -> Array:
+	var pool: Array = []
+	for u in UNLOCKS:
+		if run_pool().has(String(u["id"])) and not bool((run["acquired"] as Dictionary).get(String(u["id"]), false)):
+			pool.append(String(u["id"]))
+	pool.shuffle()
+	return pool.slice(0, 3)
+
+static func unlock_by_id(id: String) -> Dictionary:
+	for u in UNLOCKS:
+		if String(u["id"]) == id:
+			return u
+	return {}
+
+static func run_can_afford(u: Dictionary) -> bool:
+	var mats: Dictionary = run["mats"]
+	for k in (u["cost"] as Dictionary):
+		if int(mats.get(k, 0)) < int((u["cost"] as Dictionary)[k]):
+			return false
+	return true
+
+static func run_buy(u: Dictionary) -> bool:
+	if not run_can_afford(u):
+		return false
+	var mats: Dictionary = run["mats"]
+	for k in (u["cost"] as Dictionary):
+		mats[k] = int(mats.get(k, 0)) - int((u["cost"] as Dictionary)[k])
+	(run["acquired"] as Dictionary)[String(u["id"])] = true
+	return true
+
+# the run is over: a share of what is left goes to the farm storehouse for permanent unlocks
+static func end_run(victory: bool) -> Dictionary:
+	var banked: Dictionary = {}
+	var ratio: float = 1.0 if victory else 0.34
+	var mats: Dictionary = run["mats"]
+	var store: Dictionary = camp["mats"]
+	for k in MAT_ORDER:
+		var n: int = int(ceil(float(int(mats.get(k, 0))) * ratio))
+		if n > 0:
+			store[k] = int(store.get(k, 0)) + n
+			banked[k] = n
+	if victory:
+		store["wool"] = int(store.get("wool", 0)) + 10
+		store["eggs"] = int(store.get("eggs", 0)) + 5
+		banked["wool"] = int(banked.get("wool", 0)) + 10
+		banked["eggs"] = int(banked.get("eggs", 0)) + 5
+	var done: int = int(run["done"])
+	camp["best_run"] = maxi(int(camp.get("best_run", 0)), done)
+	run = {}
+	save()
+	return {"banked": banked, "done": done}
