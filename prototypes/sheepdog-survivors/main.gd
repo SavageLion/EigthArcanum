@@ -658,6 +658,14 @@ func start_wave(n: int) -> void:
 	if n == 1:
 		banner = "BARK CALLS THE ANIMALS TO THE PEN"
 	banner_t = 3.5
+	var pd0: Dictionary = Meta.PLOTS[plot]
+	var eff0: int = n + int(pd0["bonus"])
+	var ex0: String = String(pd0["extra"])
+	for i in 5 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0):
+		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
+	for i in ((1 + eff0 / 2) if eff0 >= 2 else 0) + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0):
+		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
+	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
 	if n > 1:
 		var loose: int = 0
 		for s in sheep:
@@ -677,9 +685,18 @@ func start_defend() -> void:
 			ring(sh.position, 24.0, Color(1, 1, 1), 0.3, 3.0)
 			sheep.erase(sh)
 			sh.queue_free()
+	# the gathering raiders (foxes) go home; imps keep coming
+	for f in foxes.duplicate():
+		var fo: Fox = f
+		if fo.kind == "fox":
+			drop_carry(fo)
+			foxes.erase(fo)
+			fo.queue_free()
 	var pd: Dictionary = Meta.PLOTS[plot]
 	var bonus: int = int(pd["bonus"])
 	var eff: int = wave + bonus
+	for i in (1 + eff / 2) if eff >= 2 else 0:
+		events.append({"t": randf_range(2.0, 40.0), "k": "imp"})
 	var wolf_n: int = 2 + eff + 1 + bonus / 2
 	for i in wolf_n:
 		events.append({"t": randf_range(2.0, 40.0), "k": "wolf"})
@@ -2110,7 +2127,6 @@ func update_sheep(dt: float) -> void:
 			herded += 1
 			var pay: int = maxi(1, int(round(float(TYPES[sh.type]["xp"]) * 0.5 * gold_mult())))
 			gold += pay
-			gain_xp(float(TYPES[sh.type]["xp"]) * 0.8)
 			add_popup("+%d gold" % pay, sh.position + Vector2(0, -14), Color(1.0, 0.85, 0.3))
 		if sh.in_pen:
 			sh.position.x = clampf(sh.position.x, P.position.x + sh.r + 2.0, P.end.x - sh.r - 2.0)
