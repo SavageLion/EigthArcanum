@@ -39,3 +39,5 @@ func animate(_dt: float) -> void:
 		spr.play(a)
 	spr.flip_h = (face < 0 and row.ends_with("east"))
 	spr.speed_scale = clampf(speed / 100.0, 0.6, 2.4)
+	spr.position.y = -elev
+	shadow.position.y = -elev

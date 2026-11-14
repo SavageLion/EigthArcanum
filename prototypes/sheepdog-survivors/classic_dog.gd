@@ -59,4 +59,6 @@ func animate(dt: float) -> void:
 	var sq: float = 1.0 + squash * 0.2
 	spr.scale = Vector2(0.74 / sq, 0.74 * lowered * sq)
 	dust.emitting = speed > 140.0
-	dust.position = Vector2(-face * 6.0, 0)
+	dust.position = Vector2(-face * 6.0, -elev)
+	spr.position.y = -elev
+	shadow.position.y = -elev

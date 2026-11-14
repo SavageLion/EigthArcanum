@@ -74,7 +74,8 @@ func animate(dt: float) -> void:
 	# a little hop with each step and a squash when startled
 	hop += dt * speed / 16.0
 	var bob: float = absf(sin(hop)) * 2.2 if speed > 8.0 else 0.0
-	spr.position.y = -bob
+	spr.position.y = -bob - elev
+	shadow.position.y = -elev
 	squash = move_toward(squash, 0.0, dt * 3.0)
 	var sq: float = 1.0 + squash * 0.18
 	spr.scale = Vector2(base_scale / sq, base_scale * sq)

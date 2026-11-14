@@ -45,6 +45,9 @@ var sniff_t: float = 2.0
 var ward_t: float = 3.0
 var echo_q: Array = []
 var pups: Array = []
+var ov_zoom: bool = false
+var lm: LayerMap = null
+var ysort1: Node2D
 const HERD: Array = ["normal", "normal", "normal", "normal", "normal", "normal", "goat", "goat", "goose", "goose", "ram", "black"]
 
 var world: World
@@ -111,6 +114,15 @@ func _ready() -> void:
 	ysort.y_sort_enabled = true
 	add_child(ysort)
 	world.generate(ysort)
+	if layers_mode():
+		lm = LayerMap.new()
+		lm.game = self
+		add_child(lm)
+		ysort1 = Node2D.new()
+		ysort1.y_sort_enabled = true
+		ysort1.z_index = 10
+		add_child(ysort1)
+		lm.build()
 	_spawn_dog()
 	_spawn_sheep()
 	_setup_camera()
@@ -148,6 +160,8 @@ func _spawn_sheep() -> void:
 				break
 	if cs.is_empty():
 		cs.append(Vector2(WX * 0.4, WY * 0.5))
+	if lm != null:
+		cs = lm.cluster_centers(cs)
 	var idx: int = 0
 	for t in herd_list():
 		var s := ClassicSheep.new()
@@ -158,13 +172,15 @@ func _spawn_sheep() -> void:
 		var p := c + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 80.0)
 		if hide_it:
 			p = Vector2(randf_range(260.0, WX - 260.0), randf_range(260.0, WY - 260.0))
-			if p.distance_to(world.dog_start) < 400.0 or p.distance_to(world.pen.get_center()) < 520.0 or world._blocked(p, 20.0):
+			if p.distance_to(world.dog_start) < 400.0 or p.distance_to(world.pen.get_center()) < 520.0 or world._blocked(p, 20.0) or (lm != null and lm.cell_type(p) != 0):
 				p = c + Vector2(30.0, 30.0)
 			s.hidden_grass = true
 			s.spr.visible = false
 			s.shadow.visible = false
 			_add_rustle(s)
 		s.position = p
+		if lm != null and lm.cell_type(p) == 1:
+			s.layer = 1
 		sheep.append(s)
 		idx += 1
 
@@ -254,6 +270,11 @@ func _input(event: InputEvent) -> void:
 					pick_levelup(2)
 			elif ke.keycode == KEY_SPACE:
 				do_bark()
+			elif ke.keycode == KEY_O:
+				ov_zoom = not ov_zoom
+			elif ke.keycode == KEY_U and lm != null:
+				dog.position = Vector2(11.0, 14.0) * LayerMap.CELL
+				dog.layer = 1
 			elif ke.keycode == KEY_T:
 				gain_xp(xp_need(), dog.position)
 			elif ke.keycode == KEY_P:
@@ -329,7 +350,12 @@ func _release(id: int) -> void:
 		sprint_held = false
 		sprint_id = -99
 
+var test_dir: Vector2 = Vector2.ZERO
+var test_n: int = 0
+
 func move_input() -> Vector2:
+	if test_dir != Vector2.ZERO:
+		return test_dir
 	if stick_on:
 		return stick_vec
 	var v := Vector2.ZERO
@@ -354,6 +380,8 @@ func _physics_process(delta: float) -> void:
 	banner_t = maxf(0.0, banner_t - dt)
 	update_dog(dt)
 	update_sheep(dt)
+	if lm != null and OS.get_cmdline_user_args().has("layertest"):
+		layer_test()
 	update_foxes(dt)
 	update_perks(dt)
 	run_events()
@@ -391,8 +419,10 @@ func _process(delta: float) -> void:
 		(s as ClassicSheep).animate(delta)
 	for f in foxes:
 		(f as ClassicFox).animate(delta)
+	if lm != null:
+		lm.sync_all()
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	var target_zoom: float = 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
+	var target_zoom: float = 0.3 if ov_zoom else 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	hud.queue_redraw()
@@ -423,10 +453,10 @@ func seg_push(e: Mover, r: float, a: Vector2, b: Vector2, bounce: float) -> void
 
 func collide(e: Mover, r: float, bounce: float, bounded: bool = true) -> void:
 	for w in world.walls:
-		if w["broken"]:
+		if w["broken"] or e.layer == 1:
 			continue
 		seg_push(e, r, w["a"], w["b"], bounce)
-	for k in world.rocks_near(e.position):
+	for k in (world.rocks_near(e.position) if e.layer == 0 else []):
 		var kp: Vector2 = k["pos"]
 		var m: float = float(k["r"]) + r
 		var d: Vector2 = e.position - kp
@@ -506,8 +536,10 @@ func update_dog(dt: float) -> void:
 	elif zk == "mud":
 		sp *= 0.65
 	dog.vel += (dir * sp - dog.vel) * minf(1.0, dt * 9.0)
+	var old_dog: Vector2 = dog.position
 	dog.position += dog.vel * dt
 	collide(dog, 6.0, 0.0)
+	lm_resolve(dog, old_dog)
 	bump_sheep(dt)
 	var v: float = dog.vel.length()
 	if v > 20.0:
@@ -516,7 +548,7 @@ func update_dog(dt: float) -> void:
 func bump_sheep(dt: float) -> void:
 	for s in sheep:
 		var sh: ClassicSheep = s
-		if sh.carried or sh.hidden_grass:
+		if sh.carried or sh.hidden_grass or sh.layer != dog.layer:
 			continue
 		var d: Vector2 = sh.position - dog.position
 		var dist: float = d.length()
@@ -559,7 +591,7 @@ func do_bark() -> void:
 			sh.ping = 4.0
 		if sh.hidden_grass and dist < 150.0:
 			reveal(sh)
-		if sh.in_pen:
+		if sh.in_pen or sh.layer != dog.layer:
 			continue
 		if dist < R and dist > 0.1:
 			var f: float = 1.0 - dist / R
@@ -627,12 +659,13 @@ func update_sheep(dt: float) -> void:
 			sh.wa += randf_range(-1.0, 1.0) * dt * 3.0
 			sh.vel += Vector2(cos(sh.wa), sin(sh.wa)) * 14.0 * dt
 		else:
-			var pressure: float = pressure_from(sh, dog.position, dog.heading, zone_mult(), dog.crouch, dt, 0.0)
+			var pressure: float = pressure_from(sh, dog.position, dog.heading, zone_mult(), dog.crouch, dt, 0.0) if sh.layer == dog.layer else 0.0
 			for f in foxes:
 				var fx2: ClassicFox = f
 				if fx2.carry != null:
 					continue
-				pressure += pressure_from(sh, fx2.position, fx2.vel.normalized(), 1.0, false, dt, 80.0) * 0.7
+				if fx2.layer == sh.layer:
+					pressure += pressure_from(sh, fx2.position, fx2.vel.normalized(), 1.0, false, dt, 80.0) * 0.7
 			if sh.type == "ram":
 				var dd: float = dog.position.distance_to(sh.position)
 				if dd < 26.0 and dog.stun <= 0.0 and sh.panic < 0.2:
@@ -645,7 +678,7 @@ func update_sheep(dt: float) -> void:
 			var sep := Vector2.ZERO
 			for o in sheep:
 				var ot: ClassicSheep = o
-				if ot == sh or ot.in_pen or ot.carried or ot.hidden_grass:
+				if ot == sh or ot.in_pen or ot.carried or ot.hidden_grass or ot.layer != sh.layer:
 					continue
 				var dv: Vector2 = ot.position - sh.position
 				var dist: float = dv.length()
@@ -686,7 +719,7 @@ func update_sheep(dt: float) -> void:
 		if not sh.in_pen:
 			if sh.home_t > 0.0:
 				sh.home_t -= dt
-				sh.vel += (pen_goal(sh.position) - sh.position).normalized() * (215.0 if sh.heavy else 235.0) * dt
+				sh.vel += (goal_for(sh) - sh.position).normalized() * (215.0 if sh.heavy else 235.0) * dt
 			var mg: int = pl("magnet")
 			if mg > 0:
 				var gate: Vector2 = Vector2(world.gate_x, world.pen.end.y)
@@ -705,8 +738,10 @@ func update_sheep(dt: float) -> void:
 		var v: float = sh.vel.length()
 		if v > cap:
 			sh.vel *= cap / v
+		var old_sh: Vector2 = sh.position
 		sh.position += sh.vel * dt
 		collide(sh, sh.r, 0.2)
+		lm_resolve(sh, old_sh)
 		var P: Rect2 = world.pen
 		if (not sh.in_pen) and sh.position.x > P.position.x + 16.0 and sh.position.x < P.end.x - 6.0 and sh.position.y > P.position.y + 6.0 and sh.position.y < P.end.y - 6.0:
 			sh.in_pen = true
@@ -878,7 +913,7 @@ func update_foxes(dt: float) -> void:
 					var bs: float = -1.0e9
 					for s in sheep:
 						var sh: ClassicSheep = s
-						if not eligible(sh):
+						if not eligible(sh) or sh.layer != 0:
 							continue
 						var sc: float = (120.0 if sh.type == "lamb" else 0.0) + sh.position.distance_to(dog.position) * 0.5 + (260.0 if (sh.in_pen and fx.raid) else (-60.0 if sh.in_pen else 0.0))
 						if sc > bs:
@@ -903,8 +938,10 @@ func update_foxes(dt: float) -> void:
 						move_to(fx, nw2["p"], 100.0, dt, 6.0)
 						if float(nw2["d"]) < 10.0:
 							hit_wall(fx, nw2, 11.0, dt)
+		var old_fx: Vector2 = fx.position
 		fx.position += fx.vel * dt
 		collide(fx, fx.r, 0.0, fx.carry == null)
+		lm_resolve(fx, old_fx)
 		# a tackle makes it drop what it is carrying
 		if fx.position.distance_to(dog.position) < 12.0 and fx.carry != null:
 			drop_carry(fx)
@@ -1090,8 +1127,8 @@ func update_perks(dt: float) -> void:
 			perk_ring(rg, Color(0.7, 0.9, 1.0))
 			for s in loose_sheep():
 				var sh: ClassicSheep = s
-				if sh.position.distance_to(dog.position) < rg:
-					sh.vel += (pen_goal(sh.position) - sh.position).normalized() * 150.0
+				if sh.position.distance_to(dog.position) < rg and sh.layer == dog.layer:
+					sh.vel += (goal_for(sh) - sh.position).normalized() * 150.0
 					sh.home_t = maxf(sh.home_t, 1.2)
 	var lw: int = pl("whistle")
 	if lw > 0:
@@ -1103,7 +1140,7 @@ func update_perks(dt: float) -> void:
 			add_popup("WHISTLE!", dog.position + Vector2(0, -38), Color(1.0, 0.9, 0.5))
 			for s2 in loose_sheep():
 				var sh2: ClassicSheep = s2
-				if sh2.position.distance_to(dog.position) < rw:
+				if sh2.position.distance_to(dog.position) < rw and sh2.layer == dog.layer:
 					sh2.home_t = maxf(sh2.home_t, 3.0 + 0.4 * float(lw))
 					sh2.panic = maxf(sh2.panic, 0.3)
 	var ln: int = pl("sniff")
@@ -1159,6 +1196,7 @@ func ensure_pups() -> void:
 		ysort.add_child(pd)
 		pd.setup(dog_frames, shadow_tex)
 		pd.spr.modulate = Color(0.6, 0.85, 1.0, 0.75)
+		pd.z_index = 20
 		pd.position = dog.position + Vector2(randf_range(-30.0, 30.0), randf_range(20.0, 40.0))
 		pups.append(pd)
 	while pups.size() > want:
@@ -1186,7 +1224,7 @@ func update_pups(dt: float) -> void:
 			move_to(pd, dog.position + Vector2(40.0, 40.0), spd, dt, 5.0)
 		else:
 			taken.append(tgt)
-			var dirv: Vector2 = (pen_goal(tgt.position) - tgt.position).normalized()
+			var dirv: Vector2 = (goal_for(tgt) - tgt.position).normalized()
 			var spot: Vector2 = tgt.position - dirv * 70.0
 			move_to(pd, spot, spd, dt, 5.0)
 			if pd.position.distance_to(tgt.position) < 130.0:
@@ -1194,3 +1232,59 @@ func update_pups(dt: float) -> void:
 		pd.position += pd.vel * dt
 		pd.position.x = clampf(pd.position.x, XMIN, XMAX)
 		pd.position.y = clampf(pd.position.y, YMIN, YMAX)
+
+# ---------------------------------------------------------------- levels
+func layers_mode() -> bool:
+	if OS.get_cmdline_user_args().has("layers"):
+		return true
+	return OS.has_feature("web") and str(JavaScriptBridge.eval("window.location.search")).contains("layers")
+
+func lm_resolve(e: Mover, old: Vector2) -> void:
+	if lm != null:
+		lm.resolve(e, old)
+
+# a sheep on the ground heads for the pen, one on a hill heads for the way down
+func goal_for(sh: ClassicSheep) -> Vector2:
+	if lm != null and sh.layer == 1:
+		return lm.down_goal(sh.position)
+	return pen_goal(sh.position)
+
+var probe: ClassicSheep = null
+
+func layer_test() -> void:
+	test_n += 1
+	if OS.get_cmdline_user_args().has("sheeptest"):
+		if test_n == 1:
+			for s in sheep:
+				if (s as ClassicSheep).layer == 1 and not (s as ClassicSheep).hidden_grass:
+					probe = s
+					break
+		if probe != null:
+			probe.home_t = 5.0
+			if test_n % 120 == 0:
+				print("sheeptest x=", int(probe.position.x / LayerMap.CELL), " y=", int(probe.position.y / LayerMap.CELL), " layer=", probe.layer, " in_pen=", probe.in_pen)
+		return
+	var C: float = LayerMap.CELL
+	var scen: int = (test_n - 1) / 260
+	var f: int = (test_n - 1) % 260
+	if f == 0:
+		if scen == 0:
+			dog.position = Vector2(21.0 * C, 11.9 * C)
+			dog.layer = 0
+			test_dir = Vector2.LEFT
+		elif scen == 1:
+			dog.position = Vector2(15.0 * C, 8.9 * C)
+			dog.layer = 1
+			test_dir = Vector2.RIGHT
+		elif scen == 2:
+			dog.position = Vector2(19.0 * C, 8.9 * C)
+			dog.layer = 0
+			test_dir = Vector2.RIGHT
+		elif scen == 3:
+			dog.position = Vector2(8.0 * C, 14.0 * C)
+			dog.layer = 1
+			test_dir = Vector2.RIGHT
+		else:
+			test_dir = Vector2.ZERO
+	if f % 52 == 51 and scen < 4:
+		print('layertest scen=', scen, ' x=', int(dog.position.x / C), ' y=', int(dog.position.y / C), ' layer=', dog.layer, ' elev=', int(dog.elev), ' cell=', lm.cell_type(dog.position))
