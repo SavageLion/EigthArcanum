@@ -38,7 +38,8 @@ func _draw() -> void:
 		return
 	# top left: xp and health
 	_panel(Rect2(8, 6, 230, 58))
-	_text("XP  %d" % int(main.xp), Vector2(18, 28), 17, Color(0.6, 0.9, 1.0))
+	_text("LV %d" % main.level, Vector2(18, 28), 17, Color(0.6, 0.9, 1.0))
+	_bar(Rect2(74, 16, 154, 9), main.xp / main.xp_need(), Color(0.45, 0.8, 1.0))
 	_text("HP", Vector2(18, 46), 10, Color(CREAM, 0.8))
 	_bar(Rect2(50, 38, 178, 9), main.dog.hp / main.dog.hp_max, Color(0.9, 0.3, 0.3))
 	_text("%d in the pen" % main.pen_total, Vector2(18, 59), 12, Color(CREAM, 0.85))
@@ -49,9 +50,13 @@ func _draw() -> void:
 	_text("%d gold" % main.gold, Vector2(36, 91), 14, GOLD)
 	_minimap(v)
 	# top centre: wave
-	var left: int = int(ceil(main.WAVE_LEN - main.wave_t))
-	_panel(Rect2(v.x / 2.0 - 90, 6, 180, 32))
-	_text("WAVE %d / %d   %d" % [main.wave, main.LAST_WAVE, left], Vector2(v.x / 2.0 - 90, 28), 16, CREAM, 180.0, HORIZONTAL_ALIGNMENT_CENTER)
+	var wl: String = ""
+	if main.phase == "gather":
+		wl = "WAVE %d / %d   GATHER  %d" % [main.wave, main.LAST_WAVE, int(ceil(main.WAVE_LEN - main.wave_t))]
+	else:
+		wl = "WAVE %d / %d   DEFEND  %d left" % [main.wave, main.LAST_WAVE, main.foxes.size() + main.events.size()]
+	_panel(Rect2(v.x / 2.0 - 130, 6, 260, 32))
+	_text(wl, Vector2(v.x / 2.0 - 130, 28), 16, CREAM, 260.0, HORIZONTAL_ALIGNMENT_CENTER)
 	# top right: fence health (weakest piece)
 	var worst: float = 1.0
 	for w in main.world.walls:
@@ -144,6 +149,8 @@ func _draw() -> void:
 		_text(main.banner, Vector2(v.x / 2.0 - 190, 95), 18, Color(CREAM, ba), 380.0, HORIZONTAL_ALIGNMENT_CENTER)
 	if main.state == "inter":
 		_inter(v)
+	if main.state == "levelup":
+		_levelup(v)
 	if main.state == "result":
 		var rw: Dictionary = main.result.get("reward", {})
 		draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.55))
@@ -228,10 +235,7 @@ func _btn(r: Rect2, label: String, col: Color, can: bool = true) -> void:
 
 func _inter(v: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, v), Color(0.05, 0.03, 0.02, 0.9))
-	if main.inter_stage == "wizard":
-		_inter_wizard(v)
-	else:
-		_inter_castle(v)
+	_inter_castle(v)
 
 func _inter_wizard(v: Vector2) -> void:
 	_text("WAVE %d CLEARED" % main.wave, Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
@@ -253,7 +257,7 @@ func _inter_wizard(v: Vector2) -> void:
 	_btn(main.btn_right_rect(), "NEXT: THE CASTLE  >", Color(0.28, 0.5, 0.22, 0.96))
 
 func _inter_castle(v: Vector2) -> void:
-	_text("THE CASTLE", Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("PREPARE THE DEFENCE", Vector2(0, 36), 26, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var nxt: int = [4, 10, 18, 0][main.world.tier]
 	if main.world.tier >= Meta.tier_cap() and main.world.tier < 3:
 		nxt = 0
@@ -329,8 +333,7 @@ func _inter_castle(v: Vector2) -> void:
 	elif smode == "gate":
 		hint = "Tap a wall to open a gate there"
 	_text(hint, Vector2(dr.position.x, dr.end.y - 12), 15, Color(CREAM, 0.9), dr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_btn(main.btn_left_rect(), "<  BACK", Color(0.32, 0.24, 0.5, 0.96))
-	_btn(main.btn_right_rect(), "START WAVE %d" % (main.wave + 1), Color(0.28, 0.5, 0.22, 0.96))
+	_btn(main.btn_right_rect(), "START DEFENCE  >", Color(0.28, 0.5, 0.22, 0.96))
 
 # ---------------------------------------------------------------- the farm
 func _crop_icon(c: Vector2, col: Color, s: float = 1.0) -> void:
@@ -445,3 +448,18 @@ func _farm_shop(v: Vector2) -> void:
 		else:
 			_text(_cost_text(u["cost"]), Vector2(r.end.x - 230, r.position.y + 19), 12, GOLD if can else Color(GOLD, 0.5), 220.0, HORIZONTAL_ALIGNMENT_RIGHT)
 	_farmbtn(main.farm_shop_rect(), "BACK", Color(0.4, 0.3, 0.14, 0.98))
+
+func _levelup(v: Vector2) -> void:
+	draw_rect(Rect2(Vector2.ZERO, v), Color(0.04, 0.03, 0.08, 0.82))
+	_text("LEVEL UP!  Level %d" % main.level, Vector2(0, 62), 30, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text("Choose one upgrade", Vector2(0, 92), 16, Color(CREAM, 0.8), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	for i in main.perk_offers.size():
+		var pk: Dictionary = main.perk_offers[i]
+		var id: String = String(pk["id"])
+		var lv: int = main.pl(id)
+		var r: Rect2 = main.lv_card_rect(i)
+		_panel(r, Color(0.28, 0.2, 0.14, 0.97))
+		_text(String(pk["name"]), r.position + Vector2(0, 46), 24, GOLD, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text("Lv %d > %d" % [lv, lv + 1], r.position + Vector2(0, 78), 16, Color(0.6, 1.0, 0.6), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		draw_multiline_string(font, r.position + Vector2(18, 118), String(pk["desc"]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 36.0, 16, 4, Color(CREAM, 0.92))
+		_text("TAP TO CHOOSE", r.position + Vector2(0, r.size.y - 20), 14, Color(0.6, 0.9, 1.0), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)

@@ -79,6 +79,9 @@ var wolf_frames: SpriteFrames
 var bear_frames: SpriteFrames
 var shadow_tex: Texture2D
 var state: String = "play"
+var phase: String = "gather"
+var level: int = 1
+var pending_lv: int = 0
 var plot: int = 0
 var farm_sel: int = -1
 var farm_view: String = "map"
@@ -452,7 +455,14 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var ke := event as InputEventKey
 		if ke.pressed and not ke.echo:
-			if state == "inter":
+			if state == "levelup":
+				if ke.keycode == KEY_1:
+					pick_levelup(0)
+				elif ke.keycode == KEY_2:
+					pick_levelup(1)
+				elif ke.keycode == KEY_3:
+					pick_levelup(2)
+			elif state == "inter":
 				if ke.keycode == KEY_ENTER or ke.keycode == KEY_SPACE:
 					inter_next()
 			elif ke.keycode == KEY_SPACE:
@@ -484,16 +494,22 @@ func test_boost() -> void:
 			Meta.crops[k] = int(Meta.crops.get(k, 0)) + 20
 		Meta.save()
 		return
-	xp += 1000.0
 	gold += 1000
-	add_popup("+1000 XP  +1000 gold", dog.position + Vector2(0, -40), Color(1.0, 0.9, 0.5))
+	gain_xp(xp_need() / xp_mult())
+	add_popup("+1000 gold  +1 level", dog.position + Vector2(0, -40), Color(1.0, 0.9, 0.5))
 
 func endwave_rect() -> Rect2:
 	return Rect2(vp().x - 176.0, 44.0, 70.0, 34.0)
 
 func end_wave_now() -> void:
-	if state == "play":
+	if state != "play":
+		return
+	if phase == "gather":
 		wave_t = WAVE_LEN
+	else:
+		events.clear()
+		for f in foxes.duplicate():
+			defeat(f)
 
 func fs_rect() -> Rect2:
 	return Rect2(vp().x - 46.0, 44.0, 38.0, 34.0)
@@ -548,6 +564,12 @@ func _press(p: Vector2, id: int) -> void:
 	if state == "result":
 		Meta.pending = -1
 		get_tree().reload_current_scene()
+		return
+	if state == "levelup":
+		for i in perk_offers.size():
+			if lv_card_rect(i).has_point(p):
+				pick_levelup(i)
+				return
 		return
 	if state == "inter":
 		inter_press(p)
@@ -629,34 +651,47 @@ func magnet_r() -> float:
 # ---------------------------------------------------------------- waves
 func start_wave(n: int) -> void:
 	wave = n
+	phase = "gather"
 	wave_t = 0.0
 	events.clear()
-	var pd: Dictionary = Meta.PLOTS[plot]
-	var bonus: int = int(pd["bonus"])
-	var extra: String = String(pd["extra"])
-	var eff: int = n + bonus
-	var fox_n: int = 5 + 2 * eff
-	var wolf_n: int = eff - 1
-	var imp_n: int = (1 + eff / 2) if eff >= 2 else 0
-	for i in imp_n:
-		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
-	for i in fox_n:
-		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
-	for i in wolf_n:
-		events.append({"t": randf_range(4.0, 52.0), "k": "wolf"})
-	if extra != "":
-		for i in 2 + bonus / 2:
-			events.append({"t": randf_range(4.0, 52.0), "k": extra})
-	if n == LAST_WAVE:
-		for i in 1 + bonus / 3:
-			events.append({"t": 14.0 + 18.0 * float(i), "k": "bear"})
-	elif n == 3 and bonus >= 3:
-		events.append({"t": 20.0, "k": "bear"})
-	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
-	banner = "WAVE %d" % n if n < LAST_WAVE else "LAST WAVE!"
+	banner = "WAVE %d: GATHER THE ANIMALS" % n
 	if n == 1:
 		banner = "BARK CALLS THE ANIMALS TO THE PEN"
+	banner_t = 3.5
+	if n > 1:
+		var loose: int = 0
+		for s in sheep:
+			if not (s as Sheep).in_pen:
+				loose += 1
+		for i in maxi(0, mini(12, 30 - loose)):
+			spawn_stray(false)
+
+func start_defend() -> void:
+	phase = "defend"
+	wave_t = 0.0
+	events.clear()
+	# no more gathering: everything still loose wanders off
+	for s in sheep.duplicate():
+		var sh: Sheep = s
+		if not sh.in_pen:
+			ring(sh.position, 24.0, Color(1, 1, 1), 0.3, 3.0)
+			sheep.erase(sh)
+			sh.queue_free()
+	var pd: Dictionary = Meta.PLOTS[plot]
+	var bonus: int = int(pd["bonus"])
+	var eff: int = wave + bonus
+	var wolf_n: int = 2 + eff + 1 + bonus / 2
+	for i in wolf_n:
+		events.append({"t": randf_range(2.0, 40.0), "k": "wolf"})
+	if wave == LAST_WAVE:
+		for i in 1 + bonus / 3:
+			events.append({"t": 12.0 + 16.0 * float(i), "k": "bear"})
+	elif wave == 3 and bonus >= 3:
+		events.append({"t": 20.0, "k": "bear"})
+	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
+	banner = "DEFEND THE PEN!" if wave < LAST_WAVE else "LAST DEFENCE!"
 	banner_t = 3.0
+	dog.hp = dog.hp_max
 
 func run_events() -> void:
 	while events.size() > 0 and float(events[0]["t"]) <= wave_t:
@@ -738,6 +773,8 @@ func _physics_process(delta: float) -> void:
 		events.clear()
 		stray_t = 99.0
 		wave_t = 0.0
+		if state == "levelup":
+			pick_levelup(0)
 		if state == "inter":
 			inter_auto()
 		if smoke_n % 150 == 0:
@@ -768,6 +805,8 @@ func _physics_process(delta: float) -> void:
 					print("  ", q.type, " ", q.position, " goal=", pen_goal(q.position), " home=", q.home_t, " vel=", q.vel)
 	elif smoke:
 		smoke_n += 1
+		if state == "levelup":
+			pick_levelup(0)
 		if state == "inter":
 			inter_auto()
 		elif smoke_n % 90 == 0 and state == "play":
@@ -807,7 +846,7 @@ func _physics_process(delta: float) -> void:
 	update_coins(dt)
 	run_events()
 	stray_t -= dt
-	if stray_t <= 0.0:
+	if stray_t <= 0.0 and phase == "gather":
 		stray_t = maxf(1.2, 2.6 - float(wave) * 0.12)
 		var loose: int = 0
 		for s in sheep:
@@ -818,11 +857,14 @@ func _physics_process(delta: float) -> void:
 	for pu in popups:
 		pu["t"] = float(pu["t"]) - dt
 	popups = popups.filter(func(q: Dictionary) -> bool: return float(q["t"]) > 0.0)
-	if wave_t >= WAVE_LEN:
+	if phase == "gather":
+		if wave_t >= WAVE_LEN:
+			begin_intermission()
+	elif events.is_empty() and (foxes.is_empty() and wave_t > 3.0 or wave_t > 150.0):
 		if wave >= LAST_WAVE:
 			finish_day("won")
 		else:
-			begin_intermission()
+			start_wave(wave + 1)
 
 func count_pen() -> void:
 	pen_counts.clear()
@@ -1446,8 +1488,50 @@ func update_pen_bonus(dt: float) -> void:
 					fx2.stun = maxf(fx2.stun, 1.6)
 
 # ---------------------------------------------------------------- xp and perks
+func xp_need() -> float:
+	return 40.0 + 25.0 * float(level - 1)
+
 func gain_xp(amount: float) -> void:
 	xp += amount * xp_mult()
+	while xp >= xp_need():
+		xp -= xp_need()
+		level += 1
+		pending_lv += 1
+	if pending_lv > 0 and state == "play":
+		begin_levelup()
+
+func begin_levelup() -> void:
+	state = "levelup"
+	stick_on = false
+	stick_vec = Vector2.ZERO
+	roll_perk_offers(3)
+	if perk_offers.is_empty():
+		pending_lv = 0
+		state = "play"
+
+func lv_card_rect(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	var w: float = (v.x - 100.0) / 3.0
+	return Rect2(30.0 + float(i) * (w + 20.0), 120.0, w, 250.0)
+
+func pick_levelup(i: int) -> void:
+	if state != "levelup" or i < 0 or i >= perk_offers.size():
+		return
+	var pk: Dictionary = perk_offers[i]
+	var id: String = String(pk["id"])
+	perk_lv[id] = pl(id) + 1
+	if id == "vigor":
+		dog.hp_max = max_hp()
+		dog.hp = minf(dog.hp_max, dog.hp + 25.0)
+	ring(dog.position, 60.0, Color(0.7, 0.9, 1.0), 0.5, 4.0)
+	add_popup(String(pk["name"]) + "!", dog.position + Vector2(0, -50), Color(0.8, 0.95, 1.0))
+	pending_lv -= 1
+	if pending_lv > 0:
+		roll_perk_offers(3)
+		if perk_offers.is_empty():
+			pending_lv = 0
+	if pending_lv <= 0:
+		state = "play"
 
 # ---------------------------------------------------------------- between waves
 func perk_cost(id: String) -> int:
@@ -1469,9 +1553,9 @@ func pick_new_perk() -> Dictionary:
 		return {}
 	return pool[randi() % pool.size()]
 
-func roll_perk_offers() -> void:
+func roll_perk_offers(count: int = 3) -> void:
 	perk_offers.clear()
-	for i in 4:
+	for i in count:
 		var p: Dictionary = pick_new_perk()
 		if p.is_empty():
 			break
@@ -1698,27 +1782,23 @@ func apply_option(o: Dictionary, target: Variant) -> bool:
 
 func begin_intermission() -> void:
 	state = "inter"
-	inter_stage = "wizard"
+	inter_stage = "castle"
 	reroll_n = 0
 	sel_item = ""
 	stick_on = false
 	stick_vec = Vector2.ZERO
 	dog.ko_t = 0.0
 	dog.hp = dog.hp_max
-	roll_perk_offers()
 	rebuild_options()
 
 func end_intermission() -> void:
 	if state != "inter":
 		return
 	state = "play"
-	start_wave(wave + 1)
+	start_defend()
 
 func inter_next() -> void:
-	if inter_stage == "wizard":
-		inter_stage = "castle"
-	else:
-		end_intermission()
+	end_intermission()
 
 # ---- screen layout
 func card_rect(i: int) -> Rect2:
@@ -1765,19 +1845,6 @@ func side_pos(side: String) -> Vector2:
 func inter_press(p: Vector2) -> void:
 	if btn_right_rect().has_point(p):
 		inter_next()
-		return
-	if inter_stage == "wizard":
-		if btn_left_rect().has_point(p):
-			do_reroll()
-			return
-		for i in perk_offers.size():
-			if card_rect(i).has_point(p):
-				buy_perk(i)
-				return
-		return
-	if btn_left_rect().has_point(p):
-		inter_stage = "wizard"
-		sel_item = ""
 		return
 	for i in castle_opts.size():
 		if opt_row_rect(i).has_point(p):
@@ -1827,15 +1894,6 @@ func inter_auto() -> void:
 	# the scripted test spends everything it can, then starts the next wave
 	gold += 400
 	var guard: int = 0
-	while guard < 40:
-		guard += 1
-		var bought: bool = false
-		for i in perk_offers.size():
-			if buy_perk(i):
-				bought = true
-				break
-		if not bought:
-			break
 	guard = 0
 	while guard < 60:
 		guard += 1
@@ -2052,6 +2110,7 @@ func update_sheep(dt: float) -> void:
 			herded += 1
 			var pay: int = maxi(1, int(round(float(TYPES[sh.type]["xp"]) * 0.5 * gold_mult())))
 			gold += pay
+			gain_xp(float(TYPES[sh.type]["xp"]) * 0.8)
 			add_popup("+%d gold" % pay, sh.position + Vector2(0, -14), Color(1.0, 0.85, 0.3))
 		if sh.in_pen:
 			sh.position.x = clampf(sh.position.x, P.position.x + sh.r + 2.0, P.end.x - sh.r - 2.0)
