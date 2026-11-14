@@ -1329,7 +1329,8 @@ func bite(f: Fox, s: Sheep, dmg: float) -> void:
 	s.hp -= dmg
 	s.panic = 1.0
 	s.squash = 1.0
-	s.vel += (s.position - f.position).normalized() * 70.0
+	s.home_t = 0.0
+	s.vel += ((s.position - f.position).normalized() + (s.position - world.pen.get_center()).normalized()).normalized() * 80.0
 	add_popup("-%d" % int(dmg), s.position + Vector2(randf_range(-6, 6), -20), Color(1.0, 0.45, 0.4))
 	ring(s.position, 14.0, Color(1.0, 0.4, 0.35), 0.2, 2.0)
 	if s.hp <= 0.0:
@@ -1968,14 +1969,20 @@ func update_sheep(dt: float) -> void:
 			sh.vel += Vector2(cos(sh.wa), sin(sh.wa)) * 14.0 * dt
 		else:
 			var pressure: float = pressure_from(sh, dog.position, dog.heading, zone_mult(), dog.crouch, dt, 0.0)
+			var dog_p: float = pressure
 			for f in foxes:
 				var fx2: Fox = f
 				if fx2.fleeing or fx2.carry != null:
 					continue
-				pressure += pressure_from(sh, fx2.position, fx2.vel.normalized(), 1.0, false, dt, 80.0) * 0.7
+				var fp: float = pressure_from(sh, fx2.position, fx2.vel.normalized(), 1.0, false, dt, 110.0) * 0.7
+				if fp > 0.0:
+					# raiders drive animals away from the pen and break up the call
+					pressure += fp
+					sh.vel += (sh.position - world.pen.get_center()).normalized() * 300.0 * fp * dt
+					sh.home_t = 0.0
 			var gdir: Vector2 = (pen_goal(sh.position) - sh.position).normalized()
-			if pressure > 0.0:
-				sh.vel += gdir * 170.0 * pressure * dt
+			if dog_p > 0.0:
+				sh.vel += gdir * 170.0 * dog_p * dt
 			if sh.home_t > 0.0:
 				sh.home_t -= dt
 				sh.vel += gdir * (215.0 if sh.heavy else 235.0) * dt
@@ -2187,8 +2194,8 @@ func update_enemies(dt: float) -> void:
 				if l < fx.r + fx.tgt.r + 8.0:
 					fx.bite_cd -= dt
 					if fx.bite_cd <= 0.0:
-						fx.bite_cd = 0.7
-						bite(fx, fx.tgt, 2.0)
+						fx.bite_cd = 0.5
+						bite(fx, fx.tgt, 3.0 + 0.3 * float(wave - 1))
 			else:
 				gnaw(fx, dt)
 		else:
