@@ -2,7 +2,7 @@ class_name LayerPart
 extends Node2D
 # One drawing pass of the layered map (ramps on the ground, hill tops and cliffs, bridge decks).
 
-var map: LayerMap
+var map
 var mode: String = ""
 
 func _draw() -> void:

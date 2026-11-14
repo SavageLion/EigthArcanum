@@ -30,6 +30,11 @@ const PERKS: Array = [
 	{"id": "ward", "name": "Fox Ward", "desc": "Foxes near you are frightened off and drop what they carry.", "max": 5},
 	{"id": "magnet", "name": "Gate Magnet", "desc": "Sheep near the pen gate are drawn gently inside.", "max": 5},
 	{"id": "fleece", "name": "Lucky Fleece", "desc": "Every sheep that enters the pen is worth more XP.", "max": 4},
+	{"id": "valley", "name": "Echo Valley", "desc": "Your bark, gust and whistle also reach sheep on other levels.", "max": 3},
+	{"id": "rope", "name": "Rope Line", "desc": "Sheep hurry along ramps when you send them home.", "max": 5},
+	{"id": "gold", "name": "Golden Fleece", "desc": "Sheep in the pen also give gold for the traders.", "max": 5},
+	{"id": "lookout", "name": "Lookout", "desc": "From time to time every hidden sheep on the mountain is revealed.", "max": 4},
+	{"id": "stride", "name": "Mountain Stride", "desc": "You climb and descend ramps faster.", "max": 5},
 ]
 const XP_OF: Dictionary = {"normal": 10, "goat": 14, "goose": 12, "ram": 18, "black": 14}
 static var run_day: int = 1
@@ -42,12 +47,18 @@ var pending_lv: int = 0
 var gust_t: float = 3.0
 var whistle_t: float = 4.0
 var sniff_t: float = 2.0
+var lookout_t: float = 4.0
 var ward_t: float = 3.0
 var echo_q: Array = []
 var pups: Array = []
 var ov_zoom: bool = false
-var lm: LayerMap = null
-var ysort1: Node2D
+var lm = null
+var ysorts: Dictionary = {}
+@export var summit_mode: bool = false
+var stage: Dictionary = {}
+var shop_offers: Array = []
+var map_msg: String = ""
+var final_kind: String = ""
 const HERD: Array = ["normal", "normal", "normal", "normal", "normal", "normal", "goat", "goat", "goose", "goose", "ram", "black"]
 
 var world: World
@@ -95,8 +106,21 @@ func btn_pos(i: int) -> Vector2:
 func finish_rect() -> Rect2:
 	return Rect2(vp().x / 2.0 - 70.0, 5.0, 140.0, 30.0)
 
+
 func _ready() -> void:
 	randomize()
+	if summit_mode:
+		if not Peak.active():
+			Peak.new_run()
+		stage = Peak.pending
+		if OS.has_feature("web"):
+			var sq: String = str(JavaScriptBridge.eval("window.location.search"))
+			if sq.contains("tier="):
+				stage = {"type": "herd", "tier": clampi(sq.substr(sq.find("tier=") + 5, 1).to_int(), 1, 5), "col": 0}
+		for t in 5:
+			if OS.get_cmdline_user_args().has("tier%d" % (t + 1)):
+				stage = {"type": "herd", "tier": t + 1, "col": 0}
+		run_day = int(Peak.run["done"]) + 1
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.frames(load("res://art/chars/dog.png") as Texture2D, 48, ["east", "north", "south", "south-east", "north-east"])
 	sheep_frames = U.frames(load("res://art/chars/sheep.png") as Texture2D, 40, ["east", "north", "south"])
@@ -114,14 +138,15 @@ func _ready() -> void:
 	ysort.y_sort_enabled = true
 	add_child(ysort)
 	world.generate(ysort)
-	if layers_mode():
+	if summit_mode:
+		lm = MountainMap.new()
+		lm.game = self
+		add_child(lm)
+		lm.build(int(stage.get("tier", 1)))
+	elif layers_mode():
 		lm = LayerMap.new()
 		lm.game = self
 		add_child(lm)
-		ysort1 = Node2D.new()
-		ysort1.y_sort_enabled = true
-		ysort1.z_index = 10
-		add_child(ysort1)
 		lm.build()
 	_spawn_dog()
 	_spawn_sheep()
@@ -136,6 +161,8 @@ func _ready() -> void:
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
 	banner = "DAY %d  -  FIND YOUR SHEEP" % run_day
 	ensure_pups()
+	if summit_mode:
+		summit_start()
 	banner_t = 3.5
 
 func _spawn_dog() -> void:
@@ -172,15 +199,21 @@ func _spawn_sheep() -> void:
 		var p := c + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 80.0)
 		if hide_it:
 			p = Vector2(randf_range(260.0, WX - 260.0), randf_range(260.0, WY - 260.0))
-			if p.distance_to(world.dog_start) < 400.0 or p.distance_to(world.pen.get_center()) < 520.0 or world._blocked(p, 20.0) or (lm != null and lm.cell_type(p) != 0):
+			if p.distance_to(world.dog_start) < 400.0 or p.distance_to(world.pen.get_center()) < 520.0 or world._blocked(p, 20.0) or (lm != null and lm.spawn_layer(p) != 0):
 				p = c + Vector2(30.0, 30.0)
 			s.hidden_grass = true
 			s.spr.visible = false
 			s.shadow.visible = false
 			_add_rustle(s)
 		s.position = p
-		if lm != null and lm.cell_type(p) == 1:
-			s.layer = 1
+		if lm != null:
+			var sl: int = lm.spawn_layer(p)
+			if sl < 0:
+				p = c
+				s.position = p
+				sl = lm.spawn_layer(p)
+			if sl > 0:
+				s.layer = sl
 		sheep.append(s)
 		idx += 1
 
@@ -297,7 +330,13 @@ func _press(p: Vector2, id: int) -> void:
 				pick_levelup(i)
 				return
 		return
+	if state == "pshop" or state == "prest" or state == "map" or state == "final":
+		summit_press(p)
+		return
 	if state == "result":
+		if summit_mode:
+			summit_result_tap()
+			return
 		if bool(result["ok"]):
 			run_day += 1
 		else:
@@ -453,10 +492,10 @@ func seg_push(e: Mover, r: float, a: Vector2, b: Vector2, bounce: float) -> void
 
 func collide(e: Mover, r: float, bounce: float, bounded: bool = true) -> void:
 	for w in world.walls:
-		if w["broken"] or e.layer == 1:
+		if w["broken"] or e.layer >= 1:
 			continue
 		seg_push(e, r, w["a"], w["b"], bounce)
-	for k in (world.rocks_near(e.position) if e.layer == 0 else []):
+	for k in (world.rocks_near(e.position) if e.layer <= 0 else []):
 		var kp: Vector2 = k["pos"]
 		var m: float = float(k["r"]) + r
 		var d: Vector2 = e.position - kp
@@ -528,7 +567,7 @@ func update_dog(dt: float) -> void:
 		dog.winded = true
 	dog.stam = minf(dog.stam_max, dog.stam)
 	dog.stam_max = 100.0 * (1.0 + 0.15 * float(pl("fleet")))
-	var base: float = (95.0 if dog.crouch else 210.0) * (1.0 + 0.07 * float(pl("fleet")))
+	var base: float = (95.0 if dog.crouch else 210.0) * (1.0 + 0.07 * float(pl("fleet"))) * ((1.0 + 0.1 * float(pl("stride"))) if (lm != null and lm.on_ramp(dog.position)) else 1.0)
 	var sp: float = base * speedk * (0.72 if dog.winded else 1.0) * (1.55 if sprinting else 1.0) * (0.3 if dog.stun > 0.0 else 1.0)
 	var zk: String = world.zone_kind(dog.position)
 	if zk == "water":
@@ -591,7 +630,7 @@ func do_bark() -> void:
 			sh.ping = 4.0
 		if sh.hidden_grass and dist < 150.0:
 			reveal(sh)
-		if sh.in_pen or sh.layer != dog.layer:
+		if sh.in_pen or (sh.layer != dog.layer and pl("valley") == 0):
 			continue
 		if dist < R and dist > 0.1:
 			var f: float = 1.0 - dist / R
@@ -719,7 +758,8 @@ func update_sheep(dt: float) -> void:
 		if not sh.in_pen:
 			if sh.home_t > 0.0:
 				sh.home_t -= dt
-				sh.vel += (goal_for(sh) - sh.position).normalized() * (215.0 if sh.heavy else 235.0) * dt
+				var rk: float = (1.0 + 0.6 * float(pl("rope"))) if (lm != null and lm.on_ramp(sh.position)) else 1.0
+				sh.vel += (goal_for(sh) - sh.position).normalized() * (215.0 if sh.heavy else 235.0) * rk * dt
 			var mg: int = pl("magnet")
 			if mg > 0:
 				var gate: Vector2 = Vector2(world.gate_x, world.pen.end.y)
@@ -810,6 +850,12 @@ func spawn_fox(raid: bool) -> void:
 	ysort.add_child(f)
 	f.setup(fox_frames, shadow_tex)
 	f.position = edge_point()
+	if summit_mode and lm != null:
+		var ls: Array = loose_sheep()
+		if not ls.is_empty():
+			var tsh: ClassicSheep = ls[randi() % ls.size()]
+			f.layer = tsh.layer
+			f.position = lm.fox_spawn(tsh.position, tsh.layer)
 	f.raid = raid
 	foxes.append(f)
 	if raid:
@@ -858,6 +904,7 @@ func drop_carry(f: ClassicFox) -> void:
 	s.panic = 1.0
 	s.vel = Vector2(randf_range(-60, 60), randf_range(-60, 60))
 	f.carry = null
+	f.carry_t = 0.0
 	f.scared = maxf(f.scared, 3.0)
 	add_popup("SAVED!", s.position + Vector2(0, -14), Color(0.6, 1.0, 0.6))
 
@@ -890,7 +937,8 @@ func update_foxes(dt: float) -> void:
 			var e: Vector2 = nearest_edge(fx.position)
 			move_to(fx, e, 100.0, dt, 6.0)
 			fx.carry.position = fx.position + Vector2(0, -4)
-			if fx.position.x < XMIN - 30.0 or fx.position.x > XMAX + 30.0 or fx.position.y < YMIN - 30.0 or fx.position.y > YMAX + 30.0:
+			fx.carry_t += dt
+			if fx.carry_t > 12.0 or fx.position.x < XMIN - 30.0 or fx.position.x > XMAX + 30.0 or fx.position.y < YMIN - 30.0 or fx.position.y > YMAX + 30.0:
 				var cs: ClassicSheep = fx.carry
 				fx.carry = null
 				kill_sheep(cs)
@@ -913,7 +961,7 @@ func update_foxes(dt: float) -> void:
 					var bs: float = -1.0e9
 					for s in sheep:
 						var sh: ClassicSheep = s
-						if not eligible(sh) or sh.layer != 0:
+						if not eligible(sh) or sh.layer != fx.layer:
 							continue
 						var sc: float = (120.0 if sh.type == "lamb" else 0.0) + sh.position.distance_to(dog.position) * 0.5 + (260.0 if (sh.in_pen and fx.raid) else (-60.0 if sh.in_pen else 0.0))
 						if sc > bs:
@@ -979,6 +1027,8 @@ func reset_run() -> void:
 	run_xp = 0.0
 
 func herd_list() -> Array:
+	if summit_mode:
+		return summit_herd()
 	var out: Array = HERD.duplicate()
 	var extra: Array = ["normal", "goat", "goose", "ram", "black", "normal"]
 	var n: int = mini(30, 12 + 2 * (run_day - 1)) - 12
@@ -991,6 +1041,8 @@ func xp_need() -> float:
 
 func gain_xp(amount: float, at: Vector2) -> void:
 	run_xp += amount
+	if summit_mode:
+		Peak.run["gold"] = int(Peak.run["gold"]) + int(amount / 2.0 * (1.0 + 0.5 * float(pl("gold"))))
 	add_popup("+%d xp" % int(amount), at + Vector2(0, -28), Color(0.6, 0.9, 1.0))
 	while run_xp >= xp_need():
 		run_xp -= xp_need()
@@ -1043,7 +1095,7 @@ func pick_levelup(i: int) -> void:
 		if perk_offers.is_empty():
 			pending_lv = 0
 	if pending_lv <= 0:
-		state = "play"
+		state = "map" if (summit_mode and stage.is_empty()) else "play"
 
 # ---------------------------------------------------------------- where a sheep should be sent
 func pen_entrances() -> Array:
@@ -1093,7 +1145,7 @@ func pen_goal(p: Vector2) -> Vector2:
 	var pd: float = 1.0e9
 	for c in corners:
 		var cc: Vector2 = c
-		if p.distance_to(cc) < 16.0 or seg_blocked(p, cc, box):
+		if p.distance_to(cc) < 60.0 or seg_blocked(p, cc, box):
 			continue
 		var dd: float = p.distance_to(cc) + cc.distance_to(best_st)
 		if dd < pd:
@@ -1127,7 +1179,7 @@ func update_perks(dt: float) -> void:
 			perk_ring(rg, Color(0.7, 0.9, 1.0))
 			for s in loose_sheep():
 				var sh: ClassicSheep = s
-				if sh.position.distance_to(dog.position) < rg and sh.layer == dog.layer:
+				if sh.position.distance_to(dog.position) < rg and (sh.layer == dog.layer or pl("valley") > 0):
 					sh.vel += (goal_for(sh) - sh.position).normalized() * 150.0
 					sh.home_t = maxf(sh.home_t, 1.2)
 	var lw: int = pl("whistle")
@@ -1140,7 +1192,7 @@ func update_perks(dt: float) -> void:
 			add_popup("WHISTLE!", dog.position + Vector2(0, -38), Color(1.0, 0.9, 0.5))
 			for s2 in loose_sheep():
 				var sh2: ClassicSheep = s2
-				if sh2.position.distance_to(dog.position) < rw and sh2.layer == dog.layer:
+				if sh2.position.distance_to(dog.position) < rw and (sh2.layer == dog.layer or pl("valley") > 0):
 					sh2.home_t = maxf(sh2.home_t, 3.0 + 0.4 * float(lw))
 					sh2.panic = maxf(sh2.panic, 0.3)
 	var ln: int = pl("sniff")
@@ -1158,6 +1210,17 @@ func update_perks(dt: float) -> void:
 					reveal(sh3)
 				elif not sh3.seen:
 					sh3.ping = 4.0
+	var lk: int = pl("lookout")
+	if lk > 0:
+		lookout_t -= dt
+		if lookout_t <= 0.0:
+			lookout_t = 7.0 - 0.8 * float(lk)
+			for sl in sheep:
+				var shl: ClassicSheep = sl
+				if shl.hidden_grass:
+					reveal(shl)
+				elif not shl.seen and not shl.in_pen:
+					shl.ping = 4.0
 	var lf: int = pl("ward")
 	if lf > 0:
 		ward_t -= dt
@@ -1196,7 +1259,7 @@ func ensure_pups() -> void:
 		ysort.add_child(pd)
 		pd.setup(dog_frames, shadow_tex)
 		pd.spr.modulate = Color(0.6, 0.85, 1.0, 0.75)
-		pd.z_index = 20
+		pd.z_index = 100
 		pd.position = dog.position + Vector2(randf_range(-30.0, 30.0), randf_range(20.0, 40.0))
 		pups.append(pd)
 	while pups.size() > want:
@@ -1245,8 +1308,8 @@ func lm_resolve(e: Mover, old: Vector2) -> void:
 
 # a sheep on the ground heads for the pen, one on a hill heads for the way down
 func goal_for(sh: ClassicSheep) -> Vector2:
-	if lm != null and sh.layer == 1:
-		return lm.down_goal(sh.position)
+	if lm != null and lm.use_flow(sh.position, sh.layer):
+		return lm.flow_goal(sh.position)
 	return pen_goal(sh.position)
 
 var probe: ClassicSheep = null
@@ -1256,13 +1319,17 @@ func layer_test() -> void:
 	if OS.get_cmdline_user_args().has("sheeptest"):
 		if test_n == 1:
 			for s in sheep:
-				if (s as ClassicSheep).layer == 1 and not (s as ClassicSheep).hidden_grass:
+				if (s as ClassicSheep).layer >= 1 and not (s as ClassicSheep).hidden_grass:
 					probe = s
 					break
 		if probe != null:
 			probe.home_t = 5.0
 			if test_n % 120 == 0:
-				print("sheeptest x=", int(probe.position.x / LayerMap.CELL), " y=", int(probe.position.y / LayerMap.CELL), " layer=", probe.layer, " in_pen=", probe.in_pen)
+				print("sheeptest pos=", probe.position, " goal=", goal_for(probe), " vel=", probe.vel, " layer=", probe.layer, " in_pen=", probe.in_pen, " home=", probe.home_t)
+				if lm is MountainMap:
+					var c1: Vector2i = lm._cell_of(probe.position)
+					var c2: Vector2i = lm._cell_of(goal_for(probe))
+					print("   cell ", c1, " lvl=", lm.lvl[lm._ix(c1.x, c1.y)], " rmp=", lm.rmp[lm._ix(c1.x, c1.y)], " dist=", lm.dist[lm._ix(c1.x, c1.y)], "  goalcell ", c2, " lvl=", lm.lvl[lm._ix(c2.x, c2.y)], " rmp=", lm.rmp[lm._ix(c2.x, c2.y)], " dist=", lm.dist[lm._ix(c2.x, c2.y)], " allowed=", lm._allowed(probe.layer, probe.position, goal_for(probe)))
 		return
 	var C: float = LayerMap.CELL
 	var scen: int = (test_n - 1) / 260
@@ -1288,3 +1355,147 @@ func layer_test() -> void:
 			test_dir = Vector2.ZERO
 	if f % 52 == 51 and scen < 4:
 		print('layertest scen=', scen, ' x=', int(dog.position.x / C), ' y=', int(dog.position.y / C), ' layer=', dog.layer, ' elev=', int(dog.elev), ' cell=', lm.cell_type(dog.position))
+
+# ---------------------------------------------------------------- the mountain run
+func container_for(level: int) -> Node2D:
+	if level <= 0:
+		return ysort
+	if not ysorts.has(level):
+		var n := Node2D.new()
+		n.y_sort_enabled = true
+		n.z_index = 10 * level + 5
+		add_child(n)
+		ysorts[level] = n
+	return ysorts[level]
+
+func summit_herd() -> Array:
+	var tier: int = int(stage.get("tier", 1))
+	var typ: String = String(stage.get("type", "herd"))
+	var n: int = 8 + 2 * tier + (4 if typ == "elite" else 0) + (18 if typ == "boss" else 0)
+	var out: Array = ["normal", "normal", "goat", "goose"]
+	var cycle: Array = ["normal", "normal", "goat", "goose", "ram", "black", "normal", "goat"]
+	while out.size() < n:
+		out.append(cycle[out.size() % cycle.size()])
+	return out
+
+func summit_start() -> void:
+	if stage.is_empty():
+		state = "map"
+		if int(Peak.run["picks"]) > 0:
+			pending_lv = int(Peak.run["picks"])
+			Peak.run["picks"] = 0
+			begin_levelup()
+		return
+	var tier: int = int(stage["tier"])
+	var typ: String = String(stage["type"])
+	need = int(ceil(float(sheep.size()) * (0.5 + 0.03 * float(tier))))
+	t_total = 200.0 + 8.0 * float(tier) + 6.0 * float(maxi(0, sheep.size() - 12)) + (40.0 if typ == "boss" else 0.0)
+	t_left = t_total
+	events.clear()
+	var nf: int = 2 + tier + (3 if typ == "elite" else 0) + (6 if typ == "boss" else 0)
+	for i in nf:
+		events.append({"t": randf_range(15.0, t_total - 60.0), "raid": randf() < 0.3 + 0.05 * float(tier)})
+	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
+	banner = "%s  -  %s" % [String(Peak.NAMES[typ]).to_upper(), "THE MEADOW" if tier == 1 else ("LEVEL %d" % tier)]
+
+func peak_pos(l: int, i: int) -> Vector2:
+	var v: Vector2 = vp()
+	var n: int = ((Peak.run["layers"] as Array)[l] as Array).size()
+	return Vector2(64.0 + float(l) * (v.x - 128.0) / 9.0, v.y / 2.0 + 10.0 + (float(i) - (float(n) - 1.0) / 2.0) * 92.0)
+
+func popt_rect(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 250.0 + float(i) * 260.0, v.y / 2.0 + 30.0, 240.0, 76.0)
+
+func pshop_row(i: int) -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 240.0, 120.0 + float(i) * 72.0, 480.0, 62.0)
+
+func pleave_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 100.0, v.y - 76.0, 200.0, 46.0)
+
+func shop_price(id: String) -> int:
+	return 40 + 30 * pl(id)
+
+func summit_press(p: Vector2) -> void:
+	if Rect2(8.0, 92.0, 96.0, 28.0).grow(8.0).has_point(p) and state != "final":
+		get_tree().change_scene_to_file("res://main.tscn")
+		return
+	map_msg = ""
+	if state == "final":
+		Peak.run = {}
+		Peak.pending = {}
+		reset_run()
+		get_tree().reload_current_scene()
+		return
+	if state == "map":
+		for o in Peak.options():
+			if peak_pos(int((o as Array)[0]), int((o as Array)[1])).distance_to(p) < 28.0:
+				enter_node(o)
+				return
+	elif state == "prest":
+		for i in 2:
+			if popt_rect(i).has_point(p):
+				if i == 0:
+					Peak.run["picks"] = int(Peak.run["picks"]) + 1
+				else:
+					Peak.run["gold"] = int(Peak.run["gold"]) + 50
+				Peak.finish_node()
+				Peak.pending = {}
+				get_tree().reload_current_scene()
+				return
+	elif state == "pshop":
+		if pleave_rect().has_point(p):
+			Peak.finish_node()
+			Peak.pending = {}
+			get_tree().reload_current_scene()
+			return
+		for i in shop_offers.size():
+			if pshop_row(i).has_point(p):
+				var id: String = String(shop_offers[i]["id"])
+				var cost: int = shop_price(id)
+				if int(Peak.run["gold"]) >= cost:
+					Peak.run["gold"] = int(Peak.run["gold"]) - cost
+					run_perks[id] = pl(id) + 1
+					map_msg = "Bought " + String(shop_offers[i]["name"])
+					shop_offers.remove_at(i)
+				else:
+					map_msg = "Not enough gold"
+				return
+
+func enter_node(o: Array) -> void:
+	Peak.run["cur"] = [int(o[0]), int(o[1])]
+	var typ: String = String(Peak.node(int(o[0]), int(o[1]))["type"])
+	if typ == "herd" or typ == "elite" or typ == "boss":
+		Peak.pending = {"type": typ, "tier": Peak.tier_of(int(o[0])), "col": int(o[0])}
+		get_tree().reload_current_scene()
+	elif typ == "rest":
+		state = "prest"
+	else:
+		shop_offers.clear()
+		var pool: Array = []
+		for pk in PERKS:
+			if pl(String(pk["id"])) < int(pk["max"]):
+				pool.append(pk)
+		pool.shuffle()
+		for i in mini(3, pool.size()):
+			shop_offers.append(pool[i])
+		state = "pshop"
+
+func summit_result_tap() -> void:
+	var typ: String = String(stage.get("type", "herd"))
+	var tier: int = int(stage.get("tier", 1))
+	if bool(result["ok"]):
+		Peak.finish_node()
+		Peak.run["picks"] = int(Peak.run["picks"]) + (2 if typ == "elite" else 1)
+		Peak.run["gold"] = int(Peak.run["gold"]) + 20 + 10 * tier + (30 if typ == "elite" else 0)
+		Peak.pending = {}
+		if typ == "boss":
+			final_kind = "won"
+			state = "final"
+			return
+		get_tree().reload_current_scene()
+	else:
+		final_kind = "lost"
+		state = "final"

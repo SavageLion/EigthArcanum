@@ -147,7 +147,22 @@ func height_at(p: Vector2, layer: int) -> float:
 	return 0.0
 
 # from the top of a hill: the way down
-func down_goal(p: Vector2) -> Vector2:
+func spawn_layer(p: Vector2) -> int:
+	var t: int = cell_type(p)
+	if t == 1:
+		return 1
+	return 0 if t == 0 else -1
+
+func use_flow(_p: Vector2, layer: int) -> bool:
+	return layer >= 1
+
+func flow_goal(p: Vector2) -> Vector2:
+	return down_goal(p, 1)
+
+func on_ramp(p: Vector2) -> bool:
+	return cell_type(p) == 2
+
+func down_goal(p: Vector2, _layer: int = 1) -> Vector2:
 	var cx: int = int(floor(p.x / CELL))
 	var cy: int = int(floor(p.y / CELL))
 	var here: int = int(pid[_ix(clampi(cx, 0, GW - 1), clampi(cy, 0, GH - 1))])
@@ -188,7 +203,7 @@ func sync_all() -> void:
 
 func _sync(e: Mover, dt: float) -> void:
 	e.elev = move_toward(e.elev, height_at(e.position, e.layer), 220.0 * dt)
-	var want: Node = game.ysort1 if e.layer == 1 else game.ysort
+	var want: Node = game.container_for(e.layer)
 	if e.get_parent() != want:
 		e.get_parent().remove_child(e)
 		want.add_child(e)

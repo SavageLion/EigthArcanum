@@ -164,6 +164,9 @@ func _ready() -> void:
 		if search.contains("angle="):
 			U.PROJ = clampf(float(search.substr(search.find("angle=") + 6, 2).to_int()) / 100.0, 0.4, 1.0)
 		WY = float(roundi(2208.0 / U.PROJ / 48.0)) * 48.0
+	if search.contains("summit"):
+		get_tree().change_scene_to_file.call_deferred("res://summit.tscn")
+		return
 	if search.contains("classic"):
 		get_tree().change_scene_to_file.call_deferred("res://classic.tscn")
 		return
@@ -2232,6 +2235,9 @@ func farm_go_rect() -> Rect2:
 func farm_shop_rect() -> Rect2:
 	return Rect2(24.0, vp().y - 60.0, 190.0, 46.0)
 
+func farm_summit_rect() -> Rect2:
+	return Rect2(624.0, vp().y - 60.0, 190.0, 46.0)
+
 func farm_classic_rect() -> Rect2:
 	return Rect2(424.0, vp().y - 60.0, 190.0, 46.0)
 
@@ -2281,6 +2287,9 @@ func farm_press(p: Vector2) -> void:
 		return
 	if farm_shop_rect().grow(6.0).has_point(p):
 		farm_view = "shop"
+		return
+	if farm_summit_rect().grow(6.0).has_point(p):
+		get_tree().change_scene_to_file("res://summit.tscn")
 		return
 	if farm_classic_rect().grow(6.0).has_point(p):
 		get_tree().change_scene_to_file("res://classic.tscn")
@@ -2608,7 +2617,7 @@ func pen_goal(p: Vector2) -> Vector2:
 	var pd: float = 1.0e9
 	for c in corners:
 		var cc: Vector2 = c
-		if p.distance_to(cc) < 16.0 or seg_blocked(p, cc, box):
+		if p.distance_to(cc) < 60.0 or seg_blocked(p, cc, box):
 			continue
 		var dd: float = p.distance_to(cc) + cc.distance_to(best_st)
 		if dd < pd:

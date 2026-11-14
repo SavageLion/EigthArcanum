@@ -13,6 +13,7 @@ var r: float = 6.0
 var spr: AnimatedSprite2D
 var shadow: Sprite2D
 var dead: bool = false
+var carry_t: float = 0.0
 
 func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	zig = randf() * TAU
