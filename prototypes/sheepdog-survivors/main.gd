@@ -157,6 +157,8 @@ func pl(id: String) -> int:
 
 func _ready() -> void:
 	var search: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
+	if search.contains("angle"):
+		U.PROJ = 0.78
 	if search.contains("seed="):
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
@@ -361,7 +363,7 @@ func _setup_camera() -> void:
 	cam.limit_top = 0
 	cam.limit_right = int(WX)
 	cam.limit_bottom = int(WY)
-	cam.zoom = Vector2(BASE_ZOOM, BASE_ZOOM)
+	cam.zoom = Vector2(BASE_ZOOM, BASE_ZOOM * U.PROJ)
 	add_child(cam)
 	cam.position = dog.position
 	cam.make_current()
@@ -558,7 +560,7 @@ func build_on(i: int, kind: String) -> void:
 
 func pad_scale(p: Pad) -> void:
 	var base: float = float(DEFS[p.kind]["sc"]) * (1.4 if world.flat else (1.0 if (not world.refst or p.kind == "archer") else 1.5))
-	p.sprite.scale = Vector2.ONE * base * (1.0 + 0.1 * float(p.lv - 1))
+	p.sprite.scale = Vector2(1.0, U.up()) * base * (1.0 + 0.1 * float(p.lv - 1))
 
 func upgrade_pad(i: int) -> void:
 	var p: Pad = world.pads[i]
@@ -999,7 +1001,7 @@ func _process(delta: float) -> void:
 	if overview:
 		target_zoom = 0.27
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
-	cam.zoom = Vector2(z, z)
+	cam.zoom = Vector2(z, z * U.PROJ)
 	cloud_mat.set_shader_parameter("cam", cam.get_screen_center_position())
 	cloud_mat.set_shader_parameter("view_size", vp() / cam.zoom.x)
 	hud.queue_redraw()
@@ -1082,6 +1084,7 @@ func update_dog(dt: float) -> void:
 	var inp: Vector2 = move_input()
 	var mag: float = minf(1.0, inp.length())
 	var dir: Vector2 = inp.normalized() if mag > 0.02 else Vector2.ZERO
+	dir.y *= U.up()
 	dog.stun = maxf(0.0, dog.stun - dt)
 	dog.bark_cd = maxf(0.0, dog.bark_cd - dt)
 	dog.walk = false

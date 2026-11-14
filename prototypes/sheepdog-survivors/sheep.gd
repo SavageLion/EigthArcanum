@@ -64,11 +64,11 @@ func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture
 	spr.modulate = def["tint"]
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	base_scale = 0.85 * r / 7.0 * (1.2 if t == "lamb" else 1.0) * float(def.get("sc", 1.0))
-	spr.scale = Vector2(base_scale, base_scale)
+	spr.scale = Vector2(base_scale, base_scale * U.up())
 	spr.offset = Vector2(0, -13)
 	if not fit.is_empty():
 		base_scale = float(fit["scale"])
-		spr.scale = Vector2(base_scale, base_scale)
+		spr.scale = Vector2(base_scale, base_scale * U.up())
 		spr.offset = fit["offset"]
 	spr.play("idle_east")
 	add_child(spr)
@@ -103,6 +103,6 @@ func animate(dt: float) -> void:
 	spr.position.y = -bob
 	squash = move_toward(squash, 0.0, dt * 3.0)
 	var sq: float = 1.0 + squash * 0.18
-	spr.scale = Vector2(base_scale / sq, base_scale * sq)
+	spr.scale = Vector2(base_scale / sq, base_scale * sq * U.up())
 	var tint: Color = spr.modulate
 	spr.self_modulate = Color(1.0, 1.0 - panic * 0.22, 1.0 - panic * 0.22)

@@ -102,6 +102,11 @@ static func set8(root: String, walk_fps: float) -> SpriteFrames:
 	return sf
 
 const WH: float = 58.8
+# angled view: the ground is squashed by PROJ and everything standing up is stretched back so it looks upright
+static var PROJ: float = 1.0
+
+static func up() -> float:
+	return 1.0 / PROJ
 static var _sizes: Dictionary = {}
 
 static func fit(set_name: String, metric: String, target: float) -> Dictionary:

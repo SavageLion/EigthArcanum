@@ -32,7 +32,7 @@ func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	spr = AnimatedSprite2D.new()
 	spr.sprite_frames = frames
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	spr.scale = Vector2(SC, SC)
+	spr.scale = Vector2(SC, SC * U.up())
 	spr.offset = Vector2(0, -22)
 	spr.play("idle_east")
 	add_child(spr)
@@ -66,7 +66,7 @@ func animate(dt: float) -> void:
 	var lowered: float = 0.9 if crouch else 1.0
 	squash = move_toward(squash, 0.0, dt * 4.0)
 	var sq: float = 1.0 + squash * 0.15
-	spr.scale = Vector2(SC / sq, SC * lowered * sq)
+	spr.scale = Vector2(SC / sq, SC * lowered * sq * U.up())
 	var tone: Color = Color(0.8, 0.88, 1.0) if winded else Color(1, 1, 1)
 	if hurt_t > 0.0:
 		tone = Color(1.5, 0.5, 0.5)

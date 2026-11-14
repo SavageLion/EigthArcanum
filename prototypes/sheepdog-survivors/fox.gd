@@ -60,7 +60,7 @@ func setup(k: String, frames: SpriteFrames, shadow_tex: Texture2D, hp_mult: floa
 	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	if not ft.is_empty():
 		var sc: float = ft["scale"]
-		spr.scale = Vector2(sc, sc)
+		spr.scale = Vector2(sc, sc * U.up())
 		spr.offset = ft["offset"]
 	spr.play("idle_east")
 	add_child(spr)

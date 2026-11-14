@@ -535,7 +535,7 @@ func _obstacles() -> void:
 		s.texture = rk
 		s.position = p + Vector2(0, 10)
 		var w: float = clampf(r * 2.4, 40.0, 70.0)
-		s.scale = Vector2.ONE * (w / float(rk.get_width()))
+		s.scale = Vector2(1.0, U.up()) * (w / float(rk.get_width()))
 		s.offset = Vector2(0, -float(rk.get_height()) * 0.5 + 3.0)
 		ysort.add_child(s)
 		add_child(_blob_shadow(p + Vector2(w * 0.28, 10.0), w / 64.0 * 0.85, w / 64.0 * 0.3))
@@ -560,7 +560,7 @@ func _obstacles() -> void:
 		var s2 := Sprite2D.new()
 		s2.texture = sh if big else bu
 		s2.position = p3
-		s2.scale = Vector2.ONE * (0.5 if refst else ((2.1 if big else 1.7) if flat else (1.7 if big else 1.3)))
+		s2.scale = Vector2(1.0, U.up()) * (0.5 if refst else ((2.1 if big else 1.7) if flat else (1.7 if big else 1.3)))
 		s2.offset = Vector2(0, -s2.texture.get_height() * 0.5 + 4.0)
 		s2.material = wind_mat
 		ysort.add_child(s2)
@@ -585,7 +585,7 @@ func _tree(t: Texture2D, p: Vector2, sc: float, shadow: bool) -> void:
 	var s := Sprite2D.new()
 	s.texture = t
 	s.position = p + Vector2(0, 14.0 * sc)
-	s.scale = Vector2(sc, sc)
+	s.scale = Vector2(sc, sc * U.up())
 	s.offset = Vector2(0, -t.get_height() * 0.5 + 4.0)
 	s.material = wind_mat
 	s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -761,7 +761,7 @@ func _build_posts() -> void:
 			sp.texture = tx
 			sp.position = p + Vector2(0, 2)
 			sp.offset = Vector2(0, -float(tx.get_height()) * 0.5 + 6.0)
-			sp.scale = Vector2(1.15, 1.15)
+			sp.scale = Vector2(1.15, 1.15 * U.up())
 			ysort.add_child(sp)
 			post_nodes.append(sp)
 
@@ -770,7 +770,7 @@ func _wall_height() -> float:
 
 # a wall running up and down the screen is seen edge-on: a column with its top and its end
 func _column_tex(l: float) -> ImageTexture:
-	var h: int = int(_wall_height())
+	var h: int = int(_wall_height() * U.up())
 	var W: int = 14
 	var img := Image.create(W, int(l) + h + 2, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
@@ -860,7 +860,7 @@ func _wall_nodes(w: Dictionary) -> void:
 		sp.texture = fence_h
 		sp.position = a.lerp(b, t)
 		sp.rotation = ang
-		sp.scale = Vector2(k * 1.05, k * 0.95)
+		sp.scale = Vector2(k * 1.05, k * 0.95 * U.up())
 		sp.offset = Vector2(0, -9.0 if tier == 0 else -float(fence_h.get_height()) * 0.5 + 3.0)
 		ysort.add_child(sp)
 		nodes.append(sp)
@@ -1191,6 +1191,7 @@ func _wheat_fields() -> void:
 			sp.texture = variants[rng.randi() % 3]
 			sp.position = Vector2(rc.position.x + rc.size.x / 2.0 + rng.randf_range(-3.0, 3.0), y)
 			sp.offset = Vector2(0, -18.0)
+			sp.scale = Vector2(1.0, U.up())
 			sp.material = wind_mat
 			sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			ysort.add_child(sp)
