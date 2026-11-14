@@ -415,6 +415,8 @@ func _farm_map(v: Vector2) -> void:
 		var r: Rect2 = main.farm_plot_rect(i)
 		var open: bool = Meta.plot_open(i)
 		_panel(r, Color(0.45, 0.34, 0.2) if open else Color(0.24, 0.27, 0.23))
+		_biome_thumb(Rect2(r.position + Vector2(4, 4), r.size - Vector2(8, 8)), String(pd["biome"]), open)
+		draw_rect(Rect2(r.position.x + 4.0, r.end.y - 34.0, r.size.x - 8.0, 30.0), Color(0, 0, 0, 0.5))
 		if open:
 			var an: Dictionary = Meta.plot_data(i)["animals"]
 			var n: int = 0
@@ -427,7 +429,7 @@ func _farm_map(v: Vector2) -> void:
 			_text("%d animals" % n, r.position + Vector2(0, 78), 13, CREAM, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		else:
 			_text("LOCKED", r.position + Vector2(0, 52), 14, Color(CREAM, 0.45), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text(String(pd["name"]), r.position + Vector2(0, r.size.y - 8), 11, CREAM if open else Color(CREAM, 0.45), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(String(pd["name"]), r.position + Vector2(0, r.size.y - 8), 10, CREAM if open else Color(CREAM, 0.45), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		if main.farm_sel == i:
 			draw_rect(r, GOLD, false, 3.0)
 		if target == i and main.spin_t >= Meta.SPIN_LEN:
@@ -543,3 +545,52 @@ func _levelup(v: Vector2) -> void:
 		draw_multiline_string(font, r.position + Vector2(18, 118), String(pk["desc"]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 36.0, 16, 4, Color(CREAM, 0.92))
 		_text("TAP TO CHOOSE", r.position + Vector2(0, r.size.y - 20), 14, Color(0.6, 0.9, 1.0), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
+
+func _ellipse(c: Vector2, rx: float, ry: float, col: Color) -> void:
+	var pts := PackedVector2Array()
+	for i in 20:
+		var a: float = TAU * float(i) / 20.0
+		pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+	draw_colored_polygon(pts, col)
+
+# a little picture of each biome for the farm grid
+func _biome_thumb(r: Rect2, biome_id: String, open: bool) -> void:
+	var b: Dictionary = Meta.BIOMES[biome_id]
+	var gc: Array = b["grass"]
+	var dim: float = 1.0 if open else 0.45
+	draw_rect(r, (gc[1] as Color) * Color(dim, dim, dim, 1.0))
+	draw_rect(Rect2(r.position, Vector2(r.size.x, r.size.y * 0.45)), (gc[0] as Color) * Color(dim, dim, dim, 1.0))
+	var tc: Color = b["tree"]
+	var tree: Color = Color(0.2 * tc.r, 0.5 * tc.g, 0.22 * tc.b) * Color(dim, dim, dim, 1.0)
+	for i in 3:
+		var tp: Vector2 = r.position + Vector2(14.0 + float(i) * 34.0, 14.0 + float(i % 2) * 6.0)
+		draw_circle(tp, 9.0, tree)
+		draw_rect(Rect2(tp + Vector2(-1.5, 8.0), Vector2(3, 6)), Color(0.35, 0.25, 0.15) * Color(dim, dim, dim, 1.0))
+	var cx: Vector2 = r.position + Vector2(r.size.x * 0.5, r.size.y * 0.55)
+	var d: Color = Color(dim, dim, dim, 1.0)
+	match biome_id:
+		"sunhaven":
+			draw_rect(Rect2(cx + Vector2(-22, -8), Vector2(44, 18)), Color(0.93, 0.74, 0.28) * d)
+		"whisperwood":
+			draw_circle(cx + Vector2(-14, 0), 6.0, Color(0.7, 0.4, 0.95) * d)
+			draw_circle(cx + Vector2(10, 4), 5.0, Color(0.3, 0.85, 0.95) * d)
+		"hollowshade":
+			draw_circle(cx + Vector2(-14, 2), 6.0, Color(0.95, 0.5, 0.12) * d)
+			draw_circle(cx + Vector2(8, 4), 5.0, Color(0.95, 0.5, 0.12) * d)
+		"miremoon":
+			_ellipse(cx, 22.0, 9.0, Color(0.2, 0.45, 0.52) * d)
+		"frostveil":
+			_ellipse(cx + Vector2(-8, 2), 20.0, 7.0, Color(0.95, 0.97, 1.0) * d)
+			_ellipse(cx + Vector2(14, -4), 10.0, 5.0, Color(0.65, 0.8, 0.95) * d)
+		"sunscorch":
+			_ellipse(cx, 24.0, 8.0, Color(0.95, 0.82, 0.5) * d)
+			draw_rect(Rect2(cx + Vector2(-3, -14), Vector2(6, 18)), Color(0.3, 0.62, 0.3) * d)
+		"emberfall":
+			_ellipse(cx, 20.0, 9.0, Color(0.95, 0.4, 0.1) * d)
+			_ellipse(cx + Vector2(-2, -1), 11.0, 4.0, Color(1.0, 0.85, 0.3) * d)
+		"starfall":
+			draw_colored_polygon(PackedVector2Array([cx + Vector2(-10, 10), cx + Vector2(-4, -14), cx + Vector2(2, 10)]), Color(0.7, 0.45, 1.0) * d)
+			draw_colored_polygon(PackedVector2Array([cx + Vector2(2, 10), cx + Vector2(10, -8), cx + Vector2(16, 10)]), Color(0.4, 0.85, 1.0) * d)
+		"kingsgrave":
+			draw_rect(Rect2(cx + Vector2(-14, -8), Vector2(10, 16)), Color(0.6, 0.62, 0.64) * d)
+			draw_rect(Rect2(cx + Vector2(6, -4), Vector2(10, 12)), Color(0.6, 0.62, 0.64) * d)

@@ -343,6 +343,12 @@ func _tiles() -> void:
 		var gm := ShaderMaterial.new()
 		gm.shader = load("res://shaders/grass.gdshader") as Shader
 		gm.set_shader_parameter("world_size", Vector2(wx, wy))
+		if not biome.is_empty():
+			var gc: Array = biome["grass"]
+			gm.set_shader_parameter("c_dark", Vector3((gc[0] as Color).r, (gc[0] as Color).g, (gc[0] as Color).b))
+			gm.set_shader_parameter("c_mid", Vector3((gc[1] as Color).r, (gc[1] as Color).g, (gc[1] as Color).b))
+			gm.set_shader_parameter("c_light", Vector3((gc[2] as Color).r, (gc[2] as Color).g, (gc[2] as Color).b))
+			gm.set_shader_parameter("c_tip", Vector3((gc[3] as Color).r, (gc[3] as Color).g, (gc[3] as Color).b))
 		var gfn := FastNoiseLite.new()
 		gfn.seed = randi()
 		gfn.frequency = 0.012
@@ -563,6 +569,7 @@ func _obstacles() -> void:
 		s2.scale = Vector2(1.0, U.up()) * (0.5 if refst else ((2.1 if big else 1.7) if flat else (1.7 if big else 1.3)))
 		s2.offset = Vector2(0, -s2.texture.get_height() * 0.5 + 4.0)
 		s2.material = wind_mat
+		s2.modulate = biome.get("tree", Color(1, 1, 1))
 		ysort.add_child(s2)
 
 func _blob_shadow(p: Vector2, sx: float, sy: float) -> Sprite2D:
@@ -588,6 +595,7 @@ func _tree(t: Texture2D, p: Vector2, sc: float, shadow: bool) -> void:
 	s.scale = Vector2(sc, sc * U.up())
 	s.offset = Vector2(0, -t.get_height() * 0.5 + 4.0)
 	s.material = wind_mat
+	s.modulate = biome.get("tree", Color(1, 1, 1))
 	s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	ysort.add_child(s)
 	if shadow:
@@ -630,6 +638,9 @@ func _pen_visuals() -> void:
 		_wall_nodes(w)
 
 var tier: int = 0
+var biome_id: String = "sunhaven"
+var biome: Dictionary = {}
+var decor_cache: Dictionary = {}
 var tier_tex: Dictionary = {}
 var post_nodes: Array = []
 var pen_floor: Sprite2D
@@ -1090,9 +1101,13 @@ func _decals() -> void:
 	if flat:
 		return
 	if refst:
-		_meadow_patches()
-		_dirt_patches()
-		_wheat_fields()
+		if ["sunhaven", "whisperwood"].has(biome_id):
+			_meadow_patches()
+		if ["sunhaven", "whisperwood", "hollowshade", "miremoon"].has(biome_id):
+			_dirt_patches()
+		if biome_id == "sunhaven":
+			_wheat_fields()
+		_biome_decor()
 		return
 	var tuft: Texture2D = _decal_tex("tuft", "tuft")
 	var tuft_old: Texture2D = tex("tuft")
@@ -1139,6 +1154,135 @@ func _meadow_tex(n: String) -> Texture2D:
 	if ResourceLoader.exists(p):
 		return load(p) as Texture2D
 	return null
+
+# ---- decorations that give each plot its own look, drawn in code
+func _decor_tex(kind: String, variant: int) -> Texture2D:
+	var key: String = "%s_%d" % [kind, variant]
+	if decor_cache.has(key):
+		return decor_cache[key]
+	var img := Image.create(80, 40, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var C = CreatureArt
+	var ground: bool = false
+	match kind:
+		"pumpkin":
+			img = Image.create(18, 16, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._ball(img, 9.0, 9.0, 7.0, 6.0, Color(0.95, 0.5, 0.12))
+			C._rect(img, 8.0, 1.0, 2.0, 4.0, Color(0.3, 0.5, 0.2))
+			C._rect(img, 5.0, 5.0, 1.0, 8.0, Color(0.7, 0.32, 0.08))
+			C._rect(img, 12.0, 5.0, 1.0, 8.0, Color(0.7, 0.32, 0.08))
+		"mushroom":
+			img = Image.create(20, 20, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._rect(img, 8.0, 10.0, 4.0, 8.0, Color(0.95, 0.92, 0.8))
+			var caps: Array = [Color(0.7, 0.4, 0.95), Color(0.3, 0.8, 0.95), Color(0.95, 0.5, 0.8)]
+			C._ball(img, 10.0, 9.0, 8.0, 6.0, caps[variant % 3])
+			C._px(img, 7, 7, Color(1, 1, 1))
+			C._px(img, 12, 9, Color(1, 1, 1))
+		"reeds":
+			img = Image.create(16, 26, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			for i in 5:
+				var x: float = 2.0 + float(i) * 3.0
+				C._line(img, Vector2(x, 25), Vector2(x + float(i % 2) * 2.0 - 1.0, 4.0 + float(i % 3) * 4.0), 1.0, Color(0.35, 0.5, 0.25))
+			C._rect(img, 4.0, 3.0, 2.0, 5.0, Color(0.5, 0.32, 0.18))
+			C._rect(img, 11.0, 6.0, 2.0, 5.0, Color(0.5, 0.32, 0.18))
+		"puddle":
+			ground = true
+			img = Image.create(64, 26, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._ell(img, 32.0, 13.0, 30.0, 11.0, Color(0.12, 0.3, 0.38, 0.9))
+			C._ell(img, 30.0, 11.0, 24.0, 7.0, Color(0.2, 0.45, 0.52, 0.9))
+			C._ell(img, 24.0, 9.0, 8.0, 2.0, Color(0.5, 0.75, 0.8, 0.8))
+		"snowmound":
+			img = Image.create(40, 18, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._ball(img, 20.0, 11.0, 17.0, 6.0, Color(0.95, 0.97, 1.0))
+		"icepond":
+			ground = true
+			img = Image.create(96, 44, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._ell(img, 48.0, 22.0, 46.0, 20.0, Color(0.55, 0.7, 0.85, 0.95))
+			C._ell(img, 46.0, 20.0, 40.0, 15.0, Color(0.75, 0.88, 0.97, 0.95))
+			C._line(img, Vector2(30, 24), Vector2(60, 16), 1.0, Color(1, 1, 1, 0.8))
+		"dune":
+			ground = true
+			img = Image.create(72, 22, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._ell(img, 36.0, 13.0, 34.0, 8.0, Color(0.86, 0.7, 0.38, 0.9))
+			C._ell(img, 32.0, 10.0, 26.0, 5.0, Color(0.95, 0.82, 0.5, 0.9))
+		"cactus":
+			img = Image.create(22, 34, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var g := Color(0.3, 0.62, 0.3)
+			C._rect(img, 8.0, 6.0, 6.0, 26.0, g)
+			C._rect(img, 2.0, 14.0, 4.0, 3.0, g)
+			C._rect(img, 2.0, 8.0, 4.0, 9.0, g)
+			C._rect(img, 16.0, 18.0, 4.0, 3.0, g)
+			C._rect(img, 16.0, 11.0, 4.0, 10.0, g)
+			C._rect(img, 9.0, 7.0, 2.0, 24.0, g.lightened(0.2))
+			C._outline(img)
+		"lavapool":
+			ground = true
+			img = Image.create(72, 32, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._ell(img, 36.0, 16.0, 34.0, 14.0, Color(0.25, 0.1, 0.08, 0.95))
+			C._ell(img, 36.0, 16.0, 30.0, 11.0, Color(0.95, 0.38, 0.1, 0.95))
+			C._ell(img, 34.0, 14.0, 20.0, 6.0, Color(1.0, 0.8, 0.25, 0.95))
+		"emberrock":
+			img = Image.create(26, 22, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			C._ball(img, 13.0, 13.0, 11.0, 8.0, Color(0.25, 0.2, 0.2))
+			C._line(img, Vector2(8, 10), Vector2(14, 16), 1.0, Color(1.0, 0.5, 0.15))
+			C._line(img, Vector2(15, 9), Vector2(18, 14), 1.0, Color(1.0, 0.7, 0.2))
+		"crystal":
+			img = Image.create(20, 36, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var cc: Array = [Color(0.7, 0.45, 1.0), Color(0.4, 0.85, 1.0), Color(1.0, 0.55, 0.9)]
+			var c0: Color = cc[variant % 3]
+			C._tri(img, Vector2(10, 1), Vector2(3, 30), Vector2(17, 30), c0)
+			C._tri(img, Vector2(10, 1), Vector2(10, 30), Vector2(17, 30), c0.darkened(0.25))
+			C._tri(img, Vector2(10, 5), Vector2(6, 18), Vector2(10, 18), c0.lightened(0.5))
+			C._outline(img)
+		"gravestone":
+			img = Image.create(18, 26, false, Image.FORMAT_RGBA8)
+			img.fill(Color(0, 0, 0, 0))
+			var st := Color(0.6, 0.62, 0.64)
+			C._rect(img, 3.0, 8.0, 12.0, 17.0, st)
+			C._ell(img, 9.0, 9.0, 6.0, 5.0, st)
+			C._rect(img, 4.0, 8.0, 3.0, 17.0, st.lightened(0.15))
+			C._rect(img, 8.0, 8.0, 2.0, 8.0, st.darkened(0.3))
+			C._rect(img, 6.0, 11.0, 6.0, 2.0, st.darkened(0.3))
+			C._outline(img)
+	var t: ImageTexture = ImageTexture.create_from_image(img)
+	decor_cache[key] = t
+	return t
+
+func _biome_decor() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = randi()
+	var center: Vector2 = pen.get_center()
+	for entry in (biome.get("decor", []) as Array):
+		var kind: String = String((entry as Array)[0])
+		var n: int = int((entry as Array)[1])
+		var ground: bool = ["puddle", "icepond", "dune", "lavapool"].has(kind)
+		for i in n:
+			var p := Vector2.ZERO
+			var ok: bool = false
+			for tries in 14:
+				p = Vector2(rng.randf_range(160.0, wx - 160.0), rng.randf_range(180.0, wy - 180.0))
+				if p.distance_to(center) > 300.0 and not pen.grow(120.0).has_point(p) and not _blocked(p, 14.0):
+					ok = true
+					break
+			if not ok:
+				continue
+			var t: Texture2D = _decor_tex(kind, rng.randi() % 3)
+			var sc: float = rng.randf_range(0.9, 1.35)
+			if ground:
+				_decal(t, p, sc, -140, false, false)
+			else:
+				_decal(t, p, sc, 0, false, true)
 
 func _wheat_strip(w: int, rng: RandomNumberGenerator) -> ImageTexture:
 	var H: int = 36

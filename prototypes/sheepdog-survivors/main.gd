@@ -198,6 +198,8 @@ func _ready() -> void:
 	elif Meta.pending_mode != "":
 		mode = Meta.pending_mode
 		plot = Meta.pending_plot
+	if search.contains("plot="):
+		plot = clampi(search.substr(search.find("plot=") + 5, 1).to_int(), 0, 8)
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.raven_frames("wiz_ref")
 	fox_frames = U.set8("fox8", 12.0)
@@ -211,6 +213,8 @@ func _ready() -> void:
 	world = World.new()
 	world.wx = WX
 	world.wy = WY
+	world.biome_id = String(Meta.PLOTS[plot]["biome"])
+	world.biome = Meta.BIOMES[world.biome_id]
 	world.GH = roundi(WY / 48.0)
 	world.flat = style_flat
 	world.refst = style_name == "ref"
@@ -251,6 +255,7 @@ func _ready() -> void:
 		spawn_stray(true)
 	_setup_camera()
 	_setup_layers()
+	_setup_biome_fx()
 	_spawn_butterflies()
 	start_wave(1)
 	if campaign:
@@ -409,6 +414,62 @@ func _setup_camera() -> void:
 		pet.color = Color(1.0, 0.86, 0.9, 0.95) if kind == 0 else Color(0.78, 0.86, 0.3, 0.95)
 		pet.z_index = 41
 		cam.add_child(pet)
+
+var biome_fx: CPUParticles2D
+
+# the mood of the plot: an overall tint and drifting particles that follow the camera
+func _setup_biome_fx() -> void:
+	var b: Dictionary = world.biome
+	var cm := CanvasModulate.new()
+	cm.color = b["tone"]
+	add_child(cm)
+	var kind: String = String(b["fx"])
+	if kind == "":
+		return
+	var ps := CPUParticles2D.new()
+	ps.local_coords = false
+	ps.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	ps.emission_rect_extents = Vector2(620.0, 360.0)
+	ps.z_index = 40
+	ps.amount = 70
+	ps.lifetime = 6.0
+	ps.preprocess = 6.0
+	ps.scale_amount_min = 1.2
+	ps.scale_amount_max = 2.6
+	if kind == "fireflies":
+		ps.amount = 40
+		ps.gravity = Vector2.ZERO
+		ps.direction = Vector2(0, -1)
+		ps.spread = 180.0
+		ps.initial_velocity_min = 4.0
+		ps.initial_velocity_max = 14.0
+		ps.color = Color(0.9, 1.0, 0.45, 0.9)
+	elif kind == "snow":
+		ps.amount = 120
+		ps.gravity = Vector2(10, 40)
+		ps.direction = Vector2(0.2, 1)
+		ps.spread = 25.0
+		ps.initial_velocity_min = 10.0
+		ps.initial_velocity_max = 30.0
+		ps.color = Color(1, 1, 1, 0.9)
+	elif kind == "embers":
+		ps.amount = 60
+		ps.gravity = Vector2(0, -24)
+		ps.direction = Vector2(0, -1)
+		ps.spread = 40.0
+		ps.initial_velocity_min = 8.0
+		ps.initial_velocity_max = 26.0
+		ps.color = Color(1.0, 0.55, 0.15, 0.9)
+	else:
+		ps.amount = 60
+		ps.gravity = Vector2.ZERO
+		ps.direction = Vector2(0, -1)
+		ps.spread = 180.0
+		ps.initial_velocity_min = 2.0
+		ps.initial_velocity_max = 10.0
+		ps.color = Color(0.7, 0.85, 1.0, 0.95)
+	add_child(ps)
+	biome_fx = ps
 
 func _setup_layers() -> void:
 	var clouds_layer := CanvasLayer.new()
@@ -1005,6 +1066,8 @@ func update_grass_actors() -> void:
 		world.update_trail(acts)
 
 func _process(delta: float) -> void:
+	if biome_fx != null and cam != null:
+		biome_fx.position = cam.get_screen_center_position()
 	if state == "farm" and farm_view == "spin":
 		spin_t += delta
 	update_grass_actors()
