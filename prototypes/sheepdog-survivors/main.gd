@@ -1882,7 +1882,10 @@ func pen_goal(p: Vector2) -> Vector2:
 			best_st = st
 			best_e = e
 			best_n = n
-	if bd < 110.0:
+	var rel: Vector2 = p - best_e
+	var along: float = rel.dot(best_n)
+	var lat: float = absf(rel.dot(best_n.orthogonal()))
+	if along < 110.0 and along > -60.0 and lat < 45.0:
 		return best_e - best_n * 50.0
 	var box: Rect2 = world.pen.grow(8.0)
 	if not seg_blocked(p, best_st, box):
