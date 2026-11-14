@@ -752,9 +752,9 @@ func start_wave(n: int) -> void:
 	var pd0: Dictionary = Meta.PLOTS[plot]
 	var eff0: int = (1 + int(Meta.camp["attacks"]) / 2 + int(pd0["bonus"]) / 3) if campaign else (n + int(pd0["bonus"]))
 	var ex0: String = String(pd0["extra"])
-	for i in 8 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0):
+	for i in 2 * (8 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0)):
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
-	for i in 2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0):
+	for i in 3 * (2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0)):
 		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
 	if campaign:
 		var att0: int = int(Meta.camp["attacks"]) + 1
@@ -796,7 +796,7 @@ func start_defend() -> void:
 	var att: int = (int(Meta.camp["attacks"]) + 1) if campaign else wave
 	var eff: int = att + bonus / 3
 	var boss: bool = campaign and att >= Meta.FINAL_ATTACK
-	var budget: float = 10.0 + 5.0 * float(eff)
+	var budget: float = 2.0 * (10.0 + 5.0 * float(eff))
 	var costs: Dictionary = {"wolf": 2.0, "imp": 2.0, "goblin": 1.5, "gargoyle": 3.5, "harpy": 3.0, "ogre": 8.0, "skeleton": 3.0, "torchling": 2.5, "minotaur": 5.0, "kobold": 2.5, "wisp": 2.5, "hexer": 3.5}
 	var mins: Dictionary = {"wolf": 0, "imp": 0, "skeleton": 2, "torchling": 2, "goblin": 3, "kobold": 3, "minotaur": 4, "wisp": 4, "gargoyle": 5, "harpy": 6, "hexer": 6, "ogre": 7}
 	var mix: Array = Meta.PLOTS[plot]["mix"] if campaign else [["wolf", 3], ["imp", 1]]
@@ -809,15 +809,24 @@ func start_defend() -> void:
 		kinds = ["wolf", "imp"]
 	if boss:
 		events.append({"t": 8.0, "k": "drake"})
-		events.append({"t": 20.0, "k": "ogre"})
-		events.append({"t": 34.0, "k": "ogre"})
-		budget += 15.0
+		for ot in [6.0, 20.0, 34.0, 48.0]:
+			events.append({"t": ot, "k": "ogre"})
+		budget += 30.0
 	var guard: int = 0
 	while budget > 0.0 and guard < 90:
 		guard += 1
 		var kk: String = kinds[randi() % kinds.size()]
 		budget -= float(costs.get(kk, 2.0))
 		events.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": kk})
+	# the ones that go for the wizard come three times as thick (the budget already doubled them)
+	var extra_wiz: Array = []
+	var wiz_n: int = 0
+	for ev in events:
+		if ["imp", "wisp", "hexer"].has(String(ev["k"])):
+			wiz_n += 1
+			if wiz_n % 2 == 0:
+				extra_wiz.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": ev["k"]})
+	events.append_array(extra_wiz)
 	if not campaign and wave == LAST_WAVE:
 		events.append({"t": 14.0, "k": "bear"})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
