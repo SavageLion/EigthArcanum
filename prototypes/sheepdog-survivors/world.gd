@@ -538,6 +538,7 @@ func _obstacles() -> void:
 		s.scale = Vector2.ONE * (w / float(rk.get_width()))
 		s.offset = Vector2(0, -float(rk.get_height()) * 0.5 + 3.0)
 		ysort.add_child(s)
+		add_child(_blob_shadow(p + Vector2(w * 0.28, 10.0), w / 64.0 * 0.85, w / 64.0 * 0.3))
 	var ta: Texture2D = tex("tree_big_a")
 	var tb: Texture2D = tex("tree_big_b")
 	for i in 0:
@@ -764,7 +765,56 @@ func _build_posts() -> void:
 			ysort.add_child(sp)
 			post_nodes.append(sp)
 
+func _wall_height() -> float:
+	return [17.0, 24.0, 30.0, 40.0][tier]
+
+# a wall running up and down the screen is seen edge-on: a column with its top and its end
+func _column_tex(l: float) -> ImageTexture:
+	var h: int = int(_wall_height())
+	var W: int = 14
+	var img := Image.create(W, int(l) + h + 2, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var out := Color(0.15, 0.11, 0.09)
+	var L: int = int(l)
+	if tier == 0:
+		var wood := Color(0.6, 0.4, 0.22)
+		_px(img, 5, h - 11, 4, L + 1, out)
+		_px(img, 6, h - 10, 2, L, wood.lightened(0.15))
+		var yy: int = 0
+		while yy <= L:
+			_px(img, 3, yy, 8, h + 1, out)
+			_px(img, 4, yy + 1, 6, h - 1, wood)
+			_px(img, 4, yy + 1, 2, h - 1, wood.lightened(0.2))
+			yy += 26
+	elif tier == 1:
+		var wood2 := Color(0.56, 0.37, 0.2)
+		_px(img, 1, 0, W - 2, L + h, out)
+		_px(img, 2, 1, W - 4, L + h - 2, wood2)
+		var y2: int = 3
+		while y2 < L + h - 2:
+			_px(img, 2, y2, W - 4, 1, wood2.darkened(0.35))
+			y2 += 8
+	else:
+		var stone := Color(0.66, 0.66, 0.7) if tier == 2 else Color(0.6, 0.62, 0.72)
+		_px(img, 1, 0, W - 2, L + h, out)
+		_px(img, 2, 1, W - 4, L - 1, stone.lightened(0.15))
+		var y3: int = 4
+		while y3 < L - 2:
+			_px(img, 2, y3, W - 4, 1, stone.darkened(0.12))
+			y3 += 8
+		_px(img, 2, L, W - 4, h - 1, stone)
+		var by: int = L + 6
+		while by < L + h - 2:
+			_px(img, 2, by, W - 4, 1, stone.darkened(0.25))
+			by += 7
+		if tier == 3:
+			_px(img, 2, L + 11, W - 4, 4, Color(0.72, 0.16, 0.16))
+	return ImageTexture.create_from_image(img)
+
 func _wall_nodes(w: Dictionary) -> void:
+	for s in (w.get("shadows", []) as Array):
+		(s as Node).queue_free()
+	var shadows: Array = []
 	var fence_h: Texture2D = make_wall_tex(tier)
 	var a: Vector2 = w["a"]
 	var b: Vector2 = w["b"]
@@ -772,6 +822,34 @@ func _wall_nodes(w: Dictionary) -> void:
 	if l < 2.0:
 		return
 	var nodes: Array = []
+	if absf(b.x - a.x) < absf(b.y - a.y) * 0.2:
+		var top: float = minf(a.y, b.y)
+		var bot: float = maxf(a.y, b.y)
+		var col := Sprite2D.new()
+		var ct: ImageTexture = _column_tex(bot - top)
+		col.texture = ct
+		col.position = Vector2(a.x, bot)
+		col.offset = Vector2(0, -float(ct.get_height()) / 2.0)
+		col.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		ysort.add_child(col)
+		nodes.append(col)
+		var sy: float = top + 8.0
+		while sy < bot:
+			var sh: Sprite2D = _blob_shadow(Vector2(a.x + 11.0, sy + 6.0), 0.14, 0.16)
+			add_child(sh)
+			shadows.append(sh)
+			sy += 30.0
+		w["nodes"] = nodes
+		w["shadows"] = shadows
+		return
+	var sx: float = 20.0
+	while sx < l:
+		var sp0: Vector2 = a.lerp(b, sx / l)
+		var sh2: Sprite2D = _blob_shadow(sp0 + Vector2(10.0, 8.0), 0.3, 0.1)
+		add_child(sh2)
+		shadows.append(sh2)
+		sx += 40.0
+	w["shadows"] = shadows
 	var ang: float = atan2(b.y - a.y, b.x - a.x)
 	var n2c: int = maxi(1, roundi(l / 80.0))
 	var sw: float = l / float(n2c)
@@ -807,6 +885,8 @@ func open_hole(side: String) -> void:
 		w2["hp"] = w["hp"]
 		for n in (w["nodes"] as Array):
 			(n as Sprite2D).queue_free()
+		for shd in (w.get("shadows", []) as Array):
+			(shd as Node).queue_free()
 		walls[i] = w1
 		walls.append(w2)
 		_wall_nodes(w1)
@@ -1012,6 +1092,7 @@ func _decals() -> void:
 	if refst:
 		_meadow_patches()
 		_dirt_patches()
+		_wheat_fields()
 		return
 	var tuft: Texture2D = _decal_tex("tuft", "tuft")
 	var tuft_old: Texture2D = tex("tuft")
@@ -1058,6 +1139,63 @@ func _meadow_tex(n: String) -> Texture2D:
 	if ResourceLoader.exists(p):
 		return load(p) as Texture2D
 	return null
+
+func _wheat_strip(w: int, rng: RandomNumberGenerator) -> ImageTexture:
+	var H: int = 36
+	var img := Image.create(w, H, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var pal: Array = [Color(0.86, 0.62, 0.2), Color(0.93, 0.74, 0.28), Color(0.78, 0.5, 0.15), Color(0.97, 0.82, 0.38), Color(0.9, 0.66, 0.22)]
+	_px(img, 0, H - 8, w, 8, Color(0.62, 0.42, 0.14))
+	var x: int = 0
+	while x < w:
+		var h: int = 20 + rng.randi() % 14
+		var c: Color = pal[rng.randi() % pal.size()]
+		_px(img, x, H - h, 2, h, c)
+		_px(img, x, H - h, 2, 4, c.lightened(0.18))
+		if x % 7 == 0:
+			_px(img, x + 1, H - h + 5, 1, h - 5, c.darkened(0.3))
+		x += 2
+	return ImageTexture.create_from_image(img)
+
+# fields of ripe wheat: rows of stalks, each row sorted on its own so animals wade through them
+func _wheat_fields() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = randi()
+	var placed: Array = []
+	var center: Vector2 = pen.get_center()
+	for attempt in 160:
+		if placed.size() >= 4:
+			break
+		var fw: float = rng.randf_range(220.0, 360.0)
+		var fh: float = rng.randf_range(100.0, 160.0)
+		var r := Rect2(rng.randf_range(220.0, wx - 220.0 - fw), rng.randf_range(240.0, wy - 240.0 - fh), fw, fh)
+		if r.get_center().distance_to(center) < 520.0 or pen.grow(240.0).intersects(r):
+			continue
+		var ok: bool = true
+		for pt in [r.position, r.end, Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), r.get_center()]:
+			if _blocked(pt, 16.0) or not _on_open_grass(pt):
+				ok = false
+		for o in placed:
+			if (o as Rect2).grow(50.0).intersects(r):
+				ok = false
+		if ok:
+			placed.append(r)
+	for fr in placed:
+		var rc: Rect2 = fr
+		var variants: Array = []
+		for v in 3:
+			variants.append(_wheat_strip(int(rc.size.x), rng))
+		var y: float = rc.position.y + 16.0
+		while y < rc.end.y:
+			var sp := Sprite2D.new()
+			sp.texture = variants[rng.randi() % 3]
+			sp.position = Vector2(rc.position.x + rc.size.x / 2.0 + rng.randf_range(-3.0, 3.0), y)
+			sp.offset = Vector2(0, -18.0)
+			sp.material = wind_mat
+			sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			ysort.add_child(sp)
+			y += 11.0
+		add_child(_blob_shadow(rc.get_center() + Vector2(14.0, 20.0), rc.size.x / 64.0 * 0.5, rc.size.y / 64.0 * 0.3))
 
 func _meadow_patches() -> void:
 	var lav: Texture2D = _meadow_tex("lavender")
