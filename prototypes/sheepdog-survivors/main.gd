@@ -35,9 +35,6 @@ const PERKS: Array = [
 	{"id": "wide", "name": "Wide Magic", "desc": "Bigger explosions, rings and orbits.", "max": 4},
 	{"id": "bark", "name": "Arcane Howl", "desc": "Your bark reaches further and recharges faster.", "max": 4},
 	{"id": "boots", "name": "Fleet Paws", "desc": "You run faster.", "max": 4},
-	{"id": "vigor", "name": "Vitality", "desc": "+25 maximum health and a quick heal.", "max": 5},
-	{"id": "regen", "name": "Second Wind", "desc": "You heal faster when out of danger.", "max": 4},
-	{"id": "ward", "name": "Warding Robe", "desc": "You take less damage from raiders.", "max": 4},
 	{"id": "magnet", "name": "Gem Magnet", "desc": "Pick up XP gems from further away.", "max": 4},
 	{"id": "study", "name": "Quick Study", "desc": "Every gem gives more XP.", "max": 4},
 ]
@@ -992,24 +989,17 @@ func collide(e: Mover, r: float, bounce: float) -> void:
 		e.vel.y = -absf(e.vel.y) * bounce
 
 # ---------------------------------------------------------------- the dog
-func damage_dog(amount: float, from: Vector2) -> void:
-	if dog.invuln > 0.0 or dog.ko_t > 0.0:
+func damage_dog(_amount: float, from: Vector2) -> void:
+	# the wizard has no health: a hit just stuns him for a moment
+	if dog.invuln > 0.0 or dog.stun > 0.0:
 		return
-	amount *= ward_k()
-	dog.hp -= amount
 	dog.hurt_t = 0.3
-	dog.regen_t = 4.0
-	dog.invuln = 0.35
-	dog.stun = maxf(dog.stun, 0.2)
-	dog.vel += (dog.position - from).normalized() * 260.0
+	dog.invuln = 2.2
+	dog.stun = 1.2
+	dog.vel += (dog.position - from).normalized() * 200.0
 	shake = 1.0
-	add_popup("-%d" % int(amount), dog.position + Vector2(0, -34), Color(1.0, 0.4, 0.4))
-	if dog.hp <= 0.0:
-		dog.hp = 0.0
-		dog.ko_t = 3.0
-		dog.vel = Vector2.ZERO
-		add_popup("KNOCKED OUT!", dog.position + Vector2(0, -44), Color(1.0, 0.5, 0.4))
-		ring(dog.position, 60.0, Color(1.0, 0.4, 0.35), 0.5, 5.0)
+	add_popup("STUNNED!", dog.position + Vector2(0, -40), Color(1.0, 0.85, 0.4))
+	ring(dog.position, 40.0, Color(1.0, 0.85, 0.4), 0.4, 4.0)
 
 func update_dog(dt: float) -> void:
 	dog.invuln = maxf(0.0, dog.invuln - dt)
@@ -1035,7 +1025,7 @@ func update_dog(dt: float) -> void:
 	dog.walk = false
 	dog.crouch = false
 	var speedk: float = 0.0 if mag < 0.12 else (0.55 + 0.45 * minf(1.0, (mag - 0.12) / 0.6))
-	var sp: float = 235.0 * speed_mult() * speedk * (0.3 if dog.stun > 0.0 else 1.0)
+	var sp: float = 235.0 * speed_mult() * speedk * (0.1 if dog.stun > 0.0 else 1.0)
 	if world.zone_kind(dog.position) == "water":
 		sp *= 0.5
 	dog.vel += (dir * sp - dog.vel) * minf(1.0, dt * 9.0)

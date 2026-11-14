@@ -40,8 +40,8 @@ func _draw() -> void:
 	_panel(Rect2(8, 6, 230, 58))
 	_text("LV %d" % main.level, Vector2(18, 28), 17, Color(0.6, 0.9, 1.0))
 	_bar(Rect2(74, 16, 154, 9), main.xp / main.xp_need(), Color(0.45, 0.8, 1.0))
-	_text("HP", Vector2(18, 46), 10, Color(CREAM, 0.8))
-	_bar(Rect2(50, 38, 178, 9), main.dog.hp / main.dog.hp_max, Color(0.9, 0.3, 0.3))
+	if main.dog.stun > 0.0:
+		_text("STUNNED", Vector2(120, 59), 12, Color(1.0, 0.85, 0.4))
 	_text("%d in the pen" % main.pen_total, Vector2(18, 59), 12, Color(CREAM, 0.85))
 	# gold
 	_panel(Rect2(8, 72, 104, 26))

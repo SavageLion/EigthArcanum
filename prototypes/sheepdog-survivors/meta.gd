@@ -38,7 +38,6 @@ const UNLOCKS: Array = [
 	{"id": "perk_zap", "kind": "perk", "ref": "zap", "name": "Chain Lightning", "desc": "A spell for the wizard: lightning that jumps.", "cost": {"poppy": 3, "pumpkin": 2}},
 	{"id": "perk_orbit", "kind": "perk", "ref": "orbit", "name": "Arcane Orbit", "desc": "A spell for the wizard: orbs that circle him.", "cost": {"pumpkin": 3, "wheat": 3}},
 	{"id": "perk_wide", "kind": "perk", "ref": "wide", "name": "Wide Magic", "desc": "Perk: bigger explosions, rings and orbits.", "cost": {"lavender": 2, "poppy": 2}},
-	{"id": "perk_ward", "kind": "perk", "ref": "ward", "name": "Warding Robe", "desc": "Perk: take less damage from raiders.", "cost": {"pumpkin": 2, "berry": 2}},
 	{"id": "perk_study", "kind": "perk", "ref": "study", "name": "Quick Study", "desc": "Perk: every gem gives more XP.", "cost": {"wheat": 3, "carrot": 3}},
 	{"id": "castle_gate", "kind": "castle", "ref": "gate", "name": "Pen Gates", "desc": "Castle option: cut gates so animals walk in.", "cost": {"carrot": 4}},
 	{"id": "castle_walls", "kind": "castle", "ref": "walls_up", "name": "Stronger Walls", "desc": "Castle option: reinforce the walls.", "cost": {"wheat": 6}},
