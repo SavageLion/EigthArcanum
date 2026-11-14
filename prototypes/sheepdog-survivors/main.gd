@@ -164,6 +164,9 @@ func _ready() -> void:
 		if search.contains("angle="):
 			U.PROJ = clampf(float(search.substr(search.find("angle=") + 6, 2).to_int()) / 100.0, 0.4, 1.0)
 		WY = float(roundi(2208.0 / U.PROJ / 48.0)) * 48.0
+	if search.contains("classic"):
+		get_tree().change_scene_to_file.call_deferred("res://classic.tscn")
+		return
 	if search.contains("xtest="):
 		var xk: String = search.substr(search.find("xtest=") + 6).get_slice("&", 0)
 		Meta.new_run()
@@ -2229,6 +2232,9 @@ func farm_go_rect() -> Rect2:
 func farm_shop_rect() -> Rect2:
 	return Rect2(24.0, vp().y - 60.0, 190.0, 46.0)
 
+func farm_classic_rect() -> Rect2:
+	return Rect2(424.0, vp().y - 60.0, 190.0, 46.0)
+
 func farm_exp_rect() -> Rect2:
 	return Rect2(224.0, vp().y - 60.0, 190.0, 46.0)
 
@@ -2275,6 +2281,9 @@ func farm_press(p: Vector2) -> void:
 		return
 	if farm_shop_rect().grow(6.0).has_point(p):
 		farm_view = "shop"
+		return
+	if farm_classic_rect().grow(6.0).has_point(p):
+		get_tree().change_scene_to_file("res://classic.tscn")
 		return
 	if farm_exp_rect().grow(6.0).has_point(p):
 		Meta.new_run()

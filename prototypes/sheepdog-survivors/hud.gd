@@ -503,8 +503,9 @@ func _farm_map(v: Vector2) -> void:
 			draw_multiline_string(font, pr.position + Vector2(20, 100), "Open it with materials in the Workshop (Plots tab). It starts with a fresh pen.", HORIZONTAL_ALIGNMENT_CENTER, pr.size.x - 40.0, 14, 4, Color(CREAM, 0.8))
 	_farmbtn(main.farm_shop_rect(), "WORKSHOP", Color(0.4, 0.3, 0.14, 0.98))
 	_farmbtn(main.farm_exp_rect(), "EXPEDITION", Color(0.5, 0.22, 0.2, 0.98))
+	_farmbtn(main.farm_classic_rect(), "CLASSIC DOG", Color(0.25, 0.35, 0.5, 0.98))
 	var left: int = maxi(0, Meta.GATHERS_PER_ATTACK - int(Meta.camp["gathers"]))
-	_text("Raid in %d gathers  ·  attacks faced %d / %d" % [left, int(Meta.camp["attacks"]), Meta.FINAL_ATTACK], Vector2(430, v.y - 30), 14, Color(CREAM, 0.85))
+	_text("Raid in %d gathers  ·  attacks faced %d / %d" % [left, int(Meta.camp["attacks"]), Meta.FINAL_ATTACK], Vector2(630, v.y - 30), 13, Color(CREAM, 0.85))
 
 func _farm_shop(v: Vector2) -> void:
 	var names: Array = ["Spells and perks", "Castle", "Plots"]
