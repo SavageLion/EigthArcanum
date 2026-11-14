@@ -158,7 +158,9 @@ func pl(id: String) -> int:
 func _ready() -> void:
 	var search: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
 	if search.contains("angle"):
-		U.PROJ = 0.78
+		U.PROJ = 0.62
+		if search.contains("angle="):
+			U.PROJ = clampf(float(search.substr(search.find("angle=") + 6, 2).to_int()) / 100.0, 0.4, 1.0)
 	if search.contains("seed="):
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
@@ -2342,7 +2344,7 @@ func update_sheep(dt: float) -> void:
 		var v: float = sh.vel.length()
 		if v > cap:
 			sh.vel *= cap / v
-		sh.position += sh.vel * dt
+		sh.position += Vector2(sh.vel.x, sh.vel.y * U.up()) * dt
 		collide(sh, sh.r, 0.2)
 		var P: Rect2 = world.pen
 		if (not sh.in_pen) and sh.position.x > P.position.x + 12.0 and sh.position.x < P.end.x - 12.0 and sh.position.y > P.position.y + 6.0 and sh.position.y < P.end.y - 6.0:
@@ -2552,7 +2554,7 @@ func update_enemies(dt: float) -> void:
 		if fx.fleeing:
 			var e: Vector2 = nearest_edge(fx.position)
 			move_to(fx, e, 190.0, dt, 6.0)
-			fx.position += (fx.vel + fx.kb) * dt
+			fx.position += Vector2((fx.vel + fx.kb).x, (fx.vel + fx.kb).y * U.up()) * dt
 			if fx.position.x < XMIN - 20.0 or fx.position.x > XMAX + 20.0 or fx.position.y < YMIN - 20.0 or fx.position.y > YMAX + 20.0:
 				foxes.erase(fx)
 				fx.queue_free()
@@ -2601,7 +2603,8 @@ func update_enemies(dt: float) -> void:
 		else:
 			gnaw(fx, dt)
 		var wk: float = 0.55 if world.zone_kind(fx.position) == "water" else 1.0
-		fx.position += (fx.vel * (0.5 if fx.slow > 0.0 else 1.0) * wk + fx.kb) * dt
+		var mv: Vector2 = fx.vel * (0.5 if fx.slow > 0.0 else 1.0) * wk + fx.kb
+		fx.position += Vector2(mv.x, mv.y * U.up()) * dt
 		if fx.kind != "harpy" and fx.kind != "drake":
 			collide(fx, fx.r, 0.0)
 
