@@ -754,7 +754,7 @@ func start_wave(n: int) -> void:
 	var ex0: String = String(pd0["extra"])
 	for i in 2 * (8 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0)):
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
-	for i in 3 * (2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0)):
+	for i in 6 * (2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0)):
 		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
 	if campaign:
 		var att0: int = int(Meta.camp["attacks"]) + 1
@@ -827,6 +827,11 @@ func start_defend() -> void:
 			if wiz_n % 2 == 0:
 				extra_wiz.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": ev["k"]})
 	events.append_array(extra_wiz)
+	var twin: Array = []
+	for ev2 in events:
+		if ["imp", "wisp", "hexer"].has(String(ev2["k"])):
+			twin.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": ev2["k"]})
+	events.append_array(twin)
 	if not campaign and wave == LAST_WAVE:
 		events.append({"t": 14.0, "k": "bear"})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
