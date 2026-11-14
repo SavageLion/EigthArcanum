@@ -2,7 +2,7 @@ extends Node2D
 # Sheepdog Survivors: herd animals into the pen for XP, shoo off waves of raiders, hold the fence for ten waves.
 
 const WX: float = 3264.0
-const WY: float = 2208.0
+var WY: float = 2208.0
 var XMIN: float = 36.0
 var XMAX: float = 3228.0
 var YMIN: float = 36.0
@@ -161,6 +161,7 @@ func _ready() -> void:
 		U.PROJ = 0.62
 		if search.contains("angle="):
 			U.PROJ = clampf(float(search.substr(search.find("angle=") + 6, 2).to_int()) / 100.0, 0.4, 1.0)
+		WY = float(roundi(2208.0 / U.PROJ / 48.0)) * 48.0
 	if search.contains("seed="):
 		seed(search.substr(search.find("seed=") + 5).to_int())
 	else:
@@ -210,6 +211,7 @@ func _ready() -> void:
 	world = World.new()
 	world.wx = WX
 	world.wy = WY
+	world.GH = roundi(WY / 48.0)
 	world.flat = style_flat
 	world.refst = style_name == "ref"
 	add_child(world)

@@ -5,7 +5,7 @@ extends Node2D
 
 const CELL: float = 48.0
 const GW: int = 68
-const GH: int = 46
+var GH: int = 46
 const T_GRASS: int = 0
 const T_WATER: int = 1
 const T_PATH: int = 2
