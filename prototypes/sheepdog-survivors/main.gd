@@ -8,8 +8,8 @@ var XMAX: float = 3228.0
 var YMIN: float = 36.0
 var YMAX: float = 2172.0
 const BTN_R: float = 52.0
-const WAVE_LEN: float = 60.0
-const DEFEND_LEN: float = 60.0
+var WAVE_LEN: float = 60.0
+var DEFEND_LEN: float = 60.0
 var LAST_WAVE: int = 3
 const BASE_ZOOM: float = 1.1
 const TYPES: Dictionary = {
@@ -208,6 +208,8 @@ func _ready() -> void:
 	elif Meta.pending_mode.begins_with("x"):
 		expedition = true
 		campaign = false
+		WAVE_LEN = 90.0
+		DEFEND_LEN = 90.0
 		mode = Meta.pending_mode.substr(1)
 		plot = int(Meta.run_node(int((Meta.run["cur"] as Array)[0]), int((Meta.run["cur"] as Array)[1]))["biome"])
 	elif Meta.pending_mode != "":
@@ -781,10 +783,10 @@ func start_wave(n: int) -> void:
 	var pd0: Dictionary = Meta.PLOTS[plot]
 	var eff0: int = (1 + int(Meta.camp["attacks"]) / 2 + int(pd0["bonus"]) / 3) if campaign else ((x_att() / 2 + 1 + int(pd0["bonus"]) / 3) if expedition else (n + int(pd0["bonus"])))
 	var ex0: String = String(pd0["extra"])
-	for i in 2 * (8 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0)):
-		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
-	for i in 6 * (2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0)):
-		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
+	for i in roundi(float(2 * (8 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0))) * x_k()):
+		events.append({"t": randf_range(1.0, WAVE_LEN - 6.0), "k": "fox"})
+	for i in roundi(float(6 * (2 + eff0 / 2 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0))) * x_k()):
+		events.append({"t": randf_range(3.0, WAVE_LEN - 8.0), "k": "imp"})
 	if campaign or expedition:
 		var att0: int = (int(Meta.camp["attacks"]) + 1) if campaign else x_att()
 		var pv: float = clampf(0.1 + 0.06 * float(att0), 0.0, 0.55)
@@ -835,7 +837,7 @@ func start_defend() -> void:
 	var att: int = (int(Meta.camp["attacks"]) + 1) if campaign else (x_att() if expedition else wave)
 	var eff: int = att + bonus / 3
 	var boss: bool = (campaign and att >= Meta.FINAL_ATTACK) or (expedition and x_node_type() == "boss")
-	var budget: float = 2.0 * (10.0 + 5.0 * float(eff)) * (1.5 if (expedition and x_node_type() == "elite") else 1.0)
+	var budget: float = 2.0 * (10.0 + 5.0 * float(eff)) * (1.5 if (expedition and x_node_type() == "elite") else 1.0) * x_k()
 	var costs: Dictionary = {"wolf": 2.0, "imp": 2.0, "goblin": 1.5, "gargoyle": 3.5, "harpy": 3.0, "ogre": 8.0, "skeleton": 3.0, "torchling": 2.5, "minotaur": 5.0, "kobold": 2.5, "wisp": 2.5, "hexer": 3.5, "frostling": 2.5, "bat": 2.0, "slime": 3.0, "knight": 4.5, "mole": 4.0, "necromancer": 6.0, "shaman": 4.0, "banshee": 4.0, "cutpurse": 2.5}
 	var mins: Dictionary = {"wolf": 0, "imp": 0, "bat": 2, "slime": 3, "frostling": 3, "cutpurse": 3, "mole": 4, "knight": 5, "shaman": 5, "necromancer": 6, "banshee": 6, "skeleton": 2, "torchling": 2, "goblin": 3, "kobold": 3, "minotaur": 4, "wisp": 4, "gargoyle": 5, "harpy": 6, "hexer": 6, "ogre": 7}
 	var mix: Array = Meta.PLOTS[plot]["mix"] if (campaign or expedition) else [["wolf", 3], ["imp", 1]]
@@ -1949,6 +1951,12 @@ func x_layer() -> int:
 
 func x_node_type() -> String:
 	return String(Meta.run_node(int((Meta.run["cur"] as Array)[0]), int((Meta.run["cur"] as Array)[1]))["type"])
+
+# the road starts gentle and reaches full strength by the eighth stop; longer stops get proportionally more raiders
+func x_k() -> float:
+	if not expedition:
+		return 1.0
+	return (WAVE_LEN / 60.0) * clampf(0.3 + 0.09 * float(x_layer()), 0.3, 1.0)
 
 func x_att() -> int:
 	return 1 + roundi(float(x_layer()) * 1.3)
