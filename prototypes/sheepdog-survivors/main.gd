@@ -9,6 +9,7 @@ var YMIN: float = 36.0
 var YMAX: float = 2172.0
 const BTN_R: float = 52.0
 const WAVE_LEN: float = 60.0
+const DEFEND_LEN: float = 60.0
 var LAST_WAVE: int = 5
 const BASE_ZOOM: float = 1.1
 const TYPES: Dictionary = {
@@ -508,6 +509,7 @@ func end_wave_now() -> void:
 		wave_t = WAVE_LEN
 	else:
 		events.clear()
+		wave_t = DEFEND_LEN
 		for f in foxes.duplicate():
 			defeat(f)
 
@@ -625,7 +627,7 @@ func cdm() -> float:
 func am() -> float:
 	return 1.0 + 0.15 * float(pl("wide"))
 func bark_r() -> float:
-	return 250.0 * (1.0 + 0.2 * float(pl("bark")))
+	return 150.0 * (1.0 + 0.2 * float(pl("bark")))
 func bark_cd() -> float:
 	var ducks: int = int(pen_counts.get("duck", 0))
 	return 2.4 * pow(0.88, float(pl("bark"))) * (1.0 - minf(0.3, 0.03 * float(ducks)))
@@ -656,14 +658,14 @@ func start_wave(n: int) -> void:
 	events.clear()
 	banner = "WAVE %d: GATHER THE ANIMALS" % n
 	if n == 1:
-		banner = "BARK CALLS THE ANIMALS TO THE PEN"
+		banner = "HERD THE ANIMALS INTO THE PEN"
 	banner_t = 3.5
 	var pd0: Dictionary = Meta.PLOTS[plot]
 	var eff0: int = n + int(pd0["bonus"])
 	var ex0: String = String(pd0["extra"])
-	for i in 5 + 2 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0):
+	for i in 8 + 3 * eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "fox" else 0):
 		events.append({"t": randf_range(1.0, 54.0), "k": "fox"})
-	for i in ((1 + eff0 / 2) if eff0 >= 2 else 0) + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0):
+	for i in 2 + eff0 + (2 + int(pd0["bonus"]) / 2 if ex0 == "imp" else 0):
 		events.append({"t": randf_range(3.0, 52.0), "k": "imp"})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
 	if n > 1:
@@ -695,11 +697,11 @@ func start_defend() -> void:
 	var pd: Dictionary = Meta.PLOTS[plot]
 	var bonus: int = int(pd["bonus"])
 	var eff: int = wave + bonus
-	for i in (1 + eff / 2) if eff >= 2 else 0:
-		events.append({"t": randf_range(2.0, 40.0), "k": "imp"})
-	var wolf_n: int = 2 + eff + 1 + bonus / 2
+	for i in 2 + eff:
+		events.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": "imp"})
+	var wolf_n: int = 4 + 2 * eff + bonus / 2
 	for i in wolf_n:
-		events.append({"t": randf_range(2.0, 40.0), "k": "wolf"})
+		events.append({"t": randf_range(2.0, DEFEND_LEN - 8.0), "k": "wolf"})
 	if wave == LAST_WAVE:
 		for i in 1 + bonus / 3:
 			events.append({"t": 12.0 + 16.0 * float(i), "k": "bear"})
@@ -877,7 +879,7 @@ func _physics_process(delta: float) -> void:
 	if phase == "gather":
 		if wave_t >= WAVE_LEN:
 			begin_intermission()
-	elif events.is_empty() and (foxes.is_empty() and wave_t > 3.0 or wave_t > 150.0):
+	elif events.is_empty() and (foxes.is_empty() and wave_t >= DEFEND_LEN or wave_t > 200.0):
 		if wave >= LAST_WAVE:
 			finish_day("won")
 		else:
@@ -1105,18 +1107,15 @@ func do_bark() -> void:
 		var dd: Vector2 = sh.position - dog.position
 		var dist: float = dd.length()
 		if dist < R and dist > 0.1:
-			var f: float = maxf(0.45, 1.0 - dist / R)
-			var gd: Vector2 = (pen_goal(sh.position) - sh.position).normalized()
-			var dir: Vector2 = (dd / dist * 0.3 + gd * 0.7).normalized()
-			sh.vel += dir * 170.0 * f * sh.bark_mul
-			sh.panic = maxf(sh.panic, 0.45)
-			sh.home_t = 5.0 if sh.heavy else 4.0
+			var f: float = 1.0 - dist / R
+			sh.vel += dd / dist * 190.0 * f * sh.bark_mul
+			sh.panic = maxf(sh.panic, 0.9 * sh.bark_mul)
 			sh.squash = 1.0
 	for f in foxes.duplicate():
 		var fx: Fox = f
 		if fx.fleeing:
 			continue
-		if fx.position.distance_to(dog.position) < R * 0.68:
+		if fx.position.distance_to(dog.position) < R * 1.1:
 			hurt(fx, 2.0 * sp(), dog.position, 260.0, 1.0)
 
 func add_popup(text: String, pos: Vector2, col: Color) -> void:

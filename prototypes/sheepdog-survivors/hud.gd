@@ -54,9 +54,9 @@ func _draw() -> void:
 	if main.phase == "gather":
 		wl = "WAVE %d / %d   GATHER  %d" % [main.wave, main.LAST_WAVE, int(ceil(main.WAVE_LEN - main.wave_t))]
 	else:
-		wl = "WAVE %d / %d   DEFEND  %d left" % [main.wave, main.LAST_WAVE, main.foxes.size() + main.events.size()]
-	_panel(Rect2(v.x / 2.0 - 130, 6, 260, 32))
-	_text(wl, Vector2(v.x / 2.0 - 130, 28), 16, CREAM, 260.0, HORIZONTAL_ALIGNMENT_CENTER)
+		wl = "WAVE %d / %d   DEFEND  %d  (%d raiders)" % [main.wave, main.LAST_WAVE, maxi(0, int(ceil(main.DEFEND_LEN - main.wave_t))), main.foxes.size() + main.events.size()]
+	_panel(Rect2(v.x / 2.0 - 150, 6, 300, 32))
+	_text(wl, Vector2(v.x / 2.0 - 150, 28), 16, CREAM, 300.0, HORIZONTAL_ALIGNMENT_CENTER)
 	# top right: fence health (weakest piece)
 	var worst: float = 1.0
 	for w in main.world.walls:
