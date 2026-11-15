@@ -639,7 +639,7 @@ func _pen_visuals() -> void:
 	dirt.z_index = -150
 	if not (flat or refst):
 		add_child(dirt)
-	fence_tex = tex("stone_wall")
+	fence_tex = _picket_tex() if lite else tex("stone_wall")
 	for w in walls:
 		_wall_nodes(w)
 
@@ -794,7 +794,9 @@ func _column_tex(l: float) -> ImageTexture:
 	var out := Color(0.15, 0.11, 0.09)
 	var L: int = int(l)
 	if tier == 0:
-		var wood := Color(0.6, 0.4, 0.22)
+		var wood := Color(0.94, 0.93, 0.89) if lite else Color(0.6, 0.4, 0.22)
+		if lite:
+			out = Color(0.4, 0.38, 0.37)
 		_px(img, 5, h - 11, 4, L + 1, out)
 		_px(img, 6, h - 10, 2, L, wood.lightened(0.15))
 		var yy: int = 0
@@ -1540,3 +1542,19 @@ func _trees_ref() -> void:
 		_border_tree(trees, Vector2(38.0 + rng.randf_range(-6.0, 10.0), t + rng.randf_range(-8.0, 8.0)), rng, shrub)
 		_border_tree(trees, Vector2(wx - 38.0 + rng.randf_range(-10.0, 6.0), t + 33.0 + rng.randf_range(-8.0, 8.0)), rng, shrub)
 		t += 66.0
+
+func _picket_tex() -> ImageTexture:
+	var img := Image.create(76, 17, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var out := Color(0.4, 0.38, 0.37)
+	var white := Color(0.96, 0.96, 0.93)
+	var shade := Color(0.76, 0.76, 0.74)
+	_px(img, 0, 6, 76, 2, shade)
+	_px(img, 0, 12, 76, 2, shade)
+	for i in 12:
+		var x0: int = 1 + i * 6
+		_px(img, x0, 3, 4, 13, out)
+		_px(img, x0 + 1, 4, 2, 11, white)
+		_px(img, x0 + 3, 4, 1, 11, shade)
+		_px(img, x0 + 1, 2, 2, 1, out)
+	return ImageTexture.create_from_image(img)

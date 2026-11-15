@@ -26,8 +26,13 @@ void fragment() {
 		col = mix(col, vec3(0.92, 0.97, 1.0), edge * 0.55);
 		COLOR = vec4(col, in_w);
 	} else {
+		if (f.r > 0.26) {
+			float bank = smoothstep(0.26, 0.42, f.r);
+			float grain = texture(noise, lp / 23.0).r;
+			COLOR = vec4(mix(vec3(0.82, 0.58, 0.32), vec3(0.66, 0.44, 0.24), grain), bank * 0.9);
+		}
 		float depth = -1.0;
-		for (int i = 1; i <= 16; i++) {
+		for (int i = 1; i <= 24; i++) {
 			float d = float(i) * 4.0;
 			if (texture(wfield, (lp - vec2(0.0, d)) / world_size).g >= 0.5) {
 				depth = d;
@@ -40,6 +45,10 @@ void fragment() {
 			float foot = smoothstep(hgt * 0.8, hgt * 0.98, depth);
 			col = mix(col, vec3(1.0), foot * 0.7);
 			COLOR = vec4(col, 0.94);
+		} else if (depth > 0.0 && depth <= hgt + 30.0) {
+			float m = texture(noise, vec2(lp.x / 26.0 + t * 0.05, lp.y / 22.0 - t * 0.2)).r;
+			float fade = 1.0 - (depth - hgt * 0.98) / (hgt + 30.0 - hgt * 0.98);
+			COLOR = vec4(vec3(0.96, 0.98, 1.0), smoothstep(0.35, 0.7, m) * fade * 0.75);
 		}
 	}
 }

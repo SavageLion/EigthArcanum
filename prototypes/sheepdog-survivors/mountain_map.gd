@@ -860,20 +860,22 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			var perp: Vector2 = (b - a).normalized().orthogonal() * float(r["w"]) / 2.0
 			var pa := Vector2(0.0, -H * lo)
 			var pb := Vector2(0.0, -H * (lo + 1.0))
-			ci.z_index = 2
 			var pts := PackedVector2Array([a + perp + pa, b + perp + pb, b - perp + pb, a - perp + pa])
 			var uvs := PackedVector2Array([Vector2(0, 0), Vector2(0, 3), Vector2(3, 3), Vector2(3, 0)])
 			ci.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 			ci.draw_colored_polygon(pts, Color(0.45, 0.4, 0.34))
-			var steps: int = 9
+			var steps: int = 10
 			for kk in steps:
 				var t0: float = float(kk) / float(steps)
 				var t1: float = float(kk + 1) / float(steps)
+				var tm: float = lerpf(t0, t1, 0.6)
 				var m0: Vector2 = a.lerp(b, t0) + pa.lerp(pb, t0)
+				var mm: Vector2 = a.lerp(b, tm) + pa.lerp(pb, tm)
 				var m1: Vector2 = a.lerp(b, t1) + pa.lerp(pb, t1)
-				var sh: float = 0.62 + 0.16 * t1
-				ci.draw_colored_polygon(PackedVector2Array([m0 + perp * 0.86, m1 + perp * 0.86, m1 - perp * 0.86, m0 - perp * 0.86]), Color(sh * 0.95, sh * 0.88, sh * 0.76))
-				ci.draw_line(m1 + perp * 0.86, m1 - perp * 0.86, Color(0.3, 0.2, 0.1, 0.8), 2.0)
+				var sh: float = 0.74 + 0.1 * t1
+				ci.draw_colored_polygon(PackedVector2Array([m0 + perp * 0.88, mm + perp * 0.88, mm - perp * 0.88, m0 - perp * 0.88]), Color(sh * 0.97, sh * 0.92, sh * 0.82))
+				ci.draw_colored_polygon(PackedVector2Array([mm + perp * 0.88, m1 + perp * 0.88, m1 - perp * 0.88, mm - perp * 0.88]), Color(sh * 0.52, sh * 0.48, sh * 0.44))
+				ci.draw_line(m0 + perp * 0.88, m0 - perp * 0.88, Color(1.0, 0.97, 0.88, 0.5), 1.0)
 			ci.draw_line(a + perp * 0.9 + pa, b + perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
 			ci.draw_line(a - perp * 0.9 + pa, b - perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
 		return
@@ -904,7 +906,9 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 	var tints: Array = [Vector3(1, 1, 1), Vector3(1.0, 1.0, 0.95), Vector3(1.0, 0.97, 0.9), Vector3(0.95, 0.95, 1.0), Vector3(0.88, 1.0, 1.1)]
 	mat.set_shader_parameter("tint", tints[clampi(k, 0, 4)])
 	ci.material = mat
-	ci.draw_rect(Rect2(0.0, -up, float(GW) * CELL, float(GH) * CELL + 80.0), Color(1, 1, 1))
+	for rc in _mask_rects(k, false):
+		var r: Rect2 = rc
+		ci.draw_rect(Rect2(r.position.x - 50.0, r.position.y - 50.0 - up, r.size.x + 100.0, r.size.y + H + 120.0), Color(1, 1, 1))
 
 var _noise_cache: ImageTexture
 
@@ -1194,7 +1198,9 @@ func _draw_water(ci: CanvasItem, mode: String) -> void:
 	mat.set_shader_parameter("hgt", H)
 	mat.set_shader_parameter("yoff", up)
 	ci.material = mat
-	ci.draw_rect(Rect2(0.0, -up, float(GW) * CELL, float(GH) * CELL + 80.0), Color(1, 1, 1))
+	for rc in _mask_rects(k, true):
+		var r: Rect2 = rc
+		ci.draw_rect(Rect2(r.position.x - 60.0, r.position.y - 60.0 - up, r.size.x + 120.0, r.size.y + H + 200.0), Color(1, 1, 1))
 
 func _draw_sky(ci: CanvasItem) -> void:
 	var mat := ShaderMaterial.new()
@@ -1288,3 +1294,44 @@ func _forest(rng: RandomNumberGenerator, trees: Array) -> void:
 				sp.position = p
 				sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 				game.container_for(k).add_child(sp)
+
+# the bounding boxes (in pixels) of every separate patch of land (or of water) on one level
+func _mask_rects(k: int, wet: bool) -> Array:
+	var seen := PackedByteArray()
+	seen.resize(GW * GH)
+	seen.fill(0)
+	var out: Array = []
+	for sy in GH:
+		for sx in GW:
+			var si: int = _ix(sx, sy)
+			if seen[si] == 1 or not _in_mask(si, k, wet):
+				continue
+			var q: Array = [si]
+			seen[si] = 1
+			var x0: int = sx
+			var x1: int = sx
+			var y0: int = sy
+			var y1: int = sy
+			var head: int = 0
+			while head < q.size():
+				var ci2: int = int(q[head])
+				head += 1
+				var cx: int = ci2 % GW
+				var cy: int = ci2 / GW
+				x0 = mini(x0, cx)
+				x1 = maxi(x1, cx)
+				y0 = mini(y0, cy)
+				y1 = maxi(y1, cy)
+				for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var nx: int = cx + (d as Vector2i).x
+					var ny: int = cy + (d as Vector2i).y
+					if _in(nx, ny) and seen[_ix(nx, ny)] == 0 and _in_mask(_ix(nx, ny), k, wet):
+						seen[_ix(nx, ny)] = 1
+						q.append(_ix(nx, ny))
+			out.append(Rect2(float(x0) * CELL, float(y0) * CELL, float(x1 - x0 + 1) * CELL, float(y1 - y0 + 1) * CELL))
+	return out
+
+func _in_mask(i: int, k: int, wet: bool) -> bool:
+	if wet:
+		return water[i] == 1 and int(lvl[i]) == k
+	return land[i] == 1 and int(lvl[i]) >= k
