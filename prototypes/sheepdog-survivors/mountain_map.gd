@@ -20,6 +20,7 @@ var cliff_tex: Array = []
 var trail: PackedByteArray = PackedByteArray()
 var water: PackedByteArray = PackedByteArray()
 var land: PackedByteArray = PackedByteArray()
+var bridge_cells: Array = []
 var bridges: Array = []
 var sealed: int = 0
 var seed_shift: int = 0
@@ -109,6 +110,7 @@ func _generate() -> void:
 		water[i] = 0 if land[i] == 1 else 3
 	# bridges: a strip of planks over the gap, walkable
 	bridges.clear()
+	bridge_cells.clear()
 	var strips: Array = [Rect2i(31, 45, 26, 3), Rect2i(79, 45, 26, 3), Rect2i(67, 17, 3, 21)]
 	for st in strips:
 		var rect: Rect2i = st
@@ -128,6 +130,7 @@ func _generate() -> void:
 				if land[_ix(xx, yy)] == 0:
 					water[_ix(xx, yy)] = 0
 					lvl[_ix(xx, yy)] = 0
+					bridge_cells.append(Vector2i(xx, yy))
 		if first >= 0:
 			var pa: Vector2 = Vector2.ZERO
 			var pb: Vector2 = Vector2.ZERO
@@ -151,6 +154,50 @@ func _generate() -> void:
 	_restrip()
 	_connect()
 	_prune_ramps()
+	_buffer()
+
+# the drawn edge wobbles about a cell either side of the real one, so the outermost ring of every ledge is kept clear
+func _buffer() -> void:
+	var ex_all := PackedByteArray()
+	var ex_drop := PackedByteArray()
+	ex_all.resize(GW * GH)
+	ex_drop.resize(GW * GH)
+	ex_all.fill(0)
+	ex_drop.fill(0)
+	for bcell in bridge_cells:
+		var bc: Vector2i = bcell
+		for oy in range(-3, 4):
+			for ox in range(-3, 4):
+				if _in(bc.x + ox, bc.y + oy):
+					ex_all[_ix(bc.x + ox, bc.y + oy)] = 1
+	for i in GW * GH:
+		if rmp[i] >= 0:
+			for oy2 in range(-4, 5):
+				for ox2 in range(-4, 5):
+					var rx: int = i % GW + ox2
+					var ry: int = i / GW + oy2
+					if _in(rx, ry):
+						ex_drop[_ix(rx, ry)] = 1
+	var mark: Array = []
+	for y in GH:
+		for x in GW:
+			var i3: int = _ix(x, y)
+			if water[i3] != 0 or rmp[i3] >= 0 or ex_all[i3] == 1:
+				continue
+			var edge: bool = false
+			for oy3 in range(-1, 2):
+				for ox3 in range(-1, 2):
+					if not _in(x + ox3, y + oy3):
+						continue
+					var n: int = _ix(x + ox3, y + oy3)
+					if water[n] == 3:
+						edge = true
+					elif ex_drop[i3] == 0 and water[n] == 0 and rmp[n] < 0 and int(lvl[n]) < int(lvl[i3]):
+						edge = true
+			if edge:
+				mark.append(i3)
+	for i4 in mark:
+		water[int(i4)] = 2
 
 func _smooth() -> void:
 	var out: PackedByteArray = lvl.duplicate()
@@ -527,6 +574,24 @@ func resolve(e: Mover, old: Vector2) -> void:
 		e.vel.x = 0.0
 		_finalize(e)
 		return
+	# pinned against an edge: slide along it instead of freezing
+	var step: Vector2 = np - old
+	var l: float = step.length()
+	if l > 0.01:
+		var want: Vector2 = step / l
+		var best: Vector2 = Vector2.ZERO
+		var bs: float = 0.15
+		for k in 16:
+			var d: Vector2 = Vector2.from_angle(float(k) * TAU / 16.0)
+			var sc: float = d.dot(want)
+			if sc > bs and _allowed(e.layer, old, old + d * l):
+				bs = sc
+				best = d
+		if best != Vector2.ZERO:
+			e.position = old + best * l
+			e.vel = best * e.vel.length() * 0.9
+			_finalize(e)
+			return
 	e.position = old
 	e.vel = Vector2.ZERO
 

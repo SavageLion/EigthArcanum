@@ -1673,6 +1673,47 @@ func mtn_test() -> void:
 		if m.water[m._ix(dc.x, dc.y)] != 0:
 			wet += 1
 			fails.append("the dog walked into the void at %s" % str(dc))
+	# nothing walkable may sit right on a drop (the drawn edge is up to a cell off)
+	var raw_edge: int = 0
+	for yy in range(1, MountainMap.GH - 1):
+		for xx in range(1, MountainMap.GW - 1):
+			var ii: int = m._ix(xx, yy)
+			if m.water[ii] != 0 or m.rmp[ii] >= 0:
+				continue
+			var near_bridge: bool = false
+			for bc in m.bridge_cells:
+				if absi((bc as Vector2i).x - xx) <= 3 and absi((bc as Vector2i).y - yy) <= 3:
+					near_bridge = true
+					break
+			if near_bridge:
+				continue
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var nn: int = m._ix(xx + (d as Vector2i).x, yy + (d as Vector2i).y)
+				if m.water[nn] == 3:
+					raw_edge += 1
+	if raw_edge > 0:
+		fails.append("%d walkable cells touch the void directly" % raw_edge)
+	# pushed hard into an edge at an angle, the dog must keep sliding along it
+	var slid: int = 0
+	var pushed: int = 0
+	for wi2 in range(0, m.water.size(), 53):
+		if m.water[wi2] != 2:
+			continue
+		var wc2: Vector2i = Vector2i(wi2 % MountainMap.GW, wi2 / MountainMap.GW)
+		var start2: Vector2 = (Vector2(wc2) + Vector2(-1.5, 0.5)) * cell
+		if m.spawn_layer(start2) < 0:
+			continue
+		dog.position = start2
+		dog.layer = m.spawn_layer(start2)
+		pushed += 1
+		var p0: Vector2 = dog.position
+		for fr in 90:
+			var o2: Vector2 = dog.position
+			dog.position += Vector2(0.8, 0.6).normalized() * 200.0 / 60.0
+			m.resolve(dog, o2)
+		if dog.position.distance_to(p0) > 20.0:
+			slid += 1
+	print("MTNTEST edge pushes=", pushed, " moved=", slid)
 	print("MTNTEST bridges=", bridge_ok, "/", m.bridges.size(), " void_probes=", tried, " entered_void=", wet)
 	m.sync_all()
 	# 5. sprites: visible, on the right level, inside the map
