@@ -542,6 +542,41 @@ func _decorate() -> void:
 			s.position = p2 + Vector2(rng.randf_range(-6.0, 6.0), rng.randf_range(-6.0, 6.0))
 			s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			game.container_for(k).add_child(s)
+	_landmarks(rng)
+
+func _roomy(p: Vector2, k: int, r: int) -> bool:
+	var c: Vector2i = _cell_of(p)
+	for oy in range(-r, r + 1, 2):
+		for ox in range(-r, r + 1, 2):
+			if _lv(c.x + ox, c.y + oy) != k or (_in(c.x + ox, c.y + oy) and rmp[_ix(c.x + ox, c.y + oy)] >= 0):
+				return false
+	return true
+
+func _landmark(rng: RandomNumberGenerator, k: int, path: String, sc: float, r: int) -> void:
+	var list: Array = spawnable[k]
+	for i in 80:
+		if list.is_empty():
+			return
+		var p: Vector2 = list[rng.randi() % list.size()]
+		if not _roomy(p, k, r):
+			continue
+		var t: Texture2D = load(path)
+		var s := Sprite2D.new()
+		s.texture = t
+		s.scale = Vector2.ONE * sc
+		s.offset = Vector2(0, -float(t.get_height()) * 0.5 + 8.0 - H * float(k) / sc)
+		s.position = p
+		s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		game.container_for(k).add_child(s)
+		return
+
+func _landmarks(rng: RandomNumberGenerator) -> void:
+	_landmark(rng, 1, "res://art/mtn/cabin.png", 1.3, 5)
+	_landmark(rng, mini(2, levels - 1), "res://art/mtn/camp.png", 1.2, 4)
+	_landmark(rng, levels - 1, "res://art/mtn/stones.png", 1.4, 5)
+	for k in range(1, levels):
+		for j in 3:
+			_landmark(rng, k, "res://art/mtn/blossom.png", rng.randf_range(0.9, 1.2), 2)
 
 func _hash(x: int, y: int) -> float:
 	return fposmod(sin(float(x) * 12.9898 + float(y) * 78.233) * 43758.5453, 1.0)
