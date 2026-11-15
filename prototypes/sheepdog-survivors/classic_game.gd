@@ -121,8 +121,6 @@ func _ready() -> void:
 			if OS.get_cmdline_user_args().has("tier%d" % (t + 1)):
 				stage = {"type": "herd", "tier": t + 1, "col": 0}
 		run_day = int(Peak.run["done"]) + 1
-	if summit_mode:
-		WY = 4800.0
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.frames(load("res://art/chars/dog.png") as Texture2D, 48, ["east", "north", "south", "south-east", "north-east"])
 	sheep_frames = U.frames(load("res://art/chars/sheep.png") as Texture2D, 40, ["east", "north", "south"])
@@ -130,8 +128,9 @@ func _ready() -> void:
 	world = World.new()
 	world.wx = WX
 	world.wy = WY
+	world.lite = summit_mode
 	if summit_mode:
-		world.pen_y = WY * 0.8
+		RenderingServer.set_default_clear_color(Color(0.07, 0.2, 0.12))
 	world.flat = false
 	world.refst = true
 	world.GH = int(WY / 48.0)
@@ -146,7 +145,9 @@ func _ready() -> void:
 		lm = MountainMap.new()
 		lm.game = self
 		add_child(lm)
+		var t_build: int = Time.get_ticks_msec()
 		lm.build(int(stage.get("tier", 1)))
+		print("MTN build ms=", Time.get_ticks_msec() - t_build)
 	elif layers_mode():
 		lm = LayerMap.new()
 		lm.game = self
@@ -477,7 +478,7 @@ func _process(delta: float) -> void:
 	if lm != null:
 		lm.sync_all()
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	var target_zoom: float = (0.11 if summit_mode else 0.3) if ov_zoom else 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
+	var target_zoom: float = (0.29 if summit_mode else 0.3) if ov_zoom else 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	hud.queue_redraw()
@@ -1644,42 +1645,35 @@ func mtn_test() -> void:
 				up_paths += 1
 			else:
 				fails.append("could not climb to level %d at %s, stopped %s layer %d" % [k, str(tp), str(dog.position), dog.layer])
-	# 4b. the river: bridges can be crossed both ways, the water itself cannot be entered
+	# 4b. bridges can be crossed both ways, the void beside them cannot be entered
 	var bridge_ok: int = 0
 	for b in m.bridges:
-		var by: float = (float(int(b["y"])) + 1.0) * cell
-		var west: Vector2 = Vector2((float(int(b["x"])) - 3.0) * cell, by)
-		var east: Vector2 = Vector2((float(int(b["x"])) + 4.0) * cell, by)
-		dog.position = west
-		dog.layer = int(b["lvl"])
-		var c1: bool = _walk(dog, func(_q: Vector2) -> Vector2: return east, 12.0, 12.0)
-		var c2: bool = _walk(dog, func(_q: Vector2) -> Vector2: return west, 12.0, 12.0)
+		dog.position = b["a"]
+		dog.layer = 0
+		var c1: bool = _walk(dog, func(_q: Vector2) -> Vector2: return b["b"], 14.0, 25.0)
+		var c2: bool = _walk(dog, func(_q: Vector2) -> Vector2: return b["a"], 14.0, 25.0)
 		if c1 and c2:
 			bridge_ok += 1
 		else:
-			var row: String = ""
-			for ox in range(-5, 6):
-				var ci2: int = int(b["y"]) * MountainMap.GW + int(b["x"]) + ox
-				row += "%d%s " % [int(m.lvl[ci2]), "w" if m.water[ci2] == 1 else ("r" if m.rmp[ci2] >= 0 else ".")]
-			fails.append("cannot cross the bridge at cell %s lvl=%d c1=%s c2=%s dog=%s row=%s" % [str(Vector2i(int(b["x"]), int(b["y"]))), int(b["lvl"]), str(c1), str(c2), str(dog.position), row])
+			fails.append("cannot cross the bridge from %s to %s (stopped at %s)" % [str(b["a"]), str(b["b"]), str(dog.position)])
 	var wet: int = 0
 	var tried: int = 0
-	for wi in range(0, m.water.size(), 97):
-		if m.water[wi] != 1:
+	for wi in range(0, m.water.size(), 37):
+		if m.water[wi] != 3:
 			continue
 		var wc: Vector2i = Vector2i(wi % MountainMap.GW, wi / MountainMap.GW)
-		var wl: int = int(m.lvl[wi])
 		dog.position = (Vector2(wc) + Vector2(-2.5, 0.5)) * cell
-		dog.layer = wl
-		if m.spawn_layer(dog.position) != wl:
+		var sl: int = m.spawn_layer(dog.position)
+		if sl < 0:
 			continue
+		dog.layer = sl
 		tried += 1
 		_walk(dog, func(_q: Vector2) -> Vector2: return (Vector2(wc) + Vector2(0.5, 0.5)) * cell, 6.0, 4.0)
 		var dc: Vector2i = m._cell_of(dog.position)
-		if m.water[m._ix(dc.x, dc.y)] == 1:
+		if m.water[m._ix(dc.x, dc.y)] != 0:
 			wet += 1
-			fails.append("the dog walked into water at %s" % str(dc))
-	print("MTNTEST river bridges=", bridge_ok, "/", m.bridges.size(), " water_probes=", tried, " entered_water=", wet)
+			fails.append("the dog walked into the void at %s" % str(dc))
+	print("MTNTEST bridges=", bridge_ok, "/", m.bridges.size(), " void_probes=", tried, " entered_void=", wet)
 	m.sync_all()
 	# 5. sprites: visible, on the right level, inside the map
 	var ents: Array = [dog]

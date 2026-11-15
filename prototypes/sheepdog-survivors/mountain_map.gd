@@ -5,8 +5,8 @@ extends Node2D
 
 const CELL: float = 24.0
 const GW: int = 136
-const GH: int = 200
-const PEN_ROW: int = 160
+const GH: int = 92
+const PEN_ROW: int = 46
 const H: float = 60.0
 
 var game: Node2D
@@ -19,6 +19,7 @@ var dist: PackedInt32Array = PackedInt32Array()
 var cliff_tex: Array = []
 var trail: PackedByteArray = PackedByteArray()
 var water: PackedByteArray = PackedByteArray()
+var land: PackedByteArray = PackedByteArray()
 var bridges: Array = []
 var sealed: int = 0
 var seed_shift: int = 0
@@ -27,7 +28,7 @@ var river_y0: int = 0
 var river_pond: Vector2i = Vector2i.ZERO
 var ground_tex: Dictionary = {}
 # which tiles make up the top of each level
-const TOPS: Array = [[], ["g0", "g1", "g12", "g13", "g2", "g3"], ["g4", "g5", "g6", "g7"], ["g10", "g11", "g14", "g15", "g8", "g9"], ["g0", "g1", "g12", "g13", "g2"]]
+const TOPS: Array = [["g0", "g1", "g12", "g13", "g2", "g3"], ["g0", "g1", "g12", "g13", "g2", "g3"], ["g4", "g5", "g6", "g7"], ["g10", "g11", "g14", "g15", "g8", "g9"], ["g0", "g1", "g12", "g13", "g2"]]
 
 func home_pos() -> Vector2:
 	return Vector2(float(GW) * CELL / 2.0, float(PEN_ROW) * CELL)
@@ -60,55 +61,96 @@ func build(tier: int) -> void:
 	water.fill(0)
 	bridges.clear()
 	ramps.clear()
-	if levels > 1:
-		_generate()
+	land.resize(GW * GH)
+	land.fill(0)
+	_generate()
 	_flow()
 	_seal()
 	_collect_spawns()
 	_trails()
-	if levels > 1:
-		_make_parts()
-		_decorate()
+	_make_parts()
+	_decorate()
 
+# a pen island in the middle and three mountain islands round it, joined by plank bridges over the clouds
 func _generate() -> void:
 	var noise := FastNoiseLite.new()
 	noise.seed = randi()
-	noise.frequency = 0.03
-	noise.fractal_octaves = 3
-	seed_shift = randi() % 7
-	# a few big oval terraces, each one smaller and further up the mountain than the last
-	var plateaus: Array = []
-	for k in range(1, levels):
-		var sc: float = 1.0 - 0.19 * float(k - 1)
-		plateaus.append({
-			"cx": float(GW) / 2.0 + 7.0 * sin(float(k) * 2.1 + float(seed_shift)),
-			"cy": 82.0 - 11.0 * float(k - 1),
-			"rx": 60.0 * sc,
-			"ry": 70.0 * sc,
-		})
-	for y in GH:
-		for x in GW:
-			var l: int = 0
-			for k2 in range(1, levels):
-				var pl: Dictionary = plateaus[k2 - 1]
-				var ex: float = (float(x) - float(pl["cx"])) / float(pl["rx"])
-				var ey: float = (float(y) - float(pl["cy"])) / float(pl["ry"])
-				var wob: float = noise.get_noise_2d(float(x) + float(k2) * 71.0, float(y)) * 0.42
-				if ex * ex + ey * ey + wob < 1.0:
-					l = k2
-				else:
-					break
-			lvl[_ix(x, y)] = l
-	for pass_i in 3:
-		_smooth()
-	_river()
-	for k in range(0, levels - 1):
-		_place_ramps(k, 3 + levels)
+	noise.frequency = 0.07
+	noise.fractal_octaves = 2
+	var isles: Array = [
+		{"c": Vector2(68, 46), "r": Vector2(17, 13), "p": []},
+		{"c": Vector2(19, 46), "r": Vector2(16, 24), "p": [[Vector2(18, 41), Vector2(11, 17)], [Vector2(17, 37), Vector2(7, 11)], [Vector2(16, 34), Vector2(4, 6)]]},
+		{"c": Vector2(117, 46), "r": Vector2(16, 24), "p": [[Vector2(118, 41), Vector2(11, 17)], [Vector2(119, 37), Vector2(7, 11)], [Vector2(120, 34), Vector2(4, 6)]]},
+		{"c": Vector2(68, 13), "r": Vector2(22, 9), "p": [[Vector2(68, 11), Vector2(14, 6)], [Vector2(68, 9), Vector2(8, 4)]]},
+	]
+	for ii in isles.size():
+		var isle: Dictionary = isles[ii]
+		var c: Vector2 = isle["c"]
+		var r: Vector2 = isle["r"]
+		for y in GH:
+			for x in GW:
+				var ex: float = (float(x) - c.x) / r.x
+				var ey: float = (float(y) - c.y) / r.y
+				if ex * ex + ey * ey + noise.get_noise_2d(float(x) + float(ii) * 97.0, float(y)) * 0.34 < 1.0:
+					land[_ix(x, y)] = 1
+					var l: int = 0
+					var plateaus: Array = isle["p"]
+					for j in mini(plateaus.size(), levels - 1):
+						var pc: Vector2 = (plateaus[j] as Array)[0]
+						var pr: Vector2 = (plateaus[j] as Array)[1]
+						var px: float = (float(x) - pc.x) / pr.x
+						var py: float = (float(y) - pc.y) / pr.y
+						if px * px + py * py + noise.get_noise_2d(float(x) + float(j + 1) * 41.0, float(y) + 300.0) * 0.42 < 1.0:
+							l = j + 1
+						else:
+							break
+					lvl[_ix(x, y)] = l
+	for i in GW * GH:
+		water[i] = 0 if land[i] == 1 else 3
+	# bridges: a strip of planks over the gap, walkable
+	bridges.clear()
+	var strips: Array = [Rect2i(31, 45, 26, 3), Rect2i(79, 45, 26, 3), Rect2i(67, 17, 3, 21)]
+	for st in strips:
+		var rect: Rect2i = st
+		var horizontal: bool = rect.size.x > rect.size.y
+		var first: int = -1
+		var last: int = -1
+		var n: int = rect.size.x if horizontal else rect.size.y
+		var mid: Vector2i = Vector2i(rect.position.x + rect.size.x / 2, rect.position.y + rect.size.y / 2)
+		for i in n:
+			var cc: Vector2i = Vector2i(rect.position.x + i, mid.y) if horizontal else Vector2i(mid.x, rect.position.y + i)
+			if land[_ix(cc.x, cc.y)] == 0:
+				if first < 0:
+					first = i
+				last = i
+		for yy in range(rect.position.y, rect.end.y):
+			for xx in range(rect.position.x, rect.end.x):
+				if land[_ix(xx, yy)] == 0:
+					water[_ix(xx, yy)] = 0
+					lvl[_ix(xx, yy)] = 0
+		if first >= 0:
+			var pa: Vector2 = Vector2.ZERO
+			var pb: Vector2 = Vector2.ZERO
+			if horizontal:
+				pa = Vector2(float(rect.position.x + first - 2) + 0.5, float(mid.y) + 0.5) * CELL
+				pb = Vector2(float(rect.position.x + last + 2) + 0.5, float(mid.y) + 0.5) * CELL
+			else:
+				pa = Vector2(float(mid.x) + 0.5, float(rect.position.y + first - 2) + 0.5) * CELL
+				pb = Vector2(float(mid.x) + 0.5, float(rect.position.y + last + 2) + 0.5) * CELL
+			bridges.append({"rect": rect, "a": pa, "b": pb})
+	# stairs up every mountain
+	for ii in range(1, isles.size()):
+		var isle2: Dictionary = isles[ii]
+		var c2: Vector2 = isle2["c"]
+		var r2: Vector2 = isle2["r"]
+		var region := Rect2i(int(c2.x - r2.x), int(c2.y - r2.y), int(r2.x * 2.0), int(r2.y * 2.0))
+		for k in mini((isle2["p"] as Array).size(), levels - 1):
+			if _place_ramps(k, 2, region) == 0:
+				_place_ramps(k, 1, region, true)
 	_connect()
 	_restrip()
 	_connect()
 	_prune_ramps()
-	_river_fix()
 
 func _smooth() -> void:
 	var out: PackedByteArray = lvl.duplicate()
@@ -128,17 +170,17 @@ func _smooth() -> void:
 			out[_ix(x, y)] = best
 	lvl = out
 
-func _place_ramps(k: int, want: int) -> void:
+func _place_ramps(k: int, want: int, region: Rect2i = Rect2i(0, 0, GW, GH), relaxed: bool = false) -> int:
 	var cands: Array = []
-	for y in range(8, GH - 14, 2):
-		for x in range(8, GW - 14, 2):
-			if _water_near(x - 6, y - 6, 20):
+	for y in range(maxi(8, region.position.y), mini(GH - 14, region.end.y), 2):
+		for x in range(maxi(8, region.position.x), mini(GW - 14, region.end.x), 2):
+			if _water_near(x - 3, y - 3, 10) if not relaxed else _water_near(x - 2, y - 4, 8):
 				continue
 			var okn: bool = true
 			var oks: bool = true
 			var okw: bool = true
 			var oke: bool = true
-			for i in 4:
+			for i in (range(1, 2) if relaxed else range(0, 4)):
 				if not (_lv(x + i, y) == k + 1 and _lv(x + i, y + 1) == k):
 					okn = false
 				if not (_lv(x + i, y) == k and _lv(x + i, y + 1) == k + 1):
@@ -147,14 +189,16 @@ func _place_ramps(k: int, want: int) -> void:
 					okw = false
 				if not (_lv(x, y + i) == k and _lv(x + 1, y + i) == k + 1):
 					oke = false
+			var sx: int = x - 1 if relaxed else x
+			var sy: int = y - 1 if relaxed else y
 			if okn:
-				cands.append([x, y, "n"])
+				cands.append([sx, y, "n"])
 			if oks:
-				cands.append([x, y, "s"])
+				cands.append([sx, y, "s"])
 			if okw:
-				cands.append([x, y, "w"])
+				cands.append([x, sy, "w"])
 			if oke:
-				cands.append([x, y, "e"])
+				cands.append([x, sy, "e"])
 	cands.shuffle()
 	var chosen: Array = []
 	for c in cands:
@@ -162,12 +206,13 @@ func _place_ramps(k: int, want: int) -> void:
 			break
 		var far: bool = true
 		for o in chosen:
-			if absi(int(c[0]) - int(o[0])) + absi(int(c[1]) - int(o[1])) < 26:
+			if absi(int(c[0]) - int(o[0])) + absi(int(c[1]) - int(o[1])) < (6 if relaxed else 26):
 				far = false
 		if not far:
 			continue
 		if _carve(int(c[0]), int(c[1]), String(c[2]), k):
 			chosen.append(c)
+	return chosen.size()
 
 func _carve(x: int, y: int, dir: String, k: int) -> bool:
 	var vertical: bool = dir == "n" or dir == "s"
@@ -228,7 +273,7 @@ func _prune_ramps() -> void:
 		var dir: Vector2 = ((r["b"] as Vector2) - (r["a"] as Vector2)).normalized()
 		var ca: Vector2i = _cell_of((r["a"] as Vector2) - dir * 30.0)
 		var cb: Vector2i = _cell_of((r["b"] as Vector2) + dir * 30.0)
-		if int(lvl[_ix(ca.x, ca.y)]) == int(r["lo"]) and int(lvl[_ix(cb.x, cb.y)]) == int(r["hi"]) and rmp[_ix(ca.x, ca.y)] < 0 and rmp[_ix(cb.x, cb.y)] < 0:
+		if int(lvl[_ix(ca.x, ca.y)]) == int(r["lo"]) and int(lvl[_ix(cb.x, cb.y)]) == int(r["hi"]) and rmp[_ix(ca.x, ca.y)] < 0 and rmp[_ix(cb.x, cb.y)] < 0 and water[_ix(ca.x, ca.y)] == 0 and water[_ix(cb.x, cb.y)] == 0:
 			continue
 		r["dead"] = true
 		var keep: int = int(lvl[_ix(ca.x, ca.y)])
@@ -466,8 +511,6 @@ func _finalize(e: Mover) -> void:
 		e.layer = int(lvl[_ix(c.x, c.y)])
 
 func resolve(e: Mover, old: Vector2) -> void:
-	if levels <= 1:
-		return
 	var np: Vector2 = e.position
 	if _allowed(e.layer, old, np):
 		_finalize(e)
@@ -588,6 +631,17 @@ func _sync(e: Mover, dt: float) -> void:
 
 # ---------------------------------------------------------------- how it looks
 func _make_parts() -> void:
+	var sky := LayerPart.new()
+	sky.map = self
+	sky.mode = "S"
+	sky.z_index = -138
+	add_child(sky)
+	var brp := LayerPart.new()
+	brp.map = self
+	brp.mode = "BR"
+	brp.z_index = -1
+	brp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(brp)
 	for k in range(0, levels):
 		var part := LayerPart.new()
 		part.map = self
@@ -595,11 +649,11 @@ func _make_parts() -> void:
 		part.z_index = 10 * k + 1 if k > 0 else -135
 		part.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(part)
-		if k > 0:
+		if true:
 			var cp := LayerPart.new()
 			cp.map = self
 			cp.mode = "C%d" % k
-			cp.z_index = 10 * (k - 1) + 3
+			cp.z_index = 10 * (k - 1) + 3 if k > 0 else -136
 			cp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			add_child(cp)
 	for k2 in range(0, levels):
@@ -619,7 +673,7 @@ func _make_parts() -> void:
 	var rp := LayerPart.new()
 	rp.map = self
 	rp.mode = "ramps"
-	rp.z_index = 2
+	rp.z_index = -1
 	rp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(rp)
 
@@ -629,7 +683,7 @@ func _decorate() -> void:
 	var shrub: Texture2D = load("res://art/mtn/shrub.png")
 	var rocks: Texture2D = load("res://art/mtn/boulders.png")
 	var trees: Array = [load("res://art/mtn/pine.png"), load("res://art/mtn/fir.png"), load("res://art/mtn/tree_round.png")]
-	for k in range(1, levels):
+	for k in range(0, levels):
 		var list: Array = spawnable[k]
 		if list.is_empty():
 			continue
@@ -637,12 +691,14 @@ func _decorate() -> void:
 		var edge: Array = []
 		for p in list:
 			var c: Vector2i = _cell_of(p)
-			if _lv(c.x, c.y + 3) < k:
+			if (k > 0 and _lv(c.x, c.y + 3) < k) or (k == 0 and _water_near(c.x - 3, c.y - 3, 7)):
 				edge.append(p)
 		var n: int = 60 + 14 * (levels - k)
 		for i in n:
 			var from_edge: bool = not edge.is_empty() and rng.randf() < 0.65
 			var p2: Vector2 = (edge[rng.randi() % edge.size()] if from_edge else list[rng.randi() % list.size()]) as Vector2
+			if k == 0 and p2.distance_to(home_pos()) < 330.0:
+				continue
 			var s := Sprite2D.new()
 			var roll: float = rng.randf()
 			var t: Texture2D = rocks if roll < 0.18 else trees[rng.randi() % trees.size()]
@@ -666,6 +722,8 @@ func _roomy(p: Vector2, k: int, r: int) -> bool:
 	return true
 
 func _landmark(rng: RandomNumberGenerator, k: int, path: String, sc: float, r: int) -> void:
+	if k >= spawnable.size() or k < 1:
+		return
 	var list: Array = spawnable[k]
 	for i in 80:
 		if list.is_empty():
@@ -684,6 +742,8 @@ func _landmark(rng: RandomNumberGenerator, k: int, path: String, sc: float, r: i
 		return
 
 func _landmarks(rng: RandomNumberGenerator) -> void:
+	if levels < 2:
+		return
 	_landmark(rng, 1, "res://art/mtn/cabin.png", 1.3, 5)
 	_landmark(rng, mini(2, levels - 1), "res://art/mtn/camp.png", 1.2, 4)
 	_landmark(rng, levels - 1, "res://art/mtn/stones.png", 1.4, 5)
@@ -726,25 +786,29 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			ci.draw_line(a + perp * 0.9 + pa, b + perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
 			ci.draw_line(a - perp * 0.9 + pa, b - perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
 		return
+	if mode == "S":
+		_draw_sky(ci)
+		return
+	if mode == "BR":
+		_draw_bridges(ci)
+		return
 	if mode.begins_with("W") or mode.begins_with("B"):
 		_draw_water(ci, mode)
 		return
 	var k: int = int(mode.substr(1))
-	if k == 0:
-		_draw_clouds(ci)
 	var pass_mode: int = 2 if mode.begins_with("C") else 1
 	var up: float = H * float(k)
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://mtn_level.gdshader")
 	mat.set_shader_parameter("field", _field_tex(k))
 	mat.set_shader_parameter("noise", _noise_tex())
-	mat.set_shader_parameter("ground", _composite(TOPS[clampi(k, 1, 4)] if k > 0 else ["g0"], "g"))
+	mat.set_shader_parameter("ground", _composite(TOPS[clampi(k, 0, 4)], "g"))
 	mat.set_shader_parameter("dirt", _composite(["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "d11"], "d"))
 	mat.set_shader_parameter("cliff", cliff_tex[k % 2])
 	mat.set_shader_parameter("world_size", Vector2(float(GW) * CELL, float(GH) * CELL))
 	mat.set_shader_parameter("hgt", H)
 	mat.set_shader_parameter("yoff", up)
-	mat.set_shader_parameter("base_mode", 1 if k == 0 else 0)
+	mat.set_shader_parameter("base_mode", 0)
 	mat.set_shader_parameter("pass_mode", pass_mode)
 	var tints: Array = [Vector3(1, 1, 1), Vector3(1.0, 1.0, 0.95), Vector3(1.0, 0.97, 0.9), Vector3(0.95, 0.95, 1.0), Vector3(0.88, 1.0, 1.1)]
 	mat.set_shader_parameter("tint", tints[clampi(k, 0, 4)])
@@ -811,9 +875,9 @@ func _field_make(k: int) -> ImageTexture:
 			var i: int = y * GW + x
 			var l: int = int(lvl[i])
 			var isr: bool = rmp[i] >= 0
-			top[i] = 1.0 if (k > 0 and l >= k and not isr) else 0.0
-			if isr and k > 0:
-				top[i] = 1.0 if l >= k else 0.0
+			top[i] = 1.0 if (l >= k and not isr and land[i] == 1) else 0.0
+			if isr:
+				top[i] = 1.0 if (l >= k and land[i] == 1) else 0.0
 			tr[i] = 1.0 if (trail.size() > 0 and trail[i] == 1 and l == k and not isr) else 0.0
 			rp[i] = 1.0 if isr else 0.0
 	top = _blur(_blur(top))
@@ -1040,3 +1104,45 @@ func _draw_water(ci: CanvasItem, mode: String) -> void:
 	mat.set_shader_parameter("yoff", up)
 	ci.material = mat
 	ci.draw_rect(Rect2(0.0, -up, float(GW) * CELL, float(GH) * CELL + 80.0), Color(1, 1, 1))
+
+func _draw_sky(ci: CanvasItem) -> void:
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://mtn_sky.gdshader")
+	mat.set_shader_parameter("noise", _noise_tex())
+	ci.material = mat
+	ci.draw_rect(Rect2(-1200.0, -1200.0, float(GW) * CELL + 2400.0, float(GH) * CELL + 2400.0), Color(1, 1, 1))
+
+func _draw_bridges(ci: CanvasItem) -> void:
+	for b in bridges:
+		var rect: Rect2i = b["rect"]
+		var horizontal: bool = rect.size.x > rect.size.y
+		for yy in range(rect.position.y, rect.end.y):
+			for xx in range(rect.position.x, rect.end.x):
+				if land[_ix(xx, yy)] == 1:
+					continue
+				var x0: float = float(xx) * CELL
+				var y0: float = float(yy) * CELL
+				ci.draw_rect(Rect2(x0, y0, CELL + 0.5, CELL + 0.5), Color(0.52, 0.37, 0.21))
+				if horizontal:
+					ci.draw_line(Vector2(x0 + 4.0, y0), Vector2(x0 + 4.0, y0 + CELL), Color(0.32, 0.21, 0.11), 2.0)
+					ci.draw_line(Vector2(x0 + 14.0, y0), Vector2(x0 + 14.0, y0 + CELL), Color(0.32, 0.21, 0.11), 2.0)
+				else:
+					ci.draw_line(Vector2(x0, y0 + 4.0), Vector2(x0 + CELL, y0 + 4.0), Color(0.32, 0.21, 0.11), 2.0)
+					ci.draw_line(Vector2(x0, y0 + 14.0), Vector2(x0 + CELL, y0 + 14.0), Color(0.32, 0.21, 0.11), 2.0)
+				var rail: Color = Color(0.28, 0.18, 0.1)
+				if horizontal:
+					if yy == rect.position.y:
+						ci.draw_rect(Rect2(x0, y0, CELL + 0.5, 4.0), rail)
+					if yy == rect.end.y - 1:
+						ci.draw_rect(Rect2(x0, y0 + CELL - 4.0, CELL + 0.5, 4.0), rail)
+					if xx % 4 == 0:
+						ci.draw_rect(Rect2(x0 + 8.0, y0 - 4.0, 5.0, 8.0), Color(0.22, 0.14, 0.08))
+						ci.draw_rect(Rect2(x0 + 8.0, y0 + CELL - 4.0, 5.0, 8.0), Color(0.22, 0.14, 0.08))
+				else:
+					if xx == rect.position.x:
+						ci.draw_rect(Rect2(x0, y0, 4.0, CELL + 0.5), rail)
+					if xx == rect.end.x - 1:
+						ci.draw_rect(Rect2(x0 + CELL - 4.0, y0, 4.0, CELL + 0.5), rail)
+					if yy % 4 == 0:
+						ci.draw_rect(Rect2(x0 - 4.0, y0 + 8.0, 8.0, 5.0), Color(0.22, 0.14, 0.08))
+						ci.draw_rect(Rect2(x0 + CELL - 4.0, y0 + 8.0, 8.0, 5.0), Color(0.22, 0.14, 0.08))

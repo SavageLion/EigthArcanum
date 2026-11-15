@@ -58,6 +58,7 @@ var river_pts: Array = []
 var flat: bool = false
 var refst: bool = false
 var pen_y: float = -1.0
+var lite: bool = false
 var grass_mat: ShaderMaterial
 var forest_d: PackedFloat32Array = PackedFloat32Array()
 var trail_dots: Array = []
@@ -98,6 +99,10 @@ func generate(ysort_node: Node2D) -> void:
 	_scale_layout()
 	_layout()
 	_terrain()
+	if lite:
+		rngw.seed = randi()
+		_pen_visuals()
+		return
 	rngw.seed = randi()
 	_tiles()
 	_ground_patches()
@@ -623,7 +628,7 @@ func _pen_visuals() -> void:
 		fl.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		fl.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		fl.position = pen.get_center() + Vector2(0, 14)
-		fl.z_index = -150
+		fl.z_index = -134 if lite else -150
 		add_child(fl)
 		pen_floor = fl
 	var dirt := Sprite2D.new()
