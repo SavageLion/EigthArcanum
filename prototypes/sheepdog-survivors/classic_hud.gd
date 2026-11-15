@@ -37,6 +37,9 @@ func _draw() -> void:
 	_text("SHEEP  %d / %d" % [main.penned, main.need], Vector2(18, 28), 17)
 	var secs: int = int(ceil(main.t_left))
 	_panel(Rect2(v.x - 118, 6, 110, 32))
+	if main.summit_mode and main.state == "play":
+		_panel(main.skip_rect(), Color(0.5, 0.2, 0.2, 0.92))
+		_text("NEXT >", main.skip_rect().position + Vector2(0, 21), 14, CREAM, main.skip_rect().size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	_text("%d:%02d" % [secs / 60, secs % 60], Vector2(v.x - 118, 29), 19, CREAM if secs > 20 else Color(1.0, 0.5, 0.4), 110.0, HORIZONTAL_ALIGNMENT_CENTER)
 	if main.penned >= main.need and main.state == "play":
 		var fr: Rect2 = main.finish_rect()

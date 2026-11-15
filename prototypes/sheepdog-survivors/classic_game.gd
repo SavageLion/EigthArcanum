@@ -303,6 +303,8 @@ func _input(event: InputEvent) -> void:
 					pick_levelup(2)
 			elif ke.keycode == KEY_SPACE:
 				do_bark()
+			elif ke.keycode == KEY_N and summit_mode:
+				skip_stage()
 			elif ke.keycode == KEY_O:
 				ov_zoom = not ov_zoom
 			elif ke.keycode == KEY_U and lm != null:
@@ -324,6 +326,9 @@ func _toggle_fullscreen() -> void:
 		w.mode = Window.MODE_FULLSCREEN
 
 func _press(p: Vector2, id: int) -> void:
+	if summit_mode and state == "play" and skip_rect().grow(6.0).has_point(p):
+		skip_stage()
+		return
 	if state == "levelup":
 		for i in perk_offers.size():
 			if lv_card_rect(i).has_point(p):
@@ -1499,3 +1504,13 @@ func summit_result_tap() -> void:
 	else:
 		final_kind = "lost"
 		state = "final"
+
+func skip_rect() -> Rect2:
+	return Rect2(vp().x - 118.0, 44.0, 110.0, 30.0)
+
+# test: count the stage as cleared and move on
+func skip_stage() -> void:
+	if state != "play" or not summit_mode:
+		return
+	result = {"ok": true, "penned": penned, "need": need, "total": sheep.size() + lost, "lost": lost, "why": "skip", "day": run_day, "level": run_level}
+	summit_result_tap()
