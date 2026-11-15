@@ -117,6 +117,23 @@ func _generate() -> void:
 			var pdy: float = (float(y) - pond_c.y) / 3.4
 			if pdx * pdx + pdy * pdy + noise.get_noise_2d(float(x) * 1.7, float(y) * 1.7) * 0.3 < 1.0 and land[_ix(x, y)] == 1:
 				water[_ix(x, y)] = 1
+	# a waterfall pouring off the south side of each side mountain
+	for sx in [19, 117]:
+		var ey: int = -1
+		for y in range(72, 40, -1):
+			if land[_ix(sx, y)] == 1:
+				ey = y
+				break
+		if ey < 0:
+			continue
+		for y2 in range(ey - 9, ey + 1):
+			for x2 in range(sx - 1, sx + 2):
+				if land[_ix(x2, y2)] == 1 and lvl[_ix(x2, y2)] == 0:
+					water[_ix(x2, y2)] = 1
+		for py in range(ey - 14, ey - 6):
+			for px in range(sx - 4, sx + 5):
+				if (px - sx) * (px - sx) + (py - (ey - 10)) * (py - (ey - 10)) <= 12 and land[_ix(px, py)] == 1 and lvl[_ix(px, py)] == 0:
+					water[_ix(px, py)] = 1
 	# bridges: a strip of planks over the gap, walkable
 	bridges.clear()
 	bridge_cells.clear()
@@ -1139,7 +1156,7 @@ func _water_tex(k: int) -> ImageTexture:
 			var v: float = wr[i2]
 			v = clampf(v + fn.get_noise_2d(float(x), float(y)) * 0.25 * 4.0 * v * (1.0 - v), 0.0, 1.0)
 			var fall: float = 0.0
-			if water[i2] == 1 and int(lvl[i2]) == k and y + 1 < GH and water[i2 + GW] == 1 and int(lvl[i2 + GW]) < k:
+			if water[i2] == 1 and int(lvl[i2]) == k and y + 1 < GH and ((water[i2 + GW] == 1 and int(lvl[i2 + GW]) < k) or water[i2 + GW] == 3):
 				fall = 1.0
 			img.set_pixel(x, y, Color(v, fall, 0.0, 1.0))
 	img.resize(GW * 4, GH * 4, Image.INTERPOLATE_BILINEAR)

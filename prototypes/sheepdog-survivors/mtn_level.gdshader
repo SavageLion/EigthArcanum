@@ -37,9 +37,9 @@ void cliff_pass(vec2 p, float n, float n2, vec3 lipc, out vec4 res) {
 	if (depth > 0.0) {
 		float dm = hgt * (0.82 + 0.34 * texture(noise, vec2(p.x / 52.0, 0.37)).r);
 		if (depth <= dm) {
-			float u = abs(fract(p.x / 224.0) * 2.0 - 1.0);
-			float v = 0.04 + 0.52 * clamp(depth / hgt, 0.0, 1.0);
-			vec4 ct = texture(cliff, vec2(0.06 + u * 0.88, v));
+			float u = abs(fract(p.x / 160.0) * 2.0 - 1.0);
+			float v = 0.02 + 0.96 * clamp(depth / hgt, 0.0, 1.0);
+			vec4 ct = texture(cliff, vec2(0.02 + u * 0.96, v));
 			vec3 c = mix(vec3(0.34, 0.35, 0.33), ct.rgb, step(0.5, ct.a));
 			c = mix(c, vec3(0.34, 0.35, 0.33), step(0.93, min(c.r, min(c.g, c.b))));
 			c *= 1.0 - 0.28 * (depth / hgt);
