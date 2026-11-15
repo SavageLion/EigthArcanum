@@ -561,15 +561,22 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			var pts := PackedVector2Array([a + perp + pa, b + perp + pb, b - perp + pb, a - perp + pa])
 			var uvs := PackedVector2Array([Vector2(0, 0), Vector2(0, 3), Vector2(3, 3), Vector2(3, 0)])
 			ci.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-			ci.draw_polygon(pts, PackedColorArray([Color(1, 1, 1), Color(1, 1, 1), Color(1, 1, 1), Color(1, 1, 1)]), uvs, ground_tex["d%d" % (int(r["a"].x + r["a"].y) % 12)])
-			for kk in range(1, 8):
-				var t: float = float(kk) / 8.0
-				var m: Vector2 = a.lerp(b, t) + pa.lerp(pb, t)
-				ci.draw_line(m + perp, m - perp, Color(0.44, 0.34, 0.22, 0.7), 2.0)
-			ci.draw_line(a + perp + pa, b + perp + pb, Color(0.3, 0.22, 0.14), 2.0)
-			ci.draw_line(a - perp + pa, b - perp + pb, Color(0.3, 0.22, 0.14), 2.0)
+			ci.draw_colored_polygon(pts, Color(0.5, 0.48, 0.44))
+			var steps: int = 9
+			for kk in steps:
+				var t0: float = float(kk) / float(steps)
+				var t1: float = float(kk + 1) / float(steps)
+				var m0: Vector2 = a.lerp(b, t0) + pa.lerp(pb, t0)
+				var m1: Vector2 = a.lerp(b, t1) + pa.lerp(pb, t1)
+				var sh: float = 0.42 + 0.22 * t1
+				ci.draw_colored_polygon(PackedVector2Array([m0 + perp * 0.86, m1 + perp * 0.86, m1 - perp * 0.86, m0 - perp * 0.86]), Color(sh, sh * 0.97, sh * 0.9))
+				ci.draw_line(m1 + perp * 0.86, m1 - perp * 0.86, Color(0.26, 0.25, 0.24, 0.8), 2.0)
+			ci.draw_line(a + perp * 0.86 + pa, b + perp * 0.86 + pb, Color(0.3, 0.28, 0.25), 2.0)
+			ci.draw_line(a - perp * 0.86 + pa, b - perp * 0.86 + pb, Color(0.3, 0.28, 0.25), 2.0)
 		return
 	var k: int = int(mode.substr(1))
+	if k == 0:
+		_draw_clouds(ci)
 	var base: Color = _top_color(k)
 	var up: float = H * float(k)
 	ci.modulate = [Color(1,1,1),Color(1.0,1.0,0.95),Color(1.0,0.97,0.9),Color(0.95,0.95,1.0),Color(0.92,0.96,1.08)][clampi(k,0,4)]
@@ -580,7 +587,7 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			var x: float = float(cx) * CELL
 			var y: float = float(cy) * CELL - up
 			if trail.size() > 0 and trail[_ix(cx, cy)] == 1:
-				ci.draw_texture_rect_region(ground_tex["d%d" % (int(_hash(cx, cy) * 12.0) % 12)], Rect2(x, y, CELL + 0.6, CELL + 0.6), Rect2(2.0, 2.0, 28.0, 28.0), Color(1.1, 1.0, 0.88))
+				ci.draw_texture_rect_region(ground_tex["d%d" % (int(_hash(cx, cy) * 12.0) % 12)], Rect2(x, y, CELL + 0.6, CELL + 0.6), Rect2(2.0, 2.0, 28.0, 28.0), Color(1.35, 1.25, 1.05))
 			elif k > 0:
 				var names: Array = TOPS[clampi(k, 1, 4)]
 				var tname: String = String(names[int(_hash(cx, cy) * float(names.size())) % names.size()])
@@ -611,3 +618,27 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 				ci.draw_colored_polygon(PackedVector2Array([Vector2(x - 2.0, by - 6.0), Vector2(x + CELL * 0.3, by + 3.0 + hb * 7.0), Vector2(x + CELL * 0.65, by + 1.0 + hc * 6.0), Vector2(x + CELL + 2.0, by - 6.0)]), Color(0.2, 0.2, 0.22, 0.55))
 				ci.draw_circle(Vector2(x + CELL * hb, by + 2.0 + hc * 4.0), 3.0 + hc * 2.5, Color(0.42, 0.42, 0.44))
 
+
+func _draw_clouds(ci: CanvasItem) -> void:
+	var w: float = float(GW) * CELL
+	var h: float = float(GH) * CELL
+	var sky := Color(0.66, 0.78, 0.86)
+	ci.draw_rect(Rect2(-900, -900, w + 1800, 900), sky)
+	ci.draw_rect(Rect2(-900, h, w + 1800, 900), sky)
+	ci.draw_rect(Rect2(-900, 0, 900, h), sky)
+	ci.draw_rect(Rect2(w, 0, 900, h), sky)
+	for i in 170:
+		var side: int = i % 4
+		var u: float = _hash(i, 3)
+		var d: float = _hash(i, 8)
+		var p := Vector2.ZERO
+		if side == 0:
+			p = Vector2(u * w, -d * 260.0 + 90.0)
+		elif side == 1:
+			p = Vector2(u * w, h + d * 260.0 - 90.0)
+		elif side == 2:
+			p = Vector2(-d * 260.0 + 90.0, u * h)
+		else:
+			p = Vector2(w + d * 260.0 - 90.0, u * h)
+		for j in 5:
+			ci.draw_circle(p + Vector2((_hash(i, j + 20) - 0.5) * 120.0, (_hash(i, j + 40) - 0.5) * 50.0), 26.0 + _hash(i, j + 60) * 34.0, Color(0.95, 0.97, 1.0, 0.9))
