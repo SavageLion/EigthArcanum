@@ -5,7 +5,8 @@ extends Node2D
 
 const CELL: float = 24.0
 const GW: int = 136
-const GH: int = 148
+const GH: int = 200
+const PEN_ROW: int = 160
 const H: float = 60.0
 
 var game: Node2D
@@ -20,12 +21,16 @@ var trail: PackedByteArray = PackedByteArray()
 var water: PackedByteArray = PackedByteArray()
 var bridges: Array = []
 var sealed: int = 0
+var seed_shift: int = 0
 var river_xs: Array = []
 var river_y0: int = 0
 var river_pond: Vector2i = Vector2i.ZERO
 var ground_tex: Dictionary = {}
 # which tiles make up the top of each level
-const TOPS: Array = [[], ["g0", "g1", "g12", "g13", "g2", "g3"], ["g4", "g5", "g6", "g7"], ["g10", "g11", "g14", "g15", "g8", "g9"], ["r0", "r1", "r4", "r2", "r5"]]
+const TOPS: Array = [[], ["g0", "g1", "g12", "g13", "g2", "g3"], ["g4", "g5", "g6", "g7"], ["g10", "g11", "g14", "g15", "g8", "g9"], ["g0", "g1", "g12", "g13", "g2"]]
+
+func home_pos() -> Vector2:
+	return Vector2(float(GW) * CELL / 2.0, float(PEN_ROW) * CELL)
 
 func _ix(cx: int, cy: int) -> int:
 	return cy * GW + cx
@@ -70,19 +75,29 @@ func _generate() -> void:
 	noise.seed = randi()
 	noise.frequency = 0.03
 	noise.fractal_octaves = 3
-	var cx: float = float(GW) / 2.0
-	var cy: float = float(GH) / 2.0
+	seed_shift = randi() % 7
+	# a few big oval terraces, each one smaller and further up the mountain than the last
+	var plateaus: Array = []
+	for k in range(1, levels):
+		var sc: float = 1.0 - 0.19 * float(k - 1)
+		plateaus.append({
+			"cx": float(GW) / 2.0 + 7.0 * sin(float(k) * 2.1 + float(seed_shift)),
+			"cy": 82.0 - 11.0 * float(k - 1),
+			"rx": 60.0 * sc,
+			"ry": 70.0 * sc,
+		})
 	for y in GH:
 		for x in GW:
-			var dx: float = (float(x) - cx) / (float(GW) * 0.5)
-			var dy: float = (float(y) - cy) / (float(GH) * 0.5)
-			var north: float = clampf(-dy, 0.0, 1.0)
-			var south: float = clampf(dy, 0.0, 1.0)
-			var e: float = north * 0.95 + dx * dx * 0.32 * (0.35 + north) + south * 0.2 + noise.get_noise_2d(float(x), float(y)) * 0.34 - 0.06
-			var l: int = clampi(int(floor(clampf(e, 0.0, 0.999) * float(levels))), 0, levels - 1)
-			# the valley around the pen stays flat
-			if (dx * dx / 0.18) + (dy * dy / 0.03) < 1.0:
-				l = 0
+			var l: int = 0
+			for k2 in range(1, levels):
+				var pl: Dictionary = plateaus[k2 - 1]
+				var ex: float = (float(x) - float(pl["cx"])) / float(pl["rx"])
+				var ey: float = (float(y) - float(pl["cy"])) / float(pl["ry"])
+				var wob: float = noise.get_noise_2d(float(x) + float(k2) * 71.0, float(y)) * 0.42
+				if ex * ex + ey * ey + wob < 1.0:
+					l = k2
+				else:
+					break
 			lvl[_ix(x, y)] = l
 	for pass_i in 3:
 		_smooth()
@@ -92,6 +107,7 @@ func _generate() -> void:
 	_connect()
 	_restrip()
 	_connect()
+	_prune_ramps()
 	_river_fix()
 
 func _smooth() -> void:
@@ -205,6 +221,22 @@ func _carve(x: int, y: int, dir: String, k: int) -> bool:
 	ramps.append({"a": a, "b": b, "w": 4.0 * CELL, "lo": k, "hi": k + 1, "rect": rect, "rx0": rx0, "ry0": ry0, "vertical": vertical, "high_first": high_first})
 	return true
 
+# a ramp that no longer joins two different levels is taken out
+func _prune_ramps() -> void:
+	for ri in ramps.size():
+		var r: Dictionary = ramps[ri]
+		var dir: Vector2 = ((r["b"] as Vector2) - (r["a"] as Vector2)).normalized()
+		var ca: Vector2i = _cell_of((r["a"] as Vector2) - dir * 30.0)
+		var cb: Vector2i = _cell_of((r["b"] as Vector2) + dir * 30.0)
+		if int(lvl[_ix(ca.x, ca.y)]) == int(r["lo"]) and int(lvl[_ix(cb.x, cb.y)]) == int(r["hi"]) and rmp[_ix(ca.x, ca.y)] < 0 and rmp[_ix(cb.x, cb.y)] < 0:
+			continue
+		r["dead"] = true
+		var keep: int = int(lvl[_ix(ca.x, ca.y)])
+		for i in GW * GH:
+			if rmp[i] == ri:
+				rmp[i] = -1
+				lvl[i] = keep
+
 # the cells at both ends of every ramp must stay on the right level
 func _restrip() -> void:
 	for r in ramps:
@@ -231,7 +263,7 @@ func _connect() -> void:
 	var reach: PackedByteArray = PackedByteArray()
 	reach.resize(GW * GH)
 	reach.fill(0)
-	var start: Vector2i = Vector2i(GW / 2, GH / 2)
+	var start: Vector2i = Vector2i(GW / 2, PEN_ROW)
 	var queue: Array = [start]
 	reach[_ix(start.x, start.y)] = 1
 	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
@@ -306,7 +338,7 @@ func _flow() -> void:
 	dist.resize(GW * GH)
 	dist.fill(-1)
 	var queue: Array = []
-	for y in range(GH / 2 - 5, GH / 2 + 6):
+	for y in range(PEN_ROW - 5, PEN_ROW + 6):
 		for x in range(GW / 2 - 5, GW / 2 + 6):
 			if rmp[_ix(x, y)] < 0 and lvl[_ix(x, y)] == 0:
 				dist[_ix(x, y)] = 0
@@ -362,13 +394,13 @@ func _trails() -> void:
 						trail[_ix(side.x, side.y)] = 1
 
 func use_flow(p: Vector2, layer: int) -> bool:
-	return layer >= 1 or p.distance_to(Vector2(float(GW), float(GH)) * CELL / 2.0) > 470.0
+	return layer >= 1 or p.distance_to(home_pos()) > 470.0
 
 # a few cells ahead along the way home, down through the ramps
 func flow_goal(p: Vector2) -> Vector2:
 	var cur: Vector2i = _cell_of(p)
 	if dist[_ix(cur.x, cur.y)] < 0:
-		return Vector2(float(GW), float(GH)) * CELL / 2.0
+		return home_pos()
 	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 	var best: Vector2i = cur
 	var bd: int = dist[_ix(cur.x, cur.y)]
@@ -479,7 +511,7 @@ func down_goal(p: Vector2, layer: int) -> Vector2:
 	var best: Dictionary = {}
 	var bd: float = 1.0e9
 	for r in ramps:
-		if int(r["hi"]) != layer:
+		if r.has("dead") or int(r["hi"]) != layer:
 			continue
 		var d: float = p.distance_to(r["b"])
 		if d < bd and _clear(p, r["b"], layer):
@@ -487,7 +519,7 @@ func down_goal(p: Vector2, layer: int) -> Vector2:
 			best = r
 	if best.is_empty():
 		for r2 in ramps:
-			if int(r2["hi"]) == layer:
+			if not r2.has("dead") and int(r2["hi"]) == layer:
 				var d2: float = p.distance_to(r2["b"])
 				if d2 < bd:
 					bd = d2
@@ -517,7 +549,7 @@ func cluster_centers(ground: Array) -> Array:
 			if levels > 2 and list.size() > 40:
 				out.append(list[randi() % list.size()])
 	if not spawnable[0].is_empty():
-		var home: Vector2 = Vector2(float(GW), float(GH)) * CELL / 2.0
+		var home: Vector2 = home_pos()
 		var pick: Vector2 = (spawnable[0] as Array)[0]
 		for i in 40:
 			var cand: Vector2 = (spawnable[0] as Array)[randi() % (spawnable[0] as Array).size()]
@@ -669,6 +701,8 @@ func _top_color(k: int) -> Color:
 func draw_part(ci: CanvasItem, mode: String) -> void:
 	if mode == "ramps":
 		for r in ramps:
+			if r.has("dead"):
+				continue
 			var a: Vector2 = r["a"]
 			var b: Vector2 = r["b"]
 			var lo: float = float(r["lo"])
@@ -712,7 +746,7 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 	mat.set_shader_parameter("yoff", up)
 	mat.set_shader_parameter("base_mode", 1 if k == 0 else 0)
 	mat.set_shader_parameter("pass_mode", pass_mode)
-	var tints: Array = [Vector3(1, 1, 1), Vector3(1.0, 1.0, 0.95), Vector3(1.0, 0.97, 0.9), Vector3(0.95, 0.95, 1.0), Vector3(0.92, 0.96, 1.08)]
+	var tints: Array = [Vector3(1, 1, 1), Vector3(1.0, 1.0, 0.95), Vector3(1.0, 0.97, 0.9), Vector3(0.95, 0.95, 1.0), Vector3(0.88, 1.0, 1.1)]
 	mat.set_shader_parameter("tint", tints[clampi(k, 0, 4)])
 	ci.material = mat
 	ci.draw_rect(Rect2(0.0, -up, float(GW) * CELL, float(GH) * CELL + 80.0), Color(1, 1, 1))
@@ -845,7 +879,7 @@ func _river() -> void:
 	var side: float = 0.9 if randf() < 0.5 else 0.1
 	river_xs = []
 	var y0: int = 6
-	var y1: int = GH / 2 - 10
+	var y1: int = PEN_ROW - 32
 	var xs: Array = []
 	var x: float = float(GW) * side
 	for y in range(y0, y1 + 1):

@@ -57,6 +57,7 @@ var n4: FastNoiseLite
 var river_pts: Array = []
 var flat: bool = false
 var refst: bool = false
+var pen_y: float = -1.0
 var grass_mat: ShaderMaterial
 var forest_d: PackedFloat32Array = PackedFloat32Array()
 var trail_dots: Array = []
@@ -132,7 +133,7 @@ func _layout() -> void:
 	var pw: float = 210.0
 	var ph: float = 160.0
 	var px: float = wx / 2.0 - pw / 2.0
-	var py: float = wy / 2.0 - ph / 2.0
+	var py: float = (pen_y if pen_y > 0.0 else wy / 2.0) - ph / 2.0
 	gate_x = px + pw / 2.0
 	pen = Rect2(px, py, pw, ph)
 	var hp: float = 140.0

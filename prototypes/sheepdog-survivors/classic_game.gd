@@ -122,7 +122,7 @@ func _ready() -> void:
 				stage = {"type": "herd", "tier": t + 1, "col": 0}
 		run_day = int(Peak.run["done"]) + 1
 	if summit_mode:
-		WY = 3552.0
+		WY = 4800.0
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.frames(load("res://art/chars/dog.png") as Texture2D, 48, ["east", "north", "south", "south-east", "north-east"])
 	sheep_frames = U.frames(load("res://art/chars/sheep.png") as Texture2D, 40, ["east", "north", "south"])
@@ -130,6 +130,8 @@ func _ready() -> void:
 	world = World.new()
 	world.wx = WX
 	world.wy = WY
+	if summit_mode:
+		world.pen_y = WY * 0.8
 	world.flat = false
 	world.refst = true
 	world.GH = int(WY / 48.0)
@@ -311,6 +313,11 @@ func _input(event: InputEvent) -> void:
 				skip_stage()
 			elif ke.keycode == KEY_O:
 				ov_zoom = not ov_zoom
+			elif ke.keycode == KEY_U and lm is MountainMap:
+				var top: Array = (lm as MountainMap).spawnable[(lm as MountainMap).levels - 1]
+				if not top.is_empty():
+					dog.position = top[top.size() / 2]
+					dog.layer = (lm as MountainMap).levels - 1
 			elif ke.keycode == KEY_U and lm != null:
 				dog.position = Vector2(11.0, 14.0) * LayerMap.CELL
 				dog.layer = 1
@@ -470,7 +477,7 @@ func _process(delta: float) -> void:
 	if lm != null:
 		lm.sync_all()
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	var target_zoom: float = 0.3 if ov_zoom else 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
+	var target_zoom: float = (0.11 if summit_mode else 0.3) if ov_zoom else 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	hud.queue_redraw()
@@ -1547,7 +1554,7 @@ func mtn_test() -> void:
 	var fails: Array = []
 	var m: MountainMap = lm as MountainMap
 	var cell: float = MountainMap.CELL
-	var home: Vector2 = Vector2(float(MountainMap.GW), float(MountainMap.GH)) * cell / 2.0
+	var home: Vector2 = m.home_pos()
 	# 1. every flat cell reaches the valley
 	var unreach: int = 0
 	var total: int = 0
@@ -1578,6 +1585,9 @@ func mtn_test() -> void:
 	var ramp_ok: int = 0
 	for ri in m.ramps.size():
 		var r: Dictionary = m.ramps[ri]
+		if r.has("dead"):
+			ramp_ok += 1
+			continue
 		var dir: Vector2 = ((r["b"] as Vector2) - (r["a"] as Vector2)).normalized()
 		var a0: Vector2 = (r["a"] as Vector2) - dir * 50.0
 		var b0: Vector2 = (r["b"] as Vector2) + dir * 50.0
@@ -1593,7 +1603,7 @@ func mtn_test() -> void:
 		if up_ok and down_ok2:
 			ramp_ok += 1
 		else:
-			fails.append("ramp %d (levels %d-%d) up=%s down=%s a=%s b=%s up_end=%s" % [ri, int(r["lo"]), int(r["hi"]), str(up_ok), str(down_ok2), str(r["a"]), str(r["b"]), up_end])
+			fails.append("ramp %d (levels %d-%d) up=%s down=%s a=%s b=%s up_end=%s a0cell(lvl=%d rmp=%d w=%d) b0cell(lvl=%d rmp=%d w=%d)" % [ri, int(r["lo"]), int(r["hi"]), str(up_ok), str(down_ok2), str(r["a"]), str(r["b"]), up_end, int(m.lvl[m._ix(a0c.x, a0c.y)]), int(m.rmp[m._ix(a0c.x, a0c.y)]), int(m.water[m._ix(a0c.x, a0c.y)]), int(m.lvl[m._ix(m._cell_of(b0).x, m._cell_of(b0).y)]), int(m.rmp[m._ix(m._cell_of(b0).x, m._cell_of(b0).y)]), int(m.water[m._ix(m._cell_of(b0).x, m._cell_of(b0).y)])])
 	# 4. walk from the valley up to cells on every level by the real path
 	var parent: Dictionary = {}
 	var start: Vector2i = m._cell_of(home)
