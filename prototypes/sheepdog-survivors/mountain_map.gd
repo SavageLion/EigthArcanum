@@ -6,7 +6,7 @@ extends Node2D
 const CELL: float = 24.0
 const GW: int = 136
 const GH: int = 92
-const H: float = 30.0
+const H: float = 42.0
 
 var game: Node2D
 var levels: int = 1
@@ -15,6 +15,11 @@ var rmp: PackedInt32Array = PackedInt32Array()
 var ramps: Array = []
 var spawnable: Array = []   # per level, a list of cell centres
 var dist: PackedInt32Array = PackedInt32Array()
+var cliff_tex: Array = []
+var trail: PackedByteArray = PackedByteArray()
+var ground_tex: Dictionary = {}
+# which tiles make up the top of each level
+const TOPS: Array = [[], ["g0", "g1", "g12", "g13", "g2", "g3"], ["g4", "g5", "g6", "g7"], ["g10", "g11", "g14", "g15", "g8", "g9"], ["r0", "r1", "r4", "r2", "r5"]]
 
 func _ix(cx: int, cy: int) -> int:
 	return cy * GW + cx
@@ -30,6 +35,11 @@ func _cell_of(p: Vector2) -> Vector2i:
 
 # ---------------------------------------------------------------- building the mountain
 func build(tier: int) -> void:
+	cliff_tex = [load("res://art/mtn/cliff_a.png"), load("res://art/mtn/cliff_b.png")]
+	for gi in 16:
+		ground_tex["g%d" % gi] = load("res://art/mtn/ground/g%d.png" % gi)
+		ground_tex["r%d" % gi] = load("res://art/mtn/ground/r%d.png" % gi)
+		ground_tex["d%d" % gi] = load("res://art/mtn/ground/d%d.png" % gi)
 	levels = clampi(tier, 1, 5)
 	lvl.resize(GW * GH)
 	lvl.fill(0)
@@ -40,6 +50,7 @@ func build(tier: int) -> void:
 		_generate()
 	_collect_spawns()
 	_flow()
+	_trails()
 	if levels > 1:
 		_make_parts()
 		_decorate()
@@ -265,6 +276,44 @@ func _flow() -> void:
 				dist[_ix(n.x, n.y)] = dist[_ix(c.x, c.y)] + 1
 				queue.append(n)
 
+# worn dirt trails that follow the way down from the far terraces to the valley
+func _trails() -> void:
+	trail.resize(GW * GH)
+	trail.fill(0)
+	if levels <= 1:
+		return
+	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	for t in 3 + levels:
+		var k: int = 1 + randi() % (levels - 1)
+		var list: Array = spawnable[k]
+		if list.is_empty():
+			continue
+		var cur: Vector2i = _cell_of(list[randi() % list.size()])
+		var wob: int = 0
+		for step in 500:
+			var d0: int = dist[_ix(cur.x, cur.y)]
+			if d0 <= 0:
+				break
+			var best: Vector2i = cur
+			var bd: int = d0
+			var opts: Array = dirs.duplicate()
+			opts.shuffle()
+			for d in opts:
+				var n: Vector2i = cur + (d as Vector2i)
+				if _in(n.x, n.y) and dist[_ix(n.x, n.y)] >= 0 and dist[_ix(n.x, n.y)] < bd and _can_step(cur, n):
+					best = n
+					bd = dist[_ix(n.x, n.y)]
+			if best == cur:
+				break
+			cur = best
+			if rmp[_ix(cur.x, cur.y)] < 0:
+				trail[_ix(cur.x, cur.y)] = 1
+				if randf() < 0.7:
+					wob = clampi(wob + (randi() % 3 - 1), -1, 1)
+				var side: Vector2i = Vector2i(cur.x + 1, cur.y) if (absi(best.x - cur.x) + 1) % 2 == 0 else Vector2i(cur.x, cur.y + 1)
+				if _in(side.x, side.y) and rmp[_ix(side.x, side.y)] < 0 and lvl[_ix(side.x, side.y)] == lvl[_ix(cur.x, cur.y)]:
+					trail[_ix(side.x, side.y)] = 1
+
 func use_flow(p: Vector2, layer: int) -> bool:
 	return layer >= 1 or p.distance_to(Vector2(float(GW), float(GH)) * CELL / 2.0) > 470.0
 
@@ -451,34 +500,44 @@ func _make_parts() -> void:
 		var part := LayerPart.new()
 		part.map = self
 		part.mode = "L%d" % k
-		part.z_index = 10 * k + 1
+		part.z_index = 10 * k + 1 if k > 0 else -135
+		part.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(part)
 	var rp := LayerPart.new()
 	rp.map = self
 	rp.mode = "ramps"
 	rp.z_index = 2
+	rp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(rp)
 
 func _decorate() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = randi()
+	var shrub: Texture2D = load("res://art/mtn/shrub.png")
+	var rocks: Texture2D = load("res://art/mtn/boulders.png")
 	var trees: Array = [game.world.tex("tree_big_a"), game.world.tex("tree_big_b")]
-	var rock: Texture2D = game.world.tex("rock2")
 	for k in range(1, levels):
 		var list: Array = spawnable[k]
 		if list.is_empty():
 			continue
-		var n: int = 26 + 8 * (levels - k)
+		# along the top of every cliff: shrubs and boulders
+		var edge: Array = []
+		for p in list:
+			var c: Vector2i = _cell_of(p)
+			if _lv(c.x, c.y + 3) < k:
+				edge.append(p)
+		var n: int = 30 + 10 * (levels - k)
 		for i in n:
-			var p: Vector2 = list[rng.randi() % list.size()]
+			var from_edge: bool = not edge.is_empty() and rng.randf() < 0.65
+			var p2: Vector2 = (edge[rng.randi() % edge.size()] if from_edge else list[rng.randi() % list.size()]) as Vector2
 			var s := Sprite2D.new()
-			var is_tree: bool = rng.randf() < (0.55 if k <= 2 else 0.2)
-			var t: Texture2D = trees[rng.randi() % trees.size()] if is_tree else rock
+			var roll: float = rng.randf()
+			var t: Texture2D = shrub if roll < 0.45 else (rocks if roll < 0.8 else trees[rng.randi() % trees.size()])
+			var sc: float = rng.randf_range(0.55, 0.85) if t != trees[0] and t != trees[1] else rng.randf_range(0.55, 0.75)
 			s.texture = t
-			var sc: float = rng.randf_range(0.5, 0.7) if is_tree else rng.randf_range(0.05, 0.09)
 			s.scale = Vector2.ONE * sc
-			s.offset = Vector2(0, -float(t.get_height()) * 0.5 + 4.0 - H * float(k) / maxf(sc, 0.01))
-			s.position = p
+			s.offset = Vector2(0, -float(t.get_height()) * 0.5 + 6.0 - H * float(k) / maxf(sc, 0.01))
+			s.position = p2 + Vector2(rng.randf_range(-6.0, 6.0), rng.randf_range(-6.0, 6.0))
 			s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			game.container_for(k).add_child(s)
 
@@ -499,7 +558,10 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			var pa := Vector2(0.0, -H * lo)
 			var pb := Vector2(0.0, -H * (lo + 1.0))
 			ci.z_index = 2
-			ci.draw_colored_polygon(PackedVector2Array([a + perp + pa, b + perp + pb, b - perp + pb, a - perp + pa]), Color(0.62, 0.5, 0.34))
+			var pts := PackedVector2Array([a + perp + pa, b + perp + pb, b - perp + pb, a - perp + pa])
+			var uvs := PackedVector2Array([Vector2(0, 0), Vector2(0, 3), Vector2(3, 3), Vector2(3, 0)])
+			ci.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+			ci.draw_polygon(pts, PackedColorArray([Color(1, 1, 1), Color(1, 1, 1), Color(1, 1, 1), Color(1, 1, 1)]), uvs, ground_tex["d%d" % (int(r["a"].x + r["a"].y) % 12)])
 			for kk in range(1, 8):
 				var t: float = float(kk) / 8.0
 				var m: Vector2 = a.lerp(b, t) + pa.lerp(pb, t)
@@ -516,9 +578,12 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 				continue
 			var x: float = float(cx) * CELL
 			var y: float = float(cy) * CELL - up
-			if k > 0:
-				var sh: float = _hash(cx, cy) * 0.07
-				ci.draw_rect(Rect2(x, y, CELL + 0.6, CELL + 0.6), Color(base.r + sh, base.g + sh, base.b + sh * 0.6))
+			if trail.size() > 0 and trail[_ix(cx, cy)] == 1:
+				ci.draw_texture_rect_region(ground_tex["d%d" % (int(_hash(cx, cy) * 12.0) % 12)], Rect2(x, y, CELL + 0.6, CELL + 0.6), Rect2(2.0, 2.0, 28.0, 28.0), Color(1.1, 1.0, 0.88))
+			elif k > 0:
+				var names: Array = TOPS[clampi(k, 1, 4)]
+				var tname: String = String(names[int(_hash(cx, cy) * float(names.size())) % names.size()])
+				ci.draw_texture_rect_region(ground_tex[tname], Rect2(x, y, CELL + 0.6, CELL + 0.6), Rect2(2.0, 2.0, 28.0, 28.0))
 				if _lv(cx, cy - 1) < k:
 					ci.draw_rect(Rect2(x, y, CELL + 0.6, 3.0), base.lightened(0.18))
 				if _lv(cx - 1, cy) < k:
@@ -527,13 +592,13 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 					ci.draw_rect(Rect2(x + CELL - 2.5, y, 2.5, CELL), base.darkened(0.32))
 			var south: int = _lv(cx, cy + 1)
 			if south < k and _in(cx, cy + 1) and rmp[_ix(cx, cy + 1)] < 0:
-				var drop: float = float(k - south) * H
+				var rows: int = k - south
 				var fy: float = float(cy + 1) * CELL - up
-				var wob: float = _hash(cx + 7, cy) * 5.0
-				var face := Color(0.52, 0.47, 0.41)
-				ci.draw_rect(Rect2(x, fy, CELL + 0.6, drop + wob), face)
-				for s in range(1, int(drop / 8.0)):
-					ci.draw_rect(Rect2(x, fy + float(s) * 8.0 + _hash(cx, s) * 3.0, CELL, 2.0), face.darkened(0.22))
-				ci.draw_rect(Rect2(x + _hash(cx, cy + 3) * (CELL - 4.0), fy, 3.0, drop), face.darkened(0.18))
-				ci.draw_rect(Rect2(x, fy, CELL + 0.6, 3.0), face.darkened(0.4))
-				ci.draw_rect(Rect2(x, fy + drop + wob, CELL + 0.6, 8.0), Color(0, 0, 0, 0.16))
+				var tex: Texture2D = cliff_tex[int(_hash(cx / 4, cy) * 2.0) % 2]
+				var sx: float = float(cx % 4) * 32.0
+				for rw in rows:
+					var shade: float = 1.0 - 0.12 * float(rw)
+					var src := Rect2(sx, 0.0 if rw == 0 else 28.0, 32.0, 56.0)
+					ci.draw_texture_rect_region(tex, Rect2(x, fy + float(rw) * H, CELL + 0.5, H), src, Color(shade, shade, shade))
+				ci.draw_rect(Rect2(x, fy + float(rows) * H, CELL + 0.5, 8.0), Color(0, 0, 0, 0.2))
+
