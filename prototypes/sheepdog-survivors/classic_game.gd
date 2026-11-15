@@ -314,6 +314,8 @@ func _input(event: InputEvent) -> void:
 				skip_stage()
 			elif ke.keycode == KEY_O:
 				ov_zoom = not ov_zoom
+			elif ke.keycode == KEY_H:
+				hud.visible = not hud.visible
 			elif ke.keycode == KEY_U and lm is MountainMap:
 				var top: Array = (lm as MountainMap).spawnable[(lm as MountainMap).levels - 1]
 				if not top.is_empty():
