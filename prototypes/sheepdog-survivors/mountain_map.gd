@@ -5,7 +5,7 @@ extends Node2D
 
 const CELL: float = 24.0
 const GW: int = 136
-const GH: int = 92
+const GH: int = 148
 const H: float = 42.0
 
 var game: Node2D
@@ -58,7 +58,7 @@ func build(tier: int) -> void:
 func _generate() -> void:
 	var noise := FastNoiseLite.new()
 	noise.seed = randi()
-	noise.frequency = 0.045
+	noise.frequency = 0.03
 	noise.fractal_octaves = 3
 	var cx: float = float(GW) / 2.0
 	var cy: float = float(GH) / 2.0
@@ -66,17 +66,18 @@ func _generate() -> void:
 		for x in GW:
 			var dx: float = (float(x) - cx) / (float(GW) * 0.5)
 			var dy: float = (float(y) - cy) / (float(GH) * 0.5)
-			var d: float = sqrt(dx * dx * 0.75 + dy * dy)
-			var e: float = clampf((d - 0.3) / 0.7, 0.0, 1.0) + noise.get_noise_2d(float(x), float(y)) * 0.32
+			var north: float = clampf(-dy, 0.0, 1.0)
+			var south: float = clampf(dy, 0.0, 1.0)
+			var e: float = north * 0.95 + dx * dx * 0.32 * (0.35 + north) + south * 0.2 + noise.get_noise_2d(float(x), float(y)) * 0.34 - 0.06
 			var l: int = clampi(int(floor(clampf(e, 0.0, 0.999) * float(levels))), 0, levels - 1)
 			# the valley around the pen stays flat
-			if (dx * dx / 0.08) + (dy * dy / 0.09) < 1.0:
+			if (dx * dx / 0.18) + (dy * dy / 0.03) < 1.0:
 				l = 0
 			lvl[_ix(x, y)] = l
-	for pass_i in 2:
+	for pass_i in 3:
 		_smooth()
 	for k in range(0, levels - 1):
-		_place_ramps(k, 2 + levels / 2)
+		_place_ramps(k, 3 + levels)
 	_connect()
 
 func _smooth() -> void:
@@ -283,7 +284,7 @@ func _trails() -> void:
 	if levels <= 1:
 		return
 	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-	for t in 3 + levels:
+	for t in 5 + levels * 2:
 		var k: int = 1 + randi() % (levels - 1)
 		var list: Array = spawnable[k]
 		if list.is_empty():
@@ -310,9 +311,10 @@ func _trails() -> void:
 				trail[_ix(cur.x, cur.y)] = 1
 				if randf() < 0.7:
 					wob = clampi(wob + (randi() % 3 - 1), -1, 1)
-				var side: Vector2i = Vector2i(cur.x + 1, cur.y) if (absi(best.x - cur.x) + 1) % 2 == 0 else Vector2i(cur.x, cur.y + 1)
-				if _in(side.x, side.y) and rmp[_ix(side.x, side.y)] < 0 and lvl[_ix(side.x, side.y)] == lvl[_ix(cur.x, cur.y)]:
-					trail[_ix(side.x, side.y)] = 1
+				for sd in dirs:
+					var side: Vector2i = cur + (sd as Vector2i)
+					if _in(side.x, side.y) and rmp[_ix(side.x, side.y)] < 0 and lvl[_ix(side.x, side.y)] == lvl[_ix(cur.x, cur.y)]:
+						trail[_ix(side.x, side.y)] = 1
 
 func use_flow(p: Vector2, layer: int) -> bool:
 	return layer >= 1 or p.distance_to(Vector2(float(GW), float(GH)) * CELL / 2.0) > 470.0

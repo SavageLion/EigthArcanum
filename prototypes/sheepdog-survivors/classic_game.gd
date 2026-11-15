@@ -2,7 +2,7 @@ extends Node2D
 # Sheepdog, Godot day-mode slice: find the flock in a wide meadow, herd it into the pen, ward off foxes, meet the quota.
 
 const WX: float = 3264.0
-const WY: float = 2208.0
+var WY: float = 2208.0
 const XMIN: float = 100.0
 const XMAX: float = 3164.0
 const YMIN: float = 108.0
@@ -121,6 +121,8 @@ func _ready() -> void:
 			if OS.get_cmdline_user_args().has("tier%d" % (t + 1)):
 				stage = {"type": "herd", "tier": t + 1, "col": 0}
 		run_day = int(Peak.run["done"]) + 1
+	if summit_mode:
+		WY = 3552.0
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.frames(load("res://art/chars/dog.png") as Texture2D, 48, ["east", "north", "south", "south-east", "north-east"])
 	sheep_frames = U.frames(load("res://art/chars/sheep.png") as Texture2D, 40, ["east", "north", "south"])
@@ -130,7 +132,7 @@ func _ready() -> void:
 	world.wy = WY
 	world.flat = false
 	world.refst = true
-	world.GH = 46
+	world.GH = int(WY / 48.0)
 	world.biome_id = "sunhaven"
 	world.biome = Meta.BIOMES["sunhaven"]
 	add_child(world)
