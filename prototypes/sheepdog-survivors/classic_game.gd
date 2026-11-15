@@ -166,6 +166,8 @@ func _ready() -> void:
 	if summit_mode:
 		summit_start()
 	banner_t = 3.5
+	if lm is MountainMap and OS.get_cmdline_user_args().has("mtntest"):
+		mtn_test.call_deferred()
 
 func _spawn_dog() -> void:
 	dog = ClassicDog.new()
@@ -1516,3 +1518,140 @@ func skip_stage() -> void:
 		return
 	result = {"ok": true, "penned": penned, "need": need, "total": sheep.size() + lost, "lost": lost, "why": "skip", "day": run_day, "level": run_level}
 	summit_result_tap()
+
+# ---------------------------------------------------------------- mountain self test (godot --headless ... -- tier4 mtntest)
+func _walk(e: Mover, goal_fn: Callable, done_dist: float, max_s: float) -> bool:
+	var dt: float = 1.0 / 60.0
+	var t: float = 0.0
+	var last: Vector2 = e.position
+	var stall: float = 0.0
+	while t < max_s:
+		var g: Vector2 = goal_fn.call(e.position)
+		if e.position.distance_to(g) < done_dist:
+			return true
+		var old: Vector2 = e.position
+		e.position += (g - e.position).normalized() * 200.0 * dt
+		lm.resolve(e, old)
+		t += dt
+		if int(t * 60.0) % 120 == 0:
+			if e.position.distance_to(last) < 6.0:
+				stall += 2.0
+				if stall >= 4.0:
+					return false
+			else:
+				stall = 0.0
+			last = e.position
+	return false
+
+func mtn_test() -> void:
+	var fails: Array = []
+	var m: MountainMap = lm as MountainMap
+	var cell: float = MountainMap.CELL
+	var home: Vector2 = Vector2(float(MountainMap.GW), float(MountainMap.GH)) * cell / 2.0
+	# 1. every flat cell reaches the valley
+	var unreach: int = 0
+	var total: int = 0
+	for k in m.levels:
+		for p in (m.spawnable[k] as Array):
+			total += 1
+			var c: Vector2i = m._cell_of(p)
+			if m.dist[m._ix(c.x, c.y)] < 0:
+				unreach += 1
+	if unreach > 0:
+		fails.append("%d of %d spawn cells cannot reach the valley" % [unreach, total])
+	# 2. walk down from sample cells on every level
+	var down_ok: int = 0
+	var down_n: int = 0
+	for k in m.levels:
+		var list: Array = m.spawnable[k]
+		for i in mini(12, list.size()):
+			var p: Vector2 = list[(i * 7919) % list.size()]
+			dog.position = p
+			dog.layer = k
+			down_n += 1
+			var fn := func(q: Vector2) -> Vector2: return m.flow_goal(q) if m.use_flow(q, dog.layer) else home
+			if _walk(dog, fn, 40.0, 240.0) or dog.position.distance_to(home) < 470.0:
+				down_ok += 1
+			else:
+				fails.append("stuck going down from level %d at %s ended %s layer %d" % [k, str(p), str(dog.position), dog.layer])
+	# 3. every ramp, up then down
+	var ramp_ok: int = 0
+	for ri in m.ramps.size():
+		var r: Dictionary = m.ramps[ri]
+		var dir: Vector2 = ((r["b"] as Vector2) - (r["a"] as Vector2)).normalized()
+		var a0: Vector2 = (r["a"] as Vector2) - dir * 50.0
+		var b0: Vector2 = (r["b"] as Vector2) + dir * 50.0
+		dog.position = a0
+		dog.layer = int(r["lo"])
+		var up_ok: bool = _walk(dog, func(_q: Vector2) -> Vector2: return b0, 12.0, 20.0) and dog.layer == int(r["hi"])
+		var down_ok2: bool = _walk(dog, func(_q: Vector2) -> Vector2: return a0, 12.0, 20.0) and dog.layer == int(r["lo"])
+		if up_ok and down_ok2:
+			ramp_ok += 1
+		else:
+			fails.append("ramp %d (levels %d-%d) up=%s down=%s at %s" % [ri, int(r["lo"]), int(r["hi"]), str(up_ok), str(down_ok2), str(r["a"])])
+	# 4. walk from the valley up to cells on every level by the real path
+	var parent: Dictionary = {}
+	var start: Vector2i = m._cell_of(home)
+	var queue: Array = [start]
+	parent[start] = start
+	var head: int = 0
+	while head < queue.size():
+		var cc: Vector2i = queue[head]
+		head += 1
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nn: Vector2i = cc + (d as Vector2i)
+			if m._in(nn.x, nn.y) and not parent.has(nn) and m._can_step(cc, nn):
+				parent[nn] = cc
+				queue.append(nn)
+	var up_paths: int = 0
+	var up_total: int = 0
+	for k in range(1, m.levels):
+		var list2: Array = m.spawnable[k]
+		for i in mini(5, list2.size()):
+			var tp: Vector2 = list2[(i * 104729 + 13) % list2.size()]
+			var tc: Vector2i = m._cell_of(tp)
+			if not parent.has(tc):
+				continue
+			var path: Array = []
+			var cur: Vector2i = tc
+			while cur != start:
+				path.push_front((Vector2(cur) + Vector2(0.5, 0.5)) * cell)
+				cur = parent[cur]
+			up_total += 1
+			dog.position = (Vector2(start) + Vector2(0.5, 0.5)) * cell
+			dog.layer = 0
+			var ok: bool = true
+			for wp in path:
+				if not _walk(dog, func(_q: Vector2) -> Vector2: return wp, 10.0, 6.0):
+					ok = false
+					break
+			if ok and dog.layer == k:
+				up_paths += 1
+			else:
+				fails.append("could not climb to level %d at %s, stopped %s layer %d" % [k, str(tp), str(dog.position), dog.layer])
+	m.sync_all()
+	# 5. sprites: visible, on the right level, inside the map
+	var ents: Array = [dog]
+	ents.append_array(sheep)
+	ents.append_array(foxes)
+	var vis_bad: int = 0
+	for e in ents:
+		var mv: Mover = e as Mover
+		if mv.get_parent() != container_for(mv.layer) and not (mv is ClassicDog):
+			vis_bad += 1
+			fails.append("%s is in the wrong container for layer %d" % [mv.name, mv.layer])
+	for s in sheep:
+		var sh: ClassicSheep = s as ClassicSheep
+		if not sh.hidden_grass and (not sh.spr.visible or sh.spr.sprite_frames == null or sh.spr.modulate.a < 0.9):
+			vis_bad += 1
+			fails.append("a sheep sprite is not visible")
+		var sc: Vector2i = m._cell_of(sh.position)
+		if m.rmp[m._ix(sc.x, sc.y)] < 0 and int(m.lvl[m._ix(sc.x, sc.y)]) != sh.layer:
+			fails.append("a sheep stands on level %d but is marked layer %d" % [int(m.lvl[m._ix(sc.x, sc.y)]), sh.layer])
+	print("MTNTEST levels=", m.levels, " ramps=", m.ramps.size(), " unreachable=", unreach, "/", total, " down=", down_ok, "/", down_n, " ramps_ok=", ramp_ok, "/", m.ramps.size(), " climbs=", up_paths, "/", up_total, " entities=", ents.size(), " visible_bad=", vis_bad)
+	if fails.is_empty():
+		print("MTNTEST PASS")
+	else:
+		for f in fails:
+			print("MTNTEST FAIL: ", f)
+	get_tree().quit(0 if fails.is_empty() else 1)

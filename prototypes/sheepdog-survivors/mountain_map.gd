@@ -505,6 +505,13 @@ func _make_parts() -> void:
 		part.z_index = 10 * k + 1 if k > 0 else -135
 		part.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(part)
+		if k > 0:
+			var cp := LayerPart.new()
+			cp.map = self
+			cp.mode = "C%d" % k
+			cp.z_index = 10 * (k - 1) + 3
+			cp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(cp)
 	var rp := LayerPart.new()
 	rp.map = self
 	rp.mode = "ramps"
@@ -614,6 +621,7 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 	var k: int = int(mode.substr(1))
 	if k == 0:
 		_draw_clouds(ci)
+	var pass_mode: int = 2 if mode.begins_with("C") else 1
 	var up: float = H * float(k)
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://mtn_level.gdshader")
@@ -626,6 +634,7 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 	mat.set_shader_parameter("hgt", H)
 	mat.set_shader_parameter("yoff", up)
 	mat.set_shader_parameter("base_mode", 1 if k == 0 else 0)
+	mat.set_shader_parameter("pass_mode", pass_mode)
 	var tints: Array = [Vector3(1, 1, 1), Vector3(1.0, 1.0, 0.95), Vector3(1.0, 0.97, 0.9), Vector3(0.95, 0.95, 1.0), Vector3(0.92, 0.96, 1.08)]
 	mat.set_shader_parameter("tint", tints[clampi(k, 0, 4)])
 	ci.material = mat
@@ -667,7 +676,16 @@ func _blur(src: PackedFloat32Array) -> PackedFloat32Array:
 			out[y * GW + x] = s / 9.0
 	return out
 
+var _field_cache: Dictionary = {}
+
 func _field_tex(k: int) -> ImageTexture:
+	if _field_cache.has(k):
+		return _field_cache[k]
+	var made: ImageTexture = _field_make(k)
+	_field_cache[k] = made
+	return made
+
+func _field_make(k: int) -> ImageTexture:
 	var fn := FastNoiseLite.new()
 	fn.seed = 11 + k
 	fn.frequency = 0.12

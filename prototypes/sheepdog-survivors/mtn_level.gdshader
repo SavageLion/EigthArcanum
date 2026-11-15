@@ -10,6 +10,7 @@ uniform float hgt = 42.0;
 uniform float yoff = 0.0;
 uniform vec3 tint = vec3(1.0);
 uniform int base_mode = 0;
+uniform int pass_mode = 0;
 uniform vec3 lip_col = vec3(0.45, 0.65, 0.25);
 
 varying vec2 lp;
@@ -65,6 +66,9 @@ void fragment() {
 	} else {
 		float inside = smoothstep(0.5, 0.54, f.r) * holef;
 		if (inside > 0.01) {
+			if (pass_mode == 2) {
+				discard;
+			}
 			vec3 g = texture(ground, lp / 190.0).rgb * tint;
 			g *= 0.92 + 0.16 * n;
 			float edge = 1.0 - smoothstep(0.5, 0.66, f.r);
@@ -83,7 +87,7 @@ void fragment() {
 			g = mix(g, g * vec3(0.8, 0.95, 0.75), fpatch * 0.35);
 			vec3 c = mix(g, dcol * tint, tr * (1.0 - edge * 0.5));
 			COLOR = vec4(c, inside);
-		} else if (f.b <= 0.3) {
+		} else if (f.b <= 0.3 && pass_mode != 1) {
 			vec4 res;
 			cliff_pass(lp, n, n2, lip_col, res);
 			COLOR = res;
