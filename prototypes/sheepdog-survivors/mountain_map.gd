@@ -17,6 +17,12 @@ var spawnable: Array = []   # per level, a list of cell centres
 var dist: PackedInt32Array = PackedInt32Array()
 var cliff_tex: Array = []
 var trail: PackedByteArray = PackedByteArray()
+var water: PackedByteArray = PackedByteArray()
+var bridges: Array = []
+var sealed: int = 0
+var river_xs: Array = []
+var river_y0: int = 0
+var river_pond: Vector2i = Vector2i.ZERO
 var ground_tex: Dictionary = {}
 # which tiles make up the top of each level
 const TOPS: Array = [[], ["g0", "g1", "g12", "g13", "g2", "g3"], ["g4", "g5", "g6", "g7"], ["g10", "g11", "g14", "g15", "g8", "g9"], ["r0", "r1", "r4", "r2", "r5"]]
@@ -45,11 +51,15 @@ func build(tier: int) -> void:
 	lvl.fill(0)
 	rmp.resize(GW * GH)
 	rmp.fill(-1)
+	water.resize(GW * GH)
+	water.fill(0)
+	bridges.clear()
 	ramps.clear()
 	if levels > 1:
 		_generate()
-	_collect_spawns()
 	_flow()
+	_seal()
+	_collect_spawns()
 	_trails()
 	if levels > 1:
 		_make_parts()
@@ -76,9 +86,13 @@ func _generate() -> void:
 			lvl[_ix(x, y)] = l
 	for pass_i in 3:
 		_smooth()
+	_river()
 	for k in range(0, levels - 1):
 		_place_ramps(k, 3 + levels)
 	_connect()
+	_restrip()
+	_connect()
+	_river_fix()
 
 func _smooth() -> void:
 	var out: PackedByteArray = lvl.duplicate()
@@ -100,8 +114,10 @@ func _smooth() -> void:
 
 func _place_ramps(k: int, want: int) -> void:
 	var cands: Array = []
-	for y in range(4, GH - 8, 2):
-		for x in range(4, GW - 8, 2):
+	for y in range(8, GH - 14, 2):
+		for x in range(8, GW - 14, 2):
+			if _water_near(x - 6, y - 6, 20):
+				continue
 			var okn: bool = true
 			var oks: bool = true
 			var okw: bool = true
@@ -186,8 +202,25 @@ func _carve(x: int, y: int, dir: String, k: int) -> bool:
 	else:
 		a = Vector2(rect.position.x, cym)
 		b = Vector2(rect.end.x, cym)
-	ramps.append({"a": a, "b": b, "w": 4.0 * CELL, "lo": k, "hi": k + 1, "rect": rect})
+	ramps.append({"a": a, "b": b, "w": 4.0 * CELL, "lo": k, "hi": k + 1, "rect": rect, "rx0": rx0, "ry0": ry0, "vertical": vertical, "high_first": high_first})
 	return true
+
+# the cells at both ends of every ramp must stay on the right level
+func _restrip() -> void:
+	for r in ramps:
+		var rx0: int = int(r["rx0"])
+		var ry0: int = int(r["ry0"])
+		var vertical: bool = bool(r["vertical"])
+		var high_first: bool = bool(r["high_first"])
+		var k: int = int(r["lo"])
+		for i in 4:
+			for t in range(1, 3):
+				if vertical:
+					_setl(rx0 + i, ry0 - t, k + 1 if high_first else k)
+					_setl(rx0 + i, ry0 + 3 + t, k if high_first else k + 1)
+				else:
+					_setl(rx0 - t, ry0 + i, k + 1 if high_first else k)
+					_setl(rx0 + 3 + t, ry0 + i, k if high_first else k + 1)
 
 func _setl(cx: int, cy: int, v: int) -> void:
 	if _in(cx, cy) and rmp[_ix(cx, cy)] < 0:
@@ -227,9 +260,9 @@ func _connect() -> void:
 			var n2: Vector2i = c2 + (d2 as Vector2i)
 			if not _in(n2.x, n2.y) or reach[_ix(n2.x, n2.y)] == 1:
 				continue
-			if rmp[_ix(n2.x, n2.y)] < 0 and rmp[_ix(c2.x, c2.y)] < 0:
-				lvl[_ix(n2.x, n2.y)] = lvl[_ix(c2.x, c2.y)]
-			elif rmp[_ix(n2.x, n2.y)] < 0:
+			if water[_ix(n2.x, n2.y)] != 0:
+				continue
+			if rmp[_ix(n2.x, n2.y)] < 0 and water[_ix(n2.x, n2.y)] == 0:
 				lvl[_ix(n2.x, n2.y)] = lvl[_ix(c2.x, c2.y)]
 			reach[_ix(n2.x, n2.y)] = 1
 			queue.append(n2)
@@ -246,6 +279,8 @@ func _end_level(ri: int, c: Vector2i) -> int:
 	return -1
 
 func _can_step(a: Vector2i, b: Vector2i) -> bool:
+	if water[_ix(a.x, a.y)] != 0 or water[_ix(b.x, b.y)] != 0:
+		return false
 	var ra: int = rmp[_ix(a.x, a.y)]
 	var rb: int = rmp[_ix(b.x, b.y)]
 	if ra >= 0 and rb >= 0:
@@ -257,6 +292,16 @@ func _can_step(a: Vector2i, b: Vector2i) -> bool:
 	return lvl[_ix(a.x, a.y)] == lvl[_ix(b.x, b.y)]
 
 # how far every cell is from the valley by the ways an animal can walk
+# land nobody can walk to is closed off so that nothing spawns or gets stuck there
+func _seal() -> void:
+	sealed = 0
+	for y in GH:
+		for x in GW:
+			var i: int = _ix(x, y)
+			if dist[i] < 0 and rmp[i] < 0 and water[i] == 0:
+				water[i] = 2
+				sealed += 1
+
 func _flow() -> void:
 	dist.resize(GW * GH)
 	dist.fill(-1)
@@ -350,7 +395,7 @@ func _collect_spawns() -> void:
 				continue
 			var l: int = int(lvl[_ix(x, y)])
 			# only cells that are fully inside their level
-			var inside: bool = true
+			var inside: bool = water[_ix(x, y)] == 0 and not _water_near(x - 2, y - 2, 5)
 			for o in [Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2)]:
 				if _lv(x + (o as Vector2i).x, y + (o as Vector2i).y) != l or rmp[_ix(x + (o as Vector2i).x, y + (o as Vector2i).y)] >= 0:
 					inside = false
@@ -365,6 +410,8 @@ func _frac(r: Dictionary, p: Vector2) -> float:
 func _allowed(layer: int, old: Vector2, np: Vector2) -> bool:
 	var cn: Vector2i = _cell_of(np)
 	var co: Vector2i = _cell_of(old)
+	if water[_ix(cn.x, cn.y)] != 0:
+		return false
 	var rn: int = rmp[_ix(cn.x, cn.y)]
 	var ro: int = rmp[_ix(co.x, co.y)]
 	if rn >= 0 and ro == rn:
@@ -421,6 +468,8 @@ func on_ramp(p: Vector2) -> bool:
 
 func spawn_layer(p: Vector2) -> int:
 	var c: Vector2i = _cell_of(p)
+	if water[_ix(c.x, c.y)] != 0:
+		return -1
 	if rmp[_ix(c.x, c.y)] >= 0:
 		return -1
 	return int(lvl[_ix(c.x, c.y)])
@@ -467,7 +516,16 @@ func cluster_centers(ground: Array) -> Array:
 			out.append(list[randi() % list.size()])
 			if levels > 2 and list.size() > 40:
 				out.append(list[randi() % list.size()])
-	if not ground.is_empty():
+	if not spawnable[0].is_empty():
+		var home: Vector2 = Vector2(float(GW), float(GH)) * CELL / 2.0
+		var pick: Vector2 = (spawnable[0] as Array)[0]
+		for i in 40:
+			var cand: Vector2 = (spawnable[0] as Array)[randi() % (spawnable[0] as Array).size()]
+			if cand.distance_to(home) > 650.0:
+				pick = cand
+				break
+		out.append(pick)
+	elif not ground.is_empty():
 		out.append(ground[0])
 	if out.is_empty():
 		out.append(Vector2(float(GW) * CELL * 0.3, float(GH) * CELL * 0.3))
@@ -512,6 +570,20 @@ func _make_parts() -> void:
 			cp.z_index = 10 * (k - 1) + 3
 			cp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			add_child(cp)
+	for k2 in range(0, levels):
+		if _has_water(k2):
+			var wp := LayerPart.new()
+			wp.map = self
+			wp.mode = "W%d" % k2
+			wp.z_index = 10 * k2 + 2 if k2 > 0 else -134
+			wp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(wp)
+			var bp := LayerPart.new()
+			bp.map = self
+			bp.mode = "B%d" % k2
+			bp.z_index = 10 * k2 + 3 if k2 > 0 else -133
+			bp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(bp)
 	var rp := LayerPart.new()
 	rp.map = self
 	rp.mode = "ramps"
@@ -553,6 +625,8 @@ func _decorate() -> void:
 
 func _roomy(p: Vector2, k: int, r: int) -> bool:
 	var c: Vector2i = _cell_of(p)
+	if _water_near(c.x - r - 1, c.y - r - 1, 2 * r + 3):
+		return false
 	for oy in range(-r, r + 1, 2):
 		for ox in range(-r, r + 1, 2):
 			if _lv(c.x + ox, c.y + oy) != k or (_in(c.x + ox, c.y + oy) and rmp[_ix(c.x + ox, c.y + oy)] >= 0):
@@ -617,6 +691,9 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 				ci.draw_line(m1 + perp * 0.86, m1 - perp * 0.86, Color(0.3, 0.2, 0.1, 0.8), 2.0)
 			ci.draw_line(a + perp * 0.9 + pa, b + perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
 			ci.draw_line(a - perp * 0.9 + pa, b - perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
+		return
+	if mode.begins_with("W") or mode.begins_with("B"):
+		_draw_water(ci, mode)
 		return
 	var k: int = int(mode.substr(1))
 	if k == 0:
@@ -745,3 +822,187 @@ func _draw_clouds(ci: CanvasItem) -> void:
 			p = Vector2(w + d * 260.0 - 90.0, u * h)
 		for j in 5:
 			ci.draw_circle(p + Vector2((_hash(i, j + 20) - 0.5) * 120.0, (_hash(i, j + 40) - 0.5) * 50.0), 26.0 + _hash(i, j + 60) * 34.0, Color(0.95, 0.97, 1.0, 0.9))
+
+# ---------------------------------------------------------------- the river
+func _water_near(x: int, y: int, size: int) -> bool:
+	for oy in size:
+		for ox in size:
+			if _in(x + ox, y + oy) and water[_ix(x + ox, y + oy)] != 0:
+				return true
+	return false
+
+func _has_water(k: int) -> bool:
+	for i in GW * GH:
+		if water[i] == 1 and int(lvl[i]) == k:
+			return true
+	return false
+
+# a river from the high ground down towards the valley; every level it crosses is flat and the drops become waterfalls
+func _river() -> void:
+	var noise := FastNoiseLite.new()
+	noise.seed = randi()
+	noise.frequency = 0.05
+	var side: float = 0.9 if randf() < 0.5 else 0.1
+	river_xs = []
+	var y0: int = 6
+	var y1: int = GH / 2 - 10
+	var xs: Array = []
+	var x: float = float(GW) * side
+	for y in range(y0, y1 + 1):
+		var want: float = float(GW) * side + noise.get_noise_1d(float(y)) * 5.0
+		x = clampf(want, x - 1.0, x + 1.0)
+		xs.append(int(round(x)))
+	var ls: Array = []
+	var cur: int = int(lvl[_ix(int(xs[0]), y0)])
+	var run: int = 0
+	for i in xs.size():
+		var own: int = int(lvl[_ix(int(xs[i]), y0 + i)])
+		if run >= 8 and own < cur:
+			cur = maxi(own, cur - 1)
+			run = 0
+		else:
+			run += 1
+		ls.append(cur)
+	for i in xs.size():
+		var yy: int = y0 + i
+		for ox in range(-3, 4):
+			var cx: int = int(xs[i]) + ox
+			if _in(cx, yy):
+				lvl[_ix(cx, yy)] = int(ls[i])
+				if absi(ox) <= 1:
+					water[_ix(cx, yy)] = 1
+	# a pond where the river ends
+	var ex: int = int(xs[xs.size() - 1])
+	var ey: int = y1 + 3
+	var el: int = int(ls[ls.size() - 1])
+	for oy in range(-7, 8):
+		for ox in range(-7, 8):
+			var d2: float = float(ox * ox + oy * oy)
+			if d2 <= 49.0 and _in(ex + ox, ey + oy):
+				lvl[_ix(ex + ox, ey + oy)] = el
+				if d2 <= 16.0:
+					water[_ix(ex + ox, ey + oy)] = 1
+	river_xs = xs
+	river_y0 = y0
+	river_pond = Vector2i(ex, ey)
+
+# once the terrain is final: the water takes the height of its banks, then bridges go where both banks match
+func _river_fix() -> void:
+	if river_xs.is_empty():
+		return
+	var n: int = river_xs.size()
+	var wl: Array = []
+	for i in n:
+		var yy: int = river_y0 + i
+		var cx: int = int(river_xs[i])
+		var la: int = int(lvl[_ix(cx - 3, yy)])
+		var lb: int = int(lvl[_ix(cx + 3, yy)])
+		var l: int = mini(la, lb)
+		wl.append(l)
+		for ox in range(-1, 2):
+			lvl[_ix(cx + ox, yy)] = l
+	# the pond takes the lowest bank around it
+	var pl: int = 99
+	for o in [Vector2i(7, 0), Vector2i(-7, 0), Vector2i(0, 7), Vector2i(0, -7)]:
+		var pc: Vector2i = river_pond + (o as Vector2i)
+		if _in(pc.x, pc.y) and water[_ix(pc.x, pc.y)] == 0:
+			pl = mini(pl, int(lvl[_ix(pc.x, pc.y)]))
+	if pl == 99:
+		pl = 0
+	for oy in range(-5, 6):
+		for ox in range(-5, 6):
+			var px: int = river_pond.x + ox
+			var py: int = river_pond.y + oy
+			if _in(px, py) and water[_ix(px, py)] == 1 and py > river_y0 + n - 2:
+				lvl[_ix(px, py)] = pl
+	# the river runs along the edge of the mountain, so nothing needs a crossing
+	if true:
+		return
+	var cands: Dictionary = {}
+	for r in range(1, n - 3):
+		var cx2: int = int(river_xs[r])
+		if int(river_xs[r + 1]) != cx2 or int(river_xs[r - 1]) != cx2:
+			continue
+		var yy2: int = river_y0 + r
+		var l2: int = int(lvl[_ix(cx2 - 2, yy2)])
+		var okb: bool = true
+		for ro in range(-1, 3):
+			for ox2 in [-3, -2, 2, 3]:
+				if int(lvl[_ix(cx2 + (ox2 as int), yy2 + ro)]) != l2 or rmp[_ix(cx2 + (ox2 as int), yy2 + ro)] >= 0 or water[_ix(cx2 + (ox2 as int), yy2 + ro)] != 0:
+					okb = false
+		if okb:
+			if not cands.has(l2):
+				cands[l2] = []
+			(cands[l2] as Array).append(r)
+	for kk in cands:
+		var rows: Array = cands[kk]
+		var picks: Array = [rows[rows.size() / 2]]
+		if rows.size() > 24:
+			picks.append(rows[rows.size() / 6])
+			picks.append(rows[rows.size() * 5 / 6])
+		for pr in picks:
+			var bx: int = int(river_xs[int(pr)])
+			var yr: int = river_y0 + int(pr)
+			for ro2 in 2:
+				for ox3 in range(-1, 2):
+					water[_ix(bx + ox3, yr + ro2)] = 0
+					lvl[_ix(bx + ox3, yr + ro2)] = int(kk)
+			bridges.append({"lvl": int(kk), "x": bx, "y": yr})
+
+func _water_tex(k: int) -> ImageTexture:
+	if _field_cache.has(1000 + k):
+		return _field_cache[1000 + k]
+	var fn := FastNoiseLite.new()
+	fn.seed = 91 + k
+	fn.frequency = 0.15
+	var wr := PackedFloat32Array()
+	wr.resize(GW * GH)
+	for i in GW * GH:
+		wr[i] = 1.0 if (water[i] == 1 and int(lvl[i]) == k) else 0.0
+	wr = _blur(wr)
+	var img := Image.create(GW, GH, false, Image.FORMAT_RGBA8)
+	for y in GH:
+		for x in GW:
+			var i2: int = y * GW + x
+			var v: float = wr[i2]
+			v = clampf(v + fn.get_noise_2d(float(x), float(y)) * 0.25 * 4.0 * v * (1.0 - v), 0.0, 1.0)
+			var fall: float = 0.0
+			if water[i2] == 1 and int(lvl[i2]) == k and y + 1 < GH and water[i2 + GW] == 1 and int(lvl[i2 + GW]) < k:
+				fall = 1.0
+			img.set_pixel(x, y, Color(v, fall, 0.0, 1.0))
+	img.resize(GW * 4, GH * 4, Image.INTERPOLATE_BILINEAR)
+	var tex: ImageTexture = ImageTexture.create_from_image(img)
+	_field_cache[1000 + k] = tex
+	return tex
+
+func _draw_water(ci: CanvasItem, mode: String) -> void:
+	var k: int = int(mode.substr(1))
+	var up: float = H * float(k)
+	if mode.begins_with("B"):
+		for b in bridges:
+			if int(b["lvl"]) != k:
+				continue
+			var x0: float = float(int(b["x"]) - 2) * CELL - 4.0
+			var y0: float = float(int(b["y"])) * CELL - up - 4.0
+			var w: float = 5.0 * CELL + 8.0
+			var h: float = 2.0 * CELL + 8.0
+			ci.draw_rect(Rect2(x0, y0, w, h), Color(0.5, 0.36, 0.2))
+			var bxx: float = x0 + 4.0
+			while bxx < x0 + w - 3.0:
+				ci.draw_line(Vector2(bxx, y0), Vector2(bxx, y0 + h), Color(0.3, 0.2, 0.1), 2.0)
+				bxx += 9.0
+			ci.draw_rect(Rect2(x0, y0, w, 4.0), Color(0.28, 0.18, 0.1))
+			ci.draw_rect(Rect2(x0, y0 + h - 4.0, w, 4.0), Color(0.28, 0.18, 0.1))
+			for px in [x0 + 2.0, x0 + w - 6.0]:
+				ci.draw_rect(Rect2(px, y0 - 6.0, 5.0, 10.0), Color(0.22, 0.14, 0.08))
+				ci.draw_rect(Rect2(px, y0 + h - 4.0, 5.0, 10.0), Color(0.22, 0.14, 0.08))
+		return
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://mtn_water.gdshader")
+	mat.set_shader_parameter("wfield", _water_tex(k))
+	mat.set_shader_parameter("noise", _noise_tex())
+	mat.set_shader_parameter("world_size", Vector2(float(GW) * CELL, float(GH) * CELL))
+	mat.set_shader_parameter("hgt", H)
+	mat.set_shader_parameter("yoff", up)
+	ci.material = mat
+	ci.draw_rect(Rect2(0.0, -up, float(GW) * CELL, float(GH) * CELL + 80.0), Color(1, 1, 1))

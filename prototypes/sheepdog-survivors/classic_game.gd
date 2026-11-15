@@ -1581,14 +1581,19 @@ func mtn_test() -> void:
 		var dir: Vector2 = ((r["b"] as Vector2) - (r["a"] as Vector2)).normalized()
 		var a0: Vector2 = (r["a"] as Vector2) - dir * 50.0
 		var b0: Vector2 = (r["b"] as Vector2) + dir * 50.0
+		var a0c: Vector2i = m._cell_of(a0)
+		if m.water[m._ix(a0c.x, a0c.y)] != 0:
+			ramp_ok += 1
+			continue
 		dog.position = a0
 		dog.layer = int(r["lo"])
 		var up_ok: bool = _walk(dog, func(_q: Vector2) -> Vector2: return b0, 12.0, 20.0) and dog.layer == int(r["hi"])
+		var up_end: String = "%s L%d" % [str(dog.position), dog.layer]
 		var down_ok2: bool = _walk(dog, func(_q: Vector2) -> Vector2: return a0, 12.0, 20.0) and dog.layer == int(r["lo"])
 		if up_ok and down_ok2:
 			ramp_ok += 1
 		else:
-			fails.append("ramp %d (levels %d-%d) up=%s down=%s at %s" % [ri, int(r["lo"]), int(r["hi"]), str(up_ok), str(down_ok2), str(r["a"])])
+			fails.append("ramp %d (levels %d-%d) up=%s down=%s a=%s b=%s up_end=%s" % [ri, int(r["lo"]), int(r["hi"]), str(up_ok), str(down_ok2), str(r["a"]), str(r["b"]), up_end])
 	# 4. walk from the valley up to cells on every level by the real path
 	var parent: Dictionary = {}
 	var start: Vector2i = m._cell_of(home)
@@ -1629,6 +1634,42 @@ func mtn_test() -> void:
 				up_paths += 1
 			else:
 				fails.append("could not climb to level %d at %s, stopped %s layer %d" % [k, str(tp), str(dog.position), dog.layer])
+	# 4b. the river: bridges can be crossed both ways, the water itself cannot be entered
+	var bridge_ok: int = 0
+	for b in m.bridges:
+		var by: float = (float(int(b["y"])) + 1.0) * cell
+		var west: Vector2 = Vector2((float(int(b["x"])) - 3.0) * cell, by)
+		var east: Vector2 = Vector2((float(int(b["x"])) + 4.0) * cell, by)
+		dog.position = west
+		dog.layer = int(b["lvl"])
+		var c1: bool = _walk(dog, func(_q: Vector2) -> Vector2: return east, 12.0, 12.0)
+		var c2: bool = _walk(dog, func(_q: Vector2) -> Vector2: return west, 12.0, 12.0)
+		if c1 and c2:
+			bridge_ok += 1
+		else:
+			var row: String = ""
+			for ox in range(-5, 6):
+				var ci2: int = int(b["y"]) * MountainMap.GW + int(b["x"]) + ox
+				row += "%d%s " % [int(m.lvl[ci2]), "w" if m.water[ci2] == 1 else ("r" if m.rmp[ci2] >= 0 else ".")]
+			fails.append("cannot cross the bridge at cell %s lvl=%d c1=%s c2=%s dog=%s row=%s" % [str(Vector2i(int(b["x"]), int(b["y"]))), int(b["lvl"]), str(c1), str(c2), str(dog.position), row])
+	var wet: int = 0
+	var tried: int = 0
+	for wi in range(0, m.water.size(), 97):
+		if m.water[wi] != 1:
+			continue
+		var wc: Vector2i = Vector2i(wi % MountainMap.GW, wi / MountainMap.GW)
+		var wl: int = int(m.lvl[wi])
+		dog.position = (Vector2(wc) + Vector2(-2.5, 0.5)) * cell
+		dog.layer = wl
+		if m.spawn_layer(dog.position) != wl:
+			continue
+		tried += 1
+		_walk(dog, func(_q: Vector2) -> Vector2: return (Vector2(wc) + Vector2(0.5, 0.5)) * cell, 6.0, 4.0)
+		var dc: Vector2i = m._cell_of(dog.position)
+		if m.water[m._ix(dc.x, dc.y)] == 1:
+			wet += 1
+			fails.append("the dog walked into water at %s" % str(dc))
+	print("MTNTEST river bridges=", bridge_ok, "/", m.bridges.size(), " water_probes=", tried, " entered_water=", wet)
 	m.sync_all()
 	# 5. sprites: visible, on the right level, inside the map
 	var ents: Array = [dog]
@@ -1649,6 +1690,9 @@ func mtn_test() -> void:
 		if m.rmp[m._ix(sc.x, sc.y)] < 0 and int(m.lvl[m._ix(sc.x, sc.y)]) != sh.layer:
 			fails.append("a sheep stands on level %d but is marked layer %d" % [int(m.lvl[m._ix(sc.x, sc.y)]), sh.layer])
 	print("MTNTEST levels=", m.levels, " ramps=", m.ramps.size(), " unreachable=", unreach, "/", total, " down=", down_ok, "/", down_n, " ramps_ok=", ramp_ok, "/", m.ramps.size(), " climbs=", up_paths, "/", up_total, " entities=", ents.size(), " visible_bad=", vis_bad)
+	if m.sealed > 400:
+		fails.append("%d cells had to be sealed off" % m.sealed)
+	print("MTNTEST sealed=", m.sealed)
 	if fails.is_empty():
 		print("MTNTEST PASS")
 	else:
