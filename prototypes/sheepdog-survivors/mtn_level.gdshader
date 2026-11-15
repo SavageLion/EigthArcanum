@@ -71,6 +71,16 @@ void fragment() {
 			g = mix(g, lip_col * tint, edge * 0.55);
 			float rim = 1.0 - smoothstep(0.5, 0.515, f.r);
 			g *= 1.0 - rim * 0.35;
+			vec2 fc = floor(lp / 13.0);
+			float fh = fract(sin(dot(fc, vec2(12.9898, 78.233))) * 43758.5453);
+			float fpatch = smoothstep(0.55, 0.75, texture(noise, lp / 260.0 + 0.6).r);
+			if (fh > 0.975 - 0.06 * fpatch && edge < 0.2) {
+				float ft = fract(fh * 7.0);
+				vec3 fcol = ft < 0.33 ? vec3(0.95, 0.9, 0.95) : (ft < 0.66 ? vec3(0.75, 0.55, 0.9) : vec3(0.98, 0.85, 0.35));
+				vec2 q = fract(lp / 13.0) - 0.5;
+				g = mix(g, fcol, step(max(abs(q.x), abs(q.y)), 0.1));
+			}
+			g = mix(g, g * vec3(0.8, 0.95, 0.75), fpatch * 0.35);
 			vec3 c = mix(g, dcol * tint, tr * (1.0 - edge * 0.5));
 			COLOR = vec4(c, inside);
 		} else if (f.b <= 0.3) {

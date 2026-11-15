@@ -6,7 +6,7 @@ extends Node2D
 const CELL: float = 24.0
 const GW: int = 136
 const GH: int = 148
-const H: float = 42.0
+const H: float = 60.0
 
 var game: Node2D
 var levels: int = 1
@@ -563,7 +563,7 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			var pts := PackedVector2Array([a + perp + pa, b + perp + pb, b - perp + pb, a - perp + pa])
 			var uvs := PackedVector2Array([Vector2(0, 0), Vector2(0, 3), Vector2(3, 3), Vector2(3, 0)])
 			ci.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-			ci.draw_colored_polygon(pts, Color(0.55, 0.43, 0.28))
+			ci.draw_colored_polygon(pts, Color(0.45, 0.4, 0.34))
 			var steps: int = 9
 			for kk in steps:
 				var t0: float = float(kk) / float(steps)
@@ -571,10 +571,10 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 				var m0: Vector2 = a.lerp(b, t0) + pa.lerp(pb, t0)
 				var m1: Vector2 = a.lerp(b, t1) + pa.lerp(pb, t1)
 				var sh: float = 0.62 + 0.16 * t1
-				ci.draw_colored_polygon(PackedVector2Array([m0 + perp * 0.86, m1 + perp * 0.86, m1 - perp * 0.86, m0 - perp * 0.86]), Color(sh, sh * 0.8, sh * 0.55))
+				ci.draw_colored_polygon(PackedVector2Array([m0 + perp * 0.86, m1 + perp * 0.86, m1 - perp * 0.86, m0 - perp * 0.86]), Color(sh * 0.95, sh * 0.88, sh * 0.76))
 				ci.draw_line(m1 + perp * 0.86, m1 - perp * 0.86, Color(0.3, 0.2, 0.1, 0.8), 2.0)
-			ci.draw_line(a + perp * 0.86 + pa, b + perp * 0.86 + pb, Color(0.3, 0.28, 0.25), 2.0)
-			ci.draw_line(a - perp * 0.86 + pa, b - perp * 0.86 + pb, Color(0.3, 0.28, 0.25), 2.0)
+			ci.draw_line(a + perp * 0.9 + pa, b + perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
+			ci.draw_line(a - perp * 0.9 + pa, b - perp * 0.9 + pb, Color(0.36, 0.34, 0.32), 5.0)
 		return
 	var k: int = int(mode.substr(1))
 	if k == 0:
