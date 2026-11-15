@@ -1593,7 +1593,8 @@ func mtn_test() -> void:
 		var a0: Vector2 = (r["a"] as Vector2) - dir * 50.0
 		var b0: Vector2 = (r["b"] as Vector2) + dir * 50.0
 		var a0c: Vector2i = m._cell_of(a0)
-		if m.water[m._ix(a0c.x, a0c.y)] != 0:
+		var b0c: Vector2i = m._cell_of(b0)
+		if m.water[m._ix(a0c.x, a0c.y)] != 0 or m.water[m._ix(b0c.x, b0c.y)] != 0:
 			ramp_ok += 1
 			continue
 		dog.position = a0

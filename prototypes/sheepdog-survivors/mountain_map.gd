@@ -21,6 +21,7 @@ var trail: PackedByteArray = PackedByteArray()
 var water: PackedByteArray = PackedByteArray()
 var land: PackedByteArray = PackedByteArray()
 var bridge_cells: Array = []
+var pond_c: Vector2 = Vector2.ZERO
 var bridges: Array = []
 var sealed: int = 0
 var seed_shift: int = 0
@@ -69,6 +70,7 @@ func build(tier: int) -> void:
 	_seal()
 	_collect_spawns()
 	_trails()
+	_paths()
 	_make_parts()
 	_decorate()
 
@@ -108,6 +110,13 @@ func _generate() -> void:
 					lvl[_ix(x, y)] = l
 	for i in GW * GH:
 		water[i] = 0 if land[i] == 1 else 3
+	pond_c = Vector2(77.0, 53.0)
+	for y in range(46, 61):
+		for x in range(68, 88):
+			var pdx: float = (float(x) - pond_c.x) / 5.2
+			var pdy: float = (float(y) - pond_c.y) / 3.4
+			if pdx * pdx + pdy * pdy + noise.get_noise_2d(float(x) * 1.7, float(y) * 1.7) * 0.3 < 1.0 and land[_ix(x, y)] == 1:
+				water[_ix(x, y)] = 1
 	# bridges: a strip of planks over the gap, walkable
 	bridges.clear()
 	bridge_cells.clear()
@@ -190,7 +199,7 @@ func _buffer() -> void:
 					if not _in(x + ox3, y + oy3):
 						continue
 					var n: int = _ix(x + ox3, y + oy3)
-					if water[n] == 3:
+					if water[n] == 3 or water[n] == 1:
 						edge = true
 					elif ex_drop[i3] == 0 and water[n] == 0 and rmp[n] < 0 and int(lvl[n]) < int(lvl[i3]):
 						edge = true
@@ -729,12 +738,6 @@ func _make_parts() -> void:
 			wp.z_index = 10 * k2 + 2 if k2 > 0 else -134
 			wp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			add_child(wp)
-			var bp := LayerPart.new()
-			bp.map = self
-			bp.mode = "B%d" % k2
-			bp.z_index = 10 * k2 + 3 if k2 > 0 else -133
-			bp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			add_child(bp)
 	var rp := LayerPart.new()
 	rp.map = self
 	rp.mode = "ramps"
@@ -774,6 +777,7 @@ func _decorate() -> void:
 			s.position = p2 + Vector2(rng.randf_range(-6.0, 6.0), rng.randf_range(-6.0, 6.0))
 			s.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			game.container_for(k).add_child(s)
+	_forest(rng, trees)
 	_landmarks(rng)
 
 func _roomy(p: Vector2, k: int, r: int) -> bool:
@@ -1199,20 +1203,71 @@ func _draw_bridges(ci: CanvasItem) -> void:
 				else:
 					ci.draw_line(Vector2(x0, y0 + 4.0), Vector2(x0 + CELL, y0 + 4.0), Color(0.32, 0.21, 0.11), 2.0)
 					ci.draw_line(Vector2(x0, y0 + 14.0), Vector2(x0 + CELL, y0 + 14.0), Color(0.32, 0.21, 0.11), 2.0)
-				var rail: Color = Color(0.28, 0.18, 0.1)
+				var rail: Color = Color(0.74, 0.62, 0.4)
 				if horizontal:
 					if yy == rect.position.y:
-						ci.draw_rect(Rect2(x0, y0, CELL + 0.5, 4.0), rail)
+						ci.draw_rect(Rect2(x0, y0, CELL + 0.5, 2.0), rail)
 					if yy == rect.end.y - 1:
-						ci.draw_rect(Rect2(x0, y0 + CELL - 4.0, CELL + 0.5, 4.0), rail)
+						ci.draw_rect(Rect2(x0, y0 + CELL - 2.0, CELL + 0.5, 2.0), rail)
 					if xx % 4 == 0:
 						ci.draw_rect(Rect2(x0 + 8.0, y0 - 4.0, 5.0, 8.0), Color(0.22, 0.14, 0.08))
 						ci.draw_rect(Rect2(x0 + 8.0, y0 + CELL - 4.0, 5.0, 8.0), Color(0.22, 0.14, 0.08))
 				else:
 					if xx == rect.position.x:
-						ci.draw_rect(Rect2(x0, y0, 4.0, CELL + 0.5), rail)
+						ci.draw_rect(Rect2(x0, y0, 2.0, CELL + 0.5), rail)
 					if xx == rect.end.x - 1:
-						ci.draw_rect(Rect2(x0 + CELL - 4.0, y0, 4.0, CELL + 0.5), rail)
+						ci.draw_rect(Rect2(x0 + CELL - 2.0, y0, 2.0, CELL + 0.5), rail)
 					if yy % 4 == 0:
 						ci.draw_rect(Rect2(x0 - 4.0, y0 + 8.0, 8.0, 5.0), Color(0.22, 0.14, 0.08))
 						ci.draw_rect(Rect2(x0 + CELL - 4.0, y0 + 8.0, 8.0, 5.0), Color(0.22, 0.14, 0.08))
+
+# winding dirt paths from the pen to the foot of every bridge
+func _paths() -> void:
+	if trail.size() == 0:
+		trail.resize(GW * GH)
+		trail.fill(0)
+	var home: Vector2 = home_pos() / CELL
+	for b in bridges:
+		var pa: Vector2 = (b["a"] as Vector2) / CELL
+		var pb: Vector2 = (b["b"] as Vector2) / CELL
+		var target: Vector2 = pa if pa.distance_to(home) < pb.distance_to(home) else pb
+		var start: Vector2 = home + Vector2(0.0, 5.0)
+		var seg: Vector2 = target - start
+		var n: int = int(seg.length() * 2.0)
+		var perp: Vector2 = seg.normalized().orthogonal()
+		var ph: float = randf() * TAU
+		for i in n + 1:
+			var t: float = float(i) / float(maxi(n, 1))
+			var p: Vector2 = start + seg * t + perp * sin(t * 9.0 + ph) * 2.2 * sin(t * PI)
+			for d in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var cx: int = int(p.x) + (d as Vector2i).x
+				var cy: int = int(p.y) + (d as Vector2i).y
+				if _in(cx, cy) and water[_ix(cx, cy)] == 0 and rmp[_ix(cx, cy)] < 0 and land[_ix(cx, cy)] == 1:
+					trail[_ix(cx, cy)] = 1
+
+# thick stands of pine, fir and broadleaf trees
+func _forest(rng: RandomNumberGenerator, trees: Array) -> void:
+	for k in range(0, levels):
+		var list: Array = spawnable[k]
+		if list.size() < 20:
+			continue
+		var stands: int = (7 if k == 0 else 3) + (1 if levels <= 2 else 0)
+		for s in stands:
+			var c: Vector2 = list[rng.randi() % list.size()]
+			if k == 0 and c.distance_to(home_pos()) < 420.0:
+				continue
+			var pine_bias: float = rng.randf()
+			for j in 16:
+				var p: Vector2 = c + Vector2.from_angle(rng.randf() * TAU) * (rng.randf() * rng.randf()) * 110.0
+				var cc: Vector2i = _cell_of(p)
+				if int(lvl[_ix(cc.x, cc.y)]) != k or water[_ix(cc.x, cc.y)] != 0 or rmp[_ix(cc.x, cc.y)] >= 0 or trail[_ix(cc.x, cc.y)] == 1 or _water_near(cc.x - 2, cc.y - 2, 5):
+					continue
+				var t: Texture2D = trees[rng.randi() % 2] if rng.randf() < 0.45 + 0.4 * pine_bias else trees[2 + rng.randi() % 2]
+				var sp := Sprite2D.new()
+				var sc: float = rng.randf_range(0.8, 1.25)
+				sp.texture = t
+				sp.scale = Vector2.ONE * sc
+				sp.offset = Vector2(0, -float(t.get_height()) * 0.5 + 6.0 - H * float(k) / sc)
+				sp.position = p
+				sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+				game.container_for(k).add_child(sp)

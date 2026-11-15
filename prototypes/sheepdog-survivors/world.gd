@@ -619,7 +619,7 @@ func _bridge() -> void:
 	add_child(b)
 
 func _pen_visuals() -> void:
-	if flat or refst:
+	if (flat or refst) and not lite:
 		var fl := Sprite2D.new()
 		fl.texture = load("res://art/flat/path_tex.png") as Texture2D
 		fl.region_enabled = true
