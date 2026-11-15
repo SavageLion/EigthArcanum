@@ -747,7 +747,7 @@ func _decorate() -> void:
 	rng.seed = randi()
 	var shrub: Texture2D = load("res://art/mtn/shrub.png")
 	var rocks: Texture2D = load("res://art/mtn/boulders.png")
-	var trees: Array = [load("res://art/mtn/pine.png"), load("res://art/mtn/fir.png"), load("res://art/mtn/tree_round.png")]
+	var trees: Array = [load("res://art/mtn/pine.png"), load("res://art/mtn/fir.png"), load("res://art/mtn/tree_round.png"), load("res://art/mtn/broadleaf.png")]
 	for k in range(0, levels):
 		var list: Array = spawnable[k]
 		if list.is_empty():
@@ -787,7 +787,7 @@ func _roomy(p: Vector2, k: int, r: int) -> bool:
 	return true
 
 func _landmark(rng: RandomNumberGenerator, k: int, path: String, sc: float, r: int) -> void:
-	if k >= spawnable.size() or k < 1:
+	if k >= spawnable.size() or k < 0:
 		return
 	var list: Array = spawnable[k]
 	for i in 80:
@@ -795,6 +795,8 @@ func _landmark(rng: RandomNumberGenerator, k: int, path: String, sc: float, r: i
 			return
 		var p: Vector2 = list[rng.randi() % list.size()]
 		if not _roomy(p, k, r):
+			continue
+		if k == 0 and p.distance_to(home_pos()) < 380.0:
 			continue
 		var t: Texture2D = load(path)
 		var s := Sprite2D.new()
@@ -807,6 +809,9 @@ func _landmark(rng: RandomNumberGenerator, k: int, path: String, sc: float, r: i
 		return
 
 func _landmarks(rng: RandomNumberGenerator) -> void:
+	for k0 in range(0, mini(levels, 3)):
+		for j0 in 3:
+			_landmark(rng, k0, "res://art/mtn/oak.png", rng.randf_range(1.1, 1.5), 3)
 	if levels < 2:
 		return
 	_landmark(rng, 1, "res://art/mtn/cabin.png", 1.3, 5)
