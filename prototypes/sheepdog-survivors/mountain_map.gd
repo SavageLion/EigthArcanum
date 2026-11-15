@@ -515,7 +515,7 @@ func _decorate() -> void:
 	rng.seed = randi()
 	var shrub: Texture2D = load("res://art/mtn/shrub.png")
 	var rocks: Texture2D = load("res://art/mtn/boulders.png")
-	var trees: Array = [game.world.tex("tree_big_a"), game.world.tex("tree_big_b")]
+	var trees: Array = [load("res://art/mtn/pine.png"), load("res://art/mtn/fir.png"), load("res://art/mtn/tree_round.png")]
 	for k in range(1, levels):
 		var list: Array = spawnable[k]
 		if list.is_empty():
@@ -533,7 +533,7 @@ func _decorate() -> void:
 			var s := Sprite2D.new()
 			var roll: float = rng.randf()
 			var t: Texture2D = shrub if roll < 0.45 else (rocks if roll < 0.8 else trees[rng.randi() % trees.size()])
-			var sc: float = rng.randf_range(0.55, 0.85) if t != trees[0] and t != trees[1] else rng.randf_range(0.55, 0.75)
+			var sc: float = rng.randf_range(0.55, 0.85) if not trees.has(t) else rng.randf_range(0.9, 1.3)
 			s.texture = t
 			s.scale = Vector2.ONE * sc
 			s.offset = Vector2(0, -float(t.get_height()) * 0.5 + 6.0 - H * float(k) / maxf(sc, 0.01))
@@ -572,6 +572,7 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 	var k: int = int(mode.substr(1))
 	var base: Color = _top_color(k)
 	var up: float = H * float(k)
+	ci.modulate = [Color(1,1,1),Color(1.0,1.0,0.95),Color(1.0,0.97,0.9),Color(0.95,0.95,1.0),Color(0.92,0.96,1.08)][clampi(k,0,4)]
 	for cy in GH:
 		for cx in GW:
 			if rmp[_ix(cx, cy)] >= 0 or int(lvl[_ix(cx, cy)]) != k:
@@ -585,11 +586,15 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 				var tname: String = String(names[int(_hash(cx, cy) * float(names.size())) % names.size()])
 				ci.draw_texture_rect_region(ground_tex[tname], Rect2(x, y, CELL + 0.6, CELL + 0.6), Rect2(2.0, 2.0, 28.0, 28.0))
 				if _lv(cx, cy - 1) < k:
-					ci.draw_rect(Rect2(x, y, CELL + 0.6, 3.0), base.lightened(0.18))
+					for j in 3:
+						var h2: float = _hash(cx * 3 + j, cy + 7)
+						ci.draw_circle(Vector2(x + CELL * (0.17 + 0.33 * float(j)), y + 1.0 - h2 * 5.0), 4.0 + h2 * 4.0, base.lightened(0.1 + h2 * 0.1))
 				if _lv(cx - 1, cy) < k:
-					ci.draw_rect(Rect2(x, y, 2.5, CELL), base.darkened(0.32))
+					var h3: float = _hash(cx + 5, cy * 3)
+					ci.draw_circle(Vector2(x - 1.0 - h3 * 3.0, y + CELL * h3), 4.0 + h3 * 3.0, base.darkened(0.2))
 				if _lv(cx + 1, cy) < k:
-					ci.draw_rect(Rect2(x + CELL - 2.5, y, 2.5, CELL), base.darkened(0.32))
+					var h4: float = _hash(cx * 3, cy + 11)
+					ci.draw_circle(Vector2(x + CELL + 1.0 + h4 * 3.0, y + CELL * h4), 4.0 + h4 * 3.0, base.darkened(0.2))
 			var south: int = _lv(cx, cy + 1)
 			if south < k and _in(cx, cy + 1) and rmp[_ix(cx, cy + 1)] < 0:
 				var rows: int = k - south
@@ -600,5 +605,9 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 					var shade: float = 1.0 - 0.12 * float(rw)
 					var src := Rect2(sx, 0.0 if rw == 0 else 28.0, 32.0, 56.0)
 					ci.draw_texture_rect_region(tex, Rect2(x, fy + float(rw) * H, CELL + 0.5, H), src, Color(shade, shade, shade))
-				ci.draw_rect(Rect2(x, fy + float(rows) * H, CELL + 0.5, 8.0), Color(0, 0, 0, 0.2))
+				var by: float = fy + float(rows) * H
+				var hb: float = _hash(cx * 5, cy + 3)
+				var hc: float = _hash(cx * 5 + 2, cy + 9)
+				ci.draw_colored_polygon(PackedVector2Array([Vector2(x - 2.0, by - 6.0), Vector2(x + CELL * 0.3, by + 3.0 + hb * 7.0), Vector2(x + CELL * 0.65, by + 1.0 + hc * 6.0), Vector2(x + CELL + 2.0, by - 6.0)]), Color(0.2, 0.2, 0.22, 0.55))
+				ci.draw_circle(Vector2(x + CELL * hb, by + 2.0 + hc * 4.0), 3.0 + hc * 2.5, Color(0.42, 0.42, 0.44))
 

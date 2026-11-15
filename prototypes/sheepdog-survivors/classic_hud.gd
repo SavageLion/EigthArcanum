@@ -147,12 +147,11 @@ const NODE_COL: Dictionary = {"herd": Color(0.35, 0.65, 0.3), "elite": Color(0.7
 const NODE_LET: Dictionary = {"herd": "H", "elite": "!", "rest": "C", "shop": "T", "boss": "S"}
 
 func _peak_screens(v: Vector2) -> void:
-	draw_rect(Rect2(Vector2.ZERO, v), Color(0.2, 0.34, 0.2))
-	for i in 30:
-		draw_rect(Rect2(fposmod(float(i) * 97.0, v.x), fposmod(float(i) * 53.0, v.y), 14, 4), Color(0.26, 0.42, 0.24))
-	# the mountain behind the map
-	draw_colored_polygon(PackedVector2Array([Vector2(0, v.y), Vector2(v.x * 0.18, v.y * 0.62), Vector2(v.x * 0.34, v.y * 0.8), Vector2(v.x * 0.58, v.y * 0.3), Vector2(v.x * 0.74, v.y * 0.62), Vector2(v.x * 0.9, v.y * 0.4), Vector2(v.x, v.y)]), Color(0.28, 0.36, 0.28, 0.7))
-	draw_colored_polygon(PackedVector2Array([Vector2(v.x * 0.52, v.y * 0.42), Vector2(v.x * 0.58, v.y * 0.3), Vector2(v.x * 0.64, v.y * 0.42)]), Color(0.9, 0.93, 0.97, 0.85))
+	draw_rect(Rect2(Vector2.ZERO, v), Color(0.1, 0.22, 0.22))
+	var bd: Texture2D = load("res://art/mtn/backdrop.png")
+	var bs: float = maxf(v.x / 256.0, v.y / 128.0)
+	draw_texture_rect(bd, Rect2((v.x - 256.0 * bs) / 2.0, (v.y - 128.0 * bs) / 2.0, 256.0 * bs, 128.0 * bs), false, Color(0.85, 0.85, 0.85))
+	draw_rect(Rect2(Vector2.ZERO, v), Color(0, 0, 0, 0.18))
 	_panel(Rect2(8, 92, 96, 28))
 	_text("< FARM", Vector2(8, 112), 14, CREAM, 96.0, HORIZONTAL_ALIGNMENT_CENTER)
 	_panel(Rect2(8, 6, 330, 32))
