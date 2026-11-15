@@ -284,7 +284,7 @@ func _trails() -> void:
 	if levels <= 1:
 		return
 	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-	for t in 5 + levels * 2:
+	for t in 3 + levels:
 		var k: int = 1 + randi() % (levels - 1)
 		var list: Array = spawnable[k]
 		if list.is_empty():
@@ -528,14 +528,14 @@ func _decorate() -> void:
 			var c: Vector2i = _cell_of(p)
 			if _lv(c.x, c.y + 3) < k:
 				edge.append(p)
-		var n: int = 30 + 10 * (levels - k)
+		var n: int = 60 + 14 * (levels - k)
 		for i in n:
 			var from_edge: bool = not edge.is_empty() and rng.randf() < 0.65
 			var p2: Vector2 = (edge[rng.randi() % edge.size()] if from_edge else list[rng.randi() % list.size()]) as Vector2
 			var s := Sprite2D.new()
 			var roll: float = rng.randf()
-			var t: Texture2D = shrub if roll < 0.45 else (rocks if roll < 0.8 else trees[rng.randi() % trees.size()])
-			var sc: float = rng.randf_range(0.55, 0.85) if not trees.has(t) else rng.randf_range(0.9, 1.3)
+			var t: Texture2D = rocks if roll < 0.18 else trees[rng.randi() % trees.size()]
+			var sc: float = rng.randf_range(0.55, 0.85) if not trees.has(t) else rng.randf_range(0.7, 1.25)
 			s.texture = t
 			s.scale = Vector2.ONE * sc
 			s.offset = Vector2(0, -float(t.get_height()) * 0.5 + 6.0 - H * float(k) / maxf(sc, 0.01))
@@ -563,63 +563,111 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			var pts := PackedVector2Array([a + perp + pa, b + perp + pb, b - perp + pb, a - perp + pa])
 			var uvs := PackedVector2Array([Vector2(0, 0), Vector2(0, 3), Vector2(3, 3), Vector2(3, 0)])
 			ci.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-			ci.draw_colored_polygon(pts, Color(0.5, 0.48, 0.44))
+			ci.draw_colored_polygon(pts, Color(0.55, 0.43, 0.28))
 			var steps: int = 9
 			for kk in steps:
 				var t0: float = float(kk) / float(steps)
 				var t1: float = float(kk + 1) / float(steps)
 				var m0: Vector2 = a.lerp(b, t0) + pa.lerp(pb, t0)
 				var m1: Vector2 = a.lerp(b, t1) + pa.lerp(pb, t1)
-				var sh: float = 0.42 + 0.22 * t1
-				ci.draw_colored_polygon(PackedVector2Array([m0 + perp * 0.86, m1 + perp * 0.86, m1 - perp * 0.86, m0 - perp * 0.86]), Color(sh, sh * 0.97, sh * 0.9))
-				ci.draw_line(m1 + perp * 0.86, m1 - perp * 0.86, Color(0.26, 0.25, 0.24, 0.8), 2.0)
+				var sh: float = 0.62 + 0.16 * t1
+				ci.draw_colored_polygon(PackedVector2Array([m0 + perp * 0.86, m1 + perp * 0.86, m1 - perp * 0.86, m0 - perp * 0.86]), Color(sh, sh * 0.8, sh * 0.55))
+				ci.draw_line(m1 + perp * 0.86, m1 - perp * 0.86, Color(0.3, 0.2, 0.1, 0.8), 2.0)
 			ci.draw_line(a + perp * 0.86 + pa, b + perp * 0.86 + pb, Color(0.3, 0.28, 0.25), 2.0)
 			ci.draw_line(a - perp * 0.86 + pa, b - perp * 0.86 + pb, Color(0.3, 0.28, 0.25), 2.0)
 		return
 	var k: int = int(mode.substr(1))
 	if k == 0:
 		_draw_clouds(ci)
-	var base: Color = _top_color(k)
 	var up: float = H * float(k)
-	ci.modulate = [Color(1,1,1),Color(1.0,1.0,0.95),Color(1.0,0.97,0.9),Color(0.95,0.95,1.0),Color(0.92,0.96,1.08)][clampi(k,0,4)]
-	for cy in GH:
-		for cx in GW:
-			if rmp[_ix(cx, cy)] >= 0 or int(lvl[_ix(cx, cy)]) != k:
-				continue
-			var x: float = float(cx) * CELL
-			var y: float = float(cy) * CELL - up
-			if trail.size() > 0 and trail[_ix(cx, cy)] == 1:
-				ci.draw_texture_rect_region(ground_tex["d%d" % (int(_hash(cx, cy) * 12.0) % 12)], Rect2(x, y, CELL + 0.6, CELL + 0.6), Rect2(2.0, 2.0, 28.0, 28.0), Color(1.35, 1.25, 1.05))
-			elif k > 0:
-				var names: Array = TOPS[clampi(k, 1, 4)]
-				var tname: String = String(names[int(_hash(cx, cy) * float(names.size())) % names.size()])
-				ci.draw_texture_rect_region(ground_tex[tname], Rect2(x, y, CELL + 0.6, CELL + 0.6), Rect2(2.0, 2.0, 28.0, 28.0))
-				if _lv(cx, cy - 1) < k:
-					for j in 3:
-						var h2: float = _hash(cx * 3 + j, cy + 7)
-						ci.draw_circle(Vector2(x + CELL * (0.17 + 0.33 * float(j)), y + 1.0 - h2 * 5.0), 4.0 + h2 * 4.0, base.lightened(0.1 + h2 * 0.1))
-				if _lv(cx - 1, cy) < k:
-					var h3: float = _hash(cx + 5, cy * 3)
-					ci.draw_circle(Vector2(x - 1.0 - h3 * 3.0, y + CELL * h3), 4.0 + h3 * 3.0, base.darkened(0.2))
-				if _lv(cx + 1, cy) < k:
-					var h4: float = _hash(cx * 3, cy + 11)
-					ci.draw_circle(Vector2(x + CELL + 1.0 + h4 * 3.0, y + CELL * h4), 4.0 + h4 * 3.0, base.darkened(0.2))
-			var south: int = _lv(cx, cy + 1)
-			if south < k and _in(cx, cy + 1) and rmp[_ix(cx, cy + 1)] < 0:
-				var rows: int = k - south
-				var fy: float = float(cy + 1) * CELL - up
-				var tex: Texture2D = cliff_tex[int(_hash(cx / 4, cy) * 2.0) % 2]
-				var sx: float = float(cx % 4) * 32.0
-				for rw in rows:
-					var shade: float = 1.0 - 0.12 * float(rw)
-					var src := Rect2(sx, 0.0 if rw == 0 else 28.0, 32.0, 56.0)
-					ci.draw_texture_rect_region(tex, Rect2(x, fy + float(rw) * H, CELL + 0.5, H), src, Color(shade, shade, shade))
-				var by: float = fy + float(rows) * H
-				var hb: float = _hash(cx * 5, cy + 3)
-				var hc: float = _hash(cx * 5 + 2, cy + 9)
-				ci.draw_colored_polygon(PackedVector2Array([Vector2(x - 2.0, by - 6.0), Vector2(x + CELL * 0.3, by + 3.0 + hb * 7.0), Vector2(x + CELL * 0.65, by + 1.0 + hc * 6.0), Vector2(x + CELL + 2.0, by - 6.0)]), Color(0.2, 0.2, 0.22, 0.55))
-				ci.draw_circle(Vector2(x + CELL * hb, by + 2.0 + hc * 4.0), 3.0 + hc * 2.5, Color(0.42, 0.42, 0.44))
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://mtn_level.gdshader")
+	mat.set_shader_parameter("field", _field_tex(k))
+	mat.set_shader_parameter("noise", _noise_tex())
+	mat.set_shader_parameter("ground", _composite(TOPS[clampi(k, 1, 4)] if k > 0 else ["g0"], "g"))
+	mat.set_shader_parameter("dirt", _composite(["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "d11"], "d"))
+	mat.set_shader_parameter("cliff", cliff_tex[k % 2])
+	mat.set_shader_parameter("world_size", Vector2(float(GW) * CELL, float(GH) * CELL))
+	mat.set_shader_parameter("hgt", H)
+	mat.set_shader_parameter("yoff", up)
+	mat.set_shader_parameter("base_mode", 1 if k == 0 else 0)
+	var tints: Array = [Vector3(1, 1, 1), Vector3(1.0, 1.0, 0.95), Vector3(1.0, 0.97, 0.9), Vector3(0.95, 0.95, 1.0), Vector3(0.92, 0.96, 1.08)]
+	mat.set_shader_parameter("tint", tints[clampi(k, 0, 4)])
+	ci.material = mat
+	ci.draw_rect(Rect2(0.0, -up, float(GW) * CELL, float(GH) * CELL + 80.0), Color(1, 1, 1))
 
+var _noise_cache: ImageTexture
+
+func _noise_tex() -> ImageTexture:
+	if _noise_cache == null:
+		var fn := FastNoiseLite.new()
+		fn.seed = 7
+		fn.frequency = 0.02
+		fn.fractal_octaves = 3
+		fn.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		var img: Image = fn.get_seamless_image(256, 256)
+		img.convert(Image.FORMAT_RGBA8)
+		_noise_cache = ImageTexture.create_from_image(img)
+	return _noise_cache
+
+func _composite(names: Array, _fam: String) -> ImageTexture:
+	var img := Image.create(224, 224, false, Image.FORMAT_RGBA8)
+	for ty in 8:
+		for tx in 8:
+			var nm: String = String(names[int(_hash(tx * 7 + names.size(), ty * 3) * float(names.size())) % names.size()])
+			var src: Image = (ground_tex[nm] as Texture2D).get_image()
+			src.convert(Image.FORMAT_RGBA8)
+			img.blit_rect(src, Rect2i(2, 2, 28, 28), Vector2i(tx * 28, ty * 28))
+	return ImageTexture.create_from_image(img)
+
+func _blur(src: PackedFloat32Array) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(GW * GH)
+	for y in GH:
+		for x in GW:
+			var s: float = 0.0
+			for oy in range(-1, 2):
+				for ox in range(-1, 2):
+					s += src[clampi(y + oy, 0, GH - 1) * GW + clampi(x + ox, 0, GW - 1)]
+			out[y * GW + x] = s / 9.0
+	return out
+
+func _field_tex(k: int) -> ImageTexture:
+	var fn := FastNoiseLite.new()
+	fn.seed = 11 + k
+	fn.frequency = 0.12
+	var top := PackedFloat32Array()
+	var tr := PackedFloat32Array()
+	var rp := PackedFloat32Array()
+	top.resize(GW * GH)
+	tr.resize(GW * GH)
+	rp.resize(GW * GH)
+	for y in GH:
+		for x in GW:
+			var i: int = y * GW + x
+			var l: int = int(lvl[i])
+			var isr: bool = rmp[i] >= 0
+			top[i] = 1.0 if (k > 0 and l >= k and not isr) else 0.0
+			if isr and k > 0:
+				top[i] = 1.0 if l >= k else 0.0
+			tr[i] = 1.0 if (trail.size() > 0 and trail[i] == 1 and l == k and not isr) else 0.0
+			rp[i] = 1.0 if isr else 0.0
+	top = _blur(_blur(top))
+	tr = _blur(tr)
+	rp = _blur(rp)
+	var img := Image.create(GW, GH, false, Image.FORMAT_RGBA8)
+	for y in GH:
+		for x in GW:
+			var i2: int = y * GW + x
+			var nz: float = fn.get_noise_2d(float(x), float(y))
+			var t: float = top[i2]
+			t = clampf(t + nz * 0.3 * 4.0 * t * (1.0 - t), 0.0, 1.0)
+			var g: float = tr[i2]
+			g = clampf(g + nz * 0.25 * 4.0 * g * (1.0 - g), 0.0, 1.0)
+			var rr: float = clampf((rp[i2] - 0.1) * 1.6, 0.0, 1.0)
+			img.set_pixel(x, y, Color(t, g, rr, 1.0))
+	img.resize(GW * 4, GH * 4, Image.INTERPOLATE_BILINEAR)
+	return ImageTexture.create_from_image(img)
 
 func _draw_clouds(ci: CanvasItem) -> void:
 	var w: float = float(GW) * CELL
