@@ -48,7 +48,9 @@ func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture
 	hop = randf() * 6.0
 	shadow = Sprite2D.new()
 	shadow.texture = shadow_tex
-	shadow.scale = Vector2(r * 0.34, r * 0.16)
+	shadow.scale = Vector2(r * 0.34, r * 0.16) * (0.55 if Mover.char_k > 1.0 else 1.0)
+	if Mover.char_k > 1.0:
+		shadow.modulate.a = 0.45
 	shadow.show_behind_parent = true
 	add_child(shadow)
 	spr = AnimatedSprite2D.new()
@@ -74,8 +76,8 @@ func animate(dt: float) -> void:
 	# a little hop with each step and a squash when startled
 	hop += dt * speed / 16.0
 	var bob: float = absf(sin(hop)) * 2.2 if speed > 8.0 else 0.0
-	spr.position.y = -bob - elev
-	shadow.position.y = -elev
+	spr.position.y = -bob - elev / Mover.char_k
+	shadow.position.y = -elev / Mover.char_k
 	squash = move_toward(squash, 0.0, dt * 3.0)
 	var sq: float = 1.0 + squash * 0.18
 	spr.scale = Vector2(base_scale / sq, base_scale * sq)

@@ -19,7 +19,7 @@ func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	zig = randf() * TAU
 	shadow = Sprite2D.new()
 	shadow.texture = shadow_tex
-	shadow.scale = Vector2(0.4, 0.17)
+	shadow.scale = Vector2(0.4, 0.17) * (0.6 if Mover.char_k > 1.0 else 1.0)
 	shadow.show_behind_parent = true
 	add_child(shadow)
 	spr = AnimatedSprite2D.new()
@@ -40,5 +40,5 @@ func animate(_dt: float) -> void:
 		spr.play(a)
 	spr.flip_h = (face < 0 and row.ends_with("east"))
 	spr.speed_scale = clampf(speed / 100.0, 0.6, 2.4)
-	spr.position.y = -elev
-	shadow.position.y = -elev
+	spr.position.y = -elev / Mover.char_k
+	shadow.position.y = -elev / Mover.char_k

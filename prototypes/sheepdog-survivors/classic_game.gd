@@ -53,6 +53,8 @@ var echo_q: Array = []
 var pups: Array = []
 var ov_zoom: bool = false
 var guide_mode: bool = false
+var fit_mode: bool = false
+var base_zoom: float = 1.6
 var painted_mode: bool = false
 var lm = null
 var ysorts: Dictionary = {}
@@ -111,6 +113,7 @@ func finish_rect() -> Rect2:
 
 func _ready() -> void:
 	randomize()
+	Mover.char_k = 1.0
 	if summit_mode:
 		if not Peak.active():
 			Peak.new_run()
@@ -147,6 +150,9 @@ func _ready() -> void:
 		var sqs: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
 		guide_mode = sqs.contains("guide=1") or OS.get_cmdline_user_args().has("guide")
 		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted")
+		fit_mode = sqs.contains("fit=1")
+		Mover.char_k = 1.8 if painted_mode else 1.0
+		base_zoom = 1.25 if painted_mode else 1.6
 		lm = MountainMap.new()
 		lm.guide = guide_mode
 		lm.debug_blocked = sqs.contains("dbg=1")
@@ -172,6 +178,12 @@ func _ready() -> void:
 	_setup_layers()
 	if guide_mode:
 		_guide_prepare()
+	if fit_mode:
+		cam.limit_left = -100000
+		cam.limit_top = -100000
+		cam.limit_right = 100000
+		cam.limit_bottom = 100000
+		hud.visible = false
 	need = int(ceil(float(sheep.size()) * minf(0.7, 0.5 + 0.02 * float(run_day - 1))))
 	t_total = 240.0 + 6.0 * float(maxi(0, sheep.size() - 12))
 	t_left = t_total
@@ -216,7 +228,7 @@ func _spawn_sheep() -> void:
 		var s := ClassicSheep.new()
 		ysort.add_child(s)
 		s.setup(String(t), TYPES[String(t)], sheep_frames, shadow_tex)
-		var hide_it: bool = idx < 2
+		var hide_it: bool = idx < 2 and not painted_mode
 		var c: Vector2 = cs[randi() % cs.size()]
 		var p := c + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 80.0)
 		if hide_it:
@@ -495,10 +507,10 @@ func _process(delta: float) -> void:
 	if lm != null:
 		lm.sync_all()
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	var target_zoom: float = (0.29 if summit_mode else 0.3) if ov_zoom else 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
+	var target_zoom: float = (0.29 if summit_mode else 0.3) if ov_zoom else base_zoom * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else base_zoom
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
-	if guide_mode:
+	if guide_mode or fit_mode:
 		var fit: float = minf(vp().x / WX, vp().y / WY)
 		cam.zoom = Vector2(fit, fit)
 		cam.position = Vector2(WX, WY) / 2.0
@@ -1627,6 +1639,47 @@ func mtn_test() -> void:
 			ramp_ok += 1
 		else:
 			fails.append("ramp %d (levels %d-%d) up=%s down=%s a=%s b=%s up_end=%s a0cell(lvl=%d rmp=%d w=%d) b0cell(lvl=%d rmp=%d w=%d)" % [ri, int(r["lo"]), int(r["hi"]), str(up_ok), str(down_ok2), str(r["a"]), str(r["b"]), up_end, int(m.lvl[m._ix(a0c.x, a0c.y)]), int(m.rmp[m._ix(a0c.x, a0c.y)]), int(m.water[m._ix(a0c.x, a0c.y)]), int(m.lvl[m._ix(m._cell_of(b0).x, m._cell_of(b0).y)]), int(m.rmp[m._ix(m._cell_of(b0).x, m._cell_of(b0).y)]), int(m.water[m._ix(m._cell_of(b0).x, m._cell_of(b0).y)])])
+	# 3b. stairs stress: approach every staircase off-centre and at an angle, going up and down
+	var stair_bad: int = 0
+	var stair_diag: int = 0
+	var stair_n: int = 0
+	for ri2 in m.ramps.size():
+		var rr: Dictionary = m.ramps[ri2]
+		if rr.has("dead"):
+			continue
+		var d2: Vector2 = ((rr["b"] as Vector2) - (rr["a"] as Vector2)).normalized()
+		var perp2: Vector2 = d2.orthogonal()
+		var ca: Vector2i = m._cell_of((rr["a"] as Vector2) - d2 * 50.0)
+		var cb: Vector2i = m._cell_of((rr["b"] as Vector2) + d2 * 50.0)
+		if m.water[m._ix(ca.x, ca.y)] != 0 or m.water[m._ix(cb.x, cb.y)] != 0:
+			continue
+		for lat in [-1.5, -0.5, 0.5, 1.5]:
+			for mode in 4:
+				var from_a: bool = mode % 2 == 0
+				var diag: bool = mode >= 2
+				var p0: Vector2 = ((rr["a"] as Vector2) - d2 * 60.0) if from_a else ((rr["b"] as Vector2) + d2 * 60.0)
+				var p1: Vector2 = ((rr["b"] as Vector2) + d2 * 60.0) if from_a else ((rr["a"] as Vector2) - d2 * 60.0)
+				var l0: int = int(rr["lo"]) if from_a else int(rr["hi"])
+				var l1: int = int(rr["hi"]) if from_a else int(rr["lo"])
+				var off: Vector2 = perp2 * float(lat) * cell
+				var start: Vector2 = p0 + off + (perp2 * float(lat) * cell * 1.5 if diag else Vector2.ZERO)
+				var goal: Vector2 = p1 + (Vector2.ZERO if diag else off)
+				var sc2: Vector2i = m._cell_of(start)
+				var gc2: Vector2i = m._cell_of(goal)
+				if m.water[m._ix(sc2.x, sc2.y)] != 0 or m.water[m._ix(gc2.x, gc2.y)] != 0 or int(m.lvl[m._ix(sc2.x, sc2.y)]) != l0 or m.rmp[m._ix(sc2.x, sc2.y)] >= 0:
+					continue
+				dog.position = start
+				dog.layer = l0
+				stair_n += 1
+				var ok2: bool = _walk(dog, func(_q: Vector2) -> Vector2: return goal, 14.0, 12.0) and dog.layer == l1
+				if not ok2:
+					stair_bad += 1
+					if diag:
+						stair_diag += 1
+						continue
+					if stair_bad <= 6:
+						fails.append("stairs %d lat=%.1f %s %s: from %s stuck at %s layer %d (wanted %d) goal %s" % [ri2, lat, "up" if from_a else "down", "diagonal" if diag else "straight", str(start), str(dog.position), dog.layer, l1, str(goal)])
+	print("MTNTEST stair approaches=", stair_n, " stuck=", stair_bad - stair_diag, " (diagonal into a cliff corner: ", stair_diag, ")")
 	# 4. walk from the valley up to cells on every level by the real path
 	var parent: Dictionary = {}
 	var start: Vector2i = m._cell_of(home)

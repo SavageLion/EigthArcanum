@@ -748,7 +748,7 @@ func sync_all() -> void:
 		_sync(f, dt)
 
 func _sync(e: Mover, dt: float) -> void:
-	e.elev = move_toward(e.elev, height_at(e.position, e.layer), 220.0 * dt)
+	e.elev = move_toward(e.elev, height_at(e.position, e.layer), 900.0 * dt)
 	var want: Node = game.container_for(e.layer)
 	if e.get_parent() != want:
 		e.get_parent().remove_child(e)
@@ -927,6 +927,19 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 					ci.draw_rect(Rect2(float(x) * CELL, float(y) * CELL - H * float(lvl[i]), CELL, CELL), Color(1, 0, 0, 0.45) if water[i] == 4 else Color(1, 1, 0, 0.55))
 				elif land[i] == 1 and water[i] == 0 and rmp[i] < 0:
 					ci.draw_rect(Rect2(float(x) * CELL + 9.0, float(y) * CELL - H * float(lvl[i]) + 9.0, 6.0, 6.0), Color(0, 0.3, 1, 0.5))
+		for r in ramps:
+			if r.has("dead"):
+				continue
+			var ra: Vector2 = r["a"]
+			var rb: Vector2 = r["b"]
+			var rl: float = float(r["lo"])
+			var rp: Vector2 = (rb - ra).normalized().orthogonal() * float(r["w"]) / 2.0
+			var sa := Vector2(0.0, -H * rl)
+			var sb := Vector2(0.0, -H * (rl + 1.0))
+			var poly := PackedVector2Array([ra + rp + sa, rb + rp + sb, rb - rp + sb, ra - rp + sa, ra + rp + sa])
+			ci.draw_polyline(poly, Color(1, 0, 1, 1), 3.0)
+			ci.draw_circle(ra + sa, 6.0, Color(0, 1, 0, 1))
+			ci.draw_circle(rb + sb, 6.0, Color(1, 1, 0, 1))
 		return
 	if mode == "BR":
 		_draw_bridges(ci)

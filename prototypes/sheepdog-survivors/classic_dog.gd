@@ -18,7 +18,7 @@ var squash: float = 0.0
 func setup(frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	shadow = Sprite2D.new()
 	shadow.texture = shadow_tex
-	shadow.scale = Vector2(0.55, 0.22)
+	shadow.scale = Vector2(0.55, 0.22) * (0.65 if Mover.char_k > 1.0 else 1.0)
 	shadow.show_behind_parent = true
 	add_child(shadow)
 	spr = AnimatedSprite2D.new()
@@ -59,6 +59,6 @@ func animate(dt: float) -> void:
 	var sq: float = 1.0 + squash * 0.2
 	spr.scale = Vector2(0.74 / sq, 0.74 * lowered * sq)
 	dust.emitting = speed > 140.0
-	dust.position = Vector2(-face * 6.0, -elev)
-	spr.position.y = -elev
-	shadow.position.y = -elev
+	dust.position = Vector2(-face * 6.0, -elev / Mover.char_k)
+	spr.position.y = -elev / Mover.char_k
+	shadow.position.y = -elev / Mover.char_k
