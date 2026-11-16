@@ -23,6 +23,8 @@ var land: PackedByteArray = PackedByteArray()
 var bridge_cells: Array = []
 var pond_c: Vector2 = Vector2.ZERO
 var guide: bool = false
+var paint_seed: int = 4
+var debug_blocked: bool = false
 var painted: bool = false
 var painted_path: String = "res://art/mtn/test_map.png"
 var bridges: Array = []
@@ -53,6 +55,8 @@ func _cell_of(p: Vector2) -> Vector2i:
 
 # ---------------------------------------------------------------- building the mountain
 func build(tier: int) -> void:
+	if guide or painted:
+		seed(paint_seed)
 	cliff_tex = [load("res://art/mtn/cliff_a.png"), load("res://art/mtn/cliff_b.png")]
 	for gi in 16:
 		ground_tex["g%d" % gi] = load("res://art/mtn/ground/g%d.png" % gi)
@@ -78,6 +82,8 @@ func build(tier: int) -> void:
 	_make_parts()
 	if not guide and not painted:
 		_decorate()
+	if guide or painted:
+		randomize()
 
 # a pen island in the middle and three mountain islands round it, joined by plank bridges over the clouds
 func _generate() -> void:
@@ -87,8 +93,8 @@ func _generate() -> void:
 	noise.fractal_octaves = 2
 	var isles: Array = [
 		{"c": Vector2(68, 46), "r": Vector2(17, 13), "p": []},
-		{"c": Vector2(19, 46), "r": Vector2(17, 25), "p": [[Vector2(18, 43), Vector2(13, 19)], [Vector2(17, 40), Vector2(9, 12)], [Vector2(16, 37), Vector2(5, 7)]]},
-		{"c": Vector2(117, 46), "r": Vector2(17, 25), "p": [[Vector2(118, 43), Vector2(13, 19)], [Vector2(119, 40), Vector2(9, 12)], [Vector2(120, 37), Vector2(5, 7)]]},
+		{"c": Vector2(19, 46), "r": Vector2(17, 25), "p": [[Vector2(18, 43), Vector2(10, 17)], [Vector2(17, 40), Vector2(7, 11)], [Vector2(16, 37), Vector2(4, 6)]]},
+		{"c": Vector2(117, 46), "r": Vector2(17, 25), "p": [[Vector2(118, 43), Vector2(10, 17)], [Vector2(119, 40), Vector2(7, 11)], [Vector2(120, 37), Vector2(4, 6)]]},
 	]
 	for ii in isles.size():
 		var isle: Dictionary = isles[ii]
@@ -98,7 +104,7 @@ func _generate() -> void:
 			for x in GW:
 				var ex: float = (float(x) - c.x) / r.x
 				var ey: float = (float(y) - c.y) / r.y
-				if ex * ex + ey * ey + noise.get_noise_2d(float(x) + float(ii) * 97.0, float(y)) * 0.34 < 1.0:
+				if ex * ex + ey * ey + noise.get_noise_2d(float(x) + float(ii) * 97.0, float(y)) * 0.24 < 1.0:
 					land[_ix(x, y)] = 1
 					var l: int = 0
 					var plateaus: Array = isle["p"]
@@ -107,7 +113,7 @@ func _generate() -> void:
 						var pr: Vector2 = (plateaus[j] as Array)[1]
 						var px: float = (float(x) - pc.x) / pr.x
 						var py: float = (float(y) - pc.y) / pr.y
-						if px * px + py * py + noise.get_noise_2d(float(x) + float(j + 1) * 41.0, float(y) + 300.0) * 0.42 < 1.0:
+						if px * px + py * py + noise.get_noise_2d(float(x) + float(j + 1) * 41.0, float(y) + 300.0) * 0.22 < 1.0:
 							l = j + 1
 						else:
 							break
@@ -204,6 +210,9 @@ func _generate() -> void:
 	_connect()
 	_prune_ramps()
 	_buffer()
+	if painted:
+		_block_by_painting()
+		_open_corridors()
 
 # the drawn edge wobbles about a cell either side of the real one, so the outermost ring of every ledge is kept clear
 func _buffer() -> void:
@@ -910,6 +919,15 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 	if mode == "S":
 		_draw_sky(ci)
 		return
+	if mode == "DBG":
+		for y in GH:
+			for x in GW:
+				var i: int = _ix(x, y)
+				if land[i] == 1 and (water[i] == 4 or water[i] == 2):
+					ci.draw_rect(Rect2(float(x) * CELL, float(y) * CELL - H * float(lvl[i]), CELL, CELL), Color(1, 0, 0, 0.45) if water[i] == 4 else Color(1, 1, 0, 0.55))
+				elif land[i] == 1 and water[i] == 0 and rmp[i] < 0:
+					ci.draw_rect(Rect2(float(x) * CELL + 9.0, float(y) * CELL - H * float(lvl[i]) + 9.0, 6.0, 6.0), Color(0, 0.3, 1, 0.5))
+		return
 	if mode == "BR":
 		_draw_bridges(ci)
 		return
@@ -1372,6 +1390,12 @@ func _make_painted_parts() -> void:
 	sky.mode = "S"
 	sky.z_index = -138
 	add_child(sky)
+	if debug_blocked:
+		var dbg := LayerPart.new()
+		dbg.map = self
+		dbg.mode = "DBG"
+		dbg.z_index = 60
+		add_child(dbg)
 	var tex: Texture2D = load(painted_path)
 	var sp := Sprite2D.new()
 	sp.texture = tex
@@ -1385,3 +1409,125 @@ func _make_painted_parts() -> void:
 	km.shader = load("res://mtn_key.gdshader")
 	sp.material = km
 	add_child(sp)
+
+# trees and bushes in the painting are obstacles: any cell mostly covered by dark green is closed
+func _block_by_painting() -> void:
+	var tex: Texture2D = load(painted_path)
+	var img: Image = tex.get_image()
+	if img.is_compressed():
+		img.decompress()
+	var sx: float = float(img.get_width()) / (float(GW) * CELL)
+	var sy: float = float(img.get_height()) / 1399.2
+	var keep := PackedByteArray()
+	keep.resize(GW * GH)
+	keep.fill(0)
+	for bcell in bridge_cells:
+		var bc: Vector2i = bcell
+		for oy in range(-6, 7):
+			for ox in range(-6, 7):
+				if _in(bc.x + ox, bc.y + oy):
+					keep[_ix(bc.x + ox, bc.y + oy)] = 1
+	for ri in GW * GH:
+		if rmp[ri] >= 0:
+			for oy2 in range(-4, 5):
+				for ox2 in range(-4, 5):
+					if _in(ri % GW + ox2, ri / GW + oy2):
+						keep[_ix(ri % GW + ox2, ri / GW + oy2)] = 1
+	var marked: Array = []
+	for y in GH:
+		for x in GW:
+			var i: int = _ix(x, y)
+			if water[i] != 0 or rmp[i] >= 0 or land[i] == 0 or keep[i] == 1:
+				continue
+			var k: int = int(lvl[i])
+			var wx0: float = float(x) * CELL
+			var wy0: float = float(y) * CELL - H * float(k) - 424.0
+			var hits: int = 0
+			var n: int = 0
+			for oy in 5:
+				for ox in 5:
+					var px: int = int((wx0 + (float(ox) + 0.5) * CELL / 5.0) * sx)
+					var py: int = int((wy0 + (float(oy) + 0.5) * CELL / 5.0) * sy)
+					if px < 0 or py < 0 or px >= img.get_width() or py >= img.get_height():
+						continue
+					var c: Color = img.get_pixel(px, py)
+					n += 1
+					if c.g < 0.66 and c.g >= c.r and c.g >= c.b:
+						hits += 1
+			if n > 0 and float(hits) / float(n) >= 0.3:
+				marked.append(i)
+	for mi in marked:
+		water[int(mi)] = 4
+
+func _walk_ok(c: int) -> bool:
+	return water[c] == 0 or water[c] == 4
+
+func _step_ok(a: Vector2i, b: Vector2i) -> bool:
+	if not _walk_ok(_ix(a.x, a.y)) or not _walk_ok(_ix(b.x, b.y)):
+		return false
+	var ra: int = rmp[_ix(a.x, a.y)]
+	var rb: int = rmp[_ix(b.x, b.y)]
+	if ra >= 0 and rb >= 0:
+		return ra == rb
+	if ra >= 0:
+		return _end_level(ra, b) == int(lvl[_ix(b.x, b.y)])
+	if rb >= 0:
+		return _end_level(rb, a) == int(lvl[_ix(a.x, a.y)])
+	return lvl[_ix(a.x, a.y)] == lvl[_ix(b.x, b.y)]
+
+# painted trees can wall off a staircase: find the cheapest way to each one and open a corridor through the trees
+func _open_corridors() -> void:
+	var inf: int = 1 << 28
+	var cost := PackedInt32Array()
+	cost.resize(GW * GH)
+	cost.fill(inf)
+	var par := PackedInt32Array()
+	par.resize(GW * GH)
+	par.fill(-1)
+	var buckets: Array = []
+	for b in 9000:
+		buckets.append([])
+	for y in range(PEN_ROW - 4, PEN_ROW + 5):
+		for x in range(GW / 2 - 4, GW / 2 + 5):
+			if _walk_ok(_ix(x, y)) and rmp[_ix(x, y)] < 0:
+				cost[_ix(x, y)] = 0
+				(buckets[0] as Array).append(_ix(x, y))
+	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	for d0 in 9000:
+		var list: Array = buckets[d0]
+		var hi: int = 0
+		while hi < list.size():
+			var cur: int = int(list[hi])
+			hi += 1
+			if cost[cur] != d0:
+				continue
+			var cc: Vector2i = Vector2i(cur % GW, cur / GW)
+			for dd in dirs:
+				var nn: Vector2i = cc + (dd as Vector2i)
+				if not _in(nn.x, nn.y) or not _step_ok(cc, nn):
+					continue
+				var ni: int = _ix(nn.x, nn.y)
+				var nc: int = d0 + (14 if water[ni] == 4 else 1)
+				if nc < cost[ni] and nc < 9000:
+					cost[ni] = nc
+					par[ni] = cur
+					(buckets[nc] as Array).append(ni)
+	for r in ramps:
+		if r.has("dead"):
+			continue
+		var dir: Vector2 = ((r["b"] as Vector2) - (r["a"] as Vector2)).normalized()
+		for end in [(r["a"] as Vector2) - dir * 30.0, (r["b"] as Vector2) + dir * 30.0]:
+			var ec: Vector2i = _cell_of(end as Vector2)
+			var at: int = _ix(ec.x, ec.y)
+			if OS.get_cmdline_user_args().has("sealdebug"):
+				print("CORRIDOR ramp ", r["lo"], "-", r["hi"], " end ", ec, " cost=", cost[at], " water=", water[at], " lvl=", lvl[at])
+			var guard: int = 0
+			while at >= 0 and guard < 4000:
+				guard += 1
+				var px: int = at % GW
+				var py: int = at / GW
+				for ox in range(-1, 2):
+					for oy in range(-1, 2):
+						if _in(px + ox, py + oy) and water[_ix(px + ox, py + oy)] == 4:
+							water[_ix(px + ox, py + oy)] = 0
+				at = par[at]

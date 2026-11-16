@@ -149,6 +149,12 @@ func _ready() -> void:
 		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted")
 		lm = MountainMap.new()
 		lm.guide = guide_mode
+		lm.debug_blocked = sqs.contains("dbg=1")
+		for ua in OS.get_cmdline_user_args():
+			if String(ua).begins_with("pseed"):
+				lm.paint_seed = String(ua).substr(5).to_int()
+		if sqs.contains("pseed="):
+			lm.paint_seed = sqs.substr(sqs.find("pseed=") + 6, 5).to_int()
 		lm.painted = painted_mode
 		lm.game = self
 		add_child(lm)

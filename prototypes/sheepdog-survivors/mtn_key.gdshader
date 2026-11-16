@@ -11,5 +11,5 @@ void fragment() {
 	float spill = (1.0 - smoothstep(0.5, 0.9, d)) * 0.5;
 	rgb.r = mix(rgb.r, min(rgb.r, rgb.g + 0.1), spill);
 	rgb.b = mix(rgb.b, min(rgb.b, rgb.g + 0.1), spill);
-	COLOR = vec4(rgb, c.a * a);
+	COLOR = vec4(rgb, c.a * a * smoothstep(1.0, 0.95, UV.y));
 }
