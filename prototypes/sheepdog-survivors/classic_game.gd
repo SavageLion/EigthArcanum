@@ -52,6 +52,8 @@ var ward_t: float = 3.0
 var echo_q: Array = []
 var pups: Array = []
 var ov_zoom: bool = false
+var guide_mode: bool = false
+var painted_mode: bool = false
 var lm = null
 var ysorts: Dictionary = {}
 @export var summit_mode: bool = false
@@ -142,11 +144,16 @@ func _ready() -> void:
 	add_child(ysort)
 	world.generate(ysort)
 	if summit_mode:
+		var sqs: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
+		guide_mode = sqs.contains("guide=1") or OS.get_cmdline_user_args().has("guide")
+		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted")
 		lm = MountainMap.new()
+		lm.guide = guide_mode
+		lm.painted = painted_mode
 		lm.game = self
 		add_child(lm)
 		var t_build: int = Time.get_ticks_msec()
-		lm.build(int(stage.get("tier", 1)))
+		lm.build(3 if (guide_mode or painted_mode) else int(stage.get("tier", 1)))
 		print("MTN build ms=", Time.get_ticks_msec() - t_build)
 	elif layers_mode():
 		lm = LayerMap.new()
@@ -157,6 +164,8 @@ func _ready() -> void:
 	_spawn_sheep()
 	_setup_camera()
 	_setup_layers()
+	if guide_mode:
+		_guide_prepare()
 	need = int(ceil(float(sheep.size()) * minf(0.7, 0.5 + 0.02 * float(run_day - 1))))
 	t_total = 240.0 + 6.0 * float(maxi(0, sheep.size() - 12))
 	t_left = t_total
@@ -483,6 +492,10 @@ func _process(delta: float) -> void:
 	var target_zoom: float = (0.29 if summit_mode else 0.3) if ov_zoom else 1.6 * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else 1.6
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
+	if guide_mode:
+		var fit: float = minf(vp().x / WX, vp().y / WY)
+		cam.zoom = Vector2(fit, fit)
+		cam.position = Vector2(WX, WY) / 2.0
 	hud.queue_redraw()
 	# who has been seen
 	var half: Vector2 = vp() / 2.0 * 0.9
@@ -1741,9 +1754,34 @@ func mtn_test() -> void:
 	if m.sealed > 400:
 		fails.append("%d cells had to be sealed off" % m.sealed)
 	print("MTNTEST sealed=", m.sealed)
+	if m.seal_log.size() > 300:
+		var bb: Rect2i = Rect2i((m.seal_log[0] as Vector3i).x, (m.seal_log[0] as Vector3i).y, 0, 0)
+		var lv: Dictionary = {}
+		for e in m.seal_log:
+			bb = bb.expand(Vector2i((e as Vector3i).x, (e as Vector3i).y))
+			lv[(e as Vector3i).z] = int(lv.get((e as Vector3i).z, 0)) + 1
+		print("MTNTEST sealbox=", bb, " by level=", lv)
+		for r in m.ramps:
+			print("MTNTEST ramp ", r["lo"], "-", r["hi"], " a=", (r["a"] as Vector2) / 24.0, " b=", (r["b"] as Vector2) / 24.0, " dead=", r.has("dead"))
 	if fails.is_empty():
 		print("MTNTEST PASS")
 	else:
 		for f in fails:
 			print("MTNTEST FAIL: ", f)
 	get_tree().quit(0 if fails.is_empty() else 1)
+
+# a clean picture of the map for the painter: no sprites, no buttons, the camera fitted to the whole map
+func _guide_prepare() -> void:
+	dog.visible = false
+	for sh in sheep:
+		(sh as Node2D).visible = false
+	for w in world.walls:
+		for n in (w["nodes"] as Array):
+			(n as Node2D).visible = false
+	hud.visible = false
+	cam.limit_left = -100000
+	cam.limit_top = -100000
+	cam.limit_right = 100000
+	cam.limit_bottom = 100000
+	for c in cam.get_children():
+		(c as Node).queue_free()

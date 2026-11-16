@@ -2,6 +2,7 @@ shader_type canvas_item;
 
 // the drop between the islands: a dark forest far below, with a sea of clouds drifting over it
 uniform sampler2D noise : filter_linear, repeat_enable;
+uniform bool flat_key = false;
 
 varying vec2 lp;
 
@@ -37,5 +38,8 @@ void fragment() {
 	tone = mix(tone, shade * 0.95, clamp(-rim, 0.0, 1.0) * 0.5);
 	tone = floor(tone * 7.0 + 0.5) / 7.0;
 	col = mix(col, tone, body);
+	if (flat_key) {
+		col = vec3(1.0, 0.0, 1.0);
+	}
 	COLOR = vec4(col, 1.0);
 }

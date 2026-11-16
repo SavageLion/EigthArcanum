@@ -22,8 +22,12 @@ var water: PackedByteArray = PackedByteArray()
 var land: PackedByteArray = PackedByteArray()
 var bridge_cells: Array = []
 var pond_c: Vector2 = Vector2.ZERO
+var guide: bool = false
+var painted: bool = false
+var painted_path: String = "res://art/mtn/test_map.png"
 var bridges: Array = []
 var sealed: int = 0
+var seal_log: Array = []
 var seed_shift: int = 0
 var river_xs: Array = []
 var river_y0: int = 0
@@ -72,7 +76,8 @@ func build(tier: int) -> void:
 	_trails()
 	_paths()
 	_make_parts()
-	_decorate()
+	if not guide and not painted:
+		_decorate()
 
 # a pen island in the middle and three mountain islands round it, joined by plank bridges over the clouds
 func _generate() -> void:
@@ -82,9 +87,8 @@ func _generate() -> void:
 	noise.fractal_octaves = 2
 	var isles: Array = [
 		{"c": Vector2(68, 46), "r": Vector2(17, 13), "p": []},
-		{"c": Vector2(19, 46), "r": Vector2(16, 24), "p": [[Vector2(18, 41), Vector2(11, 17)], [Vector2(17, 37), Vector2(7, 11)], [Vector2(16, 34), Vector2(4, 6)]]},
-		{"c": Vector2(117, 46), "r": Vector2(16, 24), "p": [[Vector2(118, 41), Vector2(11, 17)], [Vector2(119, 37), Vector2(7, 11)], [Vector2(120, 34), Vector2(4, 6)]]},
-		{"c": Vector2(68, 13), "r": Vector2(22, 9), "p": [[Vector2(68, 11), Vector2(14, 6)], [Vector2(68, 9), Vector2(8, 4)]]},
+		{"c": Vector2(19, 46), "r": Vector2(17, 25), "p": [[Vector2(18, 43), Vector2(13, 19)], [Vector2(17, 40), Vector2(9, 12)], [Vector2(16, 37), Vector2(5, 7)]]},
+		{"c": Vector2(117, 46), "r": Vector2(17, 25), "p": [[Vector2(118, 43), Vector2(13, 19)], [Vector2(119, 40), Vector2(9, 12)], [Vector2(120, 37), Vector2(5, 7)]]},
 	]
 	for ii in isles.size():
 		var isle: Dictionary = isles[ii]
@@ -108,6 +112,24 @@ func _generate() -> void:
 						else:
 							break
 					lvl[_ix(x, y)] = l
+	# keep every terrace well back from the island edge so the ring round it stays wide enough to walk
+	var demote: Array = []
+	for y in GH:
+		for x in GW:
+			if int(lvl[_ix(x, y)]) == 0 or land[_ix(x, y)] == 0:
+				continue
+			var near_void: bool = false
+			for oy in range(-4, 5):
+				for ox in range(-4, 5):
+					if _in(x + ox, y + oy) and land[_ix(x + ox, y + oy)] == 0:
+						near_void = true
+						break
+				if near_void:
+					break
+			if near_void:
+				demote.append(_ix(x, y))
+	for di in demote:
+		lvl[int(di)] = 0
 	for i in GW * GH:
 		water[i] = 0 if land[i] == 1 else 3
 	pond_c = Vector2(77.0, 53.0)
@@ -137,7 +159,7 @@ func _generate() -> void:
 	# bridges: a strip of planks over the gap, walkable
 	bridges.clear()
 	bridge_cells.clear()
-	var strips: Array = [Rect2i(31, 45, 26, 3), Rect2i(79, 45, 26, 3), Rect2i(67, 17, 3, 21)]
+	var strips: Array = [Rect2i(31, 45, 26, 3), Rect2i(79, 45, 26, 3)]
 	for st in strips:
 		var rect: Rect2i = st
 		var horizontal: bool = rect.size.x > rect.size.y
@@ -175,7 +197,8 @@ func _generate() -> void:
 		var region := Rect2i(int(c2.x - r2.x), int(c2.y - r2.y), int(r2.x * 2.0), int(r2.y * 2.0))
 		for k in mini((isle2["p"] as Array).size(), levels - 1):
 			if _place_ramps(k, 2, region) == 0:
-				_place_ramps(k, 1, region, true)
+				if _place_ramps(k, 1, region, true) == 0:
+					_place_ramps(k, 1, region, true, 1)
 	_connect()
 	_restrip()
 	_connect()
@@ -243,11 +266,11 @@ func _smooth() -> void:
 			out[_ix(x, y)] = best
 	lvl = out
 
-func _place_ramps(k: int, want: int, region: Rect2i = Rect2i(0, 0, GW, GH), relaxed: bool = false) -> int:
+func _place_ramps(k: int, want: int, region: Rect2i = Rect2i(0, 0, GW, GH), relaxed: bool = false, stride: int = 2) -> int:
 	var cands: Array = []
-	for y in range(maxi(8, region.position.y), mini(GH - 14, region.end.y), 2):
-		for x in range(maxi(8, region.position.x), mini(GW - 14, region.end.x), 2):
-			if _water_near(x - 3, y - 3, 10) if not relaxed else _water_near(x - 2, y - 4, 8):
+	for y in range(maxi(8, region.position.y), mini(GH - 14, region.end.y), stride):
+		for x in range(maxi(8, region.position.x), mini(GW - 14, region.end.x), stride):
+			if (_water_near(x - 3, y - 3, 10) if not relaxed else (_water_near(x - 2, y - 4, 8) and stride > 1)):
 				continue
 			var okn: bool = true
 			var oks: bool = true
@@ -451,6 +474,8 @@ func _seal() -> void:
 			if dist[i] < 0 and rmp[i] < 0 and water[i] == 0:
 				water[i] = 2
 				sealed += 1
+				if OS.get_cmdline_user_args().has("sealdebug"):
+					seal_log.append(Vector3i(x, y, int(lvl[i])))
 
 func _flow() -> void:
 	dist.resize(GW * GH)
@@ -722,6 +747,9 @@ func _sync(e: Mover, dt: float) -> void:
 
 # ---------------------------------------------------------------- how it looks
 func _make_parts() -> void:
+	if painted:
+		_make_painted_parts()
+		return
 	var sky := LayerPart.new()
 	sky.map = self
 	sky.mode = "S"
@@ -1206,6 +1234,7 @@ func _draw_sky(ci: CanvasItem) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://mtn_sky.gdshader")
 	mat.set_shader_parameter("noise", _noise_tex())
+	mat.set_shader_parameter("flat_key", guide)
 	ci.material = mat
 	ci.draw_rect(Rect2(-1200.0, -1200.0, float(GW) * CELL + 2400.0, float(GH) * CELL + 2400.0), Color(1, 1, 1))
 
@@ -1335,3 +1364,24 @@ func _in_mask(i: int, k: int, wet: bool) -> bool:
 	if wet:
 		return water[i] == 1 and int(lvl[i]) == k
 	return land[i] == 1 and int(lvl[i]) >= k
+
+# the painted version of the map: moving clouds underneath, the painting (on magenta) on top of them
+func _make_painted_parts() -> void:
+	var sky := LayerPart.new()
+	sky.map = self
+	sky.mode = "S"
+	sky.z_index = -138
+	add_child(sky)
+	var tex: Texture2D = load(painted_path)
+	var sp := Sprite2D.new()
+	sp.texture = tex
+	sp.centered = false
+	# the painting covers the middle band of the map (the band the guide picture was cut from)
+	sp.position = Vector2(0.0, 424.0)
+	sp.scale = Vector2(float(GW) * CELL / float(tex.get_width()), 1399.2 / float(tex.get_height()))
+	sp.z_index = -135
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var km := ShaderMaterial.new()
+	km.shader = load("res://mtn_key.gdshader")
+	sp.material = km
+	add_child(sp)
