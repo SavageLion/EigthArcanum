@@ -226,6 +226,7 @@ func _generate() -> void:
 	_buffer()
 	if painted:
 		_block_by_painting()
+		_block_cliff_feet()
 		_open_corridors()
 
 # the drawn edge wobbles about a cell either side of the real one, so the outermost ring of every ledge is kept clear
@@ -1583,3 +1584,39 @@ func _landing_ok(rx0: int, ry0: int, vertical: bool, high_first: bool, k: int) -
 				if land[i] != 1 or water[i] != 0 or rmp[i] >= 0 or int(lvl[i]) != want:
 					return false
 	return true
+
+# the painted cliff faces are taller than the game's cliff height, so the strip of low ground just under a high edge
+# is really painted wall: keep everybody off it
+func _block_cliff_feet() -> void:
+	var keep := PackedByteArray()
+	keep.resize(GW * GH)
+	keep.fill(0)
+	for ri in GW * GH:
+		if rmp[ri] >= 0:
+			for oy in range(-4, 5):
+				for ox in range(-4, 5):
+					if _in(ri % GW + ox, ri / GW + oy):
+						keep[_ix(ri % GW + ox, ri / GW + oy)] = 1
+	var marked: Array = []
+	for y in GH:
+		for x in GW:
+			var i: int = _ix(x, y)
+			if water[i] != 0 or rmp[i] >= 0 or land[i] == 0 or keep[i] == 1:
+				continue
+			for dy in range(1, 3):
+				if _in(x, y - dy):
+					var n: int = _ix(x, y - dy)
+					if land[n] == 1 and rmp[n] < 0 and int(lvl[n]) > int(lvl[i]):
+						marked.append(i)
+						break
+	for mi in marked:
+		water[int(mi)] = 4
+
+# a gentle push away from walls, cliff edges and the sides of stairs, so animals do not pin themselves against them
+func wall_push(p: Vector2, layer: int) -> Vector2:
+	var push := Vector2.ZERO
+	for k in 12:
+		var d: Vector2 = Vector2.from_angle(float(k) * TAU / 12.0)
+		if not _allowed(layer, p, p + d * 34.0):
+			push -= d
+	return push / 6.0

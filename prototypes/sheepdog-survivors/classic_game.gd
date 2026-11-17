@@ -820,6 +820,8 @@ func update_sheep(dt: float) -> void:
 				if sh.position.distance_to(gate) < 150.0 + 30.0 * float(mg):
 					var inside: Vector2 = gate + Vector2(0.0, -50.0)
 					sh.vel += (inside - sh.position).normalized() * (40.0 + 20.0 * float(mg)) * dt
+		if lm is MountainMap and not sh.in_pen:
+			sh.vel += (lm as MountainMap).wall_push(sh.position, sh.layer) * 170.0 * dt
 		var fr: float = 3.2 if sh.in_pen else 2.0
 		sh.vel *= exp(-fr * dt)
 		var zk: String = world.zone_kind(sh.position)
