@@ -3,8 +3,13 @@ extends RefCounted
 # The climb: a Slay-the-Spire style map of ten stops up a mountain. Every stop is a herding stage on
 # a mountain slice with more levels the higher you go.
 
-const COLS: int = 10
-const NAMES: Dictionary = {"herd": "Herd", "elite": "Hard herd", "rest": "Camp", "shop": "Trader", "boss": "The summit"}
+const COLS: int = 8
+const NAMES: Dictionary = {"herd": "Herd", "elite": "Hard herd", "rest": "Camp", "shop": "Trader", "boss": "The big day"}
+const KINDS: Dictionary = {
+	"gather": {"name": "GATHER", "desc": "Round up the whole flock into the pen."},
+	"sort": {"name": "SORT", "desc": "Three pens: black sheep, white sheep and goats each have their own."},
+	"hunt": {"name": "FOX HUNT", "desc": "Extra foxes and raiders. Keep the flock together."},
+}
 
 static var run: Dictionary = {}
 static var pending: Dictionary = {}
@@ -13,12 +18,12 @@ static func active() -> bool:
 	return bool(run.get("active", false))
 
 static func tier_of(col: int) -> int:
-	return 1 + col / 2
+	return mini(5, 1 + col / 2)
 
 static func new_run() -> void:
 	var layers: Array = []
 	for l in COLS:
-		var n: int = 1 if (l == 0 or l == COLS - 1) else (2 + randi() % 2)
+		var n: int = 3 if l == 0 else (1 if l == COLS - 1 else (2 + randi() % 2))
 		var layer: Array = []
 		for i in n:
 			var tp: String = "herd"
@@ -36,7 +41,15 @@ static func new_run() -> void:
 					tp = "shop"
 				else:
 					tp = "elite"
-			layer.append({"type": tp, "next": [], "done": false})
+			var kd: String = "gather"
+			if l == 0:
+				kd = ["gather", "sort", "hunt"][i]
+			elif tp == "herd" or tp == "elite":
+				var kr: float = randf()
+				kd = "gather" if kr < 0.4 else ("sort" if kr < 0.75 else "hunt")
+			elif tp == "boss":
+				kd = "sort"
+			layer.append({"type": tp, "kind": kd, "next": [], "done": false})
 		layers.append(layer)
 	var l1: Array = layers[1]
 	var has_herd: bool = false
@@ -65,14 +78,15 @@ static func new_run() -> void:
 			if not bool(incoming[k3]):
 				var from: int = clampi(roundi((float(k3) + 0.5) * float(cur.size()) / float(nxt.size()) - 0.5), 0, cur.size() - 1)
 				((cur[from] as Dictionary)["next"] as Array).append(k3)
-	run = {"active": true, "layers": layers, "pos": [-1, 0], "cur": [0, 0], "gold": 30, "picks": 0, "done": 0, "shop": [], "msg": ""}
+	run = {"flock": ["normal", "normal", "normal", "black", "goat"], "active": true, "layers": layers, "pos": [-1, 0], "cur": [0, 0], "gold": 30, "picks": 0, "done": 0, "shop": [], "msg": ""}
 	pending = {}
 
 static func options() -> Array:
 	var out: Array = []
 	var pos: Array = run["pos"]
 	if int(pos[0]) < 0:
-		out.append([0, 0])
+		for i0 in (run["layers"] as Array)[0].size():
+			out.append([0, i0])
 		return out
 	for k in ((run["layers"] as Array)[int(pos[0])][int(pos[1])] as Dictionary)["next"]:
 		out.append([int(pos[0]) + 1, int(k)])

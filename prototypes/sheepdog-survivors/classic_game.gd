@@ -59,6 +59,9 @@ var painted_mode: bool = false
 var lm = null
 var ysorts: Dictionary = {}
 @export var summit_mode: bool = false
+@export var hub_mode: bool = false
+var pens: Array = []
+var kind: String = "gather"
 var stage: Dictionary = {}
 var shop_offers: Array = []
 var map_msg: String = ""
@@ -122,10 +125,16 @@ func _ready() -> void:
 			var sq: String = str(JavaScriptBridge.eval("window.location.search"))
 			if sq.contains("tier="):
 				stage = {"type": "herd", "tier": clampi(sq.substr(sq.find("tier=") + 5, 1).to_int(), 1, 5), "col": 0}
+				if sq.contains("kind="):
+					stage["kind"] = sq.substr(sq.find("kind=") + 5).get_slice("&", 0)
 		for t in 5:
 			if OS.get_cmdline_user_args().has("tier%d" % (t + 1)):
 				stage = {"type": "herd", "tier": t + 1, "col": 0}
+				for kk in ["gather", "sort", "hunt"]:
+					if OS.get_cmdline_user_args().has(kk):
+						stage["kind"] = kk
 		run_day = int(Peak.run["done"]) + 1
+		kind = String(stage.get("kind", "gather"))
 	shadow_tex = U.shadow_texture()
 	dog_frames = U.frames(load("res://art/chars/dog.png") as Texture2D, 48, ["east", "north", "south", "south-east", "north-east"])
 	sheep_frames = U.frames(load("res://art/chars/sheep.png") as Texture2D, 40, ["east", "north", "south"])
@@ -155,6 +164,8 @@ func _ready() -> void:
 		base_zoom = 1.25 if painted_mode else 1.6
 		lm = MountainMap.new()
 		lm.guide = guide_mode
+		if hub_mode:
+			lm.map_id = 4 if stage.is_empty() else 3
 		if sqs.contains("map=2") or OS.get_cmdline_user_args().has("map2"):
 			lm.map_id = 2
 			lm.painted_path = "res://art/mtn/test_map2.png"
@@ -169,13 +180,14 @@ func _ready() -> void:
 		lm.game = self
 		add_child(lm)
 		var t_build: int = Time.get_ticks_msec()
-		lm.build(3 if (guide_mode or painted_mode) else int(stage.get("tier", 1)))
+		lm.build(1 if hub_mode else (3 if (guide_mode or painted_mode) else int(stage.get("tier", 1))))
 		print("MTN build ms=", Time.get_ticks_msec() - t_build)
 	elif layers_mode():
 		lm = LayerMap.new()
 		lm.game = self
 		add_child(lm)
 		lm.build()
+	_setup_pens()
 	_spawn_dog()
 	_spawn_sheep()
 	_setup_camera()
@@ -202,6 +214,10 @@ func _ready() -> void:
 	banner_t = 3.5
 	if lm is MountainMap and OS.get_cmdline_user_args().has("mtntest"):
 		mtn_test.call_deferred()
+	if lm is MountainMap and OS.get_cmdline_user_args().has("arenatest"):
+		arena_test.call_deferred()
+	if hub_mode and OS.get_cmdline_user_args().has("runtest"):
+		run_test.call_deferred()
 
 func _spawn_dog() -> void:
 	dog = ClassicDog.new()
@@ -209,12 +225,38 @@ func _spawn_dog() -> void:
 	dog.setup(dog_frames, shadow_tex)
 	dog.position = world.dog_start
 
+func _near_pen(p: Vector2, margin: float) -> bool:
+	for pn in pens:
+		if ((pn as Dictionary)["rect"] as Rect2).grow(margin).has_point(p):
+			return true
+	return false
+
+# the home pen at the hub: everything the run has herded so far wanders about in it
+func _spawn_flock() -> void:
+	var fl: Array = Peak.run.get("flock", [])
+	var R: Rect2 = world.pen
+	for i in mini(fl.size(), 70):
+		var t: String = String(fl[i])
+		if not TYPES.has(t):
+			t = "normal"
+		var s := ClassicSheep.new()
+		ysort.add_child(s)
+		s.setup(t, TYPES[t], sheep_frames, shadow_tex)
+		s.position = Vector2(randf_range(R.position.x + 24.0, R.end.x - 24.0), randf_range(R.position.y + 22.0, R.end.y - 22.0))
+		s.in_pen = true
+		s.pen_i = 0
+		s.seen = true
+		sheep.append(s)
+
 func _spawn_sheep() -> void:
+	if hub_mode and stage.is_empty():
+		_spawn_flock()
+		return
 	var cs: Array = []
 	for i in 4:
 		for tries in 60:
 			var p := Vector2(randf_range(260.0, WX - 260.0), randf_range(260.0, WY - 260.0))
-			if p.distance_to(world.dog_start) < 420.0 or p.distance_to(world.pen.get_center()) < 560.0 or world._blocked(p, 24.0):
+			if p.distance_to(world.dog_start) < 420.0 or p.distance_to(world.pen.get_center()) < 560.0 or world._blocked(p, 24.0) or _near_pen(p, 200.0):
 				continue
 			var ok: bool = true
 			for q in cs:
@@ -232,7 +274,7 @@ func _spawn_sheep() -> void:
 		var s := ClassicSheep.new()
 		ysort.add_child(s)
 		s.setup(String(t), TYPES[String(t)], sheep_frames, shadow_tex)
-		var hide_it: bool = idx < 2 and not painted_mode
+		var hide_it: bool = idx < 2 and not painted_mode and not hub_mode
 		var c: Vector2 = cs[randi() % cs.size()]
 		var p := c + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 80.0)
 		if hide_it:
@@ -462,6 +504,8 @@ func move_input() -> Vector2:
 func _physics_process(delta: float) -> void:
 	update_camera(delta)
 	if state != "play":
+		if state == "map" and hub_mode:
+			update_sheep(minf(delta, 0.05))
 		return
 	var dt: float = minf(delta, 0.05)
 	clock += dt
@@ -478,9 +522,14 @@ func _physics_process(delta: float) -> void:
 		pu["t"] = float(pu["t"]) - dt
 	popups = popups.filter(func(q: Dictionary) -> bool: return float(q["t"]) > 0.0)
 	penned = 0
+	for pn in pens:
+		(pn as Dictionary)["n"] = 0
 	for s in sheep:
 		if (s as ClassicSheep).in_pen:
 			penned += 1
+			var pdc: Dictionary = pens[clampi((s as ClassicSheep).pen_i, 0, pens.size() - 1)]
+			pdc["n"] = int(pdc["n"]) + 1
+	update_pen_signs()
 	var all_in: bool = sheep.size() > 0 and penned >= sheep.size()
 	if all_in:
 		finish_day("all")
@@ -496,8 +545,9 @@ func update_camera(delta: float) -> void:
 	if not cam_init:
 		cam_pos = dog.position
 		cam_init = true
-	cam_look = cam_look.lerp(dog.vel * 0.16, 1.0 - exp(-2.5 * delta))
-	cam_pos = cam_pos.lerp(dog.position, 1.0 - exp(-5.0 * delta))
+	var at_home: bool = hub_mode and state == "map"
+	cam_look = cam_look.lerp(Vector2.ZERO if at_home else dog.vel * 0.16, 1.0 - exp(-2.5 * delta))
+	cam_pos = cam_pos.lerp(world.pen.get_center() + Vector2(0.0, 60.0) if at_home else dog.position, 1.0 - exp(-5.0 * delta))
 	shake = maxf(0.0, shake - delta * 2.5)
 	var sh: Vector2 = Vector2(sin(clock * 63.0), cos(clock * 71.0)) * shake * shake * 3.0
 	cam.position = cam_pos + cam_look + sh
@@ -511,7 +561,7 @@ func _process(delta: float) -> void:
 	if lm != null:
 		lm.sync_all()
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	var target_zoom: float = (0.29 if summit_mode else 0.3) if ov_zoom else base_zoom * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else base_zoom
+	var target_zoom: float = 2.0 if (hub_mode and state == "map") else (0.29 if summit_mode else 0.3) if ov_zoom else base_zoom * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else base_zoom
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	if guide_mode or fit_mode:
@@ -816,7 +866,8 @@ func update_sheep(dt: float) -> void:
 				sh.vel += (goal_for(sh) - sh.position).normalized() * (215.0 if sh.heavy else 235.0) * rk * dt
 			var mg: int = pl("magnet")
 			if mg > 0:
-				var gate: Vector2 = Vector2(world.gate_x, world.pen.end.y)
+				var mpn: Dictionary = pens[pen_for(sh)]
+				var gate: Vector2 = Vector2(float(mpn["gate"]), (mpn["rect"] as Rect2).end.y)
 				if sh.position.distance_to(gate) < 150.0 + 30.0 * float(mg):
 					var inside: Vector2 = gate + Vector2(0.0, -50.0)
 					sh.vel += (inside - sh.position).normalized() * (40.0 + 20.0 * float(mg)) * dt
@@ -838,21 +889,103 @@ func update_sheep(dt: float) -> void:
 		sh.position += sh.vel * dt
 		collide(sh, sh.r, 0.2)
 		lm_resolve(sh, old_sh)
-		var P: Rect2 = world.pen
-		if (not sh.in_pen) and sh.position.x > P.position.x + 16.0 and sh.position.x < P.end.x - 6.0 and sh.position.y > P.position.y + 6.0 and sh.position.y < P.end.y - 6.0:
-			sh.in_pen = true
-			sh.squash = 1.0
-			add_popup("+1", sh.position + Vector2(0, -14), Color(0.6, 1.0, 0.6))
-			gain_xp(float(XP_OF.get(sh.type, 10)) * (1.0 + 0.25 * float(pl("fleece"))), sh.position)
-		if sh.in_pen:
-			sh.position.x = clampf(sh.position.x, P.position.x + sh.r + 2.0, P.end.x - sh.r - 2.0)
-			sh.position.y = clampf(sh.position.y, P.position.y + sh.r + 2.0, P.end.y - sh.r - 2.0)
+		check_pen(sh)
 		if sh.hidden_grass == false and sh.position.distance_to(dog.position) < 85.0 and false:
 			reveal(sh)
 	for s in sheep:
 		var sh2: ClassicSheep = s
 		if sh2.hidden_grass and sh2.position.distance_to(dog.position) < 85.0:
 			reveal(sh2)
+
+# which pen a sheep belongs in, and what happens when it reaches one
+func pen_accepts(i: int, sh: ClassicSheep) -> bool:
+	var acc: Array = pens[i]["accept"]
+	return acc.is_empty() or acc.has(sh.type)
+
+func pen_for(sh: ClassicSheep) -> int:
+	var best: int = 0
+	var bd: float = 1.0e9
+	for i in pens.size():
+		if not pen_accepts(i, sh):
+			continue
+		var d: float = sh.position.distance_to((pens[i]["rect"] as Rect2).get_center())
+		if d < bd:
+			bd = d
+			best = i
+	return best
+
+func check_pen(sh: ClassicSheep) -> void:
+	if not sh.in_pen:
+		for i in pens.size():
+			var P: Rect2 = pens[i]["rect"]
+			if sh.position.x > P.position.x + 16.0 and sh.position.x < P.end.x - 6.0 and sh.position.y > P.position.y + 6.0 and sh.position.y < P.end.y - 6.0:
+				if not pen_accepts(i, sh):
+					sh.position.y = P.end.y + 12.0
+					sh.vel = Vector2(randf_range(-40.0, 40.0), 150.0)
+					sh.panic = maxf(sh.panic, 0.5)
+					add_popup("WRONG PEN", sh.position + Vector2(0, -14), Color(1.0, 0.6, 0.4))
+					return
+				sh.in_pen = true
+				sh.pen_i = i
+				sh.squash = 1.0
+				add_popup("+1", sh.position + Vector2(0, -14), Color(0.6, 1.0, 0.6))
+				gain_xp(float(XP_OF.get(sh.type, 10)) * (1.0 + 0.25 * float(pl("fleece"))), sh.position)
+				break
+	if sh.in_pen:
+		var P2: Rect2 = pens[clampi(sh.pen_i, 0, pens.size() - 1)]["rect"]
+		sh.position.x = clampf(sh.position.x, P2.position.x + sh.r + 2.0, P2.end.x - sh.r - 2.0)
+		sh.position.y = clampf(sh.position.y, P2.position.y + sh.r + 2.0, P2.end.y - sh.r - 2.0)
+
+# the pens of this stage: the castle pen, and for a sort stage two more, each with its own kind of animal
+func _setup_pens() -> void:
+	if hub_mode:
+		for pdn in world.pads:
+			(pdn as Node2D).visible = false
+	pens = [{"rect": world.pen, "gate": world.gate_x, "accept": [], "label": "", "col": Color(1, 1, 1), "n": 0, "total": 0}]
+	if hub_mode and not stage.is_empty() and kind == "sort":
+		var c: Vector2 = world.pen.get_center()
+		(pens[0] as Dictionary)["accept"] = ["normal"]
+		(pens[0] as Dictionary)["label"] = "WHITE SHEEP"
+		(pens[0] as Dictionary)["col"] = Color(0.95, 0.93, 0.85)
+		var extra: Array = [[Vector2(-660.0, -70.0), "black", "BLACK SHEEP", Color(0.22, 0.2, 0.26)], [Vector2(660.0, -70.0), "goat", "GOATS", Color(0.78, 0.55, 0.28)]]
+		for ex in extra:
+			var d: Dictionary = world.add_pen(c + (ex[0] as Vector2))
+			pens.append({"rect": d["rect"], "gate": d["gate"], "accept": [ex[1]], "label": ex[2], "col": ex[3], "n": 0, "total": 0})
+	var rects: Array = []
+	for pn in pens:
+		rects.append((pn as Dictionary)["rect"])
+	if lm is MountainMap:
+		(lm as MountainMap).set_pens(rects)
+	for i in pens.size():
+		var pd: Dictionary = pens[i]
+		var fl := PenSign.new()
+		fl.rect = pd["rect"]
+		fl.position = (pd["rect"] as Rect2).get_center()
+		fl.mode = "floor"
+		fl.z_index = -120
+		add_child(fl)
+		if String(pd["label"]) != "":
+			var sg := PenSign.new()
+			sg.mode = "sign"
+			sg.label = pd["label"]
+			sg.col = pd["col"]
+			sg.position = Vector2((pd["rect"] as Rect2).get_center().x, (pd["rect"] as Rect2).position.y + 4.0)
+			ysort.add_child(sg)
+			pd["sign"] = sg
+
+func update_pen_signs() -> void:
+	for i in pens.size():
+		var pd: Dictionary = pens[i]
+		if pd.has("sign"):
+			var sg: PenSign = pd["sign"]
+			var tot: int = 0
+			for s in sheep:
+				if pen_accepts(i, s as ClassicSheep):
+					tot += 1
+			if sg.n != int(pd["n"]) or sg.total != tot:
+				sg.n = int(pd["n"])
+				sg.total = tot
+				sg.queue_redraw()
 
 func lure_target(s: ClassicSheep) -> Vector2:
 	if s.lure == "":
@@ -1154,9 +1287,11 @@ func pick_levelup(i: int) -> void:
 		state = "map" if (summit_mode and stage.is_empty()) else "play"
 
 # ---------------------------------------------------------------- where a sheep should be sent
-func pen_entrances() -> Array:
-	var P: Rect2 = world.pen
-	var out: Array = [[Vector2(world.gate_x, P.end.y), Vector2(0.0, 1.0)]]
+func pen_entrances(pi: int = 0) -> Array:
+	var P: Rect2 = pens[pi]["rect"] if not pens.is_empty() else world.pen
+	var out: Array = [[Vector2(float(pens[pi]["gate"]) if not pens.is_empty() else world.gate_x, P.end.y), Vector2(0.0, 1.0)]]
+	if pi > 0:
+		return out
 	if bool(world.holes.get("north", false)):
 		out.append([Vector2(P.get_center().x, P.position.y), Vector2(0.0, -1.0)])
 	if bool(world.holes.get("west", false)):
@@ -1172,12 +1307,13 @@ func seg_blocked(a: Vector2, b: Vector2, box: Rect2) -> bool:
 	return false
 
 # the way in: the nearest open gate, around the walls if need be
-func pen_goal(p: Vector2) -> Vector2:
+func pen_goal(p: Vector2, pi: int = 0) -> Vector2:
+	var PR: Rect2 = pens[pi]["rect"] if not pens.is_empty() else world.pen
 	var best_st := Vector2.ZERO
 	var best_e := Vector2.ZERO
 	var best_n := Vector2.ZERO
 	var bd: float = 1.0e9
-	for en in pen_entrances():
+	for en in pen_entrances(pi):
 		var e: Vector2 = en[0]
 		var n: Vector2 = en[1]
 		var st: Vector2 = e + n * 80.0
@@ -1192,10 +1328,10 @@ func pen_goal(p: Vector2) -> Vector2:
 	var lat: float = absf(rel.dot(best_n.orthogonal()))
 	if along < 110.0 and along > -60.0 and lat < 45.0:
 		return best_e - best_n * 50.0
-	var box: Rect2 = world.pen.grow(8.0)
+	var box: Rect2 = PR.grow(8.0)
 	if not seg_blocked(p, best_st, box):
 		return best_st
-	var cb: Rect2 = world.pen.grow(44.0)
+	var cb: Rect2 = PR.grow(44.0)
 	var corners: Array = [cb.position, Vector2(cb.end.x, cb.position.y), cb.end, Vector2(cb.position.x, cb.end.y)]
 	var pick: Vector2 = best_st
 	var pd: float = 1.0e9
@@ -1364,6 +1500,14 @@ func lm_resolve(e: Mover, old: Vector2) -> void:
 
 # a sheep on the ground heads for the pen, one on a hill heads for the way down
 func goal_for(sh: ClassicSheep) -> Vector2:
+	var pi: int = pen_for(sh)
+	if lm is MountainMap and (lm as MountainMap).map_id >= 3 and pi < (lm as MountainMap).pen_flow.size():
+		var fm: MountainMap = lm
+		var fc: Vector2i = fm._cell_of(sh.position)
+		var fd: int = (fm.pen_flow[pi] as PackedInt32Array)[fm._ix(fc.x, fc.y)]
+		if fd > 4 or fd < 0:
+			return fm.flow_goal(sh.position, fm.pen_flow[pi])
+		return pen_goal(sh.position, pi)
 	if lm != null and lm.use_flow(sh.position, sh.layer):
 		return lm.flow_goal(sh.position)
 	return pen_goal(sh.position)
@@ -1428,6 +1572,11 @@ func summit_herd() -> Array:
 	var tier: int = int(stage.get("tier", 1))
 	var typ: String = String(stage.get("type", "herd"))
 	var n: int = 8 + 2 * tier + (4 if typ == "elite" else 0) + (18 if typ == "boss" else 0)
+	if hub_mode and kind == "sort":
+		var sl: Array = []
+		for i in 3 * (3 + tier + (3 if typ == "boss" else 0)):
+			sl.append(["normal", "black", "goat"][i % 3])
+		return sl
 	var out: Array = ["normal", "normal", "goat", "goose"]
 	var cycle: Array = ["normal", "normal", "goat", "goose", "ram", "black", "normal", "goat"]
 	while out.size() < n:
@@ -1448,16 +1597,22 @@ func summit_start() -> void:
 	t_total = 200.0 + 8.0 * float(tier) + 6.0 * float(maxi(0, sheep.size() - 12)) + (40.0 if typ == "boss" else 0.0)
 	t_left = t_total
 	events.clear()
-	var nf: int = 2 + tier + (3 if typ == "elite" else 0) + (6 if typ == "boss" else 0)
+	var nf: int = 2 + tier + (3 if typ == "elite" else 0) + (6 if typ == "boss" else 0) + (4 if kind == "hunt" else 0)
 	for i in nf:
 		events.append({"t": randf_range(15.0, t_total - 60.0), "raid": randf() < 0.3 + 0.05 * float(tier)})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
-	banner = "%s  -  %s" % [String(Peak.NAMES[typ]).to_upper(), "THE MEADOW" if tier == 1 else ("LEVEL %d" % tier)]
+	banner = "%s  -  %s" % [String(Peak.NAMES[typ]).to_upper(), String(Peak.KINDS[kind]["name"]) if hub_mode else ("THE MEADOW" if tier == 1 else ("LEVEL %d" % tier))]
 
 func peak_pos(l: int, i: int) -> Vector2:
 	var v: Vector2 = vp()
 	var n: int = ((Peak.run["layers"] as Array)[l] as Array).size()
 	return Vector2(64.0 + float(l) * (v.x - 128.0) / 9.0, v.y / 2.0 + 10.0 + (float(i) - (float(n) - 1.0) / 2.0) * 92.0)
+
+func hub_card_rect(i: int, n: int) -> Rect2:
+	var v: Vector2 = vp()
+	var w: float = minf(250.0, (v.x - 40.0) / float(maxi(n, 1)) - 12.0)
+	var total: float = float(n) * w + float(n - 1) * 12.0
+	return Rect2(v.x / 2.0 - total / 2.0 + float(i) * (w + 12.0), v.y - 136.0, w, 124.0)
 
 func popt_rect(i: int) -> Rect2:
 	var v: Vector2 = vp()
@@ -1486,9 +1641,14 @@ func summit_press(p: Vector2) -> void:
 		get_tree().reload_current_scene()
 		return
 	if state == "map":
-		for o in Peak.options():
-			if peak_pos(int((o as Array)[0]), int((o as Array)[1])).distance_to(p) < 28.0:
-				enter_node(o)
+		var opts: Array = Peak.options()
+		for oi in opts.size():
+			if hub_mode:
+				if hub_card_rect(oi, opts.size()).has_point(p):
+					enter_node(opts[oi])
+					return
+			elif peak_pos(int((opts[oi] as Array)[0]), int((opts[oi] as Array)[1])).distance_to(p) < 28.0:
+				enter_node(opts[oi])
 				return
 	elif state == "prest":
 		for i in 2:
@@ -1524,7 +1684,7 @@ func enter_node(o: Array) -> void:
 	Peak.run["cur"] = [int(o[0]), int(o[1])]
 	var typ: String = String(Peak.node(int(o[0]), int(o[1]))["type"])
 	if typ == "herd" or typ == "elite" or typ == "boss":
-		Peak.pending = {"type": typ, "tier": Peak.tier_of(int(o[0])), "col": int(o[0])}
+		Peak.pending = {"type": typ, "tier": Peak.tier_of(int(o[0])), "col": int(o[0]), "kind": String(Peak.node(int(o[0]), int(o[1])).get("kind", "gather"))}
 		get_tree().reload_current_scene()
 	elif typ == "rest":
 		state = "prest"
@@ -1544,6 +1704,11 @@ func summit_result_tap() -> void:
 	var tier: int = int(stage.get("tier", 1))
 	if bool(result["ok"]):
 		Peak.finish_node()
+		if hub_mode:
+			var fl: Array = Peak.run["flock"]
+			for s in sheep:
+				if (s as ClassicSheep).in_pen:
+					fl.append((s as ClassicSheep).type)
 		Peak.run["picks"] = int(Peak.run["picks"]) + (2 if typ == "elite" else 1)
 		Peak.run["gold"] = int(Peak.run["gold"]) + 20 + 10 * tier + (30 if typ == "elite" else 0)
 		Peak.pending = {}
@@ -1871,3 +2036,129 @@ func _guide_prepare() -> void:
 	cam.limit_bottom = 100000
 	for c in cam.get_children():
 		(c as Node).queue_free()
+
+# arena self test (godot --headless res://hub.tscn -- tier2 sort arenatest): every pen can be reached from everywhere, and a flock
+# that heads for home ends up in the right pens and never in a wrong one
+func arena_test() -> void:
+	var m: MountainMap = lm
+	var ok: bool = true
+	for i in m.pen_flow.size():
+		var bad: int = 0
+		var tot: int = 0
+		for p in m.spawnable[0]:
+			var c: Vector2i = m._cell_of(p)
+			if m._near_pens(p, 20.0):
+				continue
+			tot += 1
+			if (m.pen_flow[i] as PackedInt32Array)[m._ix(c.x, c.y)] < 0:
+				bad += 1
+		print("ARENATEST pen ", i, " (", pens[i]["label"], ") cells that cannot reach it: ", bad, " of ", tot)
+		if bad > 0:
+			ok = false
+	var sim: Dictionary = _sim_home(240.0)
+	var t: float = float(sim["t"])
+	var rejected: int = int(sim["rejected"])
+	var wrong: int = 0
+	for s9 in sheep:
+		var st: ClassicSheep = s9
+		if not st.in_pen:
+			var sc: Vector2i = m._cell_of(st.position)
+			var gc: Vector2i = m._cell_of(goal_for(st))
+			print("ARENATEST stuck ", st.type, " at ", st.position, " cell ", sc, " water ", m.water[m._ix(sc.x, sc.y)], " goal ", goal_for(st), " goalcell water ", m.water[m._ix(gc.x, gc.y)], " flow ", (m.pen_flow[pen_for(st)] as PackedInt32Array)[m._ix(sc.x, sc.y)], " vel ", st.vel, " pen ", pen_for(st))
+	var inside: int = 0
+	for s3 in sheep:
+		var sh: ClassicSheep = s3
+		if sh.in_pen:
+			inside += 1
+			if not pen_accepts(sh.pen_i, sh):
+				wrong += 1
+	print("ARENATEST sheep home ", inside, " of ", sheep.size(), " after ", int(t), "s, in a wrong pen ", wrong, ", turned back at a wrong gate ", rejected)
+	if inside < sheep.size() or wrong > 0:
+		ok = false
+	if pens.size() > 1:
+		var bs := ClassicSheep.new()
+		ysort.add_child(bs)
+		bs.setup("black", TYPES["black"], sheep_frames, shadow_tex)
+		bs.position = (pens[0]["rect"] as Rect2).get_center()
+		check_pen(bs)
+		var turned: bool = (not bs.in_pen) and bs.position.y > (pens[0]["rect"] as Rect2).end.y
+		bs.position = (pens[1]["rect"] as Rect2).get_center()
+		check_pen(bs)
+		var taken: bool = bs.in_pen and bs.pen_i == 1
+		print("ARENATEST wrong pen turns a black sheep away: ", turned, ", its own pen takes it: ", taken)
+		if not (turned and taken):
+			ok = false
+	print("ARENATEST ", "PASS" if ok else "FAIL")
+	get_tree().quit()
+
+# the whole run, headless (godot --headless res://hub.tscn -- runtest): the hub offers stops, every stage is herded home, the
+# flock at home grows with every cleared stage, camp and trader stops are passed
+func run_test() -> void:
+	if not (Peak.run.has("rt_log")):
+		Peak.run["rt_log"] = []
+	if stage.is_empty():
+		var fl: int = (Peak.run["flock"] as Array).size()
+		print("RUNTEST hub: flock ", fl, " (shown in the home pen: ", sheep.size(), "), gold ", Peak.run["gold"], ", stops done ", Peak.run["done"])
+		if int(Peak.run["done"]) >= Peak.COLS - 1 or state == "final":
+			var grew: bool = fl > 5
+			print("RUNTEST ", "PASS" if (grew and sheep.size() == mini(fl, 70)) else "FAIL")
+			get_tree().quit()
+			return
+		var opts: Array = Peak.options()
+		var pick: Array = opts[0]
+		for o in opts:
+			var tpn: String = String(Peak.node(int((o as Array)[0]), int((o as Array)[1]))["type"])
+			if tpn == "herd" or tpn == "elite" or tpn == "boss":
+				pick = o
+				break
+		var typ: String = String(Peak.node(int(pick[0]), int(pick[1]))["type"])
+		print("RUNTEST entering ", typ, " ", Peak.node(int(pick[0]), int(pick[1])).get("kind", ""))
+		if typ == "rest" or typ == "shop":
+			Peak.run["cur"] = [int(pick[0]), int(pick[1])]
+			Peak.finish_node()
+			Peak.pending = {}
+			get_tree().reload_current_scene()
+			return
+		enter_node(pick)
+		return
+	_sim_home(300.0)
+	pending_lv = 0
+	state = "play"
+	var inside: int = 0
+	for s2 in sheep:
+		if (s2 as ClassicSheep).in_pen:
+			inside += 1
+	print("RUNTEST stage ", kind, " tier ", stage.get("tier", 0), ": ", inside, " of ", sheep.size(), " home")
+	penned = inside
+	finish_day("all")
+	if not bool(result["ok"]):
+		print("RUNTEST FAIL stage not cleared")
+		get_tree().quit()
+		return
+	summit_result_tap()
+
+# every loose sheep heads for its own pen, the dog far away; returns how long it took
+func _sim_home(max_s: float) -> Dictionary:
+	dog.position = Vector2(300.0, 300.0)
+	var dt: float = 1.0 / 60.0
+	var t: float = 0.0
+	var rejected: int = 0
+	while t < max_s:
+		for s in sheep:
+			if not (s as ClassicSheep).in_pen:
+				(s as ClassicSheep).home_t = 5.0
+		update_sheep(dt)
+		for pu in popups:
+			if String(pu["s"]) == "WRONG PEN" and float(pu["t"]) > 0.98:
+				rejected += 1
+		for pu2 in popups:
+			pu2["t"] = float(pu2["t"]) - dt
+		popups = popups.filter(func(q: Dictionary) -> bool: return float(q["t"]) > 0.0)
+		t += dt
+		var all_in: bool = true
+		for s2 in sheep:
+			if not (s2 as ClassicSheep).in_pen:
+				all_in = false
+		if all_in:
+			break
+	return {"t": t, "rejected": rejected}

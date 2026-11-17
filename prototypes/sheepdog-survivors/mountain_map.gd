@@ -30,6 +30,8 @@ var painted_path: String = "res://art/mtn/test_map.png"
 var map_id: int = 1
 var painted_rect: Rect2 = Rect2(0.0, 424.0, 3264.0, 1399.2)
 var wide_landings: bool = false
+var pen_rects: Array = []
+var pen_flow: Array = []
 var bridges: Array = []
 var sealed: int = 0
 var seal_log: Array = []
@@ -95,7 +97,13 @@ func _generate() -> void:
 	noise.frequency = 0.07
 	noise.fractal_octaves = 2
 	var isles: Array = []
-	if map_id == 2:
+	if map_id == 3:
+		pond_c = Vector2(94.0, 62.0)
+		isles = [{"c": Vector2(68, 46), "r": Vector2(40, 34), "p": []}]
+	elif map_id == 4:
+		pond_c = Vector2(86.0, 56.0)
+		isles = [{"c": Vector2(68, 46), "r": Vector2(25, 18), "p": []}]
+	elif map_id == 2:
 		wide_landings = true
 		painted_rect = Rect2(1080.0, 424.0, 2185.0, 1399.2)
 		isles = [
@@ -150,15 +158,16 @@ func _generate() -> void:
 		lvl[int(di)] = 0
 	for i in GW * GH:
 		water[i] = 0 if land[i] == 1 else 3
-	pond_c = Vector2(77.0, 53.0)
-	for y in range(46, 61):
-		for x in range(68, 88):
+	if map_id < 3:
+		pond_c = Vector2(77.0, 53.0)
+	for y in range(int(pond_c.y) - 7, int(pond_c.y) + 8):
+		for x in range(int(pond_c.x) - 9, int(pond_c.x) + 11):
 			var pdx: float = (float(x) - pond_c.x) / 5.2
 			var pdy: float = (float(y) - pond_c.y) / 3.4
 			if pdx * pdx + pdy * pdy + noise.get_noise_2d(float(x) * 1.7, float(y) * 1.7) * 0.3 < 1.0 and land[_ix(x, y)] == 1:
 				water[_ix(x, y)] = 1
 	# a waterfall pouring off the south side of each side mountain
-	for sx in ([114] if map_id == 2 else [19, 117]):
+	for sx in ([] if map_id >= 3 else ([114] if map_id == 2 else [19, 117])):
 		var ey: int = -1
 		for y in range(72, 40, -1):
 			if land[_ix(sx, y)] == 1:
@@ -180,6 +189,8 @@ func _generate() -> void:
 	var strips: Array = [Rect2i(31, 45, 26, 3), Rect2i(79, 45, 26, 3)]
 	if map_id == 2:
 		strips = [Rect2i(78, 45, 22, 3)]
+	if map_id >= 3:
+		strips = []
 	for st in strips:
 		var rect: Rect2i = st
 		var horizontal: bool = rect.size.x > rect.size.y
@@ -504,14 +515,22 @@ func _seal() -> void:
 					seal_log.append(Vector3i(x, y, int(lvl[i])))
 
 func _flow() -> void:
-	dist.resize(GW * GH)
-	dist.fill(-1)
-	var queue: Array = []
+	var seeds: Array = []
 	for y in range(PEN_ROW - 5, PEN_ROW + 6):
 		for x in range(GW / 2 - 5, GW / 2 + 6):
 			if rmp[_ix(x, y)] < 0 and lvl[_ix(x, y)] == 0:
-				dist[_ix(x, y)] = 0
-				queue.append(Vector2i(x, y))
+				seeds.append(Vector2i(x, y))
+	dist = _bfs(seeds)
+
+func _bfs(seeds: Array, block: PackedByteArray = PackedByteArray()) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	out.resize(GW * GH)
+	out.fill(-1)
+	var queue: Array = []
+	for sc in seeds:
+		var s: Vector2i = sc
+		out[_ix(s.x, s.y)] = 0
+		queue.append(s)
 	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 	var head: int = 0
 	while head < queue.size():
@@ -519,9 +538,66 @@ func _flow() -> void:
 		head += 1
 		for d in dirs:
 			var n: Vector2i = c + (d as Vector2i)
-			if _in(n.x, n.y) and dist[_ix(n.x, n.y)] < 0 and _can_step(c, n):
-				dist[_ix(n.x, n.y)] = dist[_ix(c.x, c.y)] + 1
+			if _in(n.x, n.y) and out[_ix(n.x, n.y)] < 0 and (block.size() == 0 or block[_ix(n.x, n.y)] == 0) and _can_step(c, n):
+				out[_ix(n.x, n.y)] = out[_ix(c.x, c.y)] + 1
 				queue.append(n)
+	return out
+
+# the cells the fences of the pens stand on (everything but the gate gaps), so the way home goes round the fence, not through it
+func _fence_mask(rects: Array, gap_w: float) -> PackedByteArray:
+	var m := PackedByteArray()
+	m.resize(GW * GH)
+	m.fill(0)
+	for rc in rects:
+		var r: Rect2 = rc
+		var q0: Vector2i = _cell_of(r.position)
+		var q1: Vector2i = _cell_of(r.end)
+		for qy in range(q0.y, q1.y + 1):
+			for qx in range(q0.x, q1.x + 1):
+				if r.grow(-6.0).has_point((Vector2(qx, qy) + Vector2(0.5, 0.5)) * CELL):
+					m[_ix(qx, qy)] = 1
+		var gx: float = r.get_center().x
+		var segs: Array = [
+			[r.position, Vector2(r.end.x, r.position.y)],
+			[r.position, Vector2(r.position.x, r.end.y)],
+			[Vector2(r.end.x, r.position.y), r.end],
+			[Vector2(r.position.x, r.end.y), Vector2(gx - gap_w / 2.0 - 6.0, r.end.y)],
+			[Vector2(gx + gap_w / 2.0 + 6.0, r.end.y), r.end],
+		]
+		for sg in segs:
+			var a: Vector2 = sg[0]
+			var b: Vector2 = sg[1]
+			var n: int = int(a.distance_to(b) / 8.0) + 1
+			for k in n + 1:
+				var p: Vector2 = a.lerp(b, float(k) / float(n))
+				for o in [Vector2(0, 0), Vector2(8, 8), Vector2(-8, -8), Vector2(8, -8), Vector2(-8, 8)]:
+					var c: Vector2i = _cell_of(p + (o as Vector2))
+					m[_ix(c.x, c.y)] = 1
+	return m
+
+# the pens of an arena: the ground in front of every gate is walkable and gets its own way-home field
+func set_pens(rects: Array) -> void:
+	pen_rects = rects
+	pen_flow = []
+	var fence: PackedByteArray = _fence_mask(rects, 100.0)
+	for rc in rects:
+		var r: Rect2 = rc
+		var seeds: Array = []
+		var c0: Vector2i = _cell_of(r.position - Vector2(30.0, 30.0))
+		var c1: Vector2i = _cell_of(r.end + Vector2(30.0, 30.0))
+		for y in range(c0.y, c1.y + 1):
+			for x in range(c0.x, c1.x + 1):
+				var i: int = _ix(x, y)
+				if land[i] == 1 and rmp[i] < 0 and water[i] != 1 and water[i] != 3:
+					water[i] = 0
+					lvl[i] = 0
+		# seeds: the cells just south of the gate
+		var gx: int = int(r.get_center().x / CELL)
+		for y in range(_cell_of(r.end).y, _cell_of(r.end).y + 4):
+			for x in range(gx - 1, gx + 2):
+				if _in(x, y) and water[_ix(x, y)] == 0 and fence[_ix(x, y)] == 0:
+					seeds.append(Vector2i(x, y))
+		pen_flow.append(_bfs(seeds, fence))
 
 # worn dirt trails that follow the way down from the far terraces to the valley
 func _trails() -> void:
@@ -566,9 +642,22 @@ func use_flow(p: Vector2, layer: int) -> bool:
 	return layer >= 1 or p.distance_to(home_pos()) > 470.0
 
 # a few cells ahead along the way home, down through the ramps
-func flow_goal(p: Vector2) -> Vector2:
+func flow_goal(p: Vector2, field_in: PackedInt32Array = PackedInt32Array()) -> Vector2:
+	var dist: PackedInt32Array = field_in if field_in.size() > 0 else self.dist
 	var cur: Vector2i = _cell_of(p)
 	if dist[_ix(cur.x, cur.y)] < 0:
+		# standing on a fence cell or on the buffer: head for the nearest cell that does lead home
+		var near: Vector2i = cur
+		var nd: int = 1 << 30
+		for r in range(1, 4):
+			for oy in range(-r, r + 1):
+				for ox in range(-r, r + 1):
+					var q: Vector2i = cur + Vector2i(ox, oy)
+					if _in(q.x, q.y) and dist[_ix(q.x, q.y)] >= 0 and dist[_ix(q.x, q.y)] < nd:
+						nd = dist[_ix(q.x, q.y)]
+						near = q
+			if near != cur:
+				return (Vector2(near) + Vector2(0.5, 0.5)) * CELL
 		return home_pos()
 	var dirs: Array = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 	var best: Vector2i = cur
@@ -725,8 +814,31 @@ func _clear(a: Vector2, b: Vector2, layer: int) -> bool:
 	return true
 
 # a few starting spots on every level
+func _near_pens(p: Vector2, margin: float) -> bool:
+	for r in pen_rects:
+		if (r as Rect2).grow(margin).has_point(p):
+			return true
+	return false
+
 func cluster_centers(ground: Array) -> Array:
 	var out: Array = []
+	if map_id >= 3 and not (spawnable[0] as Array).is_empty():
+		var list0: Array = spawnable[0]
+		var home0: Vector2 = home_pos()
+		for tries in 400:
+			if out.size() >= 4:
+				break
+			var cand0: Vector2 = list0[randi() % list0.size()]
+			if cand0.distance_to(home0) < 560.0 or _near_pens(cand0, 150.0):
+				continue
+			var apart: bool = true
+			for o0 in out:
+				if (o0 as Vector2).distance_to(cand0) < 420.0:
+					apart = false
+			if apart:
+				out.append(cand0)
+		if not out.is_empty():
+			return out
 	for k in range(1, levels):
 		var list: Array = spawnable[k]
 		if not list.is_empty():

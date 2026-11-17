@@ -164,6 +164,9 @@ func _ready() -> void:
 		if search.contains("angle="):
 			U.PROJ = clampf(float(search.substr(search.find("angle=") + 6, 2).to_int()) / 100.0, 0.4, 1.0)
 		WY = float(roundi(2208.0 / U.PROJ / 48.0)) * 48.0
+	if search.contains("hub"):
+		get_tree().change_scene_to_file.call_deferred("res://hub.tscn")
+		return
 	if search.contains("summit"):
 		get_tree().change_scene_to_file.call_deferred("res://summit.tscn")
 		return

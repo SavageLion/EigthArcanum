@@ -1558,3 +1558,26 @@ func _picket_tex() -> ImageTexture:
 		_px(img, x0 + 3, 4, 1, 11, shade)
 		_px(img, x0 + 1, 2, 2, 1, out)
 	return ImageTexture.create_from_image(img)
+
+# one more pen out in the field: four fence walls with a gate gap on the south side
+func add_pen(center: Vector2) -> Dictionary:
+	var pw: float = 210.0
+	var ph: float = 160.0
+	var px: float = center.x - pw / 2.0
+	var py: float = center.y - ph / 2.0
+	var by: float = py + ph
+	var hp: float = 140.0
+	var tag: String = "x%d" % walls.size()
+	var made: Array = [
+		_wall(Vector2(px, py), Vector2(px + pw, py), true, hp, tag + "n"),
+		_wall(Vector2(px, py), Vector2(px, by), true, hp, tag + "w"),
+		_wall(Vector2(px + pw, py), Vector2(px + pw, by), true, hp, tag + "e"),
+		_wall(Vector2(px, by), Vector2(center.x - gap / 2.0, by), true, hp, tag + "s"),
+		_wall(Vector2(center.x + gap / 2.0, by), Vector2(px + pw, by), true, hp, tag + "s"),
+	]
+	for w in made:
+		walls.append(w)
+		_wall_nodes(w)
+	if tier > 0:
+		_build_posts()
+	return {"rect": Rect2(px, py, pw, ph), "gate": center.x}
