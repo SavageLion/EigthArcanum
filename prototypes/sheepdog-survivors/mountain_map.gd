@@ -32,6 +32,7 @@ var painted_rect: Rect2 = Rect2(0.0, 424.0, 3264.0, 1399.2)
 var wide_landings: bool = false
 var pen_rects: Array = []
 var hide_bridges: bool = false
+var home_c: Vector2 = Vector2(-1.0, -1.0)   # where the pen is, when it is not in the middle of the world
 var paint_parts: Array = []   # [{path, rect}]: the paintings that make up the map (a hub world is several islands)
 var blockers: Array = []   # building footprints in the hub world, closed to walking
 
@@ -47,17 +48,37 @@ const HUB_PARTS: Array = [
 	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(200.0, 896.0, 680.0, 510.0)},
 	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(2432.0, 896.0, 680.0, 510.0)},
 	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(1304.0, 56.0, 680.0, 510.0)},
+	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(200.0, 1544.0, 680.0, 510.0)},
+	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(2432.0, 1544.0, 680.0, 510.0)},
 ]
-const HUB_GATES: Array = [Vector2(528.0, 1104.0), Vector2(2760.0, 1104.0), Vector2(1632.0, 264.0)]
+# the bridge crossing stage: the big start island and the pen island
+const CROSS_PARTS: Array = [
+	{"path": "res://art/mtn/cross_start.png", "rect": Rect2(0.0, 570.0, 1500.0, 1125.0)},
+	{"path": "res://art/mtn/cross_pen.png", "rect": Rect2(1772.0, 740.0, 1040.0, 780.0)},
+]
+const HUB_GATES: Array = [Vector2(528.0, 1104.0), Vector2(2760.0, 1104.0), Vector2(1632.0, 264.0), Vector2(528.0, 1752.0), Vector2(2760.0, 1752.0)]
+# the bridges to the two far islands are shut with a barrier until they are unlocked
+const HUB_BARRIERS: Array = [Rect2i(21, 58, 3, 2), Rect2i(113, 58, 3, 2)]
+const HUB_LOCKS: Array = [Vector2(540.0, 1330.0), Vector2(2748.0, 1330.0)]
 
 func hub_pois() -> Array:
 	var out: Array = []
+	for li in HUB_LOCKS.size():
+		out.append({"id": "lock%d" % (li + 3), "kind": "lock", "slot": li + 3, "pos": HUB_LOCKS[li]})
 	for i in HUB_GATES.size():
 		out.append({"id": "gate%d" % i, "kind": "gate", "slot": i, "pos": HUB_GATES[i] + Vector2(0.0, 40.0)})
 	for b in HUB_BUILDINGS:
 		var d: Dictionary = b
 		out.append({"id": d["id"], "kind": d["id"], "pos": (d["c"] as Vector2) + Vector2(0.0, (d["size"] as Vector2).y / 2.0 + 44.0)})
 	return out
+
+# shut or open the barrier across the bridge to one of the far islands (slot 3 or 4)
+func set_barrier(slot: int, shut: bool) -> void:
+	var r: Rect2i = HUB_BARRIERS[slot - 3]
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			if _in(x, y) and land[_ix(x, y)] == 0:
+				water[_ix(x, y)] = 4 if shut else 0
 
 func _block_rects() -> void:
 	blockers = []
@@ -85,6 +106,8 @@ var ground_tex: Dictionary = {}
 const TOPS: Array = [["g0", "g1", "g12", "g13", "g2", "g3"], ["g0", "g1", "g12", "g13", "g2", "g3"], ["g4", "g5", "g6", "g7"], ["g10", "g11", "g14", "g15", "g8", "g9"], ["g0", "g1", "g12", "g13", "g2"]]
 
 func home_pos() -> Vector2:
+	if home_c.x > 0.0:
+		return home_c
 	return Vector2(float(GW) * CELL / 2.0, float(PEN_ROW) * CELL)
 
 func _ix(cx: int, cy: int) -> int:
@@ -138,7 +161,14 @@ func _generate() -> void:
 	noise.frequency = 0.07
 	noise.fractal_octaves = 2
 	var isles: Array = []
-	if map_id == 5:
+	if map_id == 6:
+		paint_parts = CROSS_PARTS
+		pond_c = Vector2(20.0, 56.0)
+		isles = [
+			{"c": Vector2(96, 46), "r": Vector2(17, 14), "p": []},
+			{"c": Vector2(30, 46), "r": Vector2(24, 21), "p": []},
+		]
+	elif map_id == 5:
 		painted_rect = Rect2(112.0, 40.0, 3040.0, 1710.0)
 		paint_parts = HUB_PARTS
 		pond_c = Vector2(80.0, 51.0)
@@ -147,6 +177,8 @@ func _generate() -> void:
 			{"c": Vector2(22, 46), "r": Vector2(11, 8), "p": []},
 			{"c": Vector2(114, 46), "r": Vector2(11, 8), "p": []},
 			{"c": Vector2(68, 11), "r": Vector2(11, 8), "p": []},
+			{"c": Vector2(22, 72), "r": Vector2(11, 8), "p": []},
+			{"c": Vector2(114, 72), "r": Vector2(11, 8), "p": []},
 		]
 	elif map_id == 3:
 		painted_rect = Rect2(435.0, 245.0, 2400.0, 1800.0)
@@ -246,8 +278,10 @@ func _generate() -> void:
 		strips = [Rect2i(78, 45, 22, 3)]
 	if map_id >= 3:
 		strips = []
+	if map_id == 6:
+		strips = [Rect2i(50, 45, 34, 3)]
 	if map_id == 5:
-		strips = [Rect2i(28, 45, 20, 3), Rect2i(88, 45, 20, 3), Rect2i(67, 14, 3, 20)]
+		strips = [Rect2i(28, 45, 20, 3), Rect2i(88, 45, 20, 3), Rect2i(67, 14, 3, 20), Rect2i(21, 52, 3, 14), Rect2i(113, 52, 3, 14)]
 	for st in strips:
 		var rect: Rect2i = st
 		var horizontal: bool = rect.size.x > rect.size.y
@@ -575,9 +609,10 @@ func _seal() -> void:
 
 func _flow() -> void:
 	var seeds: Array = []
-	for y in range(PEN_ROW - 5, PEN_ROW + 6):
-		for x in range(GW / 2 - 5, GW / 2 + 6):
-			if rmp[_ix(x, y)] < 0 and lvl[_ix(x, y)] == 0:
+	var hc: Vector2i = _cell_of(home_pos())
+	for y in range(hc.y - 5, hc.y + 6):
+		for x in range(hc.x - 5, hc.x + 6):
+			if _in(x, y) and rmp[_ix(x, y)] < 0 and lvl[_ix(x, y)] == 0:
 				seeds.append(Vector2i(x, y))
 	dist = _bfs(seeds)
 
@@ -1615,7 +1650,7 @@ func _make_painted_parts() -> void:
 		sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		sp.material = km
 		add_child(sp)
-	if map_id == 5 and not hide_bridges:
+	if (map_id == 5 or map_id == 6) and not hide_bridges:
 		var brp := LayerPart.new()
 		brp.map = self
 		brp.mode = "BR"

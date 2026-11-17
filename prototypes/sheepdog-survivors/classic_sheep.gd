@@ -30,6 +30,7 @@ var base_scale: float = 0.64
 var squash: float = 0.0
 var home_t: float = 0.0
 var pen_i: int = 0
+var vip: bool = false
 
 func setup(t: String, def: Dictionary, frames: SpriteFrames, shadow_tex: Texture2D) -> void:
 	type = t

@@ -58,6 +58,7 @@ var river_pts: Array = []
 var flat: bool = false
 var refst: bool = false
 var pen_y: float = -1.0
+var pen_cx: float = -1.0
 var lite: bool = false
 var grass_mat: ShaderMaterial
 var forest_d: PackedFloat32Array = PackedFloat32Array()
@@ -137,7 +138,7 @@ func _scale_layout() -> void:
 func _layout() -> void:
 	var pw: float = 210.0
 	var ph: float = 160.0
-	var px: float = wx / 2.0 - pw / 2.0
+	var px: float = (pen_cx if pen_cx > 0.0 else wx / 2.0) - pw / 2.0
 	var py: float = (pen_y if pen_y > 0.0 else wy / 2.0) - ph / 2.0
 	gate_x = px + pw / 2.0
 	pen = Rect2(px, py, pw, ph)

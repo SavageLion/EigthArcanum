@@ -101,6 +101,13 @@ func _draw() -> void:
 	_button(0, "BARK", main.dog.bark_cd > 0.0, 1.0 - main.dog.bark_cd / 2.4, false)
 	_button(1, "CALM", false, 1.0, main.calm_held or main.dog.crouch)
 	_button(2, "SPRINT", main.dog.winded, 1.0, main.sprint_held)
+	if main.hub_mode and main.kind == "escort" and main.state == "play":
+		var vs: String = "The lamb is lost"
+		for vsh in main.sheep:
+			if (vsh as ClassicSheep).vip:
+				vs = "The lamb is home" if (vsh as ClassicSheep).in_pen else ("The lamb follows you" if (vsh as ClassicSheep).position.distance_to(main.dog.position) < 480.0 else "Find the lamb (gold star)")
+		_panel(Rect2(112, 92, 230, 28))
+		_text(vs, Vector2(112, 112), 13, Color(1.0, 0.85, 0.3), 230.0, HORIZONTAL_ALIGNMENT_CENTER)
 	# banner
 	if main.banner_t > 0.0 and main.state == "play":
 		var ba: float = minf(1.0, main.banner_t)
@@ -182,19 +189,33 @@ func _hub_screen(v: Vector2) -> void:
 	var rew: String = ""
 	var tint := Color(0.3, 0.5, 0.25)
 	match String(pd["kind"]):
+		"lock":
+			var li: Dictionary = main.lock_info(int(pd["slot"]))
+			title = String(li["title"])
+			desc = String(li["text"])
+			rew = String(li["act"])
+			tint = Color(0.6, 0.25, 0.2) if not bool(li["ok"]) else Color(0.3, 0.5, 0.25)
 		"gate":
-			var o: Array = main.hub_gate_opt[int(pd["slot"])]
-			var nd: Dictionary = Peak.node(int(o[0]), int(o[1]))
-			var kd: String = String(nd.get("kind", "gather"))
-			var tp: String = String(nd["type"])
-			var tier: int = Peak.tier_of(int(o[0]))
-			title = String(Peak.KINDS[kd]["name"])
-			if tp == "elite":
-				title = "HARD " + title
-			elif tp == "boss":
-				title = "BIG DAY: " + title
-			desc = String(Peak.KINDS[kd]["desc"])
-			rew = "Level %d   ·   +%d gold   ·   +flock" % [tier, 20 + 10 * tier + (30 if tp == "elite" else 0)]
+			if int(pd["slot"]) >= 3:
+				var bk: String = main.bonus_kind(int(pd["slot"]))
+				var btier: int = Peak.tier_of(int(Peak.run.get("done", 0)))
+				title = "BONUS: " + String(Peak.KINDS[bk]["name"])
+				desc = String(Peak.KINDS[bk]["desc"])
+				rew = "+%d gold   ·   +animals   ·   once per stop, no risk" % (40 + 10 * btier)
+				tint = Color(0.6, 0.45, 0.15)
+			else:
+				var o: Array = main.hub_gate_opt[int(pd["slot"])]
+				var nd: Dictionary = Peak.node(int(o[0]), int(o[1]))
+				var kd: String = String(nd.get("kind", "gather"))
+				var tp: String = String(nd["type"])
+				var tier: int = Peak.tier_of(int(o[0]))
+				title = String(Peak.KINDS[kd]["name"])
+				if tp == "elite":
+					title = "HARD " + title
+				elif tp == "boss":
+					title = "BIG DAY: " + title
+				desc = String(Peak.KINDS[kd]["desc"])
+				rew = "Level %d   ·   +%d gold   ·   +flock" % [tier, 20 + 10 * tier + (30 if tp == "elite" else 0)]
 		"shop":
 			title = "THE TRADER"
 			desc = "Spend gold on helpers for the dog."

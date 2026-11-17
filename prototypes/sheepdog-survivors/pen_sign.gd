@@ -16,6 +16,23 @@ func _process(_d: float) -> void:
 		queue_redraw()
 
 func _draw() -> void:
+	if mode == "crown":
+		var gold := Color(1.0, 0.85, 0.25)
+		var pts := PackedVector2Array()
+		for i in 10:
+			var rr: float = 9.0 if i % 2 == 0 else 4.0
+			pts.append(Vector2.from_angle(-PI / 2.0 + float(i) * PI / 5.0) * rr)
+		draw_colored_polygon(pts, gold)
+		draw_polyline(pts + PackedVector2Array([pts[0]]), Color(0.4, 0.25, 0.05), 1.5)
+		return
+	if mode == "barrier":
+		draw_rect(Rect2(-40.0, -26.0, 7.0, 38.0), Color(0.35, 0.22, 0.12))
+		draw_rect(Rect2(33.0, -26.0, 7.0, 38.0), Color(0.35, 0.22, 0.12))
+		draw_line(Vector2(-36.0, -14.0), Vector2(36.0, -10.0), Color(0.85, 0.7, 0.4), 4.0)
+		draw_line(Vector2(-36.0, 0.0), Vector2(36.0, 4.0), Color(0.85, 0.7, 0.4), 4.0)
+		draw_rect(Rect2(-9.0, -12.0, 18.0, 15.0), Color(0.9, 0.75, 0.2))
+		draw_arc(Vector2(0.0, -12.0), 6.0, PI, TAU, 12, Color(0.75, 0.75, 0.8), 3.0)
+		return
 	if mode == "ring":
 		var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.004)
 		draw_arc(Vector2.ZERO, 46.0 + 8.0 * pulse, 0.0, TAU, 40, Color(col, 0.5 + 0.4 * pulse), 4.0, true)

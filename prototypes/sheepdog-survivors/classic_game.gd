@@ -64,6 +64,9 @@ var pens: Array = []
 var hub_pois: Array = []
 var hub_gate_opt: Dictionary = {}
 var hub_near: int = -1
+var hub_nodes: Array = []
+var hub_msg: String = ""
+var vip_lost: bool = false
 var barn_offers: Array = [{"type": "normal", "name": "White sheep", "cost": 30}, {"type": "black", "name": "Black sheep", "cost": 40}, {"type": "goat", "name": "Goat", "cost": 45}, {"type": "goose", "name": "Goose", "cost": 35}, {"type": "ram", "name": "Ram", "cost": 70}]
 var kind: String = "gather"
 var stage: Dictionary = {}
@@ -134,7 +137,7 @@ func _ready() -> void:
 		for t in 5:
 			if OS.get_cmdline_user_args().has("tier%d" % (t + 1)):
 				stage = {"type": "herd", "tier": t + 1, "col": 0}
-				for kk in ["gather", "sort", "hunt"]:
+				for kk in ["gather", "sort", "hunt", "escort", "crossing"]:
 					if OS.get_cmdline_user_args().has(kk):
 						stage["kind"] = kk
 		run_day = int(Peak.run["done"]) + 1
@@ -158,12 +161,18 @@ func _ready() -> void:
 	ysort = Node2D.new()
 	ysort.y_sort_enabled = true
 	add_child(ysort)
+	if hub_mode and kind == "crossing" and not stage.is_empty():
+		world.pen_cx = 2304.0
 	world.generate(ysort)
+	if hub_mode and kind == "crossing" and not stage.is_empty():
+		world.dog_start = Vector2(30.0 * 24.0, 46.0 * 24.0)
 	if summit_mode:
 		var sqs: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
 		guide_mode = sqs.contains("guide=1") or OS.get_cmdline_user_args().has("guide")
 		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted") or (hub_mode and not sqs.contains("painted=0") and not guide_mode and not OS.get_cmdline_user_args().has("flat"))
 		if hub_mode and stage.is_empty() and not ResourceLoader.exists("res://art/mtn/hub_home.png"):
+			painted_mode = false
+		if hub_mode and kind == "crossing" and not stage.is_empty() and not ResourceLoader.exists("res://art/mtn/cross_pen.png"):
 			painted_mode = false
 		fit_mode = sqs.contains("fit=1")
 		Mover.char_k = 1.8 if painted_mode else 1.0
@@ -171,8 +180,9 @@ func _ready() -> void:
 		lm = MountainMap.new()
 		lm.guide = guide_mode
 		if hub_mode:
-			lm.map_id = 5 if stage.is_empty() else 3
+			lm.map_id = 5 if stage.is_empty() else (6 if kind == "crossing" else 3)
 			lm.painted_path = "res://art/mtn/world.png" if stage.is_empty() else "res://art/mtn/arena.png"
+			lm.home_c = world.pen.get_center()
 		if sqs.contains("map=2") or OS.get_cmdline_user_args().has("map2"):
 			lm.map_id = 2
 			lm.painted_path = "res://art/mtn/test_map2.png"
@@ -226,6 +236,9 @@ func _ready() -> void:
 	if summit_mode:
 		summit_start()
 	banner_t = 3.5
+	if hub_mode and stage.is_empty() and hub_msg != "":
+		banner = hub_msg
+		banner_t = 4.5
 	if lm is MountainMap and OS.get_cmdline_user_args().has("mtntest"):
 		mtn_test.call_deferred()
 	if lm is MountainMap and OS.get_cmdline_user_args().has("arenatest"):
@@ -290,6 +303,12 @@ func _spawn_sheep() -> void:
 		var s := ClassicSheep.new()
 		ysort.add_child(s)
 		s.setup(String(t), TYPES[String(t)], sheep_frames, shadow_tex)
+		if hub_mode and kind == "escort" and idx == 0:
+			s.vip = true
+			var cr := PenSign.new()
+			cr.mode = "crown"
+			cr.position = Vector2(0.0, -34.0)
+			s.add_child(cr)
 		var hide_it: bool = idx < 2 and not painted_mode and not hub_mode
 		var c: Vector2 = cs[randi() % cs.size()]
 		var p := c + Vector2.from_angle(randf() * TAU) * randf_range(0.0, 80.0)
@@ -551,6 +570,8 @@ func _physics_process(delta: float) -> void:
 	if lm != null and OS.get_cmdline_user_args().has("layertest"):
 		layer_test()
 	update_foxes(dt)
+	if vip_lost:
+		finish_day("vip")
 	update_perks(dt)
 	run_events()
 	for pu in popups:
@@ -577,6 +598,8 @@ var cam_look: Vector2 = Vector2.ZERO
 var cam_init: bool = false
 
 func update_camera(delta: float) -> void:
+	if guide_mode or fit_mode:
+		return
 	if not cam_init:
 		cam_pos = dog.position
 		cam_init = true
@@ -837,7 +860,7 @@ func update_sheep(dt: float) -> void:
 			sh.wa += randf_range(-1.0, 1.0) * dt * 3.0
 			sh.vel += Vector2(cos(sh.wa), sin(sh.wa)) * 14.0 * dt
 		else:
-			var pressure: float = pressure_from(sh, dog.position, dog.heading, zone_mult(), dog.crouch, dt, 0.0) if sh.layer == dog.layer else 0.0
+			var pressure: float = pressure_from(sh, dog.position, dog.heading, zone_mult(), dog.crouch, dt, 0.0) if (sh.layer == dog.layer and not sh.vip) else 0.0
 			for f in foxes:
 				var fx2: ClassicFox = f
 				if fx2.carry != null:
@@ -894,6 +917,14 @@ func update_sheep(dt: float) -> void:
 					var o2s: ClassicSheep = o2
 					if o2s != sh and not o2s.in_pen and not o2s.carried and not o2s.heavy and o2s.position.distance_to(sh.position) < 46.0 and randf() < dt * 2.2:
 						o2s.panic = maxf(o2s.panic, sh.panic * 0.8)
+		if sh.vip and not sh.in_pen:
+			var dv2: float = dog.position.distance_to(sh.position)
+			if (pens[0]["rect"] as Rect2).grow(30.0).has_point(dog.position):
+				sh.home_t = maxf(sh.home_t, 1.0)
+			if dv2 < 480.0:
+				var back: Vector2 = dog.position - dog.heading * 90.0
+				if sh.position.distance_to(back) > 40.0:
+					sh.vel += (back - sh.position).normalized() * 160.0 * dt
 		if not sh.in_pen:
 			if sh.home_t > 0.0:
 				sh.home_t -= dt
@@ -1157,6 +1188,8 @@ func scare_fox(f: ClassicFox, t: float) -> void:
 		drop_carry(f)
 
 func kill_sheep(s: ClassicSheep) -> void:
+	if s.vip:
+		vip_lost = true
 	sheep.erase(s)
 	lost += 1
 	add_popup("CARRIED OFF", s.position + Vector2(0, -12), Color(1.0, 0.42, 0.42))
@@ -1206,7 +1239,7 @@ func update_foxes(dt: float) -> void:
 						var sh: ClassicSheep = s
 						if not eligible(sh) or sh.layer != fx.layer:
 							continue
-						var sc: float = (120.0 if sh.type == "lamb" else 0.0) + sh.position.distance_to(dog.position) * 0.5 + (260.0 if (sh.in_pen and fx.raid) else (-60.0 if sh.in_pen else 0.0))
+						var sc: float = (120.0 if sh.type == "lamb" else 0.0) + (700.0 if sh.vip else 0.0) + sh.position.distance_to(dog.position) * 0.5 + (260.0 if (sh.in_pen and fx.raid) else (-60.0 if sh.in_pen else 0.0))
 						if sc > bs:
 							bs = sc
 							best = sh
@@ -1254,7 +1287,13 @@ func finish_day(why: String) -> void:
 	if state != "play":
 		return
 	state = "result"
-	var ok: bool = penned >= need
+	var ok: bool = penned >= need and not vip_lost
+	if hub_mode and kind == "escort":
+		var vip_home: bool = false
+		for vs in sheep:
+			if (vs as ClassicSheep).vip and (vs as ClassicSheep).in_pen:
+				vip_home = true
+		ok = ok and vip_home
 	result = {"ok": ok, "penned": penned, "need": need, "total": sheep.size() + lost, "lost": lost, "why": why, "day": run_day, "level": run_level}
 	if not ok:
 		run_best = maxi(run_best, run_day - 1)
@@ -1626,6 +1665,12 @@ func summit_herd() -> Array:
 	var tier: int = int(stage.get("tier", 1))
 	var typ: String = String(stage.get("type", "herd"))
 	var n: int = 8 + 2 * tier + (4 if typ == "elite" else 0) + (18 if typ == "boss" else 0)
+	if hub_mode and kind == "escort":
+		var el: Array = ["lamb"]
+		var ecycle: Array = ["normal", "normal", "goat", "black", "normal", "goose"]
+		while el.size() < 6 + tier:
+			el.append(ecycle[el.size() % ecycle.size()])
+		return el
 	if hub_mode and kind == "sort":
 		var sl: Array = []
 		for i in 3 * (3 + tier + (3 if typ == "boss" else 0)):
@@ -1651,7 +1696,7 @@ func summit_start() -> void:
 	t_total = 200.0 + 8.0 * float(tier) + 6.0 * float(maxi(0, sheep.size() - 12)) + (40.0 if typ == "boss" else 0.0)
 	t_left = t_total
 	events.clear()
-	var nf: int = 2 + tier + (3 if typ == "elite" else 0) + (6 if typ == "boss" else 0) + (4 if kind == "hunt" else 0)
+	var nf: int = 2 + tier + (3 if typ == "elite" else 0) + (6 if typ == "boss" else 0) + (4 if kind == "hunt" else 0) + (3 if kind == "escort" else 0)
 	for i in nf:
 		events.append({"t": randf_range(15.0, t_total - 60.0), "raid": randf() < 0.3 + 0.05 * float(tier)})
 	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["t"]) < float(b["t"]))
@@ -1805,7 +1850,25 @@ func hub_btn_rect() -> Rect2:
 	var v: Vector2 = vp()
 	return Rect2(v.x / 2.0 - 190.0, v.y - 128.0, 380.0, 104.0)
 
-func _setup_hub_world() -> void:
+func is_unlocked(slot: int) -> bool:
+	return bool((Peak.run["unlocked"] as Dictionary).get(slot, false))
+
+func bonus_kind(slot: int) -> String:
+	return "crossing" if slot == 3 else "escort"
+
+# what a shut bridge wants
+func lock_info(slot: int) -> Dictionary:
+	if slot == 3:
+		var g: int = int(Peak.run.get("gold", 0))
+		return {"ok": g >= 120, "title": "THE BRIDGE IS OUT", "text": "Repair it for 120 gold to reach the Bridge Crossing island.", "act": "TAP TO PAY 120 GOLD" if g >= 120 else "NEED 120 GOLD"}
+	var n: int = (Peak.run.get("flock", []) as Array).size()
+	return {"ok": n >= 15, "title": "THE SHEPHERDS' GATE", "text": "Opens when your flock has 15 animals (you have %d)." % n, "act": "TAP TO OPEN" if n >= 15 else "NEED A BIGGER FLOCK"}
+
+func _setup_hub_world(first: bool = true) -> void:
+	for hn in hub_nodes:
+		if is_instance_valid(hn):
+			(hn as Node).queue_free()
+	hub_nodes.clear()
 	var m: MountainMap = lm
 	var opts: Array = Peak.options()
 	var slots: Dictionary = {1: [2], 2: [0, 1], 3: [0, 2, 1]}
@@ -1813,24 +1876,46 @@ func _setup_hub_world() -> void:
 	var sl: Array = slots.get(opts.size(), [0, 2, 1])
 	for i in mini(opts.size(), sl.size()):
 		hub_gate_opt[int(sl[i])] = opts[i]
+	for bs in [3, 4]:
+		m.set_barrier(bs, not is_unlocked(bs))
+		if not is_unlocked(bs):
+			var br := PenSign.new()
+			br.mode = "barrier"
+			var rb: Rect2i = MountainMap.HUB_BARRIERS[bs - 3]
+			br.position = Vector2((float(rb.position.x) + float(rb.size.x) / 2.0) * 24.0, (float(rb.position.y) + float(rb.size.y) / 2.0) * 24.0)
+			ysort.add_child(br)
+			hub_nodes.append(br)
 	hub_pois = []
 	for p in m.hub_pois():
 		var pd: Dictionary = p
-		if String(pd["kind"]) == "gate" and not hub_gate_opt.has(int(pd["slot"])):
+		var pk: String = String(pd["kind"])
+		var slot: int = int(pd.get("slot", -1))
+		if pk == "gate" and slot <= 2 and not hub_gate_opt.has(slot):
+			continue
+		if pk == "gate" and slot >= 3 and not is_unlocked(slot):
+			continue
+		if pk == "lock" and is_unlocked(slot):
 			continue
 		hub_pois.append(pd)
 		var label: String = ""
 		var col := Color(1.0, 0.85, 0.3)
-		match String(pd["kind"]):
+		match pk:
 			"gate":
-				var o: Array = hub_gate_opt[int(pd["slot"])]
-				var nd: Dictionary = Peak.node(int(o[0]), int(o[1]))
-				label = String(Peak.KINDS[String(nd.get("kind", "gather"))]["name"])
-				if String(nd["type"]) == "elite":
-					label = "HARD " + label
-				elif String(nd["type"]) == "boss":
-					label = "BIG DAY: " + label
-				col = Color(0.55, 0.9, 0.5)
+				if slot >= 3:
+					label = String(Peak.KINDS[bonus_kind(slot)]["name"])
+					col = Color(0.95, 0.75, 0.3)
+				else:
+					var o: Array = hub_gate_opt[slot]
+					var nd: Dictionary = Peak.node(int(o[0]), int(o[1]))
+					label = String(Peak.KINDS[String(nd.get("kind", "gather"))]["name"])
+					if String(nd["type"]) == "elite":
+						label = "HARD " + label
+					elif String(nd["type"]) == "boss":
+						label = "BIG DAY: " + label
+					col = Color(0.55, 0.9, 0.5)
+			"lock":
+				label = "LOCKED"
+				col = Color(0.95, 0.4, 0.35)
 			"shop":
 				label = "TRADER"
 				col = Color(0.4, 0.65, 1.0)
@@ -1846,19 +1931,26 @@ func _setup_hub_world() -> void:
 		ring.position = pd["pos"]
 		ring.z_index = -119
 		add_child(ring)
+		hub_nodes.append(ring)
 		var sg := PenSign.new()
 		sg.mode = "sign"
 		sg.label = label
 		sg.col = col.darkened(0.35)
-		sg.position = (pd["pos"] as Vector2) + Vector2(0.0, -62.0 if String(pd["kind"]) == "gate" else 10.0)
+		sg.position = (pd["pos"] as Vector2) + Vector2(0.0, -62.0 if pk == "gate" else 10.0)
 		ysort.add_child(sg)
-	# the wool the flock grew while you were away
+		hub_nodes.append(sg)
+	if not first:
+		return
+	# the wool the flock grew while you were away, and how the last bonus stage went
 	var wool: int = int(Peak.run.get("wool", 0))
+	hub_msg = ""
 	if wool > 0:
 		Peak.run["gold"] = int(Peak.run["gold"]) + wool
 		Peak.run["wool"] = 0
-		banner = "The flock's wool sells for %d gold" % wool
-		banner_t = 4.0
+		hub_msg = "The flock's wool sells for %d gold" % wool
+	if String(Peak.run.get("msg", "")) != "":
+		hub_msg = String(Peak.run["msg"]) + ("   ·   " + hub_msg if hub_msg != "" else "")
+		Peak.run["msg"] = ""
 
 func update_hub() -> void:
 	hub_near = -1
@@ -1869,14 +1961,41 @@ func update_hub() -> void:
 			best = d
 			hub_near = i
 
+func enter_bonus(slot: int) -> void:
+	var bk: String = bonus_kind(slot)
+	var done: int = int(Peak.run["done"])
+	if int((Peak.run["bonus_stop"] as Dictionary).get(bk, -1)) == done:
+		banner = "You already did this one at this stop. Clear a stage first."
+		banner_t = 3.5
+		return
+	Peak.pending = {"type": "bonus", "tier": Peak.tier_of(done), "col": done, "kind": bk}
+	get_tree().reload_current_scene()
+
 func hub_activate() -> void:
 	if hub_near < 0:
 		return
 	var pd: Dictionary = hub_pois[hub_near]
+	var slot: int = int(pd.get("slot", -1))
 	match String(pd["kind"]):
 		"gate":
 			stick_on = false
-			enter_node(hub_gate_opt[int(pd["slot"])])
+			if slot >= 3:
+				enter_bonus(slot)
+			else:
+				enter_node(hub_gate_opt[slot])
+		"lock":
+			var info: Dictionary = lock_info(slot)
+			if not bool(info["ok"]):
+				banner = String(info["text"])
+				banner_t = 3.5
+				return
+			if slot == 3:
+				Peak.run["gold"] = int(Peak.run["gold"]) - 120
+			(Peak.run["unlocked"] as Dictionary)[slot] = true
+			banner = "The way is open!"
+			banner_t = 3.5
+			_setup_hub_world(false)
+			update_hub()
 		"shop":
 			open_shop()
 		"camp":
@@ -1893,6 +2012,22 @@ func hub_activate() -> void:
 func summit_result_tap() -> void:
 	var typ: String = String(stage.get("type", "herd"))
 	var tier: int = int(stage.get("tier", 1))
+	if typ == "bonus":
+		if bool(result["ok"]):
+			var reward: int = 40 + 10 * tier
+			Peak.run["gold"] = int(Peak.run["gold"]) + reward
+			var bfl: Array = Peak.run["flock"]
+			for bsh in sheep:
+				if (bsh as ClassicSheep).in_pen:
+					bfl.append((bsh as ClassicSheep).type)
+			(Peak.run["bonus_stop"] as Dictionary)[kind] = int(Peak.run["done"])
+			Peak.run["wool"] = bfl.size() / 5
+			Peak.run["msg"] = "Bonus cleared: +%d gold and %d animals for the flock" % [reward, int(result["penned"])]
+		else:
+			Peak.run["msg"] = "The bonus stage failed. Nothing lost, try again after the next stop."
+		Peak.pending = {}
+		get_tree().reload_current_scene()
+		return
 	if bool(result["ok"]):
 		Peak.finish_node()
 		if hub_mode:
@@ -2247,6 +2382,44 @@ func arena_test() -> void:
 		print("ARENATEST pen ", i, " (", pens[i]["label"], ") cells that cannot reach it: ", bad, " of ", tot)
 		if bad > 0:
 			ok = false
+	if kind == "escort":
+		# the lamb follows the dog and goes into the pen behind it, and a fox that takes it fails the stage
+		var lamb: ClassicSheep = null
+		for ls in sheep:
+			if (ls as ClassicSheep).vip:
+				lamb = ls
+		dog.position = lamb.position + Vector2(30.0, 0.0)
+		if not m._allowed(0, lamb.position, dog.position):
+			dog.position = lamb.position - Vector2(30.0, 0.0)
+		var fpen: PackedInt32Array = m.pen_flow[0]
+		var pc: Vector2 = (pens[0]["rect"] as Rect2).get_center()
+		var steps: int = 0
+		while steps < 60 * 90 and not lamb.in_pen:
+			var dcell: Vector2i = m._cell_of(dog.position)
+			var dd: int = fpen[m._ix(dcell.x, dcell.y)]
+			var gdog: Vector2 = pc if dog.position.distance_to(pc) < 40.0 else (pen_goal(dog.position, 0) if ((dd >= 0 and dd <= 4) or dog.position.distance_to(pc) < 150.0) else m.flow_goal(dog.position, fpen))
+			var dir: Vector2 = (gdog - dog.position).normalized()
+			dog.heading = dir
+			var oldp: Vector2 = dog.position
+			dog.position += dir * 90.0 / 60.0
+			collide(dog, 6.0, 0.0)
+			m.resolve(dog, oldp)
+			update_sheep(1.0 / 60.0)
+			steps += 1
+		print("ARENATEST lamb followed the dog into the pen: ", lamb.in_pen, " after ", steps / 60, "s, dog ", dog.position, " lamb ", lamb.position)
+		if not lamb.in_pen:
+			ok = false
+		lamb.vip = true
+		vip_lost = true
+		state = "play"
+		lamb.in_pen = false
+		finish_day("vip")
+		print("ARENATEST losing the lamb fails the stage: ", not bool(result["ok"]))
+		if bool(result["ok"]):
+			ok = false
+		print("ARENATEST ", "PASS" if ok else "FAIL")
+		get_tree().quit()
+		return
 	var sim: Dictionary = _sim_home(240.0)
 	var t: float = float(sim["t"])
 	var rejected: int = int(sim["rejected"])
@@ -2296,6 +2469,12 @@ func run_test() -> void:
 			print("RUNTEST ", "PASS" if (grew and sheep.size() == mini(fl, 70)) else "FAIL")
 			get_tree().quit()
 			return
+		if fl >= 15 and not (Peak.run["bonus_stop"] as Dictionary).has("escort"):
+			print("RUNTEST taking the escort bonus stage, flock ", fl, " gold ", Peak.run["gold"])
+			(Peak.run["unlocked"] as Dictionary)[4] = true
+			Peak.pending = {"type": "bonus", "tier": 1, "col": int(Peak.run["done"]), "kind": "escort"}
+			get_tree().reload_current_scene()
+			return
 		var opts: Array = Peak.options()
 		var pick: Array = opts[0]
 		for o in opts:
@@ -2320,7 +2499,7 @@ func run_test() -> void:
 	for s2 in sheep:
 		if (s2 as ClassicSheep).in_pen:
 			inside += 1
-	print("RUNTEST stage ", kind, " tier ", stage.get("tier", 0), ": ", inside, " of ", sheep.size(), " home")
+	print("RUNTEST stage ", kind, " tier ", stage.get("tier", 0), ": ", inside, " of ", sheep.size(), " home", " (bonus)" if String(stage.get("type", "")) == "bonus" else "")
 	penned = inside
 	finish_day("all")
 	if not bool(result["ok"]):
@@ -2391,7 +2570,7 @@ func hub_test() -> void:
 	var sheep0: int = sheep.size()
 	for i2 in hub_pois.size():
 		var kind: String = String((hub_pois[i2] as Dictionary)["kind"])
-		if kind == "gate":
+		if kind == "gate" or kind == "lock":
 			continue
 		hub_near = i2
 		hub_activate()
@@ -2424,6 +2603,63 @@ func hub_test() -> void:
 				ok = false
 		state = "map"
 		if state != "map":
+			ok = false
+	# the shut bridges: the barrier holds, the price or the flock size opens it, and then the dog can cross
+	for slot in [3, 4]:
+		var lock_i: int = -1
+		for i3 in hub_pois.size():
+			if String((hub_pois[i3] as Dictionary)["kind"]) == "lock" and int((hub_pois[i3] as Dictionary)["slot"]) == slot:
+				lock_i = i3
+		if lock_i < 0:
+			print("HUBTEST no lock for slot ", slot)
+			ok = false
+			continue
+		dog.position = (hub_pois[lock_i] as Dictionary)["pos"]
+		update_hub()
+		var gate_pos: Vector2 = MountainMap.HUB_GATES[slot]
+		var fence: PackedByteArray = m._fence_mask(m.pen_rects, 100.0)
+		var field_open: PackedInt32Array = m._bfs([m._cell_of(gate_pos)], fence)
+		var blocked: bool = field_open[m._ix(m._cell_of(dog.position).x, m._cell_of(dog.position).y)] < 0
+		print("HUBTEST slot ", slot, " barrier holds the dog back: ", blocked)
+		if not blocked:
+			ok = false
+		if slot == 3:
+			Peak.run["gold"] = 50
+		else:
+			Peak.run["flock"] = ["normal", "normal"]
+		hub_near = lock_i
+		hub_activate()
+		var stays: bool = not is_unlocked(slot)
+		print("HUBTEST slot ", slot, " stays shut without the price: ", stays)
+		if not stays:
+			ok = false
+		if slot == 3:
+			Peak.run["gold"] = 500
+		else:
+			var big: Array = []
+			for q in 15:
+				big.append("normal")
+			Peak.run["flock"] = big
+		hub_near = lock_i
+		hub_activate()
+		print("HUBTEST slot ", slot, " opens with the price: ", is_unlocked(slot), " gold ", Peak.run["gold"])
+		if not is_unlocked(slot):
+			ok = false
+		var gate_i: int = -1
+		for i4 in hub_pois.size():
+			if String((hub_pois[i4] as Dictionary)["kind"]) == "gate" and int((hub_pois[i4] as Dictionary)["slot"]) == slot:
+				gate_i = i4
+		if gate_i < 0:
+			ok = false
+			print("HUBTEST gate of slot ", slot, " did not appear")
+			continue
+		var gpos: Vector2 = (hub_pois[gate_i] as Dictionary)["pos"]
+		var fld: PackedInt32Array = m._bfs([m._cell_of(gpos)], fence)
+		dog.position = world.dog_start
+		var got: bool = _walk_to(dog, gpos, fld, 150.0)
+		update_hub()
+		print("HUBTEST dog crosses to the island of slot ", slot, ": ", got, " prompt ", hub_near == gate_i)
+		if not (got and hub_near == gate_i):
 			ok = false
 	print("HUBTEST ", "PASS" if ok else "FAIL")
 	get_tree().quit()

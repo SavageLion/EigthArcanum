@@ -4,8 +4,10 @@ extends RefCounted
 # a mountain slice with more levels the higher you go.
 
 const COLS: int = 8
-const NAMES: Dictionary = {"herd": "Herd", "elite": "Hard herd", "rest": "Camp", "shop": "Trader", "boss": "The big day"}
+const NAMES: Dictionary = {"herd": "Herd", "elite": "Hard herd", "rest": "Camp", "shop": "Trader", "boss": "The big day", "bonus": "Bonus"}
 const KINDS: Dictionary = {
+	"crossing": {"name": "BRIDGE CROSSING", "desc": "The flock starts on one island, the pen is across a narrow bridge."},
+	"escort": {"name": "ESCORT", "desc": "Guide a lost lamb home. Foxes hunt it, and if it is lost the stage fails."},
 	"gather": {"name": "GATHER", "desc": "Round up the whole flock into the pen."},
 	"sort": {"name": "SORT", "desc": "Three pens: black sheep, white sheep and goats each have their own."},
 	"hunt": {"name": "FOX HUNT", "desc": "Extra foxes and raiders. Keep the flock together."},
@@ -87,7 +89,7 @@ static func new_run(hub: bool = false) -> void:
 			if not bool(incoming[k3]):
 				var from: int = clampi(roundi((float(k3) + 0.5) * float(cur.size()) / float(nxt.size()) - 0.5), 0, cur.size() - 1)
 				((cur[from] as Dictionary)["next"] as Array).append(k3)
-	run = {"flock": ["normal", "normal", "normal", "black", "goat"], "active": true, "layers": layers, "pos": [-1, 0], "cur": [0, 0], "gold": 30, "picks": 0, "done": 0, "shop": [], "msg": ""}
+	run = {"unlocked": {}, "bonus_stop": {}, "flock": ["normal", "normal", "normal", "black", "goat"], "active": true, "layers": layers, "pos": [-1, 0], "cur": [0, 0], "gold": 30, "picks": 0, "done": 0, "shop": [], "msg": ""}
 	pending = {}
 
 static func options() -> Array:
