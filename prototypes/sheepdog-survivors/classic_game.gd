@@ -155,6 +155,10 @@ func _ready() -> void:
 		base_zoom = 1.25 if painted_mode else 1.6
 		lm = MountainMap.new()
 		lm.guide = guide_mode
+		if sqs.contains("map=2") or OS.get_cmdline_user_args().has("map2"):
+			lm.map_id = 2
+			lm.painted_path = "res://art/mtn/test_map2.png"
+			lm.paint_seed = 8
 		lm.debug_blocked = sqs.contains("dbg=1")
 		for ua in OS.get_cmdline_user_args():
 			if String(ua).begins_with("pseed"):
@@ -1680,6 +1684,27 @@ func mtn_test() -> void:
 					if stair_bad <= 6:
 						fails.append("stairs %d lat=%.1f %s %s: from %s stuck at %s layer %d (wanted %d) goal %s" % [ri2, lat, "up" if from_a else "down", "diagonal" if diag else "straight", str(start), str(dog.position), dog.layer, l1, str(goal)])
 	print("MTNTEST stair approaches=", stair_n, " stuck=", stair_bad - stair_diag, " (diagonal into a cliff corner: ", stair_diag, ")")
+	# 3c. roomy landings: plenty of walkable ground at both ends of every staircase
+	var thin: int = 0
+	var roomiest: int = 99
+	for ri3 in m.ramps.size():
+		var r3: Dictionary = m.ramps[ri3]
+		if r3.has("dead"):
+			continue
+		var d3: Vector2 = ((r3["b"] as Vector2) - (r3["a"] as Vector2)).normalized()
+		for endp in [(r3["a"] as Vector2) - d3 * 70.0, (r3["b"] as Vector2) + d3 * 70.0]:
+			var ec: Vector2i = m._cell_of(endp as Vector2)
+			var open_n: int = 0
+			for oy in range(-3, 4):
+				for ox in range(-3, 4):
+					if m._in(ec.x + ox, ec.y + oy) and m.water[m._ix(ec.x + ox, ec.y + oy)] == 0 and m.rmp[m._ix(ec.x + ox, ec.y + oy)] < 0 and m.lvl[m._ix(ec.x + ox, ec.y + oy)] == m.lvl[m._ix(ec.x, ec.y)]:
+						open_n += 1
+			roomiest = mini(roomiest, open_n)
+			if open_n < 30:
+				thin += 1
+	print("MTNTEST landings thin=", thin, " least open cells of 49=", roomiest)
+	if m.wide_landings and thin > 0:
+		fails.append("%d staircase ends land on thin ground" % thin)
 	# 4. walk from the valley up to cells on every level by the real path
 	var parent: Dictionary = {}
 	var start: Vector2i = m._cell_of(home)

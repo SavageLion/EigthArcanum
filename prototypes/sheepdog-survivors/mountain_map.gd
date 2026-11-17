@@ -27,6 +27,9 @@ var paint_seed: int = 4
 var debug_blocked: bool = false
 var painted: bool = false
 var painted_path: String = "res://art/mtn/test_map.png"
+var map_id: int = 1
+var painted_rect: Rect2 = Rect2(0.0, 424.0, 3264.0, 1399.2)
+var wide_landings: bool = false
 var bridges: Array = []
 var sealed: int = 0
 var seal_log: Array = []
@@ -91,11 +94,20 @@ func _generate() -> void:
 	noise.seed = randi()
 	noise.frequency = 0.07
 	noise.fractal_octaves = 2
-	var isles: Array = [
+	var isles: Array = []
+	if map_id == 2:
+		wide_landings = true
+		painted_rect = Rect2(1080.0, 424.0, 2185.0, 1399.2)
+		isles = [
+			{"c": Vector2(66, 46), "r": Vector2(17, 13), "p": []},
+			{"c": Vector2(113, 48), "r": Vector2(21, 24), "p": [[Vector2(112, 45), Vector2(15, 18)], [Vector2(112, 42), Vector2(10, 12)]]},
+		]
+	else:
+		isles = [
 		{"c": Vector2(68, 46), "r": Vector2(17, 13), "p": []},
 		{"c": Vector2(19, 46), "r": Vector2(17, 25), "p": [[Vector2(18, 43), Vector2(10, 17)], [Vector2(17, 40), Vector2(7, 11)], [Vector2(16, 37), Vector2(4, 6)]]},
 		{"c": Vector2(117, 46), "r": Vector2(17, 25), "p": [[Vector2(118, 43), Vector2(10, 17)], [Vector2(119, 40), Vector2(7, 11)], [Vector2(120, 37), Vector2(4, 6)]]},
-	]
+		]
 	for ii in isles.size():
 		var isle: Dictionary = isles[ii]
 		var c: Vector2 = isle["c"]
@@ -146,7 +158,7 @@ func _generate() -> void:
 			if pdx * pdx + pdy * pdy + noise.get_noise_2d(float(x) * 1.7, float(y) * 1.7) * 0.3 < 1.0 and land[_ix(x, y)] == 1:
 				water[_ix(x, y)] = 1
 	# a waterfall pouring off the south side of each side mountain
-	for sx in [19, 117]:
+	for sx in ([114] if map_id == 2 else [19, 117]):
 		var ey: int = -1
 		for y in range(72, 40, -1):
 			if land[_ix(sx, y)] == 1:
@@ -166,6 +178,8 @@ func _generate() -> void:
 	bridges.clear()
 	bridge_cells.clear()
 	var strips: Array = [Rect2i(31, 45, 26, 3), Rect2i(79, 45, 26, 3)]
+	if map_id == 2:
+		strips = [Rect2i(78, 45, 22, 3)]
 	for st in strips:
 		var rect: Rect2i = st
 		var horizontal: bool = rect.size.x > rect.size.y
@@ -323,6 +337,8 @@ func _carve(x: int, y: int, dir: String, k: int) -> bool:
 	var vertical: bool = dir == "n" or dir == "s"
 	var rx0: int = x if vertical else x - 1
 	var ry0: int = y - 1 if vertical else y
+	if wide_landings and not _landing_ok(rx0, ry0, vertical, dir == "n" or dir == "w", k):
+		return false
 	# nothing else may be in the way
 	for oy in range(-3, 8):
 		for ox in range(-3, 8):
@@ -1414,8 +1430,8 @@ func _make_painted_parts() -> void:
 	sp.texture = tex
 	sp.centered = false
 	# the painting covers the middle band of the map (the band the guide picture was cut from)
-	sp.position = Vector2(0.0, 424.0)
-	sp.scale = Vector2(float(GW) * CELL / float(tex.get_width()), 1399.2 / float(tex.get_height()))
+	sp.position = painted_rect.position
+	sp.scale = Vector2(painted_rect.size.x / float(tex.get_width()), painted_rect.size.y / float(tex.get_height()))
 	sp.z_index = -135
 	sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	var km := ShaderMaterial.new()
@@ -1429,8 +1445,8 @@ func _block_by_painting() -> void:
 	var img: Image = tex.get_image()
 	if img.is_compressed():
 		img.decompress()
-	var sx: float = float(img.get_width()) / (float(GW) * CELL)
-	var sy: float = float(img.get_height()) / 1399.2
+	var sx: float = float(img.get_width()) / painted_rect.size.x
+	var sy: float = float(img.get_height()) / painted_rect.size.y
 	var keep := PackedByteArray()
 	keep.resize(GW * GH)
 	keep.fill(0)
@@ -1453,8 +1469,8 @@ func _block_by_painting() -> void:
 			if water[i] != 0 or rmp[i] >= 0 or land[i] == 0 or keep[i] == 1:
 				continue
 			var k: int = int(lvl[i])
-			var wx0: float = float(x) * CELL
-			var wy0: float = float(y) * CELL - H * float(k) - 424.0
+			var wx0: float = float(x) * CELL - painted_rect.position.x
+			var wy0: float = float(y) * CELL - H * float(k) - painted_rect.position.y
 			var hits: int = 0
 			var n: int = 0
 			for oy in 5:
@@ -1467,7 +1483,7 @@ func _block_by_painting() -> void:
 					n += 1
 					if c.g < 0.66 and c.g >= c.r and c.g >= c.b:
 						hits += 1
-			if n > 0 and float(hits) / float(n) >= 0.3:
+			if n > 0 and float(hits) / float(n) >= 0.5:
 				marked.append(i)
 	for mi in marked:
 		water[int(mi)] = 4
@@ -1544,3 +1560,26 @@ func _open_corridors() -> void:
 						if _in(px + ox, py + oy) and water[_ix(px + ox, py + oy)] == 4:
 							water[_ix(px + ox, py + oy)] = 0
 				at = par[at]
+
+# both ends of a staircase must land on a roomy patch of ground, not a thin strip
+func _landing_ok(rx0: int, ry0: int, vertical: bool, high_first: bool, k: int) -> bool:
+	for end in 2:
+		var is_high: bool = (end == 0) == high_first
+		var want: int = k + 1 if is_high else k
+		var before: bool = end == 0
+		for along in range(1, 6):
+			for across in range(-2, 6):
+				var cx: int
+				var cy: int
+				if vertical:
+					cx = rx0 + across
+					cy = (ry0 - along) if before else (ry0 + 3 + along)
+				else:
+					cx = (rx0 - along) if before else (rx0 + 3 + along)
+					cy = ry0 + across
+				if not _in(cx, cy):
+					return false
+				var i: int = _ix(cx, cy)
+				if land[i] != 1 or water[i] != 0 or rmp[i] >= 0 or int(lvl[i]) != want:
+					return false
+	return true
