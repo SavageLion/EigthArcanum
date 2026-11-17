@@ -61,6 +61,10 @@ var ysorts: Dictionary = {}
 @export var summit_mode: bool = false
 @export var hub_mode: bool = false
 var pens: Array = []
+var hub_pois: Array = []
+var hub_gate_opt: Dictionary = {}
+var hub_near: int = -1
+var barn_offers: Array = [{"type": "normal", "name": "White sheep", "cost": 30}, {"type": "black", "name": "Black sheep", "cost": 40}, {"type": "goat", "name": "Goat", "cost": 45}, {"type": "goose", "name": "Goose", "cost": 35}, {"type": "ram", "name": "Ram", "cost": 70}]
 var kind: String = "gather"
 var stage: Dictionary = {}
 var shop_offers: Array = []
@@ -119,7 +123,7 @@ func _ready() -> void:
 	Mover.char_k = 1.0
 	if summit_mode:
 		if not Peak.active():
-			Peak.new_run()
+			Peak.new_run(hub_mode)
 		stage = Peak.pending
 		if OS.has_feature("web"):
 			var sq: String = str(JavaScriptBridge.eval("window.location.search"))
@@ -158,20 +162,23 @@ func _ready() -> void:
 	if summit_mode:
 		var sqs: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
 		guide_mode = sqs.contains("guide=1") or OS.get_cmdline_user_args().has("guide")
-		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted") or (hub_mode and not sqs.contains("painted=0") and not sqs.contains("guide=1") and not OS.get_cmdline_user_args().has("flat"))
+		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted") or (hub_mode and not sqs.contains("painted=0") and not guide_mode and not OS.get_cmdline_user_args().has("flat"))
+		if hub_mode and stage.is_empty() and not ResourceLoader.exists("res://art/mtn/hub_home.png"):
+			painted_mode = false
 		fit_mode = sqs.contains("fit=1")
 		Mover.char_k = 1.8 if painted_mode else 1.0
 		base_zoom = 1.25 if painted_mode else 1.6
 		lm = MountainMap.new()
 		lm.guide = guide_mode
 		if hub_mode:
-			lm.map_id = 4 if stage.is_empty() else 3
-			lm.painted_path = "res://art/mtn/home.png" if stage.is_empty() else "res://art/mtn/arena.png"
+			lm.map_id = 5 if stage.is_empty() else 3
+			lm.painted_path = "res://art/mtn/world.png" if stage.is_empty() else "res://art/mtn/arena.png"
 		if sqs.contains("map=2") or OS.get_cmdline_user_args().has("map2"):
 			lm.map_id = 2
 			lm.painted_path = "res://art/mtn/test_map2.png"
 			lm.paint_seed = 8
 		lm.debug_blocked = sqs.contains("dbg=1")
+		lm.hide_bridges = sqs.contains("nobridge=1")
 		for ua in OS.get_cmdline_user_args():
 			if String(ua).begins_with("pseed"):
 				lm.paint_seed = String(ua).substr(5).to_int()
@@ -189,7 +196,13 @@ func _ready() -> void:
 		add_child(lm)
 		lm.build()
 	_setup_pens()
+	if hub_mode and stage.is_empty() and lm is MountainMap and (lm as MountainMap).map_id == 5 and not guide_mode:
+		_setup_hub_world()
 	_spawn_dog()
+	if hub_mode and OS.has_feature("web") and not hub_pois.is_empty():
+		var hq: String = str(JavaScriptBridge.eval("window.location.search"))
+		if hq.contains("hubat="):
+			dog.position = ((hub_pois[clampi(hq.substr(hq.find("hubat=") + 6, 1).to_int(), 0, hub_pois.size() - 1)] as Dictionary)["pos"] as Vector2)
 	_spawn_sheep()
 	_setup_camera()
 	_setup_layers()
@@ -219,6 +232,8 @@ func _ready() -> void:
 		arena_test.call_deferred()
 	if hub_mode and OS.get_cmdline_user_args().has("runtest"):
 		run_test.call_deferred()
+	if hub_mode and OS.get_cmdline_user_args().has("hubtest"):
+		hub_test.call_deferred()
 
 func _spawn_dog() -> void:
 	dog = ClassicDog.new()
@@ -423,7 +438,21 @@ func _press(p: Vector2, id: int) -> void:
 				pick_levelup(i)
 				return
 		return
-	if state == "pshop" or state == "prest" or state == "map" or state == "final":
+	if hub_mode and state == "map":
+		if hub_near >= 0 and hub_btn_rect().has_point(p):
+			hub_activate()
+			return
+		if Rect2(8.0, 92.0, 96.0, 28.0).grow(8.0).has_point(p):
+			get_tree().change_scene_to_file("res://main.tscn")
+			return
+		if not stick_on and p.y > 46.0:
+			stick_on = true
+			stick_id = id
+			stick_origin = p
+			stick_pos = p
+			stick_vec = Vector2.ZERO
+		return
+	if state == "pshop" or state == "prest" or state == "map" or state == "final" or state == "pbarn":
 		summit_press(p)
 		return
 	if state == "result":
@@ -506,7 +535,12 @@ func _physics_process(delta: float) -> void:
 	update_camera(delta)
 	if state != "play":
 		if state == "map" and hub_mode:
-			update_sheep(minf(delta, 0.05))
+			var hdt: float = minf(delta, 0.05)
+			clock += hdt
+			banner_t = maxf(0.0, banner_t - hdt)
+			update_dog(hdt)
+			update_sheep(hdt)
+			update_hub()
 		return
 	var dt: float = minf(delta, 0.05)
 	clock += dt
@@ -546,7 +580,7 @@ func update_camera(delta: float) -> void:
 	if not cam_init:
 		cam_pos = dog.position
 		cam_init = true
-	var at_home: bool = hub_mode and state == "map"
+	var at_home: bool = false
 	cam_look = cam_look.lerp(Vector2.ZERO if at_home else dog.vel * 0.16, 1.0 - exp(-2.5 * delta))
 	cam_pos = cam_pos.lerp(world.pen.get_center() + Vector2(0.0, 60.0) if at_home else dog.position, 1.0 - exp(-5.0 * delta))
 	shake = maxf(0.0, shake - delta * 2.5)
@@ -562,7 +596,7 @@ func _process(delta: float) -> void:
 	if lm != null:
 		lm.sync_all()
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	var target_zoom: float = (0.72 if painted_mode else 2.0) if (hub_mode and state == "map") else (0.29 if summit_mode else 0.3) if ov_zoom else base_zoom * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else base_zoom
+	var target_zoom: float = (1.0 if painted_mode else 2.0) if (hub_mode and state == "map") else (0.29 if summit_mode else 0.3) if ov_zoom else base_zoom * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else base_zoom
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	if guide_mode or fit_mode:
@@ -952,6 +986,24 @@ func _setup_pens() -> void:
 		for ex in extra:
 			var d: Dictionary = world.add_pen(c + (ex[0] as Vector2))
 			pens.append({"rect": d["rect"], "gate": d["gate"], "accept": [ex[1]], "label": ex[2], "col": ex[3], "n": 0, "total": 0})
+	if guide_mode and hub_mode and stage.is_empty():
+		for b in MountainMap.HUB_BUILDINGS:
+			var bd: Dictionary = b
+			var mk := PenSign.new()
+			mk.mode = "marker"
+			mk.size = bd["size"]
+			mk.col = bd["col"]
+			mk.position = bd["c"]
+			mk.z_index = -120
+			add_child(mk)
+		for g in MountainMap.HUB_GATES:
+			var gk := PenSign.new()
+			gk.mode = "marker"
+			gk.size = Vector2(80.0, 80.0)
+			gk.col = Color(0.55, 0.2, 0.75)
+			gk.position = g
+			gk.z_index = -120
+			add_child(gk)
 	var rects: Array = []
 	for pn in pens:
 		rects.append((pn as Dictionary)["rect"])
@@ -1652,8 +1704,37 @@ func summit_press(p: Vector2) -> void:
 			elif peak_pos(int((opts[oi] as Array)[0]), int((opts[oi] as Array)[1])).distance_to(p) < 28.0:
 				enter_node(opts[oi])
 				return
+	elif state == "pbarn":
+		if pleave_rect().has_point(p):
+			state = "map"
+			return
+		for i in barn_offers.size():
+			if pshop_row(i).has_point(p):
+				var bo: Dictionary = barn_offers[i]
+				if int(Peak.run["gold"]) >= int(bo["cost"]):
+					Peak.run["gold"] = int(Peak.run["gold"]) - int(bo["cost"])
+					(Peak.run["flock"] as Array).append(String(bo["type"]))
+					_add_home_sheep(String(bo["type"]))
+					map_msg = "Bought a " + String(bo["name"]).to_lower()
+				else:
+					map_msg = "Not enough gold"
+				return
 	elif state == "prest":
+		if hub_mode and pleave_rect().has_point(p):
+			state = "map"
+			return
 		for i in 2:
+			if popt_rect(i).has_point(p) and hub_mode:
+				Peak.run["camp_used"] = true
+				if i == 0:
+					pending_lv = 1
+					begin_levelup()
+				else:
+					Peak.run["gold"] = int(Peak.run["gold"]) + 50
+					banner = "You forage 50 gold"
+					banner_t = 3.0
+					state = "map"
+				return
 			if popt_rect(i).has_point(p):
 				if i == 0:
 					Peak.run["picks"] = int(Peak.run["picks"]) + 1
@@ -1664,6 +1745,9 @@ func summit_press(p: Vector2) -> void:
 				get_tree().reload_current_scene()
 				return
 	elif state == "pshop":
+		if pleave_rect().has_point(p) and hub_mode:
+			state = "map"
+			return
 		if pleave_rect().has_point(p):
 			Peak.finish_node()
 			Peak.pending = {}
@@ -1691,15 +1775,120 @@ func enter_node(o: Array) -> void:
 	elif typ == "rest":
 		state = "prest"
 	else:
-		shop_offers.clear()
-		var pool: Array = []
-		for pk in PERKS:
-			if pl(String(pk["id"])) < int(pk["max"]):
-				pool.append(pk)
-		pool.shuffle()
-		for i in mini(3, pool.size()):
-			shop_offers.append(pool[i])
-		state = "pshop"
+		open_shop()
+
+func open_shop() -> void:
+	shop_offers.clear()
+	var pool: Array = []
+	for pk in PERKS:
+		if pl(String(pk["id"])) < int(pk["max"]):
+			pool.append(pk)
+	pool.shuffle()
+	for i in mini(3, pool.size()):
+		shop_offers.append(pool[i])
+	map_msg = ""
+	state = "pshop"
+
+func _add_home_sheep(t: String) -> void:
+	var s := ClassicSheep.new()
+	ysort.add_child(s)
+	s.setup(t, TYPES[t], sheep_frames, shadow_tex)
+	var R: Rect2 = world.pen
+	s.position = Vector2(randf_range(R.position.x + 24.0, R.end.x - 24.0), randf_range(R.position.y + 22.0, R.end.y - 22.0))
+	s.in_pen = true
+	s.pen_i = 0
+	s.seen = true
+	sheep.append(s)
+
+# ---------------------------------------------------------------- the hub world: gates, buildings, what is under the dog's paws
+func hub_btn_rect() -> Rect2:
+	var v: Vector2 = vp()
+	return Rect2(v.x / 2.0 - 190.0, v.y - 128.0, 380.0, 104.0)
+
+func _setup_hub_world() -> void:
+	var m: MountainMap = lm
+	var opts: Array = Peak.options()
+	var slots: Dictionary = {1: [2], 2: [0, 1], 3: [0, 2, 1]}
+	hub_gate_opt = {}
+	var sl: Array = slots.get(opts.size(), [0, 2, 1])
+	for i in mini(opts.size(), sl.size()):
+		hub_gate_opt[int(sl[i])] = opts[i]
+	hub_pois = []
+	for p in m.hub_pois():
+		var pd: Dictionary = p
+		if String(pd["kind"]) == "gate" and not hub_gate_opt.has(int(pd["slot"])):
+			continue
+		hub_pois.append(pd)
+		var label: String = ""
+		var col := Color(1.0, 0.85, 0.3)
+		match String(pd["kind"]):
+			"gate":
+				var o: Array = hub_gate_opt[int(pd["slot"])]
+				var nd: Dictionary = Peak.node(int(o[0]), int(o[1]))
+				label = String(Peak.KINDS[String(nd.get("kind", "gather"))]["name"])
+				if String(nd["type"]) == "elite":
+					label = "HARD " + label
+				elif String(nd["type"]) == "boss":
+					label = "BIG DAY: " + label
+				col = Color(0.55, 0.9, 0.5)
+			"shop":
+				label = "TRADER"
+				col = Color(0.4, 0.65, 1.0)
+			"camp":
+				label = "CAMP"
+				col = Color(1.0, 0.65, 0.3)
+			"barn":
+				label = "BARN"
+				col = Color(1.0, 0.45, 0.45)
+		var ring := PenSign.new()
+		ring.mode = "ring"
+		ring.col = col
+		ring.position = pd["pos"]
+		ring.z_index = -119
+		add_child(ring)
+		var sg := PenSign.new()
+		sg.mode = "sign"
+		sg.label = label
+		sg.col = col.darkened(0.35)
+		sg.position = (pd["pos"] as Vector2) + Vector2(0.0, -62.0 if String(pd["kind"]) == "gate" else 10.0)
+		ysort.add_child(sg)
+	# the wool the flock grew while you were away
+	var wool: int = int(Peak.run.get("wool", 0))
+	if wool > 0:
+		Peak.run["gold"] = int(Peak.run["gold"]) + wool
+		Peak.run["wool"] = 0
+		banner = "The flock's wool sells for %d gold" % wool
+		banner_t = 4.0
+
+func update_hub() -> void:
+	hub_near = -1
+	var best: float = 100.0
+	for i in hub_pois.size():
+		var d: float = dog.position.distance_to((hub_pois[i] as Dictionary)["pos"])
+		if d < best:
+			best = d
+			hub_near = i
+
+func hub_activate() -> void:
+	if hub_near < 0:
+		return
+	var pd: Dictionary = hub_pois[hub_near]
+	match String(pd["kind"]):
+		"gate":
+			stick_on = false
+			enter_node(hub_gate_opt[int(pd["slot"])])
+		"shop":
+			open_shop()
+		"camp":
+			if bool(Peak.run.get("camp_used", false)):
+				banner = "You already rested here. Clear another stage first."
+				banner_t = 3.0
+			else:
+				map_msg = ""
+				state = "prest"
+		"barn":
+			map_msg = ""
+			state = "pbarn"
 
 func summit_result_tap() -> void:
 	var typ: String = String(stage.get("type", "herd"))
@@ -1707,6 +1896,7 @@ func summit_result_tap() -> void:
 	if bool(result["ok"]):
 		Peak.finish_node()
 		if hub_mode:
+			Peak.run["wool"] = (Peak.run["flock"] as Array).size() / 5
 			var fl: Array = Peak.run["flock"]
 			for s in sheep:
 				if (s as ClassicSheep).in_pen:
@@ -2164,3 +2354,91 @@ func _sim_home(max_s: float) -> Dictionary:
 		if all_in:
 			break
 	return {"t": t, "rejected": rejected}
+
+# the hub world, headless (godot --headless res://hub.tscn -- hubtest): the dog can walk to every gate and building, the right prompt
+# comes up there, and the barn, camp and trader work
+func hub_test() -> void:
+	var m: MountainMap = lm
+	var ok: bool = true
+	print("HUBTEST places: ", hub_pois.size())
+	for row in [45, 46, 47]:
+		var line: String = ""
+		for x in range(10, 126):
+			line += str(m.water[m._ix(x, row)]) if m.land[m._ix(x, row)] == 1 or m.water[m._ix(x, row)] != 3 else "."
+		print("HUBROW ", row, " ", line)
+	for i in hub_pois.size():
+		var pd: Dictionary = hub_pois[i]
+		var cell: Vector2i = m._cell_of(pd["pos"])
+		var field: PackedInt32Array = m._bfs([cell], m._fence_mask(m.pen_rects, 100.0))
+		var sc0: Vector2i = m._cell_of(world.dog_start)
+		var reach_n: int = 0
+		for v in field:
+			if v >= 0:
+				reach_n += 1
+		print("HUBTEST   field from ", cell, " water here ", m.water[m._ix(cell.x, cell.y)], " reaches ", reach_n, " cells; dog start cell ", sc0, " value ", field[m._ix(sc0.x, sc0.y)], " water there ", m.water[m._ix(sc0.x, sc0.y)])
+		dog.position = world.dog_start
+		var tgt: Vector2 = pd["pos"]
+		var reached: bool = _walk_to(dog, tgt, field, 120.0)
+		update_hub()
+		var near_ok: bool = hub_near == i
+		print("HUBTEST ", pd["id"], " reached ", reached, " prompt shows it ", near_ok, " dog at ", dog.position)
+		if not (reached and near_ok):
+			ok = false
+	# the buildings
+	var gold0: int = int(Peak.run["gold"])
+	Peak.run["gold"] = 500
+	var flock0: int = (Peak.run["flock"] as Array).size()
+	var sheep0: int = sheep.size()
+	for i2 in hub_pois.size():
+		var kind: String = String((hub_pois[i2] as Dictionary)["kind"])
+		if kind == "gate":
+			continue
+		hub_near = i2
+		hub_activate()
+		var want: String = {"shop": "pshop", "camp": "prest", "barn": "pbarn"}[kind]
+		print("HUBTEST ", kind, " opens state ", state, " (want ", want, ")")
+		if state != want:
+			ok = false
+		if kind == "barn":
+			var gold_b: int = int(Peak.run["gold"])
+			summit_press(pshop_row(0).get_center())
+			var bought: bool = (Peak.run["flock"] as Array).size() == flock0 + 1 and sheep.size() == sheep0 + 1 and int(Peak.run["gold"]) == gold_b - int(barn_offers[0]["cost"])
+			print("HUBTEST barn buy adds a sheep to the home pen and takes the gold: ", bought)
+			if not bought:
+				ok = false
+		if kind == "shop":
+			var before: int = int(Peak.run["gold"])
+			summit_press(pshop_row(0).get_center())
+			print("HUBTEST trader sale: gold ", before, " -> ", Peak.run["gold"])
+			if int(Peak.run["gold"]) >= before:
+				ok = false
+		if kind == "camp":
+			summit_press(popt_rect(1).get_center())
+			print("HUBTEST camp forage: gold -> ", Peak.run["gold"], " state ", state, " used ", Peak.run["camp_used"])
+			if state != "map" or not bool(Peak.run["camp_used"]):
+				ok = false
+			hub_near = i2
+			hub_activate()
+			if state != "map":
+				print("HUBTEST camp can be used twice")
+				ok = false
+		state = "map"
+		if state != "map":
+			ok = false
+	print("HUBTEST ", "PASS" if ok else "FAIL")
+	get_tree().quit()
+
+# walk a mover along a way-home field to a spot, the way the dog would; true when it gets within a body of the spot
+func _walk_to(e: Mover, tgt: Vector2, field: PackedInt32Array, max_s: float) -> bool:
+	var dt: float = 1.0 / 60.0
+	var t: float = 0.0
+	while t < max_s:
+		if e.position.distance_to(tgt) < 30.0:
+			return true
+		var g: Vector2 = tgt if e.position.distance_to(tgt) < 60.0 else lm.flow_goal(e.position, field)
+		var old: Vector2 = e.position
+		e.position += (g - e.position).normalized() * 200.0 * dt
+		collide(e, 6.0, 0.0)
+		lm.resolve(e, old)
+		t += dt
+	return false

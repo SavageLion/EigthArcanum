@@ -28,7 +28,7 @@ func _draw() -> void:
 	if main == null or main.dog == null:
 		return
 	var v: Vector2 = main.vp()
-	if main.summit_mode and (main.state == "map" or main.state == "pshop" or main.state == "prest" or main.state == "final"):
+	if main.summit_mode and (main.state == "map" or main.state == "pshop" or main.state == "prest" or main.state == "final" or main.state == "pbarn"):
 		_peak_screens(v)
 		return
 	# top bar
@@ -146,11 +146,11 @@ func _button(i: int, label: String, dim: bool, fill: float, on: bool) -> void:
 const NODE_COL: Dictionary = {"herd": Color(0.35, 0.65, 0.3), "elite": Color(0.72, 0.3, 0.25), "rest": Color(0.3, 0.55, 0.82), "shop": Color(0.92, 0.72, 0.25), "boss": Color(0.85, 0.85, 0.95)}
 const NODE_LET: Dictionary = {"herd": "H", "elite": "!", "rest": "C", "shop": "T", "boss": "S"}
 
-# the home base: the pen with everything the run has herded so far is the scene behind, the next stops are cards along the bottom
+# the hub world: top bar, the stick, and a prompt whenever the dog stands at a gate or a building
 func _hub_screen(v: Vector2) -> void:
 	var done: int = int(Peak.run.get("done", 0))
-	_panel(Rect2(8, 6, 440, 34))
-	_text("HOME BASE   ·   Flock %d   ·   Gold %d   ·   Stop %d of %d" % [(Peak.run.get("flock", []) as Array).size(), int(Peak.run.get("gold", 0)), done + 1, Peak.COLS], Vector2(18, 29), 16, GOLD)
+	_panel(Rect2(8, 6, 470, 34))
+	_text("HOME   ·   Flock %d   ·   Gold %d   ·   Stop %d of %d" % [(Peak.run.get("flock", []) as Array).size(), int(Peak.run.get("gold", 0)), done + 1, Peak.COLS], Vector2(18, 29), 16, GOLD)
 	_panel(Rect2(8, 92, 96, 28))
 	_text("< FARM", Vector2(8, 112), 14, CREAM, 96.0, HORIZONTAL_ALIGNMENT_CENTER)
 	var py: float = 134.0
@@ -160,44 +160,78 @@ func _hub_screen(v: Vector2) -> void:
 			_text("%s  %d" % [String(pk["name"]), lvp], Vector2(10, py), 12, Color(CREAM, 0.9))
 			py += 15.0
 	for i in Peak.COLS:
-		var dp := Vector2(v.x / 2.0 - float(Peak.COLS - 1) * 11.0 + float(i) * 22.0, 20.0)
+		var dp := Vector2(500.0 + float(i) * 22.0, 23.0)
 		var last: bool = i == Peak.COLS - 1
 		draw_circle(dp, 8.0 if last else 6.0, Color(0.08, 0.06, 0.05, 0.85))
 		draw_circle(dp, 6.0 if last else 4.0, GOLD if i < done else (Color(0.9, 0.9, 1.0) if i == done else Color(CREAM, 0.35)))
-	_text("Choose where the flock goes next", Vector2(0, v.y - 150.0), 17, CREAM, v.x, HORIZONTAL_ALIGNMENT_CENTER)
-	var opts: Array = Peak.options()
-	var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.008)
-	for i in opts.size():
-		var o: Array = opts[i]
-		var nd: Dictionary = Peak.node(int(o[0]), int(o[1]))
-		var tp: String = String(nd["type"])
-		var kd: String = String(nd.get("kind", "gather"))
-		var tier: int = Peak.tier_of(int(o[0]))
-		var r: Rect2 = main.hub_card_rect(i, opts.size())
-		var title: String = ""
-		var desc: String = ""
-		var rew: String = ""
-		if tp == "rest":
-			title = "CAMP"
-			desc = "Rest by the fire. Train the dog or find gold."
-		elif tp == "shop":
-			title = "TRADER"
-			desc = "Spend gold on helpers for the dog."
-		else:
+	if main.banner_t > 0.0:
+		var ba: float = minf(1.0, main.banner_t)
+		_panel(Rect2(v.x / 2.0 - 220, 72, 440, 38), Color(0.13, 0.09, 0.08, 0.8 * ba))
+		_text(main.banner, Vector2(v.x / 2.0 - 220, 97), 17, Color(CREAM, ba), 440.0, HORIZONTAL_ALIGNMENT_CENTER)
+	if main.stick_on:
+		draw_circle(main.stick_origin, 62.0, Color(1, 1, 1, 0.10))
+		draw_arc(main.stick_origin, 62.0, 0.0, TAU, 40, Color(1, 0.95, 0.8, 0.35), 2.0, true)
+		draw_circle(main.stick_pos, 24.0, Color(1, 0.95, 0.8, 0.45))
+	if main.hub_near < 0:
+		_text("Walk the dog over a bridge to a gate, or visit the trader, the camp and the barn", Vector2(0, v.y - 18.0), 13, Color(CREAM, 0.8), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+		return
+	var pd: Dictionary = main.hub_pois[main.hub_near]
+	var r: Rect2 = main.hub_btn_rect()
+	var title: String = ""
+	var desc: String = ""
+	var rew: String = ""
+	var tint := Color(0.3, 0.5, 0.25)
+	match String(pd["kind"]):
+		"gate":
+			var o: Array = main.hub_gate_opt[int(pd["slot"])]
+			var nd: Dictionary = Peak.node(int(o[0]), int(o[1]))
+			var kd: String = String(nd.get("kind", "gather"))
+			var tp: String = String(nd["type"])
+			var tier: int = Peak.tier_of(int(o[0]))
 			title = String(Peak.KINDS[kd]["name"])
-			desc = String(Peak.KINDS[kd]["desc"])
 			if tp == "elite":
 				title = "HARD " + title
 			elif tp == "boss":
 				title = "BIG DAY: " + title
+			desc = String(Peak.KINDS[kd]["desc"])
 			rew = "Level %d   ·   +%d gold   ·   +flock" % [tier, 20 + 10 * tier + (30 if tp == "elite" else 0)]
-		_panel(r, NODE_COL[tp].darkened(0.55))
-		draw_rect(Rect2(r.position + Vector2(5, 5), Vector2(r.size.x - 10, 6)), NODE_COL[tp])
-		_text(title, r.position + Vector2(0, 38), 22, GOLD, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		draw_multiline_string(font, r.position + Vector2(12, 60), desc, HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 24.0, 12, 3, Color(CREAM, 0.9))
-		if rew != "":
-			_text(rew, r.position + Vector2(0, 108), 12, Color(0.6, 0.9, 1.0), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		draw_rect(r.grow(2.0 + pulse * 2.0), Color(1.0, 0.85, 0.3, 0.25 + 0.35 * pulse), false, 2.0)
+		"shop":
+			title = "THE TRADER"
+			desc = "Spend gold on helpers for the dog."
+			tint = Color(0.2, 0.35, 0.6)
+		"camp":
+			title = "THE CAMP"
+			desc = "Rest by the fire: train the dog or forage for gold. Once per stage cleared."
+			tint = Color(0.6, 0.38, 0.15)
+		"barn":
+			title = "THE BARN"
+			desc = "Buy sheep, goats and more for the home pen. A bigger flock sells more wool."
+			tint = Color(0.55, 0.2, 0.2)
+	_panel(r, tint.darkened(0.45))
+	draw_rect(Rect2(r.position + Vector2(5, 5), Vector2(r.size.x - 10, 6)), tint)
+	_text(title, r.position + Vector2(0, 38), 21, GOLD, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	draw_multiline_string(font, r.position + Vector2(12, 58), desc, HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 24.0, 12, 2, Color(CREAM, 0.9))
+	if rew != "":
+		_text(rew, r.position + Vector2(0, 90), 12, Color(0.6, 0.9, 1.0), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	else:
+		_text("TAP TO ENTER", r.position + Vector2(0, 92), 13, Color(0.6, 0.9, 1.0), r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.008)
+	draw_rect(r.grow(2.0 + pulse * 2.0), Color(1.0, 0.85, 0.3, 0.25 + 0.35 * pulse), false, 2.0)
+
+func _peak_barn(v: Vector2) -> void:
+	_text("THE BARN", Vector2(0, 100), 24, GOLD, v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	for i in main.barn_offers.size():
+		var bo: Dictionary = main.barn_offers[i]
+		var r: Rect2 = main.pshop_row(i)
+		var can: bool = int(Peak.run["gold"]) >= int(bo["cost"])
+		_panel(r, Color(0.3, 0.22, 0.14, 0.97) if can else Color(0.17, 0.13, 0.1, 0.93))
+		_text(String(bo["name"]), r.position + Vector2(14, 28), 18, CREAM)
+		_text("Joins the home pen", r.position + Vector2(14, 49), 11, Color(CREAM, 0.75))
+		_text("%d gold" % int(bo["cost"]), Vector2(r.end.x - 110, r.position.y + 34), 14, GOLD if can else Color(GOLD, 0.5), 96.0, HORIZONTAL_ALIGNMENT_RIGHT)
+	_text("Gold %d   ·   Flock %d" % [int(Peak.run["gold"]), (Peak.run["flock"] as Array).size()], Vector2(0, v.y - 96.0), 14, Color(CREAM, 0.85), v.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var lr: Rect2 = main.pleave_rect()
+	_panel(lr, Color(0.4, 0.3, 0.14, 0.98))
+	_text("LEAVE", lr.position + Vector2(0, 29), 17, CREAM, lr.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _peak_screens(v: Vector2) -> void:
 	if main.hub_mode and main.state == "map":
@@ -206,9 +240,11 @@ func _peak_screens(v: Vector2) -> void:
 			_panel(Rect2(v.x / 2.0 - 160, v.y - 44, 320, 34), Color(0.5, 0.38, 0.12, 0.96))
 			_text(main.map_msg, Vector2(v.x / 2.0 - 160, v.y - 21), 15, CREAM, 320.0, HORIZONTAL_ALIGNMENT_CENTER)
 		return
-	draw_rect(Rect2(Vector2.ZERO, v), Color(0.1, 0.22, 0.22))
+	draw_rect(Rect2(Vector2.ZERO, v), Color(0.1, 0.22, 0.22, 0.86 if main.hub_mode else 1.0))
 	var bd: Texture2D = load("res://art/mtn/backdrop.png")
 	var bs: float = maxf(v.x / 256.0, v.y / 128.0)
+	if main.hub_mode:
+		bs = 0.0
 	draw_texture_rect(bd, Rect2((v.x - 256.0 * bs) / 2.0, (v.y - 128.0 * bs) / 2.0, 256.0 * bs, 128.0 * bs), false, Color(0.85, 0.85, 0.85))
 	draw_rect(Rect2(Vector2.ZERO, v), Color(0, 0, 0, 0.18))
 	_panel(Rect2(8, 92, 96, 28))
@@ -225,6 +261,12 @@ func _peak_screens(v: Vector2) -> void:
 		_peak_map(v)
 	elif main.state == "prest":
 		_peak_choice(v, "A QUIET CAMP", "The flock rests by a fire.", ["Train the dog", "Choose a new helper"], ["Forage", "Find 50 gold"])
+		if main.hub_mode:
+			var lr2: Rect2 = main.pleave_rect()
+			_panel(lr2, Color(0.4, 0.3, 0.14, 0.98))
+			_text("LEAVE", lr2.position + Vector2(0, 29), 17, CREAM, lr2.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	elif main.state == "pbarn":
+		_peak_barn(v)
 	elif main.state == "pshop":
 		_peak_shop(v)
 	else:

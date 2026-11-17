@@ -20,7 +20,7 @@ static func active() -> bool:
 static func tier_of(col: int) -> int:
 	return mini(5, 1 + col / 2)
 
-static func new_run() -> void:
+static func new_run(hub: bool = false) -> void:
 	var layers: Array = []
 	for l in COLS:
 		var n: int = 3 if l == 0 else (1 if l == COLS - 1 else (2 + randi() % 2))
@@ -51,6 +51,15 @@ static func new_run() -> void:
 				kd = "sort"
 			layer.append({"type": tp, "kind": kd, "next": [], "done": false})
 		layers.append(layer)
+	if hub:
+		# in the hub world the trader and the camp are buildings on the home island, so every stop is a stage
+		for ly in layers:
+			for nd0 in (ly as Array):
+				var nd: Dictionary = nd0
+				if String(nd["type"]) == "rest" or String(nd["type"]) == "shop":
+					nd["type"] = "herd"
+					var kr2: float = randf()
+					nd["kind"] = "gather" if kr2 < 0.4 else ("sort" if kr2 < 0.75 else "hunt")
 	var l1: Array = layers[1]
 	var has_herd: bool = false
 	for nd in l1:
@@ -98,5 +107,6 @@ static func node(l: int, i: int) -> Dictionary:
 static func finish_node() -> void:
 	var cur: Array = run["cur"]
 	node(int(cur[0]), int(cur[1]))["done"] = true
+	run["camp_used"] = false
 	run["pos"] = [int(cur[0]), int(cur[1])]
 	run["done"] = int(run["done"]) + 1

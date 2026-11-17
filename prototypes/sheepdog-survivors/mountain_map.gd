@@ -31,6 +31,47 @@ var map_id: int = 1
 var painted_rect: Rect2 = Rect2(0.0, 424.0, 3264.0, 1399.2)
 var wide_landings: bool = false
 var pen_rects: Array = []
+var hide_bridges: bool = false
+var paint_parts: Array = []   # [{path, rect}]: the paintings that make up the map (a hub world is several islands)
+var blockers: Array = []   # building footprints in the hub world, closed to walking
+
+# the hub world (map 5): the home island with the pen, three gate islands joined by bridges, and the buildings on the home island
+const HUB_BUILDINGS: Array = [
+	{"id": "shop", "c": Vector2(1300.0, 1000.0), "size": Vector2(150.0, 110.0), "col": Color(0.2, 0.45, 0.9)},
+	{"id": "camp", "c": Vector2(2000.0, 950.0), "size": Vector2(130.0, 100.0), "col": Color(0.95, 0.5, 0.1)},
+	{"id": "barn", "c": Vector2(1330.0, 1250.0), "size": Vector2(170.0, 120.0), "col": Color(0.85, 0.1, 0.15)},
+]
+# where the paintings of the hub world sit in the world: the home island, and the one gate island used three times
+const HUB_PARTS: Array = [
+	{"path": "res://art/mtn/hub_home.png", "rect": Rect2(1000.0, 656.0, 1290.0, 967.0)},
+	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(200.0, 896.0, 680.0, 510.0)},
+	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(2432.0, 896.0, 680.0, 510.0)},
+	{"path": "res://art/mtn/hub_gate.png", "rect": Rect2(1304.0, 56.0, 680.0, 510.0)},
+]
+const HUB_GATES: Array = [Vector2(528.0, 1104.0), Vector2(2760.0, 1104.0), Vector2(1632.0, 264.0)]
+
+func hub_pois() -> Array:
+	var out: Array = []
+	for i in HUB_GATES.size():
+		out.append({"id": "gate%d" % i, "kind": "gate", "slot": i, "pos": HUB_GATES[i] + Vector2(0.0, 40.0)})
+	for b in HUB_BUILDINGS:
+		var d: Dictionary = b
+		out.append({"id": d["id"], "kind": d["id"], "pos": (d["c"] as Vector2) + Vector2(0.0, (d["size"] as Vector2).y / 2.0 + 44.0)})
+	return out
+
+func _block_rects() -> void:
+	blockers = []
+	for b in HUB_BUILDINGS:
+		var d: Dictionary = b
+		blockers.append(Rect2((d["c"] as Vector2) - (d["size"] as Vector2) / 2.0, d["size"]))
+	for rc in blockers:
+		var r: Rect2 = rc
+		var c0: Vector2i = _cell_of(r.position)
+		var c1: Vector2i = _cell_of(r.end)
+		for y in range(c0.y, c1.y + 1):
+			for x in range(c0.x, c1.x + 1):
+				if land[_ix(x, y)] == 1 and water[_ix(x, y)] == 0:
+					water[_ix(x, y)] = 4
 var pen_flow: Array = []
 var bridges: Array = []
 var sealed: int = 0
@@ -97,7 +138,17 @@ func _generate() -> void:
 	noise.frequency = 0.07
 	noise.fractal_octaves = 2
 	var isles: Array = []
-	if map_id == 3:
+	if map_id == 5:
+		painted_rect = Rect2(112.0, 40.0, 3040.0, 1710.0)
+		paint_parts = HUB_PARTS
+		pond_c = Vector2(80.0, 51.0)
+		isles = [
+			{"c": Vector2(68, 46), "r": Vector2(23, 15), "p": []},
+			{"c": Vector2(22, 46), "r": Vector2(11, 8), "p": []},
+			{"c": Vector2(114, 46), "r": Vector2(11, 8), "p": []},
+			{"c": Vector2(68, 11), "r": Vector2(11, 8), "p": []},
+		]
+	elif map_id == 3:
 		painted_rect = Rect2(435.0, 245.0, 2400.0, 1800.0)
 		pond_c = Vector2(94.0, 62.0)
 		isles = [{"c": Vector2(68, 46), "r": Vector2(40, 34), "p": []}]
@@ -126,7 +177,7 @@ func _generate() -> void:
 			for x in GW:
 				var ex: float = (float(x) - c.x) / r.x
 				var ey: float = (float(y) - c.y) / r.y
-				if ex * ex + ey * ey + noise.get_noise_2d(float(x) + float(ii) * 97.0, float(y)) * 0.24 < 1.0:
+				if ex * ex + ey * ey + noise.get_noise_2d(float(x) + float(ii) * 97.0, float(y)) * (0.0 if (map_id == 5 and ii >= 1) else 0.24) < 1.0:
 					land[_ix(x, y)] = 1
 					var l: int = 0
 					var plateaus: Array = isle["p"]
@@ -195,6 +246,8 @@ func _generate() -> void:
 		strips = [Rect2i(78, 45, 22, 3)]
 	if map_id >= 3:
 		strips = []
+	if map_id == 5:
+		strips = [Rect2i(28, 45, 20, 3), Rect2i(88, 45, 20, 3), Rect2i(67, 14, 3, 20)]
 	for st in strips:
 		var rect: Rect2i = st
 		var horizontal: bool = rect.size.x > rect.size.y
@@ -242,6 +295,8 @@ func _generate() -> void:
 	if painted and map_id != 4:
 		_block_by_painting()
 		_block_cliff_feet()
+	if map_id == 5:
+		_block_rects()
 		_open_corridors()
 
 # the drawn edge wobbles about a cell either side of the real one, so the outermost ring of every ledge is kept clear
@@ -1075,7 +1130,8 @@ func draw_part(ci: CanvasItem, mode: String) -> void:
 			ci.draw_circle(rb + sb, 6.0, Color(1, 1, 0, 1))
 		return
 	if mode == "BR":
-		_draw_bridges(ci)
+		if not hide_bridges:
+			_draw_bridges(ci)
 		return
 	if mode.begins_with("W") or mode.begins_with("B"):
 		_draw_water(ci, mode)
@@ -1542,28 +1598,40 @@ func _make_painted_parts() -> void:
 		dbg.mode = "DBG"
 		dbg.z_index = 60
 		add_child(dbg)
-	var tex: Texture2D = load(painted_path)
-	var sp := Sprite2D.new()
-	sp.texture = tex
-	sp.centered = false
-	# the painting covers the middle band of the map (the band the guide picture was cut from)
-	sp.position = painted_rect.position
-	sp.scale = Vector2(painted_rect.size.x / float(tex.get_width()), painted_rect.size.y / float(tex.get_height()))
-	sp.z_index = -135
-	sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	var parts: Array = paint_parts if not paint_parts.is_empty() else [{"path": painted_path, "rect": painted_rect}]
 	var km := ShaderMaterial.new()
 	km.shader = load("res://mtn_key.gdshader")
-	sp.material = km
-	add_child(sp)
+	for pp in parts:
+		var pd: Dictionary = pp
+		var tex: Texture2D = load(String(pd["path"]))
+		var sp := Sprite2D.new()
+		sp.texture = tex
+		sp.centered = false
+		# a painting covers the band of the map the guide picture was cut from
+		var rc: Rect2 = pd["rect"]
+		sp.position = rc.position
+		sp.scale = Vector2(rc.size.x / float(tex.get_width()), rc.size.y / float(tex.get_height()))
+		sp.z_index = -135
+		sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sp.material = km
+		add_child(sp)
+	if map_id == 5 and not hide_bridges:
+		var brp := LayerPart.new()
+		brp.map = self
+		brp.mode = "BR"
+		brp.z_index = -134
+		brp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(brp)
 
 # trees and bushes in the painting are obstacles: any cell mostly covered by dark green is closed
 func _block_by_painting() -> void:
-	var tex: Texture2D = load(painted_path)
-	var img: Image = tex.get_image()
-	if img.is_compressed():
-		img.decompress()
-	var sx: float = float(img.get_width()) / painted_rect.size.x
-	var sy: float = float(img.get_height()) / painted_rect.size.y
+	var imgs: Array = []
+	for pp in (paint_parts if not paint_parts.is_empty() else [{"path": painted_path, "rect": painted_rect}]):
+		var pd: Dictionary = pp
+		var im: Image = (load(String(pd["path"])) as Texture2D).get_image()
+		if im.is_compressed():
+			im.decompress()
+		imgs.append({"img": im, "rect": pd["rect"]})
 	var keep := PackedByteArray()
 	keep.resize(GW * GH)
 	keep.fill(0)
@@ -1587,18 +1655,25 @@ func _block_by_painting() -> void:
 			if water[i] != 0 or rmp[i] >= 0 or land[i] == 0 or keep[i] == 1:
 				continue
 			var k: int = int(lvl[i])
-			var wx0: float = float(x) * CELL - painted_rect.position.x
-			var wy0: float = float(y) * CELL - H * float(k) - painted_rect.position.y
+			var wx0: float = float(x) * CELL
+			var wy0: float = float(y) * CELL - H * float(k)
 			var hits: int = 0
 			var blue: int = 0
 			var n: int = 0
 			for oy in 5:
 				for ox in 5:
-					var px: int = int((wx0 + (float(ox) + 0.5) * CELL / 5.0) * sx)
-					var py: int = int((wy0 + (float(oy) + 0.5) * CELL / 5.0) * sy)
-					if px < 0 or py < 0 or px >= img.get_width() or py >= img.get_height():
+					var wp := Vector2(wx0 + (float(ox) + 0.5) * CELL / 5.0, wy0 + (float(oy) + 0.5) * CELL / 5.0)
+					var c: Color = Color(-1.0, 0.0, 0.0)
+					for ip in imgs:
+						var rc2: Rect2 = (ip as Dictionary)["rect"]
+						if rc2.has_point(wp):
+							var im2: Image = (ip as Dictionary)["img"]
+							var qx: int = int((wp.x - rc2.position.x) / rc2.size.x * float(im2.get_width()))
+							var qy: int = int((wp.y - rc2.position.y) / rc2.size.y * float(im2.get_height()))
+							c = im2.get_pixel(clampi(qx, 0, im2.get_width() - 1), clampi(qy, 0, im2.get_height() - 1))
+							break
+					if c.r < 0.0:
 						continue
-					var c: Color = img.get_pixel(px, py)
 					n += 1
 					if c.g < (0.58 if map_id >= 3 else 0.66) and c.g >= c.r and c.g >= c.b:
 						hits += 1

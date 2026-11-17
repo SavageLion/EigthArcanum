@@ -7,7 +7,7 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'applica
 const srv = http.createServer((q, s) => { const p = q.url.split('?')[0], f = path.join(root, p === '/' ? 'index.html' : p); try { const d = fs.readFileSync(f); s.setHeader('Content-Type', MIME[path.extname(f)] || 'application/octet-stream'); s.setHeader('Cross-Origin-Opener-Policy', 'same-origin'); s.setHeader('Cross-Origin-Embedder-Policy', 'require-corp'); s.end(d); } catch (e) { s.statusCode = 404; s.end(''); } }).listen(0);
 await new Promise(r => srv.on('listening', r));
 const b = await chromium.launch({ channel: 'chrome', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const page = await b.newPage({ viewport: { width: 3264, height: 2208 } });
+const page = await b.newPage({ viewport: { width: 3264, height: +(process.env.VH || 2208) } });
 await page.goto('http://localhost:' + srv.address().port + '/?' + qs);
 await page.waitForTimeout(25000);
 const opt = { path: out };

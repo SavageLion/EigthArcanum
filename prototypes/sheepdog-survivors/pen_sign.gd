@@ -9,8 +9,21 @@ var col: Color = Color(1, 1, 1)
 var mode: String = "floor"
 var n: int = 0
 var total: int = 0
+var size: Vector2 = Vector2(80.0, 80.0)
+
+func _process(_d: float) -> void:
+	if mode == "ring":
+		queue_redraw()
 
 func _draw() -> void:
+	if mode == "ring":
+		var pulse: float = 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.004)
+		draw_arc(Vector2.ZERO, 46.0 + 8.0 * pulse, 0.0, TAU, 40, Color(col, 0.5 + 0.4 * pulse), 4.0, true)
+		draw_arc(Vector2.ZERO, 30.0, 0.0, TAU, 32, Color(col, 0.35), 2.0, true)
+		return
+	if mode == "marker":
+		draw_rect(Rect2(-size / 2.0, size), col)
+		return
 	if mode == "floor":
 		var r: Rect2 = Rect2(rect.position - position, rect.size).grow(10.0)
 		draw_rect(r.grow(5.0), Color(0.26, 0.2, 0.1, 0.55))
