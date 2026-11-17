@@ -158,7 +158,7 @@ func _ready() -> void:
 	if summit_mode:
 		var sqs: String = str(JavaScriptBridge.eval("window.location.search")) if OS.has_feature("web") else ""
 		guide_mode = sqs.contains("guide=1") or OS.get_cmdline_user_args().has("guide")
-		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted")
+		painted_mode = sqs.contains("painted=1") or OS.get_cmdline_user_args().has("painted") or (hub_mode and not sqs.contains("painted=0") and not sqs.contains("guide=1") and not OS.get_cmdline_user_args().has("flat"))
 		fit_mode = sqs.contains("fit=1")
 		Mover.char_k = 1.8 if painted_mode else 1.0
 		base_zoom = 1.25 if painted_mode else 1.6
@@ -166,6 +166,7 @@ func _ready() -> void:
 		lm.guide = guide_mode
 		if hub_mode:
 			lm.map_id = 4 if stage.is_empty() else 3
+			lm.painted_path = "res://art/mtn/home.png" if stage.is_empty() else "res://art/mtn/arena.png"
 		if sqs.contains("map=2") or OS.get_cmdline_user_args().has("map2"):
 			lm.map_id = 2
 			lm.painted_path = "res://art/mtn/test_map2.png"
@@ -561,7 +562,7 @@ func _process(delta: float) -> void:
 	if lm != null:
 		lm.sync_all()
 	# camera: look ahead, ease out when sprinting, tiny shake on a bark
-	var target_zoom: float = 2.0 if (hub_mode and state == "map") else (0.29 if summit_mode else 0.3) if ov_zoom else base_zoom * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else base_zoom
+	var target_zoom: float = (0.72 if painted_mode else 2.0) if (hub_mode and state == "map") else (0.29 if summit_mode else 0.3) if ov_zoom else base_zoom * 0.94 if (sprint_held and not dog.winded and dog.vel.length() > 150.0) else base_zoom
 	var z: float = lerpf(cam.zoom.x, target_zoom, minf(1.0, delta * 3.0))
 	cam.zoom = Vector2(z, z)
 	if guide_mode or fit_mode:
@@ -958,13 +959,14 @@ func _setup_pens() -> void:
 		(lm as MountainMap).set_pens(rects)
 	for i in pens.size():
 		var pd: Dictionary = pens[i]
-		var fl := PenSign.new()
-		fl.rect = pd["rect"]
-		fl.position = (pd["rect"] as Rect2).get_center()
-		fl.mode = "floor"
-		fl.z_index = -120
-		add_child(fl)
-		if String(pd["label"]) != "":
+		if not painted_mode:
+			var fl := PenSign.new()
+			fl.rect = pd["rect"]
+			fl.position = (pd["rect"] as Rect2).get_center()
+			fl.mode = "floor"
+			fl.z_index = -120
+			add_child(fl)
+		if String(pd["label"]) != "" and not guide_mode:
 			var sg := PenSign.new()
 			sg.mode = "sign"
 			sg.label = pd["label"]

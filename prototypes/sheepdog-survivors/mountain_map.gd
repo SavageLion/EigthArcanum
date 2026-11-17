@@ -98,10 +98,12 @@ func _generate() -> void:
 	noise.fractal_octaves = 2
 	var isles: Array = []
 	if map_id == 3:
+		painted_rect = Rect2(435.0, 245.0, 2400.0, 1800.0)
 		pond_c = Vector2(94.0, 62.0)
 		isles = [{"c": Vector2(68, 46), "r": Vector2(40, 34), "p": []}]
 	elif map_id == 4:
-		pond_c = Vector2(86.0, 56.0)
+		painted_rect = Rect2(848.0, 531.0, 1600.0, 1200.0)
+		pond_c = Vector2(83.0, 51.0)
 		isles = [{"c": Vector2(68, 46), "r": Vector2(25, 18), "p": []}]
 	elif map_id == 2:
 		wide_landings = true
@@ -162,6 +164,8 @@ func _generate() -> void:
 		pond_c = Vector2(77.0, 53.0)
 	for y in range(int(pond_c.y) - 7, int(pond_c.y) + 8):
 		for x in range(int(pond_c.x) - 9, int(pond_c.x) + 11):
+			if painted and map_id >= 3:
+				continue
 			var pdx: float = (float(x) - pond_c.x) / 5.2
 			var pdy: float = (float(y) - pond_c.y) / 3.4
 			if pdx * pdx + pdy * pdy + noise.get_noise_2d(float(x) * 1.7, float(y) * 1.7) * 0.3 < 1.0 and land[_ix(x, y)] == 1:
@@ -235,7 +239,7 @@ func _generate() -> void:
 	_connect()
 	_prune_ramps()
 	_buffer()
-	if painted:
+	if painted and map_id != 4:
 		_block_by_painting()
 		_block_cliff_feet()
 		_open_corridors()
@@ -1576,6 +1580,7 @@ func _block_by_painting() -> void:
 					if _in(ri % GW + ox2, ri / GW + oy2):
 						keep[_ix(ri % GW + ox2, ri / GW + oy2)] = 1
 	var marked: Array = []
+	var wet: Array = []
 	for y in GH:
 		for x in GW:
 			var i: int = _ix(x, y)
@@ -1585,6 +1590,7 @@ func _block_by_painting() -> void:
 			var wx0: float = float(x) * CELL - painted_rect.position.x
 			var wy0: float = float(y) * CELL - H * float(k) - painted_rect.position.y
 			var hits: int = 0
+			var blue: int = 0
 			var n: int = 0
 			for oy in 5:
 				for ox in 5:
@@ -1594,12 +1600,23 @@ func _block_by_painting() -> void:
 						continue
 					var c: Color = img.get_pixel(px, py)
 					n += 1
-					if c.g < 0.66 and c.g >= c.r and c.g >= c.b:
+					if c.g < (0.58 if map_id >= 3 else 0.66) and c.g >= c.r and c.g >= c.b:
 						hits += 1
-			if n > 0 and float(hits) / float(n) >= 0.5:
+					if map_id >= 3 and c.b > c.r + 0.2 and c.b > c.g - 0.12 and c.b > 0.5:
+						blue += 1
+			if n > 0 and float(blue) / float(n) >= 0.25:
+				wet.append(Vector2i(x, y))
+			elif n > 0 and float(hits) / float(n) >= 0.5:
 				marked.append(i)
 	for mi in marked:
 		water[int(mi)] = 4
+	# open water in the painting: closed, with a cell of bank round it
+	for wc in wet:
+		var w: Vector2i = wc
+		for oy in range(-1, 2):
+			for ox in range(-1, 2):
+				if _in(w.x + ox, w.y + oy) and land[_ix(w.x + ox, w.y + oy)] == 1 and rmp[_ix(w.x + ox, w.y + oy)] < 0:
+					water[_ix(w.x + ox, w.y + oy)] = 4
 
 func _walk_ok(c: int) -> bool:
 	return water[c] == 0 or water[c] == 4
